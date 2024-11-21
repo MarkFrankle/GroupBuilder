@@ -1,0 +1,81 @@
+import React, { useState, useEffect } from "react"
+import TableAssignments from "../components/TableAssignments/TableAssignments"
+
+// Dummy data for local development
+const dummyData = [
+  {
+    session: 1,
+    tables: {
+      1: ["Alice", "Bob", "Charlie"],
+      2: ["David", "Eve", "Frank"],
+      3: ["George", "Hannah", "Ian"]
+    }
+  },
+  {
+    session: 2,
+    tables: {
+      1: ["Eve", "Ian", "Charlie"],
+      2: ["Alice", "Frank", "Hannah"],
+      3: ["Bob", "David", "George"]
+    }
+  }
+]
+
+const TableAssignmentsPage: React.FC = () => {
+  const [assignments, setAssignments] = useState<any[]>([])
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchAssignments = async () => {
+      // Check if we're running in development mode
+      if (process.env.NODE_ENV === "development") {
+        // Use dummy data in development
+        setAssignments(dummyData)
+        setLoading(false)
+      } else {
+        try {
+          // In production, fetch from API
+          const response = await fetch("/api/table-assignments")
+          if (!response.ok) {
+            throw new Error("Failed to fetch assignments")
+          }
+          const data = await response.json()
+          setAssignments(data)
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "An unknown error occurred")
+        } finally {
+          setLoading(false)
+        }
+      }
+    }
+
+    fetchAssignments()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-gray-900"></div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto p-4">
+        <h1 className="text-2xl font-bold mb-4">Error</h1>
+        <p className="text-red-500">{error}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Table Assignments</h1>
+      <TableAssignments assignments={assignments} />
+    </div>
+  )
+}
+
+export default TableAssignmentsPage
