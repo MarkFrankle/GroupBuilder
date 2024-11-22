@@ -1,8 +1,10 @@
 from collections import defaultdict
 import pandas as pd
 
-def dataframe_to_participant_dict(dataframe: pd.DataFrame):
-    participants = dataframe.to_dict('records')
+def dataframe_to_participant_dict(df: pd.DataFrame):
+    # Nan in pandas needs to be normalized to None
+    df['Partner'] = df['Partner'].apply(lambda x: None if pd.isnull(x) else x)
+    participants = df.to_dict('records')
 
     transformed_participants = [
         {
@@ -23,7 +25,7 @@ def _assign_couple_ids(data):
     next_couple_id = [1]
 
     for row in data:
-        partner_name = row['partner']
+        partner_name = row.get('partner')
         if partner_name:
             couple_key = tuple(sorted([row['name'], partner_name]))
             
@@ -37,7 +39,6 @@ def _assign_couple_ids(data):
             row['couple_id'] = None
 
         del row['partner']
-    
     return data
 
 
@@ -64,7 +65,6 @@ if __name__ == "__main__":
         ],
         'Partner': ['Jane Doe', 'John Doe', None, 'Ross Green', 'Rachel Green', None, None, None, None, None]
     }
-
 
     df = pd.DataFrame(data)
     print(dataframe_to_participant_dict(df))

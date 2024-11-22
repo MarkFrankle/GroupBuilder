@@ -10,16 +10,13 @@ def get_assignments(file_name: str):
         raise HTTPException(status_code=400, detail="No file uploaded for the given user ID.")
     
     try:
-        # Retrieve the user's uploaded data
         participants_dict, num_tables, num_sessions = group_data[file_name].values()
         
-        # Generate assignments
         results = handle_generate_assignments(participants_dict, num_tables, num_sessions)
         
-        # Optionally clear the data after use
         del group_data[file_name]
         
-        if not results['success']:
+        if results['status'] != 'success':
             raise HTTPException(status_code=400, detail="No feasible solution found")
 
         return results['assignments']
