@@ -13,11 +13,11 @@ class GroupBuilder:
         self.religions = set([p['religion'] for p in self.participants])
         self.genders = set([p['gender'] for p in self.participants])
 
-    def generate_assignments(self) -> None:
+    def generate_assignments(self) -> dict:
         self.setup_model()
         self._add_constraints_to_model()
         self._add_objective_functions_to_model()
-        self._run_solver()
+        return self._run_solver()
     
     def setup_model(self):
         self.model = cp_model.CpModel()
@@ -107,18 +107,35 @@ class GroupBuilder:
         self.model.Minimize(weighted_actual_pairings)
 
     def _run_solver(self):
-        solver = cp_model.CpSolver()
-        status = solver.Solve(self.model)
+        self.solver = cp_model.CpSolver()
+        status = self.solver.Solve(self.model)
 
         if status in [cp_model.FEASIBLE, cp_model.OPTIMAL]:
-            print(f'Solution found with total deviation: {solver.ObjectiveValue()}')
+            assignments = []
+
             for s in self.sessions:
+                session_data = {'session': s, 'tables': defaultdict(list)}
                 for t in self.tables:
                     for p in self.participants:
-                        if solver.BooleanValue(self.x[(p['id'], s, t)]):
-                            print(f"Participant {p['id']} {p['religion']} is at Table {t} in Session {s}.")
+                        if self.solver.BooleanValue(self.x[(p['id'], s, t)]):
+                            session_data['tables'][t].append({
+                                'name': p['name'],
+                                'religion': p['religion'],
+                                'gender': p['gender'],
+                                'couple_id': p['couple_id'],
+                            })
+                # Convert defaultdict to a regular dict for JSON compatibility
+                session_data['tables'] = dict(session_data['tables'])
+                assignments.append(session_data)
+            return {
+                'status': 'success',
+                'total_deviation': self.solver.ObjectiveValue(),
+                'assignments': assignments
+            }
         else:
-            print('No solution')
+            return {
+                'status': 'failure'
+            }
 
 if __name__ == "__main__":
     # Data input
@@ -168,20 +185,4 @@ if __name__ == "__main__":
 
     df = pd.DataFrame(data)
     gb = GroupBuilder(df, 4, 6)
-    gb.generate_assignments()
-
-    # participants = [
-        # {'id': 1, 'name': 'John Doe', 'religion': 'Christian', 'gender': 'Male', 'couple_id': 1},
-        # {'id': 2, 'name': 'Jane Doe', 'religion': 'Christian', 'gender': 'Female', 'couple_id': 1},
-        # {'id': 3, 'name': 'Ali Hassan', 'religion': 'Muslim', 'gender': 'Male', 'couple_id': None},
-        # {'id': 4, 'name': 'Rachel Green', 'religion': 'Jewish', 'gender': 'Female', 'couple_id': 2},
-        # {'id': 5, 'name': 'Ross Green', 'religion': 'Jewish', 'gender': 'Male', 'couple_id': 2},
-        # {'id': 6, 'name': 'Chandler Bing', 'religion': 'other', 'gender': 'Male', 'couple_id': None},
-        # {'id': 7, 'name': 'Monica', 'religion': 'Muslim', 'gender': 'Female', 'couple_id': None},
-        # {'id': 8, 'name': 'Joey', 'religion': 'Jewish', 'gender': 'Male', 'couple_id': None},
-        # {'id': 9, 'name': 'Phoebe', 'religion': 'Christian', 'gender': 'Female', 'couple_id': None},
-        # {'id': 10, 'name': 'Akshay', 'religion': 'Muslim', 'gender': 'Male', 'couple_id': None},
-    # ]
-    # dummy_groups = 2
-    # result = run_assignments(dummy_students, dummy_groups)
-    # print(f"Assignments: {result}")
+    print(gb.generate_assignments())
