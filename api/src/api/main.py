@@ -14,7 +14,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Frontend origin
+    allow_origins=["http://localhost:3000", "https://group-builder.netlify.app/"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
