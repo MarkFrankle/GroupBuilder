@@ -53,8 +53,8 @@ const LandingPage: React.FC = () => {
       }
   
       // Generate assignments
-      const assignmentsResponse = await fetch(`${API_BASE_URL}/api/assignments`, {
-        method: 'POST',
+      const assignmentsResponse = await fetch(`${API_BASE_URL}/api/assignments?file_name=${encodeURIComponent(file.name)}`, {
+        method: 'GET',
       });
   
       if (!assignmentsResponse.ok) {
