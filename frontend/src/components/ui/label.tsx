@@ -1,6 +1,6 @@
 import * as React from "react"
 import * as LabelPrimitive from "@radix-ui/react-label"
-import { clsx } from "clsx"
+import { cn } from "@/utils/cn"
 import { cva, type VariantProps } from "class-variance-authority"
 
 
@@ -15,7 +15,7 @@ const Label = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <LabelPrimitive.Root
     ref={ref}
-    className={clsx(labelVariants(), className)}
+    className={cn(labelVariants(), className)}
     {...props}
   />
 ))

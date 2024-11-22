@@ -6,10 +6,19 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 const LandingPage: React.FC = () => {
   const [file, setFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [numTables, setNumTables] = useState<string>("1")
+  const [numSessions, setNumSessions] = useState<string>("1")
   const navigate = useNavigate()
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -27,6 +36,8 @@ const LandingPage: React.FC = () => {
 
     const formData = new FormData()
     formData.append('file', file)
+    formData.append('numTables', numTables)
+    formData.append('numSessions', numSessions)
 
     try {
       const response = await fetch('/api/upload', {
@@ -76,6 +87,39 @@ const LandingPage: React.FC = () => {
                 />
               </div>
 
+              <div className="flex space-x-4">
+                <div className="flex-1 space-y-2">
+                  <Label htmlFor="num-tables">Number of Tables</Label>
+                  <Select value={numTables} onValueChange={setNumTables}>
+                    <SelectTrigger id="num-tables">
+                      <SelectValue placeholder="Select number of tables" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[...Array(10)].map((_, i) => (
+                        <SelectItem key={i} value={(i + 1).toString()}>
+                          {i + 1}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex-1 space-y-2">
+                  <Label htmlFor="num-sessions">Number of Sessions</Label>
+                  <Select value={numSessions} onValueChange={setNumSessions}>
+                    <SelectTrigger id="num-sessions">
+                      <SelectValue placeholder="Select number of sessions" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[...Array(10)].map((_, i) => (
+                        <SelectItem key={i} value={(i + 1).toString()}>
+                          {i + 1}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               {error && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
@@ -85,7 +129,7 @@ const LandingPage: React.FC = () => {
               )}
 
               <div className="flex justify-between items-center">
-                <Button type="submit">
+                <Button type="submit" variant="outline">
                   Generate Assignments
                 </Button>
                 <Button variant="outline" asChild>
