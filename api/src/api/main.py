@@ -1,6 +1,17 @@
+import os
+import debugpy
+from api.routers import upload, assignments
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routers import upload, assignments
+
+load_dotenv()
+print("*****")
+print(os.getenv("DEBUGPY_ENABLE"))
+
+debugpy.listen(("0.0.0.0", 5678))
+print("Waiting for debugger to attach...")
+debugpy.wait_for_client()
 
 app = FastAPI()
 
@@ -11,11 +22,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(upload.router, prefix="/upload", tags=["upload"])
-app.include_router(assignments.router, prefix="/assignments", tags=["assignments"])
+app.include_router(upload.router, prefix="/api/upload", tags=["upload"])
+app.include_router(assignments.router, prefix="/api/assignments", tags=["assignments"])
 
-# Run with `uvicorn src.api.main:app --reload`
+
+# Run with `poetry run uvicorn src.api.main:app --reload`
 if __name__ == "__main__":
+    # if os.getenv("DEBUGPY_ENABLE") == "1":
+    #     debugpy.listen(("0.0.0.0", 5678))
+    #     print("Waiting for debugger to attach...")
+    #     debugpy.wait_for_client()
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
