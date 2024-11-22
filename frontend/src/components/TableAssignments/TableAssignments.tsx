@@ -5,7 +5,7 @@ interface Participant {
   name: string;
   religion: string;
   gender: string;
-  partner: string;
+  partner: string | null;
 }
 
 interface Assignment {

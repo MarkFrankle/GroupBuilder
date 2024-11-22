@@ -43,12 +43,28 @@ def _assign_couple_ids(data):
 
 if __name__ == "__main__":
     # Data input
+    # data = {
+    #     'Name': ['Alice', 'Bob', 'Charlie', 'David', 'Eve', 'Frank'],
+    #     'Religion': ['Christian', 'Jewish', 'Muslim', 'Hindu', 'Buddhist', 'Atheist'],
+    #     'Gender': ['Female', 'Male', 'Male', 'Male', 'Female', 'Male'],
+    #     'Partner': ['Bob', 'Alice', None, 'Eve', 'David', None]
+    # }
     data = {
-        'Name': ['Alice', 'Bob', 'Charlie', 'David', 'Eve', 'Frank'],
-        'Religion': ['Christian', 'Jewish', 'Muslim', 'Hindu', 'Buddhist', 'Atheist'],
-        'Gender': ['Female', 'Male', 'Male', 'Male', 'Female', 'Male'],
-        'Partner': ['Bob', 'Alice', None, 'Eve', 'David', None]
+        'Name': [
+            'John Doe', 'Jane Doe', 'Ali Hassan', 'Rachel Green', 'Ross Green',
+            'Chandler Bing', 'Monica', 'Joey', 'Phoebe', 'Akshay'
+        ],
+        'Religion': [
+            'Christian', 'Christian', 'Muslim', 'Jewish', 'Jewish', 
+            'other', 'Muslim', 'Jewish', 'Christian', 'Muslim'
+        ],
+        'Gender': [
+            'Male', 'Female', 'Male', 'Female', 'Male', 
+            'Male', 'Female', 'Male', 'Female', 'Male'
+        ],
+        'Partner': ['Jane Doe', 'John Doe', None, 'Ross Green', 'Rachel Green', None, None, None, None, None]
     }
 
+
     df = pd.DataFrame(data)
-    dataframe_to_participant_dict(df)
+    print(dataframe_to_participant_dict(df))

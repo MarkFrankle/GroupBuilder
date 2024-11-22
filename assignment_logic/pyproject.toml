@@ -15,6 +15,9 @@ mypy = "^1.0"          # For type checking
 flake8 = "^6.0"        # For linting
 black = "^23.0"        # For formatting
 
+[tool.poetry.group.dev.dependencies]
+black = "^24.10.0"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

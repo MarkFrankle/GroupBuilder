@@ -21,7 +21,7 @@ interface Assignment {
       name: string;
       religion: string;
       gender: string;
-      partner: string;
+      partner: string | null;
     }[];
   };
 }

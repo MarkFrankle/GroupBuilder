@@ -1,6 +1,7 @@
+from api.utils.dataframe_to_participant_dict import dataframe_to_participant_dict
 from fastapi import APIRouter, File, UploadFile, HTTPException, Form
-import pandas as pd
 from io import BytesIO
+import pandas as pd
 
 router = APIRouter()
 
@@ -18,14 +19,15 @@ async def upload_file(
     
     try:
         contents = await file.read()
-        data = pd.read_excel(BytesIO(contents))
+        participant_dataframe = pd.read_excel(BytesIO(contents))
+        participant_dict = dataframe_to_participant_dict(participant_dataframe)
         
         group_data[file.filename] = {
-            "data": data,
-            "numTables": numTables,
-            "numSessions": numSessions,
+            "participant_dict": participant_dict,
+            "num_tables": numTables,
+            "num_sessions": numSessions,
         }
 
-        return {"message": "File uploaded successfully", "columns": list(data.columns)}
+        return {"message": "File uploaded successfully", "columns": list(participant_dataframe.columns)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to process file: {str(e)}")

@@ -11,14 +11,17 @@ def get_assignments(file_name: str):
     
     try:
         # Retrieve the user's uploaded data
-        data = group_data[file_name]
+        participants_dict, num_tables, num_sessions = group_data[file_name].values()
         
         # Generate assignments
-        result = handle_generate_assignments(data)
+        results = handle_generate_assignments(participants_dict, num_tables, num_sessions)
         
         # Optionally clear the data after use
         del group_data[file_name]
         
-        return result
+        if not results['success']:
+            raise HTTPException(status_code=400, detail="No feasible solution found")
+
+        return results['assignments']
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate assignments: {str(e)}")
