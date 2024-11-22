@@ -6,8 +6,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
-print("*****")
-print(os.getenv("DEBUGPY_ENABLE"))
 
 debugpy.listen(("0.0.0.0", 5678))
 print("Waiting for debugger to attach...")

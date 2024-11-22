@@ -5,8 +5,7 @@ def handle_generate_assignments(input_data):
     # validate_input(input_data)
 
     # Extract required data
-    participants = input_data["participants"]
-    sessions = input_data["sessions"]
+    participants, tables, sessions = input_data.values()
 
     # Use the core logic
     builder = GroupBuilder(participants, sessions)

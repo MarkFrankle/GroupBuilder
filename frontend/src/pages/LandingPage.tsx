@@ -33,28 +33,41 @@ const LandingPage: React.FC = () => {
       setError('Please select a file to upload.')
       return
     }
-
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('numTables', numTables)
-    formData.append('numSessions', numSessions)
-
+  
     try {
-      const response = await fetch('/api/upload', {
+      // Step 1: Upload the file
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('numTables', numTables)
+      formData.append('numSessions', numSessions)
+  
+      const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
       })
-
-      if (!response.ok) {
+  
+      if (!uploadResponse.ok) {
         throw new Error('File upload failed')
       }
-
-      const data = await response.json()
-      navigate('/table-assignments', { state: { assignments: data } })
+  
+      // Step 2: Generate assignments
+      const assignmentsResponse = await fetch(`/api/assignments?file_name=${file.name}`, {
+        method: 'GET',
+      })
+  
+      if (!assignmentsResponse.ok) {
+        throw new Error('Failed to generate assignments')
+      }
+  
+      const assignmentsData = await assignmentsResponse.json()
+  
+      // Navigate to the table assignments page
+      navigate('/table-assignments', { state: { assignments: assignmentsData } })
     } catch (err) {
-      setError('An error occurred while uploading the file. Please try again.')
+      setError('An error occurred while processing your request. Please try again.')
     }
   }
+  
 
   return (
     <div className="container mx-auto p-4">

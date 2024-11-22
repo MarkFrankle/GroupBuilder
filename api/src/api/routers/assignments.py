@@ -1,23 +1,23 @@
 from fastapi import APIRouter, HTTPException
 from assignment_logic.api_handler import handle_generate_assignments
-from .upload import uploaded_files
+from .upload import group_data
 
 router = APIRouter()
 
 @router.get("/")
 def get_assignments(file_name: str):
-    if file_name not in uploaded_files:
+    if file_name not in group_data:
         raise HTTPException(status_code=400, detail="No file uploaded for the given user ID.")
     
     try:
         # Retrieve the user's uploaded data
-        data = uploaded_files[file_name]
+        data = group_data[file_name]
         
         # Generate assignments
-        result = handle_generate_assignments({"participants": data.to_dict("records"), "sessions": 6})
+        result = handle_generate_assignments(data)
         
         # Optionally clear the data after use
-        del uploaded_files[file_name]
+        del group_data[file_name]
         
         return result
     except Exception as e:
