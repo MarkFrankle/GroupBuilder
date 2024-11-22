@@ -34,31 +34,32 @@ const TableAssignmentsPage: React.FC = () => {
 
   const navigate = useNavigate()
 
+  const useRealData = true;
+
+
   useEffect(() => {
     const fetchAssignments = async () => {
-      if (process.env.NODE_ENV === "development") {
-        // Use dummy data in development
-        setAssignments(dummyData)
-        setLoading(false)
-      } else {
-        try {
-          // In production, fetch from API
-          const response = await fetch("/api/table-assignments")
+      try {
+        if (process.env.NODE_ENV === 'development' && !useRealData) {
+          setAssignments(dummyData)
+        } else {
+          const response = await fetch('/api/assignments/results')
           if (!response.ok) {
-            throw new Error("Failed to fetch assignments")
+            throw new Error('Failed to fetch assignments')
           }
           const data = await response.json()
           setAssignments(data)
-        } catch (err) {
-          setError(err instanceof Error ? err.message : "An unknown error occurred")
-        } finally {
-          setLoading(false)
         }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred')
+      } finally {
+        setLoading(false)
       }
     }
-
+  
     fetchAssignments()
   }, [])
+  
 
   const handleClearAssignments = () => {
     navigate('/')

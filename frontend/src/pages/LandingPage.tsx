@@ -28,45 +28,45 @@ const LandingPage: React.FC = () => {
   }
 
   const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault()
+    event.preventDefault();
     if (!file) {
-      setError('Please select a file to upload.')
-      return
+      setError('Please select a file to upload.');
+      return;
     }
   
-    try {
-      // Step 1: Upload the file
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('numTables', numTables)
-      formData.append('numSessions', numSessions)
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('numTables', numTables);
+    formData.append('numSessions', numSessions);
   
+    try {
+      // Upload file
       const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
-      })
+      });
   
       if (!uploadResponse.ok) {
-        throw new Error('File upload failed')
+        throw new Error('File upload failed');
       }
   
-      // Step 2: Generate assignments
-      const assignmentsResponse = await fetch(`/api/assignments?file_name=${file.name}`, {
-        method: 'GET',
-      })
+      // Generate assignments
+      const assignmentsResponse = await fetch('/api/assignments', {
+        method: 'POST',
+      });
   
       if (!assignmentsResponse.ok) {
-        throw new Error('Failed to generate assignments')
+        throw new Error('Failed to generate assignments');
       }
   
-      const assignmentsData = await assignmentsResponse.json()
+      const assignments = await assignmentsResponse.json();
   
-      // Navigate to the table assignments page
-      navigate('/table-assignments', { state: { assignments: assignmentsData } })
+      // Navigate to the TableAssignmentsPage with assignments
+      navigate('/table-assignments', { state: { assignments } });
     } catch (err) {
-      setError('An error occurred while processing your request. Please try again.')
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
     }
-  }
+  };
   
 
   return (
