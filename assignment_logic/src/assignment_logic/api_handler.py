@@ -5,10 +5,10 @@ def handle_generate_assignments(input_data):
     # validate_input(input_data)
 
     # Extract required data
-    participants, tables, sessions = input_data.values()
+    participants, numTables, numSessions = input_data.values()
 
     # Use the core logic
-    builder = GroupBuilder(participants, sessions)
+    builder = GroupBuilder(participants, numTables, numSessions)
     assignments = builder.generate_assignments()
 
     # Post-process and return API-ready response

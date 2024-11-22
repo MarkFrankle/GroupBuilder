@@ -4,14 +4,14 @@ export const dummyData = [
     session: 1,
     tables: {
     1: [
-        { name: "Alice", religion: "Christian", gender: "Female", partner: "No" },
-        { name: "Bob", religion: "Jewish", gender: "Male", partner: "Yes" },
-        { name: "Charlie", religion: "Muslim", gender: "Male", partner: "No" }
+        { name: "Alice", religion: "Christian", gender: "Female", partner: "Bob" },
+        { name: "Bob", religion: "Jewish", gender: "Male", partner: "Alice" },
+        { name: "Charlie", religion: "Muslim", gender: "Male", partner: null }
     ],
     2: [
-        { name: "David", religion: "Hindu", gender: "Male", partner: "Yes" },
-        { name: "Eve", religion: "Buddhist", gender: "Female", partner: "No" },
-        { name: "Frank", religion: "Atheist", gender: "Male", partner: "No" }
+        { name: "David", religion: "Hindu", gender: "Male", partner: "Eve" },
+        { name: "Eve", religion: "Buddhist", gender: "Female", partner: "David" },
+        { name: "Frank", religion: "Atheist", gender: "Male", partner: null }
     ]
     }
 },
@@ -19,14 +19,14 @@ export const dummyData = [
     session: 2,
     tables: {
     1: [
-        { name: "Eve", religion: "Buddhist", gender: "Female", partner: "No" },
-        { name: "Charlie", religion: "Muslim", gender: "Male", partner: "No" },
-        { name: "David", religion: "Hindu", gender: "Male", partner: "Yes" }
+        { name: "Eve", religion: "Buddhist", gender: "Female", partner: "David" },
+        { name: "Charlie", religion: "Muslim", gender: "Male", partner: null },
+        { name: "David", religion: "Hindu", gender: "Male", partner: "Eve" },
     ],
     2: [
-        { name: "Frank", religion: "Atheist", gender: "Male", partner: "No" },
-        { name: "Alice", religion: "Christian", gender: "Female", partner: "No" },
-        { name: "Bob", religion: "Jewish", gender: "Male", partner: "Yes" }
+        { name: "Frank", religion: "Atheist", gender: "Male", partner: null },
+        { name: "Alice", religion: "Christian", gender: "Female", partner: "Bob" },
+        { name: "Bob", religion: "Jewish", gender: "Male", partner: "Alice" },
     ]
     }
 },
@@ -34,14 +34,14 @@ export const dummyData = [
     session: 3,
     tables: {
     1: [
-        { name: "Bob", religion: "Jewish", gender: "Male", partner: "Yes" },
-        { name: "Frank", religion: "Atheist", gender: "Male", partner: "No" },
-        { name: "Eve", religion: "Buddhist", gender: "Female", partner: "No" }
+        { name: "Bob", religion: "Jewish", gender: "Male", partner: "Alice" },
+        { name: "Frank", religion: "Atheist", gender: "Male", partner: null },
+        { name: "Eve", religion: "Buddhist", gender: "Female", partner: "David" },
     ],
     2: [
-        { name: "Charlie", religion: "Muslim", gender: "Male", partner: "No" },
-        { name: "Alice", religion: "Christian", gender: "Female", partner: "No" },
-        { name: "David", religion: "Hindu", gender: "Male", partner: "Yes" }
+        { name: "Charlie", religion: "Muslim", gender: "Male", partner: null },
+        { name: "Alice", religion: "Christian", gender: "Female", partner: "Bob" },
+        { name: "David", religion: "Hindu", gender: "Male", partner: "Eve" },
     ]
     }
   }
