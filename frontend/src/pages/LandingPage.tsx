@@ -14,6 +14,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+
 const LandingPage: React.FC = () => {
   const [file, setFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -41,7 +43,7 @@ const LandingPage: React.FC = () => {
   
     try {
       // Upload file
-      const uploadResponse = await fetch('/api/upload', {
+      const uploadResponse = await fetch(`${API_BASE_URL}/api/upload`, {
         method: 'POST',
         body: formData,
       });
@@ -51,7 +53,7 @@ const LandingPage: React.FC = () => {
       }
   
       // Generate assignments
-      const assignmentsResponse = await fetch('/api/assignments', {
+      const assignmentsResponse = await fetch(`${API_BASE_URL}/api/assignments`, {
         method: 'POST',
       });
   

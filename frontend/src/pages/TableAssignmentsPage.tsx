@@ -14,6 +14,8 @@ import { dummyData } from "../data/dummyData"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Loader2 } from 'lucide-react'
 
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+
 interface Assignment {
   session: number;
   tables: {
@@ -43,7 +45,7 @@ const TableAssignmentsPage: React.FC = () => {
         if (process.env.NODE_ENV === 'development' && !useRealData) {
           setAssignments(dummyData)
         } else {
-          const response = await fetch('/api/assignments/results')
+          const response = await fetch(`${API_BASE_URL}/api/assignments/results`)
           if (!response.ok) {
             throw new Error('Failed to fetch assignments')
           }
