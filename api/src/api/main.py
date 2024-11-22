@@ -3,6 +3,7 @@ from api.routers import upload, assignments
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import os
 
 load_dotenv()
 
@@ -30,7 +31,9 @@ if __name__ == "__main__":
     #     print("Waiting for debugger to attach...")
     #     debugpy.wait_for_client()
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))  # Default to 8000 if $PORT is not set
+    uvicorn.run(app, host="0.0.0.0", port=port)
+
 
 # Testing curl
 # curl -X POST "http://127.0.0.1:8000/upload/?file_name=template" \

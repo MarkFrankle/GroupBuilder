@@ -43,7 +43,7 @@ const LandingPage: React.FC = () => {
   
     try {
       // Upload file
-      const uploadResponse = await fetch(`${API_BASE_URL}/api/upload`, {
+      const uploadResponse = await fetch(`${API_BASE_URL}/api/upload/`, {
         method: 'POST',
         body: formData,
       });
@@ -53,7 +53,7 @@ const LandingPage: React.FC = () => {
       }
   
       // Generate assignments
-      const assignmentsResponse = await fetch(`${API_BASE_URL}/api/assignments?file_name=${encodeURIComponent(file.name)}`, {
+      const assignmentsResponse = await fetch(`${API_BASE_URL}/api/assignments/?file_name=${encodeURIComponent(file.name)}`, {
         method: 'GET',
       });
   
