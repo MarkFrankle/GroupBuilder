@@ -13,8 +13,8 @@ openpyxl = "^3.1.5"
 python-multipart = "^0.0.17"
 python-dotenv = "^1.0.1"
 debugpy = "^1.8.9"
-assignment-logic = {path = "../assignment_logic"}
 gunicorn = "^23.0.0"
+assignment-logic = {path = "../assignment_logic"}
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.9"

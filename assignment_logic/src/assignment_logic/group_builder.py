@@ -148,11 +148,11 @@ class GroupBuilder:
             assignments = []
 
             for s in self.sessions:
-                session_data = {"session": s, "tables": defaultdict(list)}
+                session_data = {"session": s + 1, "tables": defaultdict(list)}
                 for t in self.tables:
                     for p in self.participants:
                         if self.solver.BooleanValue(self.x[(p["id"], s, t)]):
-                            session_data["tables"][t].append(
+                            session_data["tables"][t + 1].append(
                                 {
                                     "name": p["name"],
                                     "religion": p["religion"],
