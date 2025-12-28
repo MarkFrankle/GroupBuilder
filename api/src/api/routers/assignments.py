@@ -33,7 +33,8 @@ def get_assignments(session_id: str):
             raise HTTPException(status_code=400, detail=error_msg)
 
         logger.info(
-            f"Solver: {results.get('solution_quality', 'unknown').upper()} solution in {results.get('solve_time', 0):.2f}s | "
+            f"Solver [{len(participants_dict)}p/{num_tables}t/{num_sessions}s]: "
+            f"{results.get('solution_quality', 'unknown').upper()} in {results.get('solve_time', 0):.2f}s | "
             f"Deviation: {results.get('total_deviation', 'N/A')} | "
             f"Branches: {results.get('num_branches', 'N/A'):,} | "
             f"Conflicts: {results.get('num_conflicts', 'N/A'):,}"

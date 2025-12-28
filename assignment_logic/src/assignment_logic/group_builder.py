@@ -160,11 +160,8 @@ class GroupBuilder:
         self.solver = cp_model.CpSolver()
 
         self.solver.parameters.max_time_in_seconds = 120.0
-        self.solver.parameters.num_search_workers = 8
+        self.solver.parameters.num_search_workers = 4
         self.solver.parameters.log_search_progress = False
-        self.solver.parameters.cp_model_presolve = True
-        self.solver.parameters.cp_model_probing_level = 2
-        self.solver.parameters.linearization_level = 2
 
         logger.info(f"Starting CP-SAT solver (max time: 120s, {self.solver.parameters.num_search_workers} workers)")
         status = self.solver.Solve(self.model)
