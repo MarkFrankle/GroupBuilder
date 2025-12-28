@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, Loader2 } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -22,6 +22,8 @@ const LandingPage: React.FC = () => {
   const [numTables, setNumTables] = useState<string>("1")
   const [numSessions, setNumSessions] = useState<string>("1")
   const [email, setEmail] = useState<string>("")
+  const [loading, setLoading] = useState<boolean>(false)
+  const [loadingMessage, setLoadingMessage] = useState<string>("")
   const navigate = useNavigate()
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -38,6 +40,8 @@ const LandingPage: React.FC = () => {
     }
 
     setError(null);
+    setLoading(true);
+    setLoadingMessage('Uploading participant data...');
 
     const formData = new FormData();
     formData.append('file', file);
@@ -67,6 +71,8 @@ const LandingPage: React.FC = () => {
       }
 
       // Generate assignments using session ID
+      setLoadingMessage('Generating optimal table assignments... This may take up to 2 minutes for large groups.');
+
       const assignmentsResponse = await fetch(`${API_BASE_URL}/api/assignments/?session_id=${sessionId}`, {
         method: 'GET',
       });
@@ -82,6 +88,9 @@ const LandingPage: React.FC = () => {
       navigate('/table-assignments', { state: { assignments, sessionId } });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
+    } finally {
+      setLoading(false);
+      setLoadingMessage('');
     }
   };
   
@@ -164,7 +173,15 @@ const LandingPage: React.FC = () => {
                 </p>
               </div>
 
-              {error && (
+              {loading && (
+                <Alert>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <AlertTitle>Processing</AlertTitle>
+                  <AlertDescription>{loadingMessage}</AlertDescription>
+                </Alert>
+              )}
+
+              {error && !loading && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Error</AlertTitle>
@@ -173,10 +190,17 @@ const LandingPage: React.FC = () => {
               )}
 
               <div className="flex justify-between items-center">
-                <Button type="submit" variant="outline">
-                  Generate Assignments
+                <Button type="submit" variant="outline" disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    'Generate Assignments'
+                  )}
                 </Button>
-                <Button variant="outline" asChild>
+                <Button variant="outline" asChild disabled={loading}>
                   <a href="/template.xlsx" download>
                     Download Template
                   </a>

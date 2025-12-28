@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from assignment_logic.api_handler import handle_generate_assignments
 from api.storage import get_session, session_exists, store_result, get_result, result_exists
+from api.email import send_magic_link_email
 from datetime import datetime
 import logging
 
@@ -46,10 +47,13 @@ def get_assignments(session_id: str):
         # Send magic link email if provided
         user_email = session_data.get("email")
         if user_email:
-            magic_link = f"/results/{session_id}"
-            logger.info(f"TODO: Send email to {user_email} with magic link: {magic_link}")
-            # TODO: Replace with actual email service (SendGrid, etc.)
-            # send_magic_link_email(user_email, magic_link, results['assignments'])
+            magic_link_path = f"/table-assignments?session={session_id}"
+            send_magic_link_email(
+                to_email=user_email,
+                magic_link_path=magic_link_path,
+                num_sessions=num_sessions,
+                num_tables=num_tables
+            )
 
         # Keep upload data for regeneration (auto-cleaned after 1 hour)
         return results['assignments']
