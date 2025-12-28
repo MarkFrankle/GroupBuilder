@@ -45,10 +45,14 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment }) => {
     const colors: { [key: string]: string } = {
       'Male': 'bg-blue-100 text-blue-800',
       'Female': 'bg-pink-100 text-pink-800',
+      'Non-binary': 'bg-purple-100 text-purple-800',
+      'Nonbinary': 'bg-purple-100 text-purple-800',
+      'Genderqueer': 'bg-violet-100 text-violet-800',
       'Other': 'bg-purple-100 text-purple-800',
       'M': 'bg-blue-100 text-blue-800',
       'F': 'bg-pink-100 text-pink-800',
     }
+    // Fallback to neutral gray for any other gender identity
     return colors[gender] || 'bg-gray-100 text-gray-800'
   }
 
