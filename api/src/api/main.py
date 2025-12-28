@@ -1,11 +1,11 @@
-from api.routers import upload, assignments
 from dotenv import load_dotenv
+load_dotenv()
+
+from api.routers import upload, assignments
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 import os
-
-load_dotenv()
 
 # Configure logging
 logging.basicConfig(
