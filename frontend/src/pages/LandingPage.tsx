@@ -26,7 +26,7 @@ const LandingPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false)
   const [loadingMessage, setLoadingMessage] = useState<string>("")
   const [recentUploads, setRecentUploads] = useState<RecentUpload[]>([])
-  const [selectedRecentUpload, setSelectedRecentUpload] = useState<string>("")
+  const [selectedRecentUpload, setSelectedRecentUpload] = useState<string>("new-upload")
   const navigate = useNavigate()
 
   // Load recent uploads on mount
@@ -74,15 +74,15 @@ const LandingPage: React.FC = () => {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       setFile(event.target.files[0])
-      setSelectedRecentUpload("") // Clear recent upload selection when new file chosen
+      setSelectedRecentUpload("new-upload") // Clear recent upload selection when new file chosen
     }
   }
 
   const handleRecentUploadSelect = (sessionId: string) => {
     setSelectedRecentUpload(sessionId)
 
-    if (!sessionId) {
-      // "None" selected, reset form
+    if (sessionId === "new-upload") {
+      // "Upload new file" selected, reset form
       setFile(null)
       return
     }
@@ -101,7 +101,7 @@ const LandingPage: React.FC = () => {
     event.preventDefault();
 
     // Check if using recent upload or new file
-    if (!file && !selectedRecentUpload) {
+    if (!file && selectedRecentUpload === "new-upload") {
       setError('Please select a file to upload or choose a recent upload.');
       return;
     }
@@ -112,7 +112,7 @@ const LandingPage: React.FC = () => {
     try {
       let sessionId: string;
 
-      if (selectedRecentUpload) {
+      if (selectedRecentUpload !== "new-upload") {
         // Using a recent upload - skip upload step
         sessionId = selectedRecentUpload;
         setLoadingMessage('Generating optimal table assignments... This may take up to 2 minutes for large groups.');
@@ -206,7 +206,7 @@ const LandingPage: React.FC = () => {
                       <SelectValue placeholder="Choose a recent upload or upload new file" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Upload new file</SelectItem>
+                      <SelectItem value="new-upload">Upload new file</SelectItem>
                       {recentUploads.map((upload) => {
                         const timeAgo = getTimeAgo(upload.created_at)
                         return (
@@ -230,9 +230,9 @@ const LandingPage: React.FC = () => {
                   type="file"
                   accept=".xlsx, .xls"
                   onChange={handleFileChange}
-                  disabled={!!selectedRecentUpload}
+                  disabled={selectedRecentUpload !== "new-upload"}
                 />
-                {selectedRecentUpload && (
+                {selectedRecentUpload !== "new-upload" && (
                   <p className="text-sm text-muted-foreground">
                     Using recent upload. Clear selection above to upload a new file.
                   </p>
