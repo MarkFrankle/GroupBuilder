@@ -35,6 +35,10 @@ def get_assignments(session_id: str):
         logger.info(f"Successfully generated assignments (quality: {results.get('solution_quality', 'unknown')}, "
                    f"time: {results.get('solve_time', 'unknown')}s)")
 
+        # Debug: Log the results to see if there's NaN
+        logger.info(f"Results keys: {results.keys()}")
+        logger.info(f"total_deviation value: {results.get('total_deviation')} (type: {type(results.get('total_deviation'))})")
+
         store_result(session_id, {
             "assignments": results['assignments'],
             "metadata": {
@@ -57,6 +61,15 @@ def get_assignments(session_id: str):
             )
 
         # Keep upload data for regeneration (auto-cleaned after 1 hour)
+        # Debug: Check what we're about to return
+        import json
+        try:
+            json.dumps(results['assignments'])
+            logger.info("Assignments are JSON serializable")
+        except Exception as e:
+            logger.error(f"Assignments NOT JSON serializable: {e}")
+            logger.error(f"Assignments preview: {str(results['assignments'])[:500]}")
+
         return results['assignments']
     except HTTPException:
         raise
