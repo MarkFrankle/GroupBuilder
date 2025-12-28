@@ -205,6 +205,8 @@ class GroupBuilder:
                 "solution_quality": solution_quality,
                 "total_deviation": objective_value,
                 "solve_time": self.solver.WallTime(),
+                "num_branches": self.solver.NumBranches(),
+                "num_conflicts": self.solver.NumConflicts(),
                 "assignments": assignments,
             }
         elif status == cp_model.INFEASIBLE:
