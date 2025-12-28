@@ -78,13 +78,25 @@ const TableAssignmentsPage: React.FC = () => {
 
   const handleRegenerateAssignments = async () => {
     setLoading(true)
+    setError(null)
     try {
-      // In a real application, you would call an API endpoint to regenerate assignments
-      // For this example, we'll just simulate it with a delay
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // For demonstration, we'll just shuffle the current assignments
-      setAssignments(prevAssignments => [...prevAssignments].sort(() => Math.random() - 0.5))
+      const sessionId = (window.history.state?.usr as any)?.sessionId;
+
+      if (!sessionId) {
+        throw new Error('Session ID not found. Please upload a file again.')
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/assignments/regenerate/${sessionId}`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to regenerate assignments')
+      }
+
+      const newAssignments = await response.json()
+      setAssignments(newAssignments)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to regenerate assignments")
     } finally {
