@@ -78,8 +78,29 @@ def get_assignments(session_id: str):
             )
 
         # Keep upload data for regeneration (auto-cleaned after 1 hour)
-        # Debug: Check what we're about to return
+        # Debug: Aggressively scan for NaN values
         import json
+        import math
+
+        def find_nan(obj, path=""):
+            """Recursively find NaN values in nested data structures"""
+            if isinstance(obj, float):
+                if math.isnan(obj) or math.isinf(obj):
+                    logger.error(f"FOUND NaN/Inf at {path}: {obj}")
+                    return True
+            elif isinstance(obj, dict):
+                for key, val in obj.items():
+                    if find_nan(val, f"{path}.{key}"):
+                        return True
+            elif isinstance(obj, (list, tuple)):
+                for i, val in enumerate(obj):
+                    if find_nan(val, f"{path}[{i}]"):
+                        return True
+            return False
+
+        logger.info("Scanning results for NaN...")
+        find_nan(results, "results")
+
         try:
             json.dumps(results['assignments'])
             logger.info("Assignments are JSON serializable")
