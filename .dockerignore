@@ -1,0 +1,51 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Poetry
+poetry.lock
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Frontend (not needed in API container)
+frontend/
+node_modules/
+
+# Documentation
+*.md
+README.md
+docs/
+
+# Test files
+test_participants.xlsx
+generate_test_data.py
+GroupBuilderTemplate.xlsx
+
+# Environment
+.env
+.env.*
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Logs
+*.log
