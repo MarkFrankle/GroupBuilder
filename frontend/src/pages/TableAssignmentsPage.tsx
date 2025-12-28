@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { useNavigate } from 'react-router-dom'
 import TableAssignments from "../components/TableAssignments/TableAssignments"
+import ValidationStats from "../components/ValidationStats/ValidationStats"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { dummyData } from "../data/dummyData"
@@ -171,6 +172,8 @@ const TableAssignmentsPage: React.FC = () => {
           <CardTitle className="text-3xl font-bold text-center">Table Assignments</CardTitle>
         </CardHeader>
         <CardContent>
+          <ValidationStats assignments={assignments} />
+
           <div className="flex justify-center space-x-4 mb-6">
             <Button variant="outline" onClick={downloadCSV}>
               Download CSV
