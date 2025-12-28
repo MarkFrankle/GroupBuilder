@@ -3,13 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import TableAssignments from "../components/TableAssignments/TableAssignments"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { ChevronDown } from 'lucide-react'
 import { dummyData } from "../data/dummyData"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Loader2 } from 'lucide-react'
@@ -104,15 +97,6 @@ const TableAssignmentsPage: React.FC = () => {
     }
   }
 
-  const handleDownload = (format: string) => {
-    if (format === 'csv') {
-      downloadCSV()
-    } else {
-      // TODO: Implement PDF and Excel export
-      alert(`${format.toUpperCase()} export coming soon!`)
-    }
-  }
-
   const downloadCSV = () => {
     let csvContent = ""
 
@@ -188,24 +172,9 @@ const TableAssignmentsPage: React.FC = () => {
         </CardHeader>
         <CardContent>
           <div className="flex justify-center space-x-4 mb-6">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  Download Assignments <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => handleDownload('pdf')}>
-                  Download PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleDownload('xlsx')}>
-                  Download Excel
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleDownload('csv')}>
-                  Download CSV
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Button variant="outline" onClick={downloadCSV}>
+              Download CSV
+            </Button>
             <Button variant="outline" onClick={handleRegenerateAssignments}>
               Regenerate Assignments
             </Button>

@@ -170,7 +170,7 @@ class GroupBuilder:
                                     "name": p["name"],
                                     "religion": p["religion"],
                                     "gender": p["gender"],
-                                    "couple_id": p["couple_id"],
+                                    "partner": p.get("partner"),
                                 }
                             )
                 # Convert defaultdict to a regular dict for JSON compatibility

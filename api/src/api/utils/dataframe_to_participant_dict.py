@@ -28,17 +28,16 @@ def _assign_couple_ids(data):
         partner_name = row.get('partner')
         if partner_name:
             couple_key = tuple(sorted([row['name'], partner_name]))
-            
+
             couple_id = couple_map[couple_key]
             row['couple_id'] = couple_id
-            
+
             # Increment the counter if this is a new couple
             if couple_id == next_couple_id[0]:
                 next_couple_id[0] += 1
         else:
             row['couple_id'] = None
 
-        del row['partner']
     return data
 
 
