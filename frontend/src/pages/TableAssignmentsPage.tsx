@@ -179,17 +179,19 @@ const TableAssignmentsPage: React.FC = () => {
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
             <div className="flex gap-2">
               <Button
-                variant={viewMode === 'compact' ? 'default' : 'outline'}
+                variant={viewMode === 'compact' ? 'outline' : 'ghost'}
                 onClick={() => setViewMode('compact')}
                 size="sm"
+                className={viewMode === 'compact' ? 'border-2 border-primary' : ''}
               >
                 <LayoutGrid className="h-4 w-4 mr-2" />
                 Compact
               </Button>
               <Button
-                variant={viewMode === 'detailed' ? 'default' : 'outline'}
+                variant={viewMode === 'detailed' ? 'outline' : 'ghost'}
                 onClick={() => setViewMode('detailed')}
                 size="sm"
+                className={viewMode === 'detailed' ? 'border-2 border-primary' : ''}
               >
                 <List className="h-4 w-4 mr-2" />
                 Detailed
