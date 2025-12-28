@@ -9,11 +9,14 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Store data with session IDs instead of filenames to prevent collisions
-# Structure: {session_id: {data: {...}, created_at: datetime}}
+# Short-term storage for upload data (1 hour TTL)
+# Used during upload → generate flow, then cleaned up
 group_data = {}
 
-# Clean up old sessions (> 1 hour)
+# Long-term storage for assignment results (30 days TTL)
+# Used for magic links that users can bookmark
+assignment_results = {}
+
 def cleanup_old_sessions():
     current_time = datetime.now()
     expired_sessions = [
@@ -24,24 +27,33 @@ def cleanup_old_sessions():
         del group_data[sid]
         logger.info(f"Cleaned up expired session: {sid}")
 
+def cleanup_old_results():
+    current_time = datetime.now()
+    expired_results = [
+        sid for sid, data in assignment_results.items()
+        if current_time - data.get('created_at', current_time) > timedelta(days=30)
+    ]
+    for sid in expired_results:
+        del assignment_results[sid]
+        logger.info(f"Cleaned up expired result: {sid}")
+
 @router.post("/")
 async def upload_file(
     file: UploadFile = File(...),
     numTables: int = Form(...),
     numSessions: int = Form(...),
+    email: str = Form(None),
 ):
     logger.info(f"Uploading file: {file.filename}, tables: {numTables}, sessions: {numSessions}")
 
-    # Validate input parameters
-    if numTables < 1 or numTables > 50:
+    if numTables < 1 or numTables > 10:
         logger.warning(f"Invalid number of tables: {numTables}")
-        raise HTTPException(status_code=400, detail="Number of tables must be between 1 and 50.")
+        raise HTTPException(status_code=400, detail="Number of tables must be between 1 and 10.")
 
-    if numSessions < 1 or numSessions > 20:
+    if numSessions < 1 or numSessions > 6:
         logger.warning(f"Invalid number of sessions: {numSessions}")
-        raise HTTPException(status_code=400, detail="Number of sessions must be between 1 and 20.")
+        raise HTTPException(status_code=400, detail="Number of sessions must be between 1 and 6.")
 
-    # Ensure file is an Excel file
     if not file.filename.endswith((".xlsx", ".xls")):
         logger.warning(f"Invalid file format: {file.filename}")
         raise HTTPException(status_code=400, detail="Invalid file format. Please upload an Excel file.")
@@ -51,7 +63,6 @@ async def upload_file(
         participant_dataframe = pd.read_excel(BytesIO(contents))
         logger.info(f"Parsed Excel file with {len(participant_dataframe)} participants")
 
-        # Validate required columns
         required_columns = ['Name', 'Religion', 'Gender', 'Partner']
         missing_columns = [col for col in required_columns if col not in participant_dataframe.columns]
         if missing_columns:
@@ -62,7 +73,6 @@ async def upload_file(
                        f"Required columns are: {', '.join(required_columns)}"
             )
 
-        # Validate minimum participants
         num_participants = len(participant_dataframe)
         if num_participants < numTables:
             logger.warning(f"Not enough participants ({num_participants}) for {numTables} tables")
@@ -72,15 +82,18 @@ async def upload_file(
                        f"Need at least {numTables} participants."
             )
 
+        if num_participants > 200:
+            logger.warning(f"Too many participants ({num_participants})")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Maximum 200 participants supported. You have {num_participants}."
+            )
+
         participant_dict = dataframe_to_participant_dict(participant_dataframe)
 
-        # Generate unique session ID
         session_id = str(uuid.uuid4())
-
-        # Clean up old sessions before adding new one
         cleanup_old_sessions()
 
-        # Store data with session ID and timestamp
         group_data[session_id] = {
             "data": {
                 "participant_dict": participant_dict,
@@ -88,10 +101,15 @@ async def upload_file(
                 "num_sessions": numSessions,
             },
             "created_at": datetime.now(),
-            "filename": file.filename
+            "filename": file.filename,
+            "email": email
         }
 
         logger.info(f"Successfully stored data for {file.filename} with session ID: {session_id}")
+
+        if email:
+            logger.info(f"Email provided: {email}. Magic link will be sent after assignment generation.")
+
         return {
             "message": "File uploaded successfully",
             "session_id": session_id,

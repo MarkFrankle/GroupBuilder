@@ -21,6 +21,7 @@ const LandingPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [numTables, setNumTables] = useState<string>("1")
   const [numSessions, setNumSessions] = useState<string>("1")
+  const [email, setEmail] = useState<string>("")
   const navigate = useNavigate()
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,6 +43,9 @@ const LandingPage: React.FC = () => {
     formData.append('file', file);
     formData.append('numTables', numTables);
     formData.append('numSessions', numSessions);
+    if (email) {
+      formData.append('email', email);
+    }
 
     try {
       // Upload file and get session ID
@@ -144,6 +148,20 @@ const LandingPage: React.FC = () => {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email (optional)</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="your.email@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+                <p className="text-sm text-muted-foreground">
+                  Get a link to your results via email (bookmarkable for 30 days)
+                </p>
               </div>
 
               {error && (
