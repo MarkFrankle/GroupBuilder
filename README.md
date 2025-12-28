@@ -17,16 +17,6 @@ GroupBuilder solves this in seconds using constraint programming.
 
 ## Features
 
-<<<<<<< HEAD
-✅ **Intelligent assignment** - Uses Google OR-Tools CP-SAT solver to optimize table assignments
-✅ **Diversity balancing** - Ensures even distribution of religions, genders across all tables
-✅ **Couple separation** - Automatically seats partners at different tables
-✅ **Multi-session optimization** - Minimizes repeat pairings across sessions (weighted toward early sessions)
-✅ **Excel-based workflow** - Upload a spreadsheet, download assignments
-✅ **Magic links** - Bookmarkable results URLs valid for 30 days
-✅ **Input validation** - Clear error messages for invalid data
-✅ **Fast** - Handles 100 participants, 10 tables, 6 sessions in under 2 minutes
-=======
 - ✅ **Intelligent assignment** - Uses Google OR-Tools CP-SAT solver to optimize table assignments
 - ✅ **Diversity balancing** - Ensures even distribution of religions, genders across all tables
 - ✅ **Couple separation** - Automatically seats partners at different tables
@@ -35,7 +25,6 @@ GroupBuilder solves this in seconds using constraint programming.
 - ✅ **Magic links** - Bookmarkable results URLs valid for 30 days
 - ✅ **Input validation** - Clear error messages for invalid data
 - ✅ **Fast** - Handles 100 participants, 10 tables, 6 sessions in under 2 minutes
->>>>>>> 199d3a7273ccbee4ab7ea3894f647d9777b6c40d
 
 ## Quick Start
 
