@@ -23,6 +23,8 @@ class GroupBuilder:
         self._add_constraints_to_model()
         logger.info("Adding objective functions to model")
         self._add_objective_functions_to_model()
+        logger.info("Adding symmetry breaking constraints")
+        self._add_symmetry_breaking()
         logger.info("Running solver")
         return self._run_solver()
 
@@ -148,11 +150,23 @@ class GroupBuilder:
                         weighted_actual_pairings += session_weight * z
         self.model.Minimize(weighted_actual_pairings)
 
+    def _add_symmetry_breaking(self):
+        """Break table symmetry by fixing first participant to first table in first session."""
+        if len(self.participants) > 0 and len(self.sessions) > 0 and len(self.tables) > 0:
+            first_participant_id = self.participants[0]["id"]
+            self.model.Add(self.x[(first_participant_id, 0, 0)] == 1)
+
     def _run_solver(self):
         self.solver = cp_model.CpSolver()
-        self.solver.parameters.max_time_in_seconds = 120.0
 
-        logger.info("Starting CP-SAT solver (max time: 120s)")
+        self.solver.parameters.max_time_in_seconds = 120.0
+        self.solver.parameters.num_search_workers = 8
+        self.solver.parameters.log_search_progress = False
+        self.solver.parameters.cp_model_presolve = True
+        self.solver.parameters.cp_model_probing_level = 2
+        self.solver.parameters.linearization_level = 2
+
+        logger.info(f"Starting CP-SAT solver (max time: 120s, {self.solver.parameters.num_search_workers} workers)")
         status = self.solver.Solve(self.model)
         logger.info(f"Solver completed with status: {self.solver.StatusName(status)} "
                    f"in {self.solver.WallTime():.2f}s")
