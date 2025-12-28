@@ -27,7 +27,7 @@ participants = [
     {"Name": "Christopher Montgomery-Wellington", "Religion": "Jewish", "Gender": "Male", "Partner": "Elizabeth Montgomery-Wellington"},
     {"Name": "Elizabeth Montgomery-Wellington", "Religion": "Jewish", "Gender": "Female", "Partner": "Christopher Montgomery-Wellington"},
     {"Name": "Yuki Tanaka", "Religion": "Buddhist", "Gender": "Female", "Partner": "Kenji Tanaka"},
-    {"Name": "Kenji Tanaka", "Religion": "None", "Gender": "Male", "Partner": "Yuki Tanaka"},
+    {"Name": "Kenji Tanaka", "Religion": "Secular", "Gender": "Male", "Partner": "Yuki Tanaka"},
 ]
 
 # Create workbook and get active sheet

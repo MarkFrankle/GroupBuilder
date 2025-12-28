@@ -2,8 +2,12 @@ from collections import defaultdict
 import pandas as pd
 
 def dataframe_to_participant_dict(df: pd.DataFrame):
-    # Nan in pandas needs to be normalized to None
+    # Nan in pandas needs to be normalized to None or empty string
+    # Partner can be None, but other fields should be empty strings to avoid NaN in JSON
     df['Partner'] = df['Partner'].apply(lambda x: None if pd.isnull(x) else x)
+    df['Religion'] = df['Religion'].apply(lambda x: '' if pd.isnull(x) else x)
+    df['Gender'] = df['Gender'].apply(lambda x: '' if pd.isnull(x) else x)
+    df['Name'] = df['Name'].apply(lambda x: '' if pd.isnull(x) else x)
     participants = df.to_dict('records')
 
     transformed_participants = [
