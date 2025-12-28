@@ -113,8 +113,35 @@ const LandingPage: React.FC = () => {
       let sessionId: string;
 
       if (selectedRecentUpload !== "new-upload") {
-        // Using a recent upload - skip upload step
-        sessionId = selectedRecentUpload;
+        // Using a recent upload - check if parameters changed
+        const selectedUpload = recentUploads.find(u => u.session_id === selectedRecentUpload);
+
+        if (selectedUpload &&
+            (selectedUpload.num_tables.toString() !== numTables ||
+             selectedUpload.num_sessions.toString() !== numSessions)) {
+          // Parameters changed - clone session with new params
+          setLoadingMessage('Updating configuration...');
+
+          const cloneResponse = await fetch(
+            `${API_BASE_URL}/api/assignments/sessions/${selectedRecentUpload}/clone?num_tables=${numTables}&num_sessions=${numSessions}`,
+            { method: 'POST' }
+          );
+
+          if (!cloneResponse.ok) {
+            const errorData = await cloneResponse.json();
+            throw new Error(errorData.detail || 'Failed to update configuration');
+          }
+
+          const cloneData = await cloneResponse.json();
+          sessionId = cloneData.session_id;
+
+          // Save new session to recent uploads
+          saveRecentUpload(sessionId);
+        } else {
+          // Parameters unchanged - use existing session
+          sessionId = selectedRecentUpload;
+        }
+
         setLoadingMessage('Generating optimal table assignments... This may take up to 2 minutes for large groups.');
       } else {
         // New file upload

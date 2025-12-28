@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException
 from assignment_logic.api_handler import handle_generate_assignments
-from api.storage import get_session, session_exists, store_result, get_result, result_exists
+from api.storage import get_session, session_exists, store_result, get_result, result_exists, store_session
 from api.email import send_magic_link_email
 from datetime import datetime
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -142,4 +143,52 @@ async def get_session_metadata(session_id: str):
         "num_tables": session_data.get("num_tables"),
         "num_sessions": session_data.get("num_sessions"),
         "created_at": session_data.get("created_at"),
+    }
+
+
+@router.post("/sessions/{session_id}/clone")
+async def clone_session_with_params(session_id: str, num_tables: int, num_sessions: int):
+    """Clone a session with new table/session parameters (reuses participant data)"""
+    logger.info(f"Cloning session {session_id} with new params: tables={num_tables}, sessions={num_sessions}")
+
+    if not session_exists(session_id):
+        logger.warning(f"Source session not found or expired: {session_id}")
+        raise HTTPException(status_code=404, detail="Source session not found or expired.")
+
+    # Validate parameters
+    if num_tables < 1 or num_tables > 10:
+        raise HTTPException(status_code=400, detail="Number of tables must be between 1 and 10.")
+    if num_sessions < 1 or num_sessions > 6:
+        raise HTTPException(status_code=400, detail="Number of sessions must be between 1 and 6.")
+
+    # Get original session data
+    original_session = get_session(session_id)
+    participant_dict = original_session.get("participant_dict", [])
+
+    # Validate participant count vs tables
+    num_participants = len(participant_dict)
+    if num_participants < num_tables:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not enough participants ({num_participants}) for {num_tables} tables. "
+                   f"Need at least {num_tables} participants."
+        )
+
+    # Create new session with same participant data but new parameters
+    new_session_id = str(uuid.uuid4())
+    store_session(new_session_id, {
+        "participant_dict": participant_dict,
+        "num_tables": num_tables,
+        "num_sessions": num_sessions,
+        "filename": original_session.get("filename", "Unknown"),
+        "email": original_session.get("email"),
+        "created_at": datetime.now().isoformat(),
+        "cloned_from": session_id
+    })
+
+    logger.info(f"Successfully cloned session. New session ID: {new_session_id}")
+
+    return {
+        "message": "Session cloned successfully",
+        "session_id": new_session_id
     }

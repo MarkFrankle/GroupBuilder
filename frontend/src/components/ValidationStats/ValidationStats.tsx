@@ -238,13 +238,13 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
               <div className="flex items-center gap-2">
                 <Info className="h-4 w-4 text-blue-600" />
                 <span className="text-sm">
-                  Avg {stats.avgNewPeopleMet} people met
+                  Avg {stats.avgNewPeopleMet} unique tablemates per person
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <Info className="h-4 w-4 text-blue-600" />
                 <span className="text-sm">
-                  {stats.repeatPairings} repeat pairings
+                  {stats.repeatPairings} pairs meet more than once
                 </span>
               </div>
               <div className="text-xs text-muted-foreground mt-1">
@@ -259,17 +259,17 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
             {allConstraintsSatisfied ? (
               <Alert className="py-2">
                 <CheckCircle2 className="h-4 w-4" />
-                <AlertTitle className="text-sm">All constraints satisfied</AlertTitle>
+                <AlertTitle className="text-sm">Looks good!</AlertTitle>
                 <AlertDescription className="text-xs">
-                  Solution is valid and ready to use
+                  All requirements met - ready to use
                 </AlertDescription>
               </Alert>
             ) : (
               <Alert variant="destructive" className="py-2">
                 <AlertCircle className="h-4 w-4" />
-                <AlertTitle className="text-sm">Some constraints violated</AlertTitle>
+                <AlertTitle className="text-sm">Issues found</AlertTitle>
                 <AlertDescription className="text-xs">
-                  Review issues above
+                  Check details above
                 </AlertDescription>
               </Alert>
             )}
