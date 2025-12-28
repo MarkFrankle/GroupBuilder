@@ -105,8 +105,45 @@ const TableAssignmentsPage: React.FC = () => {
   }
 
   const handleDownload = (format: string) => {
-    // TODO: Implement download logic
-    console.log(`Downloading assignments as ${format}...`)
+    if (format === 'csv') {
+      downloadCSV()
+    } else {
+      // TODO: Implement PDF and Excel export
+      alert(`${format.toUpperCase()} export coming soon!`)
+    }
+  }
+
+  const downloadCSV = () => {
+    let csvContent = ""
+
+    // Generate CSV for each session
+    assignments.forEach((assignment) => {
+      csvContent += `Session ${assignment.session}\n`
+      csvContent += "Table,Name,Religion,Gender,Partner\n"
+
+      // Iterate through each table in the session
+      Object.entries(assignment.tables).forEach(([tableNum, participants]) => {
+        participants.forEach(participant => {
+          const partner = participant.partner || ""
+          csvContent += `${tableNum},"${participant.name}","${participant.religion}","${participant.gender}","${partner}"\n`
+        })
+      })
+
+      csvContent += "\n" // Blank line between sessions
+    })
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+
+    link.setAttribute('href', url)
+    link.setAttribute('download', `table-assignments-${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   const handlePreviousSession = () => {
@@ -127,11 +164,16 @@ const TableAssignmentsPage: React.FC = () => {
 
   if (error) {
     return (
-      <div className="container mx-auto p-4">
+      <div className="container mx-auto p-4 max-w-2xl mt-8">
         <Alert variant="destructive">
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
+        <div className="flex justify-center mt-6">
+          <Button onClick={() => navigate('/')} variant="outline">
+            Back to Home
+          </Button>
+        </div>
       </div>
     )
   }
