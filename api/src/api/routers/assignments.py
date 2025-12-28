@@ -1,12 +1,11 @@
 from fastapi import APIRouter, HTTPException
 from assignment_logic.api_handler import handle_generate_assignments
-from .upload import group_data
+from .upload import group_data, assignment_results, cleanup_old_results
+from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-cached_results = {}
 
 @router.get("/")
 def get_assignments(session_id: str):
@@ -34,19 +33,25 @@ def get_assignments(session_id: str):
         logger.info(f"Successfully generated assignments (quality: {results.get('solution_quality', 'unknown')}, "
                    f"time: {results.get('solve_time', 'unknown')}s)")
 
-        # Cache results with session_id for retrieval
-        cached_results[session_id] = {
+        assignment_results[session_id] = {
             "assignments": results['assignments'],
             "metadata": {
                 "solution_quality": results.get('solution_quality'),
                 "solve_time": results.get('solve_time'),
                 "total_deviation": results.get('total_deviation')
-            }
+            },
+            "created_at": datetime.now()
         }
 
-        # Don't delete session data immediately - keep it for potential regeneration
-        # It will be cleaned up by the cleanup function after 1 hour
+        # Send magic link email if provided
+        user_email = group_data[session_id].get("email")
+        if user_email:
+            magic_link = f"/results/{session_id}"
+            logger.info(f"TODO: Send email to {user_email} with magic link: {magic_link}")
+            # TODO: Replace with actual email service (SendGrid, etc.)
+            # send_magic_link_email(user_email, magic_link, results['assignments'])
 
+        # Keep upload data for regeneration (auto-cleaned after 1 hour)
         return results['assignments']
     except HTTPException:
         raise
@@ -58,8 +63,10 @@ def get_assignments(session_id: str):
 async def get_cached_results(session_id: str):
     logger.info(f"Retrieving cached results for session: {session_id}")
 
-    if session_id not in cached_results:
-        logger.warning(f"No cached results for session: {session_id}")
-        raise HTTPException(status_code=404, detail="No results found for this session. Please generate assignments first.")
+    cleanup_old_results()
 
-    return cached_results[session_id]["assignments"]
+    if session_id not in assignment_results:
+        logger.warning(f"No cached results for session: {session_id}")
+        raise HTTPException(status_code=404, detail="Results not found or expired. Links expire after 30 days.")
+
+    return assignment_results[session_id]["assignments"]

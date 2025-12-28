@@ -150,9 +150,7 @@ class GroupBuilder:
 
     def _run_solver(self):
         self.solver = cp_model.CpSolver()
-        # Set timeout to prevent infinite running (especially for large problems)
-        # For complex multi-session problems, we'll accept a good solution within time limit
-        self.solver.parameters.max_time_in_seconds = 120.0  # 2 minutes max
+        self.solver.parameters.max_time_in_seconds = 120.0
 
         logger.info("Starting CP-SAT solver (max time: 120s)")
         status = self.solver.Solve(self.model)
