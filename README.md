@@ -52,6 +52,27 @@ poetry run uvicorn src.api.main:app --reload
 
 API will be available at `http://localhost:8000`
 
+**Optional: Redis for Persistent Storage**
+
+By default, the API uses in-memory storage (data is lost on restart). For production or to test magic links across server restarts:
+
+```bash
+# Option 1: Local Redis with Docker
+docker run -d -p 6379:6379 redis:7-alpine
+
+# Option 2: Use Upstash Redis (free tier)
+# Create account at upstash.com, create Redis database, copy URL
+
+# Set environment variable
+cd api
+echo 'REDIS_URL=redis://localhost:6379' > .env
+
+# Or for Upstash:
+# echo 'REDIS_URL=redis://default:<password>@<host>:6379' > .env
+```
+
+The API will automatically use Redis if `REDIS_URL` is set, otherwise falls back to in-memory storage.
+
 ### 2. Frontend Setup
 
 ```bash

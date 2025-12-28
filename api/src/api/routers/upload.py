@@ -1,41 +1,14 @@
 from api.utils.dataframe_to_participant_dict import dataframe_to_participant_dict
+from api.storage import store_session
 from fastapi import APIRouter, File, UploadFile, HTTPException, Form
 from io import BytesIO
 import logging
 import pandas as pd
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-# Short-term storage for upload data (1 hour TTL)
-# Used during upload → generate flow, then cleaned up
-group_data = {}
-
-# Long-term storage for assignment results (30 days TTL)
-# Used for magic links that users can bookmark
-assignment_results = {}
-
-def cleanup_old_sessions():
-    current_time = datetime.now()
-    expired_sessions = [
-        sid for sid, data in group_data.items()
-        if current_time - data.get('created_at', current_time) > timedelta(hours=1)
-    ]
-    for sid in expired_sessions:
-        del group_data[sid]
-        logger.info(f"Cleaned up expired session: {sid}")
-
-def cleanup_old_results():
-    current_time = datetime.now()
-    expired_results = [
-        sid for sid, data in assignment_results.items()
-        if current_time - data.get('created_at', current_time) > timedelta(days=30)
-    ]
-    for sid in expired_results:
-        del assignment_results[sid]
-        logger.info(f"Cleaned up expired result: {sid}")
 
 @router.post("/")
 async def upload_file(
@@ -92,18 +65,15 @@ async def upload_file(
         participant_dict = dataframe_to_participant_dict(participant_dataframe)
 
         session_id = str(uuid.uuid4())
-        cleanup_old_sessions()
 
-        group_data[session_id] = {
-            "data": {
-                "participant_dict": participant_dict,
-                "num_tables": numTables,
-                "num_sessions": numSessions,
-            },
-            "created_at": datetime.now(),
+        store_session(session_id, {
+            "participant_dict": participant_dict,
+            "num_tables": numTables,
+            "num_sessions": numSessions,
             "filename": file.filename,
-            "email": email
-        }
+            "email": email,
+            "created_at": datetime.now().isoformat()
+        })
 
         logger.info(f"Successfully stored data for {file.filename} with session ID: {session_id}")
 
