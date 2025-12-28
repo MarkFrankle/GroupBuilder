@@ -1,11 +1,11 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle, Loader2 } from 'lucide-react'
+import { AlertCircle, Loader2, Clock } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { getRecentUploadIds, saveRecentUpload, removeRecentUpload, type RecentUpload } from '@/utils/recentUploads'
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
 
@@ -24,55 +25,133 @@ const LandingPage: React.FC = () => {
   const [email, setEmail] = useState<string>("")
   const [loading, setLoading] = useState<boolean>(false)
   const [loadingMessage, setLoadingMessage] = useState<string>("")
+  const [recentUploads, setRecentUploads] = useState<RecentUpload[]>([])
+  const [selectedRecentUpload, setSelectedRecentUpload] = useState<string>("")
   const navigate = useNavigate()
+
+  // Load recent uploads on mount
+  useEffect(() => {
+    const loadRecentUploads = async () => {
+      const sessionIds = getRecentUploadIds()
+      const uploads: RecentUpload[] = []
+
+      for (const sessionId of sessionIds) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/assignments/sessions/${sessionId}/metadata`)
+          if (response.ok) {
+            const metadata = await response.json()
+            uploads.push(metadata)
+          } else {
+            // Session expired, remove from localStorage
+            removeRecentUpload(sessionId)
+          }
+        } catch (err) {
+          console.error(`Failed to load metadata for session ${sessionId}:`, err)
+          removeRecentUpload(sessionId)
+        }
+      }
+
+      setRecentUploads(uploads)
+    }
+
+    loadRecentUploads()
+  }, [])
+
+  const getTimeAgo = (isoString: string): string => {
+    const date = new Date(isoString)
+    const now = new Date()
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+    if (seconds < 60) return 'just now'
+    const minutes = Math.floor(seconds / 60)
+    if (minutes < 60) return `${minutes} min ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`
+    const days = Math.floor(hours / 24)
+    return `${days} day${days > 1 ? 's' : ''} ago`
+  }
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       setFile(event.target.files[0])
+      setSelectedRecentUpload("") // Clear recent upload selection when new file chosen
+    }
+  }
+
+  const handleRecentUploadSelect = (sessionId: string) => {
+    setSelectedRecentUpload(sessionId)
+
+    if (!sessionId) {
+      // "None" selected, reset form
+      setFile(null)
+      return
+    }
+
+    // Find the selected upload and populate form
+    const upload = recentUploads.find(u => u.session_id === sessionId)
+    if (upload) {
+      setNumTables(upload.num_tables.toString())
+      setNumSessions(upload.num_sessions.toString())
+      // Clear file input since we're using an existing session
+      setFile(null)
     }
   }
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!file) {
-      setError('Please select a file to upload.');
+
+    // Check if using recent upload or new file
+    if (!file && !selectedRecentUpload) {
+      setError('Please select a file to upload or choose a recent upload.');
       return;
     }
 
     setError(null);
     setLoading(true);
-    setLoadingMessage('Uploading participant data...');
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('numTables', numTables);
-    formData.append('numSessions', numSessions);
-    if (email) {
-      formData.append('email', email);
-    }
 
     try {
-      // Upload file and get session ID
-      const uploadResponse = await fetch(`${API_BASE_URL}/api/upload/`, {
-        method: 'POST',
-        body: formData,
-      });
+      let sessionId: string;
 
-      if (!uploadResponse.ok) {
-        const errorData = await uploadResponse.json();
-        throw new Error(errorData.detail || 'File upload failed');
-      }
+      if (selectedRecentUpload) {
+        // Using a recent upload - skip upload step
+        sessionId = selectedRecentUpload;
+        setLoadingMessage('Generating optimal table assignments... This may take up to 2 minutes for large groups.');
+      } else {
+        // New file upload
+        setLoadingMessage('Uploading participant data...');
 
-      const uploadData = await uploadResponse.json();
-      const sessionId = uploadData.session_id;
+        const formData = new FormData();
+        formData.append('file', file!);
+        formData.append('numTables', numTables);
+        formData.append('numSessions', numSessions);
+        if (email) {
+          formData.append('email', email);
+        }
 
-      if (!sessionId) {
-        throw new Error('No session ID received from server');
+        const uploadResponse = await fetch(`${API_BASE_URL}/api/upload/`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!uploadResponse.ok) {
+          const errorData = await uploadResponse.json();
+          throw new Error(errorData.detail || 'File upload failed');
+        }
+
+        const uploadData = await uploadResponse.json();
+        sessionId = uploadData.session_id;
+
+        if (!sessionId) {
+          throw new Error('No session ID received from server');
+        }
+
+        // Save to recent uploads
+        saveRecentUpload(sessionId);
+
+        setLoadingMessage('Generating optimal table assignments... This may take up to 2 minutes for large groups.');
       }
 
       // Generate assignments using session ID
-      setLoadingMessage('Generating optimal table assignments... This may take up to 2 minutes for large groups.');
-
       const assignmentsResponse = await fetch(`${API_BASE_URL}/api/assignments/?session_id=${sessionId}`, {
         method: 'GET',
       });
@@ -116,6 +195,34 @@ const LandingPage: React.FC = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {recentUploads.length > 0 && (
+                <div className="space-y-2">
+                  <Label htmlFor="recent-uploads">
+                    <Clock className="inline h-4 w-4 mr-1" />
+                    Recent Uploads
+                  </Label>
+                  <Select value={selectedRecentUpload} onValueChange={handleRecentUploadSelect}>
+                    <SelectTrigger id="recent-uploads">
+                      <SelectValue placeholder="Choose a recent upload or upload new file" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Upload new file</SelectItem>
+                      {recentUploads.map((upload) => {
+                        const timeAgo = getTimeAgo(upload.created_at)
+                        return (
+                          <SelectItem key={upload.session_id} value={upload.session_id}>
+                            {upload.filename} ({upload.num_participants} participants, {upload.num_tables} tables, {upload.num_sessions} sessions) - {timeAgo}
+                          </SelectItem>
+                        )
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    Reuse a recent upload (available for 1 hour)
+                  </p>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="file-upload">Upload Participant Data</Label>
                 <Input
@@ -123,7 +230,13 @@ const LandingPage: React.FC = () => {
                   type="file"
                   accept=".xlsx, .xls"
                   onChange={handleFileChange}
+                  disabled={!!selectedRecentUpload}
                 />
+                {selectedRecentUpload && (
+                  <p className="text-sm text-muted-foreground">
+                    Using recent upload. Clear selection above to upload a new file.
+                  </p>
+                )}
               </div>
 
               <div className="flex space-x-4">

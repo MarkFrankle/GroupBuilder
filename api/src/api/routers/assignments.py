@@ -122,3 +122,24 @@ async def get_cached_results(session_id: str):
 
     result_data = get_result(session_id)
     return result_data["assignments"]
+
+
+@router.get("/sessions/{session_id}/metadata")
+async def get_session_metadata(session_id: str):
+    """Get metadata about a session for displaying in Recent Uploads"""
+    logger.info(f"Retrieving metadata for session: {session_id}")
+
+    if not session_exists(session_id):
+        logger.warning(f"Session not found or expired: {session_id}")
+        raise HTTPException(status_code=404, detail="Session not found or expired.")
+
+    session_data = get_session(session_id)
+
+    return {
+        "session_id": session_id,
+        "filename": session_data.get("filename", "Unknown"),
+        "num_participants": len(session_data.get("participant_dict", {})),
+        "num_tables": session_data.get("num_tables"),
+        "num_sessions": session_data.get("num_sessions"),
+        "created_at": session_data.get("created_at"),
+    }
