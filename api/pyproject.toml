@@ -15,6 +15,7 @@ python-dotenv = "^1.0.1"
 debugpy = "^1.8.9"
 gunicorn = "^23.0.0"
 redis = "^5.0.0"
+sendgrid = "^6.11.0"
 assignment-logic = {path = "../assignment_logic"}
 
 [tool.poetry.group.dev.dependencies]

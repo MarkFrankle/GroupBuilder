@@ -233,7 +233,18 @@ fly deploy
 **Session Storage (Upstash Redis):**
 1. Create free account at upstash.com
 2. Create Redis database
-3. Add `UPSTASH_REDIS_URL` to Fly secrets
+3. Add `REDIS_URL` to Fly secrets
+
+**Email Delivery (SendGrid - Optional):**
+1. Create free account at sendgrid.com (100 emails/day free tier)
+2. Create API key with Mail Send permissions
+3. Add to Fly secrets:
+   ```bash
+   fly secrets set SENDGRID_API_KEY=your_api_key_here
+   fly secrets set FROM_EMAIL=noreply@groupbuilder.app
+   fly secrets set FRONTEND_URL=https://your-app.netlify.app
+   ```
+4. If not configured, magic links will be logged but not emailed
 
 **Frontend (Netlify):**
 1. Connect GitHub repo to Netlify
@@ -254,7 +265,6 @@ This is open-source software built for the public good. Contributions welcome!
 - PDF generation for printable table cards
 - Additional constraint types (dietary restrictions, accessibility needs)
 - Performance optimizations for larger events
-- Email delivery integration (SendGrid, etc.)
 - Localization/internationalization
 
 **To contribute:**
@@ -285,8 +295,8 @@ GroupBuilder was originally built for interfaith dialogue seminars, but works fo
 ## Roadmap
 
 - [ ] Excel export of generated assignments
-- [ ] Redis integration for production deployments
-- [ ] Email delivery via SendGrid
+- [x] Redis integration for production deployments
+- [x] Email delivery via SendGrid
 - [ ] Downloadable PDF table cards
 - [ ] User accounts and event history
 - [ ] Additional balancing attributes (age, profession, etc.)
