@@ -304,14 +304,7 @@ const LandingPage: React.FC = () => {
 
               <div className="flex justify-between items-center">
                 <Button type="submit" variant="outline" disabled={loading}>
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    'Generate Assignments'
-                  )}
+                  Generate Assignments
                 </Button>
                 <Button variant="outline" asChild disabled={loading}>
                   <a href="/template.xlsx" download>
