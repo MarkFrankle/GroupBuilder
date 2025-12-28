@@ -1,6 +1,9 @@
 from collections import defaultdict
 from math import ceil
 from ortools.sat.python import cp_model
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class GroupBuilder:
@@ -13,9 +16,14 @@ class GroupBuilder:
         self.genders = set([p["gender"] for p in self.participants])
 
     def generate_assignments(self) -> dict:
+        logger.info(f"Setting up model for {len(self.participants)} participants, "
+                   f"{len(self.tables)} tables, {len(self.sessions)} sessions")
         self.setup_model()
+        logger.info("Adding constraints to model")
         self._add_constraints_to_model()
+        logger.info("Adding objective functions to model")
         self._add_objective_functions_to_model()
+        logger.info("Running solver")
         return self._run_solver()
 
     def setup_model(self):
@@ -142,7 +150,14 @@ class GroupBuilder:
 
     def _run_solver(self):
         self.solver = cp_model.CpSolver()
+        # Set timeout to prevent infinite running (especially for large problems)
+        # For complex multi-session problems, we'll accept a good solution within time limit
+        self.solver.parameters.max_time_in_seconds = 120.0  # 2 minutes max
+
+        logger.info("Starting CP-SAT solver (max time: 120s)")
         status = self.solver.Solve(self.model)
+        logger.info(f"Solver completed with status: {self.solver.StatusName(status)} "
+                   f"in {self.solver.WallTime():.2f}s")
 
         if status in [cp_model.FEASIBLE, cp_model.OPTIMAL]:
             assignments = []
@@ -163,13 +178,30 @@ class GroupBuilder:
                 # Convert defaultdict to a regular dict for JSON compatibility
                 session_data["tables"] = dict(session_data["tables"])
                 assignments.append(session_data)
+
+            solution_quality = "optimal" if status == cp_model.OPTIMAL else "feasible"
             return {
                 "status": "success",
+                "solution_quality": solution_quality,
                 "total_deviation": self.solver.ObjectiveValue(),
+                "solve_time": self.solver.WallTime(),
                 "assignments": assignments,
             }
+        elif status == cp_model.INFEASIBLE:
+            return {
+                "status": "failure",
+                "error": "No solution exists with the given constraints. Try fewer sessions or more tables."
+            }
+        elif status == cp_model.MODEL_INVALID:
+            return {
+                "status": "failure",
+                "error": "Internal error: Invalid constraint model."
+            }
         else:
-            return {"status": "failure"}
+            return {
+                "status": "failure",
+                "error": "Solver timed out or encountered an unknown error."
+            }
 
 
 if __name__ == "__main__":

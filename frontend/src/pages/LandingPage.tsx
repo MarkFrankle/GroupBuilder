@@ -35,36 +35,47 @@ const LandingPage: React.FC = () => {
       setError('Please select a file to upload.');
       return;
     }
-  
+
+    setError(null);
+
     const formData = new FormData();
     formData.append('file', file);
     formData.append('numTables', numTables);
     formData.append('numSessions', numSessions);
-  
+
     try {
-      // Upload file
+      // Upload file and get session ID
       const uploadResponse = await fetch(`${API_BASE_URL}/api/upload/`, {
         method: 'POST',
         body: formData,
       });
-  
+
       if (!uploadResponse.ok) {
-        throw new Error('File upload failed');
+        const errorData = await uploadResponse.json();
+        throw new Error(errorData.detail || 'File upload failed');
       }
-  
-      // Generate assignments
-      const assignmentsResponse = await fetch(`${API_BASE_URL}/api/assignments/?file_name=${encodeURIComponent(file.name)}`, {
+
+      const uploadData = await uploadResponse.json();
+      const sessionId = uploadData.session_id;
+
+      if (!sessionId) {
+        throw new Error('No session ID received from server');
+      }
+
+      // Generate assignments using session ID
+      const assignmentsResponse = await fetch(`${API_BASE_URL}/api/assignments/?session_id=${sessionId}`, {
         method: 'GET',
       });
-  
+
       if (!assignmentsResponse.ok) {
-        throw new Error('Failed to generate assignments');
+        const errorData = await assignmentsResponse.json();
+        throw new Error(errorData.detail || 'Failed to generate assignments');
       }
-  
+
       const assignments = await assignmentsResponse.json();
-  
-      // Navigate to the TableAssignmentsPage with assignments
-      navigate('/table-assignments', { state: { assignments } });
+
+      // Navigate to the TableAssignmentsPage with assignments and session ID
+      navigate('/table-assignments', { state: { assignments, sessionId } });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
     }

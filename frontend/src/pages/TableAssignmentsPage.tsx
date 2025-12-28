@@ -45,9 +45,18 @@ const TableAssignmentsPage: React.FC = () => {
         if (process.env.NODE_ENV === 'development' && !useRealData) {
           setAssignments(dummyData)
         } else {
-          const response = await fetch(`${API_BASE_URL}/api/assignments/results`)
+          // Try to get session ID from navigation state
+          const sessionId = (window.history.state?.usr as any)?.sessionId;
+
+          if (!sessionId) {
+            // No session ID available, user might have refreshed the page
+            throw new Error('Session expired. Please upload a file again.')
+          }
+
+          const response = await fetch(`${API_BASE_URL}/api/assignments/results/${sessionId}`)
           if (!response.ok) {
-            throw new Error('Failed to fetch assignments')
+            const errorData = await response.json()
+            throw new Error(errorData.detail || 'Failed to fetch assignments')
           }
           const data = await response.json()
           setAssignments(data)
@@ -58,7 +67,7 @@ const TableAssignmentsPage: React.FC = () => {
         setLoading(false)
       }
     }
-  
+
     fetchAssignments()
   }, [])
   
