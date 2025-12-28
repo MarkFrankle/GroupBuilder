@@ -1,17 +1,22 @@
-# import debugpy
 from api.routers import upload, assignments
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import logging
 import os
 
 load_dotenv()
 
-# debugpy.listen(("0.0.0.0", 5678))
-# print("Waiting for debugger to attach...")
-# debugpy.wait_for_client()
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
+
+logger.info("Starting GroupBuilder API")
 
 app.add_middleware(
     CORSMiddleware,
