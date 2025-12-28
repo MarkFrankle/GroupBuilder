@@ -289,7 +289,7 @@ const LandingPage: React.FC = () => {
                       <SelectValue placeholder="Select number of sessions" />
                     </SelectTrigger>
                     <SelectContent>
-                      {[...Array(10)].map((_, i) => (
+                      {[...Array(6)].map((_, i) => (
                         <SelectItem key={i} value={(i + 1).toString()}>
                           {i + 1}
                         </SelectItem>
