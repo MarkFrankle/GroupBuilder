@@ -1,0 +1,113 @@
+import React, { useState } from 'react'
+import { Card, CardContent } from "@/components/ui/card"
+
+interface Participant {
+  name: string;
+  religion: string;
+  gender: string;
+  partner: string | null;
+}
+
+interface Assignment {
+  session: number;
+  tables: {
+    [key: number]: Participant[];
+  };
+}
+
+interface CompactAssignmentsProps {
+  assignments: Assignment[];
+}
+
+const CompactAssignments: React.FC<CompactAssignmentsProps> = ({ assignments }) => {
+  const [highlightedPerson, setHighlightedPerson] = useState<string | null>(null)
+
+  // Generate consistent color for each participant based on their name
+  const getPersonColor = (name: string): string => {
+    // Simple hash function to get consistent color
+    let hash = 0
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash)
+    }
+
+    // Use predefined color palette for better visibility
+    const colors = [
+      'bg-blue-100 hover:bg-blue-200',
+      'bg-green-100 hover:bg-green-200',
+      'bg-yellow-100 hover:bg-yellow-200',
+      'bg-purple-100 hover:bg-purple-200',
+      'bg-pink-100 hover:bg-pink-200',
+      'bg-indigo-100 hover:bg-indigo-200',
+      'bg-red-100 hover:bg-red-200',
+      'bg-orange-100 hover:bg-orange-200',
+      'bg-teal-100 hover:bg-teal-200',
+      'bg-cyan-100 hover:bg-cyan-200',
+      'bg-lime-100 hover:bg-lime-200',
+      'bg-amber-100 hover:bg-amber-200',
+    ]
+
+    const index = Math.abs(hash) % colors.length
+    return colors[index]
+  }
+
+  const handlePersonClick = (name: string) => {
+    setHighlightedPerson(highlightedPerson === name ? null : name)
+  }
+
+  return (
+    <div className="space-y-4">
+      {highlightedPerson && (
+        <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm">
+          <strong>{highlightedPerson}</strong> is highlighted across all sessions. Click again to clear.
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {assignments.map((assignment) => (
+          <Card key={assignment.session} className="overflow-hidden">
+            <div className="bg-gray-100 px-4 py-2 border-b">
+              <h3 className="font-semibold text-center">Session {assignment.session}</h3>
+            </div>
+            <CardContent className="p-4 space-y-3">
+              {Object.entries(assignment.tables)
+                .sort(([a], [b]) => Number(a) - Number(b))
+                .map(([tableNum, participants]) => (
+                  <div key={tableNum} className="space-y-1">
+                    <div className="text-xs font-semibold text-gray-600">Table {tableNum}</div>
+                    <div className="flex flex-wrap gap-1">
+                      {participants.map((participant, idx) => {
+                        const isHighlighted = participant.name === highlightedPerson
+                        const colorClass = getPersonColor(participant.name)
+
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => handlePersonClick(participant.name)}
+                            className={`
+                              px-2 py-1 rounded text-xs font-medium transition-all
+                              ${colorClass}
+                              ${isHighlighted ? 'ring-2 ring-blue-500 ring-offset-1' : ''}
+                              cursor-pointer
+                            `}
+                            title={`${participant.name}\n${participant.religion}, ${participant.gender}${participant.partner ? `\nPartner: ${participant.partner}` : ''}`}
+                          >
+                            {participant.name}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="text-xs text-muted-foreground text-center mt-4">
+        💡 Tip: Click any name to highlight them across all sessions. Hover to see details.
+      </div>
+    </div>
+  )
+}
+
+export default CompactAssignments

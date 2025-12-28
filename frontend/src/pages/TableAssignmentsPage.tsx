@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react"
 import { useNavigate } from 'react-router-dom'
 import TableAssignments from "../components/TableAssignments/TableAssignments"
+import CompactAssignments from "../components/CompactAssignments/CompactAssignments"
 import ValidationStats from "../components/ValidationStats/ValidationStats"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { dummyData } from "../data/dummyData"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2 } from 'lucide-react'
+import { Loader2, LayoutGrid, List } from 'lucide-react'
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
 
@@ -27,6 +28,7 @@ const TableAssignmentsPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [currentSession, setCurrentSession] = useState<number>(1)
+  const [viewMode, setViewMode] = useState<'detailed' | 'compact'>('compact')
 
   const navigate = useNavigate()
 
@@ -174,26 +176,54 @@ const TableAssignmentsPage: React.FC = () => {
         <CardContent>
           <ValidationStats assignments={assignments} />
 
-          <div className="flex justify-center space-x-4 mb-6">
-            <Button variant="outline" onClick={downloadCSV}>
-              Download CSV
-            </Button>
-            <Button variant="outline" onClick={handleRegenerateAssignments}>
-              Regenerate Assignments
-            </Button>
-            <Button variant="outline" onClick={handleClearAssignments}>
-              Clear Assignments
-            </Button>
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
+            <div className="flex gap-2">
+              <Button
+                variant={viewMode === 'compact' ? 'default' : 'outline'}
+                onClick={() => setViewMode('compact')}
+                size="sm"
+              >
+                <LayoutGrid className="h-4 w-4 mr-2" />
+                Compact
+              </Button>
+              <Button
+                variant={viewMode === 'detailed' ? 'default' : 'outline'}
+                onClick={() => setViewMode('detailed')}
+                size="sm"
+              >
+                <List className="h-4 w-4 mr-2" />
+                Detailed
+              </Button>
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={downloadCSV} size="sm">
+                Download CSV
+              </Button>
+              <Button variant="outline" onClick={handleRegenerateAssignments} size="sm">
+                Regenerate
+              </Button>
+              <Button variant="outline" onClick={handleClearAssignments} size="sm">
+                Clear
+              </Button>
+            </div>
           </div>
-          {currentAssignment && <TableAssignments assignment={currentAssignment} />}
-          <div className="flex justify-between mt-6">
-            <Button variant="outline" onClick={handlePreviousSession} disabled={currentSession === 1}>
-              Previous Session
-            </Button>
-            <Button variant="outline" onClick={handleNextSession} disabled={currentSession === assignments.length}>
-              Next Session
-            </Button>
-          </div>
+
+          {viewMode === 'compact' ? (
+            <CompactAssignments assignments={assignments} />
+          ) : (
+            <>
+              {currentAssignment && <TableAssignments assignment={currentAssignment} />}
+              <div className="flex justify-between mt-6">
+                <Button variant="outline" onClick={handlePreviousSession} disabled={currentSession === 1}>
+                  Previous Session
+                </Button>
+                <Button variant="outline" onClick={handleNextSession} disabled={currentSession === assignments.length}>
+                  Next Session
+                </Button>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
