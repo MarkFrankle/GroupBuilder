@@ -1,18 +1,13 @@
 import React, { useState, useEffect } from "react"
 import { useNavigate } from 'react-router-dom'
 import TableAssignments from "../components/TableAssignments/TableAssignments"
+import CompactAssignments from "../components/CompactAssignments/CompactAssignments"
+import ValidationStats from "../components/ValidationStats/ValidationStats"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { ChevronDown } from 'lucide-react'
 import { dummyData } from "../data/dummyData"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2 } from 'lucide-react'
+import { Loader2, LayoutGrid, List } from 'lucide-react'
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
 
@@ -33,6 +28,7 @@ const TableAssignmentsPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [currentSession, setCurrentSession] = useState<number>(1)
+  const [viewMode, setViewMode] = useState<'detailed' | 'compact'>('compact')
 
   const navigate = useNavigate()
 
@@ -101,15 +97,6 @@ const TableAssignmentsPage: React.FC = () => {
       setError(err instanceof Error ? err.message : "Failed to regenerate assignments")
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handleDownload = (format: string) => {
-    if (format === 'csv') {
-      downloadCSV()
-    } else {
-      // TODO: Implement PDF and Excel export
-      alert(`${format.toUpperCase()} export coming soon!`)
     }
   }
 
@@ -187,41 +174,58 @@ const TableAssignmentsPage: React.FC = () => {
           <CardTitle className="text-3xl font-bold text-center">Table Assignments</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex justify-center space-x-4 mb-6">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  Download Assignments <ChevronDown className="ml-2 h-4 w-4" />
+          <ValidationStats assignments={assignments} />
+
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
+            <div className="flex gap-2">
+              <Button
+                variant={viewMode === 'compact' ? 'outline' : 'ghost'}
+                onClick={() => setViewMode('compact')}
+                size="sm"
+                className={viewMode === 'compact' ? 'border-2 border-primary' : ''}
+              >
+                <LayoutGrid className="h-4 w-4 mr-2" />
+                Compact
+              </Button>
+              <Button
+                variant={viewMode === 'detailed' ? 'outline' : 'ghost'}
+                onClick={() => setViewMode('detailed')}
+                size="sm"
+                className={viewMode === 'detailed' ? 'border-2 border-primary' : ''}
+              >
+                <List className="h-4 w-4 mr-2" />
+                Detailed
+              </Button>
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={downloadCSV} size="sm">
+                Download CSV
+              </Button>
+              <Button variant="outline" onClick={handleRegenerateAssignments} size="sm">
+                Regenerate
+              </Button>
+              <Button variant="outline" onClick={handleClearAssignments} size="sm">
+                Clear
+              </Button>
+            </div>
+          </div>
+
+          {viewMode === 'compact' ? (
+            <CompactAssignments assignments={assignments} />
+          ) : (
+            <>
+              {currentAssignment && <TableAssignments assignment={currentAssignment} />}
+              <div className="flex justify-between mt-6">
+                <Button variant="outline" onClick={handlePreviousSession} disabled={currentSession === 1}>
+                  Previous Session
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => handleDownload('pdf')}>
-                  Download PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleDownload('xlsx')}>
-                  Download Excel
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleDownload('csv')}>
-                  Download CSV
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button variant="outline" onClick={handleRegenerateAssignments}>
-              Regenerate Assignments
-            </Button>
-            <Button variant="outline" onClick={handleClearAssignments}>
-              Clear Assignments
-            </Button>
-          </div>
-          {currentAssignment && <TableAssignments assignment={currentAssignment} />}
-          <div className="flex justify-between mt-6">
-            <Button variant="outline" onClick={handlePreviousSession} disabled={currentSession === 1}>
-              Previous Session
-            </Button>
-            <Button variant="outline" onClick={handleNextSession} disabled={currentSession === assignments.length}>
-              Next Session
-            </Button>
-          </div>
+                <Button variant="outline" onClick={handleNextSession} disabled={currentSession === assignments.length}>
+                  Next Session
+                </Button>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

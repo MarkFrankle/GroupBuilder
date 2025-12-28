@@ -170,7 +170,7 @@ class GroupBuilder:
                                     "name": p["name"],
                                     "religion": p["religion"],
                                     "gender": p["gender"],
-                                    "couple_id": p["couple_id"],
+                                    "partner": p.get("partner"),
                                 }
                             )
                 # Convert defaultdict to a regular dict for JSON compatibility
@@ -178,10 +178,18 @@ class GroupBuilder:
                 assignments.append(session_data)
 
             solution_quality = "optimal" if status == cp_model.OPTIMAL else "feasible"
+
+            try:
+                objective_value = self.solver.ObjectiveValue()
+                if objective_value != objective_value or objective_value == float('inf') or objective_value == float('-inf'):
+                    objective_value = None
+            except:
+                objective_value = None
+
             return {
                 "status": "success",
                 "solution_quality": solution_quality,
-                "total_deviation": self.solver.ObjectiveValue(),
+                "total_deviation": objective_value,
                 "solve_time": self.solver.WallTime(),
                 "assignments": assignments,
             }
@@ -203,34 +211,6 @@ class GroupBuilder:
 
 
 if __name__ == "__main__":
-    # Data input
-    # data = {
-    #     'Name': [
-    #         'John Doe', 'Jane Doe', 'Ali Hassan', 'Rachel Green', 'Ross Green',
-    #         'Chandler Bing', 'Monica', 'Joey', 'Phoebe', 'Akshay',
-    #         'Jessica', 'Mike', 'Anwar', 'Sarah', 'Ethan',
-    #         'Priya', 'Raj', 'Emily', 'Tariq', 'Sophia'
-    #     ],
-    #     'Religion': [
-    #         'Christian', 'Christian', 'Muslim', 'Jewish', 'Jewish',
-    #         'other', 'Muslim', 'Jewish', 'Christian', 'Muslim',
-    #         'Christian', 'Muslim', 'Muslim', 'Jewish', 'Jewish',
-    #         'Christian', 'other', 'other', 'Muslim', 'Christian'
-    #     ],
-    #     'Gender': [
-    #         'Male', 'Female', 'Male', 'Female', 'Male',
-    #         'Male', 'Female', 'Male', 'Female', 'Male',
-    #         'Female', 'Male', 'Male', 'Female', 'Male',
-    #         'Female', 'Male', 'Female', 'Male', 'Female'
-    #     ],
-    #     'Partner': [
-    #         'Jane Doe', 'John Doe', None, 'Ross Green', 'Rachel Green',
-    #         None, None, None, None, None,
-    #         'Mike', 'Jessica', 'Sarah', 'Anwar', 'Priya',
-    #         'Ethan', 'Emily', 'Raj', 'Sophia', 'Tariq'
-    #     ]
-    # }
-
     data = [
         {
             "id": 1,
