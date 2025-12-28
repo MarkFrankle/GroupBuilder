@@ -38,8 +38,9 @@ def get_assignments(session_id: str):
         # Debug: Log the results to see if there's NaN
         logger.info(f"Results keys: {results.keys()}")
         logger.info(f"total_deviation value: {results.get('total_deviation')} (type: {type(results.get('total_deviation'))})")
+        logger.info(f"solve_time value: {results.get('solve_time')} (type: {type(results.get('solve_time'))})")
 
-        store_result(session_id, {
+        result_data = {
             "assignments": results['assignments'],
             "metadata": {
                 "solution_quality": results.get('solution_quality'),
@@ -47,7 +48,23 @@ def get_assignments(session_id: str):
                 "total_deviation": results.get('total_deviation')
             },
             "created_at": datetime.now().isoformat()
-        })
+        }
+
+        # Debug: Test if result_data is serializable
+        try:
+            import json as json_module
+            json_module.dumps(result_data)
+            logger.info("result_data is JSON serializable")
+        except Exception as e:
+            logger.error(f"result_data NOT JSON serializable: {e}")
+            # Find the NaN
+            for key, val in result_data["metadata"].items():
+                try:
+                    json_module.dumps(val)
+                except:
+                    logger.error(f"  metadata.{key} = {val} is NOT serializable")
+
+        store_result(session_id, result_data)
 
         # Send magic link email if provided
         user_email = session_data.get("email")
