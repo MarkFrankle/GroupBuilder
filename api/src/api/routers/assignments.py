@@ -35,12 +35,7 @@ def get_assignments(session_id: str):
         logger.info(f"Successfully generated assignments (quality: {results.get('solution_quality', 'unknown')}, "
                    f"time: {results.get('solve_time', 'unknown')}s)")
 
-        # Debug: Log the results to see if there's NaN
-        logger.info(f"Results keys: {results.keys()}")
-        logger.info(f"total_deviation value: {results.get('total_deviation')} (type: {type(results.get('total_deviation'))})")
-        logger.info(f"solve_time value: {results.get('solve_time')} (type: {type(results.get('solve_time'))})")
-
-        result_data = {
+        store_result(session_id, {
             "assignments": results['assignments'],
             "metadata": {
                 "solution_quality": results.get('solution_quality'),
@@ -48,65 +43,15 @@ def get_assignments(session_id: str):
                 "total_deviation": results.get('total_deviation')
             },
             "created_at": datetime.now().isoformat()
-        }
+        })
 
-        # Debug: Test if result_data is serializable
-        try:
-            import json as json_module
-            json_module.dumps(result_data)
-            logger.info("result_data is JSON serializable")
-        except Exception as e:
-            logger.error(f"result_data NOT JSON serializable: {e}")
-            # Find the NaN
-            for key, val in result_data["metadata"].items():
-                try:
-                    json_module.dumps(val)
-                except:
-                    logger.error(f"  metadata.{key} = {val} is NOT serializable")
-
-        store_result(session_id, result_data)
-
-        # Send magic link email if provided
-        user_email = session_data.get("email")
-        if user_email:
-            magic_link_path = f"/table-assignments?session={session_id}"
+        if session_data.get("email"):
             send_magic_link_email(
-                to_email=user_email,
-                magic_link_path=magic_link_path,
+                to_email=session_data["email"],
+                magic_link_path=f"/table-assignments?session={session_id}",
                 num_sessions=num_sessions,
                 num_tables=num_tables
             )
-
-        # Keep upload data for regeneration (auto-cleaned after 1 hour)
-        # Debug: Aggressively scan for NaN values
-        import json
-        import math
-
-        def find_nan(obj, path=""):
-            """Recursively find NaN values in nested data structures"""
-            if isinstance(obj, float):
-                if math.isnan(obj) or math.isinf(obj):
-                    logger.error(f"FOUND NaN/Inf at {path}: {obj}")
-                    return True
-            elif isinstance(obj, dict):
-                for key, val in obj.items():
-                    if find_nan(val, f"{path}.{key}"):
-                        return True
-            elif isinstance(obj, (list, tuple)):
-                for i, val in enumerate(obj):
-                    if find_nan(val, f"{path}[{i}]"):
-                        return True
-            return False
-
-        logger.info("Scanning results for NaN...")
-        find_nan(results, "results")
-
-        try:
-            json.dumps(results['assignments'])
-            logger.info("Assignments are JSON serializable")
-        except Exception as e:
-            logger.error(f"Assignments NOT JSON serializable: {e}")
-            logger.error(f"Assignments preview: {str(results['assignments'])[:500]}")
 
         return results['assignments']
     except HTTPException:

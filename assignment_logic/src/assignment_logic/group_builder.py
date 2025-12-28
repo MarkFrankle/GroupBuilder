@@ -179,10 +179,8 @@ class GroupBuilder:
 
             solution_quality = "optimal" if status == cp_model.OPTIMAL else "feasible"
 
-            # Get objective value, handling cases where it might be NaN or unavailable
             try:
                 objective_value = self.solver.ObjectiveValue()
-                # Check for NaN or infinity
                 if objective_value != objective_value or objective_value == float('inf') or objective_value == float('-inf'):
                     objective_value = None
             except:
@@ -213,34 +211,6 @@ class GroupBuilder:
 
 
 if __name__ == "__main__":
-    # Data input
-    # data = {
-    #     'Name': [
-    #         'John Doe', 'Jane Doe', 'Ali Hassan', 'Rachel Green', 'Ross Green',
-    #         'Chandler Bing', 'Monica', 'Joey', 'Phoebe', 'Akshay',
-    #         'Jessica', 'Mike', 'Anwar', 'Sarah', 'Ethan',
-    #         'Priya', 'Raj', 'Emily', 'Tariq', 'Sophia'
-    #     ],
-    #     'Religion': [
-    #         'Christian', 'Christian', 'Muslim', 'Jewish', 'Jewish',
-    #         'other', 'Muslim', 'Jewish', 'Christian', 'Muslim',
-    #         'Christian', 'Muslim', 'Muslim', 'Jewish', 'Jewish',
-    #         'Christian', 'other', 'other', 'Muslim', 'Christian'
-    #     ],
-    #     'Gender': [
-    #         'Male', 'Female', 'Male', 'Female', 'Male',
-    #         'Male', 'Female', 'Male', 'Female', 'Male',
-    #         'Female', 'Male', 'Male', 'Female', 'Male',
-    #         'Female', 'Male', 'Female', 'Male', 'Female'
-    #     ],
-    #     'Partner': [
-    #         'Jane Doe', 'John Doe', None, 'Ross Green', 'Rachel Green',
-    #         None, None, None, None, None,
-    #         'Mike', 'Jessica', 'Sarah', 'Anwar', 'Priya',
-    #         'Ethan', 'Emily', 'Raj', 'Sophia', 'Tariq'
-    #     ]
-    # }
-
     data = [
         {
             "id": 1,
