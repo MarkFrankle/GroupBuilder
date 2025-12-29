@@ -414,7 +414,7 @@ const TableAssignmentsPage: React.FC = () => {
                     <RotateCw className="h-4 w-4 mr-2" />
                     Regenerate
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleClearAssignments} disabled={editMode}>
+                  <DropdownMenuItem onClick={handleClearAssignments}>
                     <X className="h-4 w-4 mr-2" />
                     Clear
                   </DropdownMenuItem>
