@@ -26,6 +26,7 @@ EXPOSE 8080
 # Set environment variables
 ENV PORT=8080
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app/src
 
 # Run with uvicorn (single worker for Cloud Run autoscaling)
 CMD exec uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT} --workers 1
