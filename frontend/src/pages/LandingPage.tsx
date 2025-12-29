@@ -324,7 +324,7 @@ const LandingPage: React.FC = () => {
                   type="file"
                   accept=".xlsx, .xls"
                   onChange={handleFileChange}
-                  disabled={selectedRecentUpload !== "new-upload"}
+                  disabled={selectedRecentUpload !== "" && selectedRecentUpload !== "new-upload"}
                 />
                 {selectedRecentUpload !== "new-upload" && (
                   <p className="text-sm text-muted-foreground">
