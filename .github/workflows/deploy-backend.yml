@@ -53,6 +53,7 @@ jobs:
             --cpu 4 \
             --timeout 300 \
             --max-instances 10 \
+            --clear-secrets \
             --set-env-vars "UPSTASH_REDIS_REST_URL=${{ secrets.UPSTASH_REDIS_REST_URL }},UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_REST_TOKEN }},CORS_ORIGINS=${{ secrets.FRONTEND_URL }},FROM_EMAIL=${{ secrets.FROM_EMAIL }},FRONTEND_URL=${{ secrets.FRONTEND_URL }},SENDGRID_API_KEY=${{ secrets.SENDGRID_API_KEY }}"
 
       - name: Show deployed service URL
