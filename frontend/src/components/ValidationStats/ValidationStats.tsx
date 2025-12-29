@@ -1,7 +1,6 @@
 import React from 'react'
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { CheckCircle2, AlertCircle, Info } from 'lucide-react'
+import { CheckCircle2, AlertCircle } from 'lucide-react'
 
 interface Participant {
   name: string;
@@ -47,7 +46,9 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
     const firstSession = assignments[0]
     const allParticipants: Participant[] = []
     Object.values(firstSession.tables).forEach(participants => {
-      allParticipants.push(...participants)
+      // Filter out empty/undefined participants
+      const realParticipants = participants.filter(p => p && p.name && p.name !== '')
+      allParticipants.push(...realParticipants)
     })
     const totalParticipants = allParticipants.length
 
@@ -55,11 +56,13 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
     let coupleViolations = 0
     assignments.forEach(assignment => {
       Object.values(assignment.tables).forEach(participants => {
+        // Filter out empty/undefined participants
+        const realParticipants = participants.filter(p => p && p.name && p.name !== '')
         const couples = new Set<string>()
-        participants.forEach(p => {
+        realParticipants.forEach(p => {
           if (p.partner) {
             // Check if partner is at same table
-            const partnerAtTable = participants.some(other => other.name === p.partner)
+            const partnerAtTable = realParticipants.some(other => other && other.name === p.partner)
             if (partnerAtTable) {
               const coupleKey = [p.name, p.partner].sort().join('-')
               couples.add(coupleKey)
@@ -80,7 +83,9 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
       // Religion balance
       const religionCounts = tables.map(participants => {
         const counts: { [key: string]: number } = {}
-        participants.forEach(p => {
+        // Filter out empty/undefined participants
+        const realParticipants = participants.filter(p => p && p.name && p.name !== '')
+        realParticipants.forEach(p => {
           counts[p.religion] = (counts[p.religion] || 0) + 1
         })
         return counts
@@ -98,7 +103,9 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
       // Gender balance
       const genderCounts = tables.map(participants => {
         const counts: { [key: string]: number } = {}
-        participants.forEach(p => {
+        // Filter out empty/undefined participants
+        const realParticipants = participants.filter(p => p && p.name && p.name !== '')
+        realParticipants.forEach(p => {
           counts[p.gender] = (counts[p.gender] || 0) + 1
         })
         return counts
@@ -118,10 +125,12 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
 
     assignments.forEach(assignment => {
       Object.values(assignment.tables).forEach(participants => {
+        // Filter out empty/undefined participants
+        const realParticipants = participants.filter(p => p && p.name && p.name !== '')
         // For each table, count all pairings
-        for (let i = 0; i < participants.length; i++) {
-          for (let j = i + 1; j < participants.length; j++) {
-            const pairKey = [participants[i].name, participants[j].name].sort().join('|')
+        for (let i = 0; i < realParticipants.length; i++) {
+          for (let j = i + 1; j < realParticipants.length; j++) {
+            const pairKey = [realParticipants[i].name, realParticipants[j].name].sort().join('|')
             pairingsCount.set(pairKey, (pairingsCount.get(pairKey) || 0) + 1)
           }
         }
@@ -146,8 +155,10 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
 
     assignments.forEach(assignment => {
       Object.values(assignment.tables).forEach(participants => {
-        participants.forEach(p1 => {
-          participants.forEach(p2 => {
+        // Filter out empty/undefined participants
+        const realParticipants = participants.filter(p => p && p.name && p.name !== '')
+        realParticipants.forEach(p1 => {
+          realParticipants.forEach(p2 => {
             if (p1.name !== p2.name) {
               participantPairings.get(p1.name)?.add(p2.name)
             }
@@ -235,17 +246,13 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
           <div className="space-y-2">
             <h3 className="font-semibold text-sm text-muted-foreground">Mixing Quality</h3>
             <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-blue-600" />
-                <span className="text-sm">
-                  Avg {stats.avgNewPeopleMet} unique tablemates per person
-                </span>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-base">👥</span>
+                Avg {stats.avgNewPeopleMet} unique tablemates per person
               </div>
-              <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-blue-600" />
-                <span className="text-sm">
-                  {stats.repeatPairings} pairs meet more than once
-                </span>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-base">🔄</span>
+                {stats.repeatPairings} pairs meet more than once
               </div>
               <div className="text-xs text-muted-foreground mt-1">
                 Across {assignments.length} session{assignments.length !== 1 ? 's' : ''}
@@ -257,21 +264,15 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
           <div className="space-y-2">
             <h3 className="font-semibold text-sm text-muted-foreground">Overall</h3>
             {allConstraintsSatisfied ? (
-              <Alert className="py-2">
-                <CheckCircle2 className="h-4 w-4" />
-                <AlertTitle className="text-sm">Looks good!</AlertTitle>
-                <AlertDescription className="text-xs">
-                  All requirements met - ready to use
-                </AlertDescription>
-              </Alert>
+              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                <span className="text-3xl">✅</span>
+                <div className="font-semibold text-sm text-green-900">Looks Good</div>
+              </div>
             ) : (
-              <Alert variant="destructive" className="py-2">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle className="text-sm">Issues found</AlertTitle>
-                <AlertDescription className="text-xs">
-                  Check details above
-                </AlertDescription>
-              </Alert>
+              <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-300">
+                <span className="text-3xl">🚧</span>
+                <div className="font-semibold text-sm text-yellow-900">Has Issues</div>
+              </div>
             )}
           </div>
         </div>

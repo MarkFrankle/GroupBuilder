@@ -14,8 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { getRecentUploadIds, saveRecentUpload, removeRecentUpload, type RecentUpload } from '@/utils/recentUploads'
-
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+import { API_BASE_URL } from '@/config/api'
 
 const LandingPage: React.FC = () => {
   const [file, setFile] = useState<File | null>(null)
