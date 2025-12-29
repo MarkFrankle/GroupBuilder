@@ -67,11 +67,16 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
     const hasGenderImbalance = genderCountValues.length > 0 &&
       (Math.max(...genderCountValues) - Math.min(...genderCountValues) > 1)
 
+    const hasCouple = realParticipants.some(p => p.partner)
     const coupleViolations = new Set<string>()
+    const violatingCoupleNames: string[] = []
     realParticipants.forEach(p => {
       if (p.partner && realParticipants.some(other => other.name === p.partner)) {
         const coupleKey = [p.name, p.partner].sort().join('-')
-        coupleViolations.add(coupleKey)
+        if (!coupleViolations.has(coupleKey)) {
+          coupleViolations.add(coupleKey)
+          violatingCoupleNames.push(p.name)
+        }
       }
     })
 
@@ -79,8 +84,10 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
       count: realParticipants.length,
       genderSplit: genderSplit || '0',
       religionCount: religions.size,
+      hasCouple,
       hasCoupleViolation: coupleViolations.size > 0,
-      hasGenderImbalance
+      hasGenderImbalance,
+      violatingCoupleNames
     }
   }
 
@@ -161,7 +168,8 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
                     <span className={stats.hasCoupleViolation ? 'text-red-600' : ''}>Table {tableNumber}</span>
                     <span className="text-sm font-normal text-muted-foreground">
                       {stats.count} {stats.count === 1 ? 'person' : 'people'} • <span className={stats.hasGenderImbalance ? 'text-red-600' : ''}>{stats.genderSplit}</span> • {stats.religionCount} {stats.religionCount === 1 ? 'religion' : 'religions'}
-                      {stats.hasCoupleViolation && <span className="text-red-600"> • ⚠️ Couple</span>}
+                      {stats.hasCouple && !stats.hasCoupleViolation && <span> • Couple</span>}
+                      {stats.hasCoupleViolation && <span className="text-red-600"> • ⚠️ Couple ({stats.violatingCoupleNames.join(', ')})</span>}
                     </span>
                   </CardTitle>
                 </CardHeader>
