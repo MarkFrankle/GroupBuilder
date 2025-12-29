@@ -43,7 +43,7 @@ const LandingPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false)
   const [loadingMessage, setLoadingMessage] = useState<string>("")
   const [recentUploads, setRecentUploads] = useState<RecentUpload[]>([])
-  const [selectedRecentUpload, setSelectedRecentUpload] = useState<string>("new-upload")
+  const [selectedRecentUpload, setSelectedRecentUpload] = useState<string>("")
   const [availableVersions, setAvailableVersions] = useState<ResultVersion[]>([])
   const [advancedOpen, setAdvancedOpen] = useState<boolean>(false)
   const navigate = useNavigate()
@@ -159,7 +159,7 @@ const LandingPage: React.FC = () => {
     event.preventDefault();
 
     // Check if using recent upload or new file
-    if (!file && selectedRecentUpload === "new-upload") {
+    if (!file && (!selectedRecentUpload || selectedRecentUpload === "new-upload")) {
       setError('Please select a file to upload or choose a recent upload.');
       return;
     }
@@ -297,7 +297,7 @@ const LandingPage: React.FC = () => {
                   </Label>
                   <Select value={selectedRecentUpload} onValueChange={handleRecentUploadSelect}>
                     <SelectTrigger id="recent-uploads">
-                      <SelectValue placeholder="Select a previous file" />
+                      <SelectValue placeholder="Select a previous upload" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="new-upload">New upload</SelectItem>
@@ -422,7 +422,7 @@ const LandingPage: React.FC = () => {
                       <Button
                         type="button"
                         variant="outline"
-                        disabled={loading || selectedRecentUpload === "new-upload" || !recentUploads.find(u => u.session_id === selectedRecentUpload)?.has_results}
+                        disabled={loading || !selectedRecentUpload || selectedRecentUpload === "new-upload" || !recentUploads.find(u => u.session_id === selectedRecentUpload)?.has_results}
                         className="flex-1"
                       >
                         View Previous Results
