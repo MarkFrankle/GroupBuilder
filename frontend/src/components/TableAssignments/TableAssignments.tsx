@@ -67,16 +67,11 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
     const hasGenderImbalance = genderCountValues.length > 0 &&
       (Math.max(...genderCountValues) - Math.min(...genderCountValues) > 1)
 
-    const hasCouple = realParticipants.some(p => p.partner)
     const coupleViolations = new Set<string>()
-    const violatingCoupleNames: string[] = []
     realParticipants.forEach(p => {
       if (p.partner && realParticipants.some(other => other.name === p.partner)) {
         const coupleKey = [p.name, p.partner].sort().join('-')
-        if (!coupleViolations.has(coupleKey)) {
-          coupleViolations.add(coupleKey)
-          violatingCoupleNames.push(p.name)
-        }
+        coupleViolations.add(coupleKey)
       }
     })
 
@@ -84,10 +79,8 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
       count: realParticipants.length,
       genderSplit: genderSplit || '0',
       religionCount: religions.size,
-      hasCouple,
       hasCoupleViolation: coupleViolations.size > 0,
-      hasGenderImbalance,
-      violatingCoupleNames
+      hasGenderImbalance
     }
   }
 
@@ -168,8 +161,7 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
                     <span className={stats.hasCoupleViolation ? 'text-red-600' : ''}>Table {tableNumber}</span>
                     <span className="text-sm font-normal text-muted-foreground">
                       {stats.count} {stats.count === 1 ? 'person' : 'people'} • <span className={stats.hasGenderImbalance ? 'text-red-600' : ''}>{stats.genderSplit}</span> • {stats.religionCount} {stats.religionCount === 1 ? 'religion' : 'religions'}
-                      {stats.hasCouple && !stats.hasCoupleViolation && <span> • Couple</span>}
-                      {stats.hasCoupleViolation && <span className="text-red-600"> • ⚠️ Couple ({stats.violatingCoupleNames.join(', ')})</span>}
+                      {stats.hasCoupleViolation && <span className="text-red-600"> • ⚠️ Couple</span>}
                     </span>
                   </CardTitle>
                 </CardHeader>
@@ -200,12 +192,15 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
                             <div className="flex-1 space-y-1.5">
                               <div className="flex items-center gap-2">
                                 <span className="font-medium">{participant.name}</span>
-                                {participant.partner && (
-                                  <div className="flex items-center gap-1 text-xs text-red-600">
-                                    <Heart className="h-3 w-3 fill-current" />
-                                    <span className="text-muted-foreground">with {participant.partner}</span>
-                                  </div>
-                                )}
+                                {participant.partner && (() => {
+                                  const partnerAtSameTable = participants.some(p => p.name === participant.partner)
+                                  return (
+                                    <div className="flex items-center gap-1 text-xs text-red-600">
+                                      <Heart className="h-3 w-3 fill-current" />
+                                      <span className={partnerAtSameTable ? 'text-red-600' : 'text-gray-900'}>with {participant.partner}</span>
+                                    </div>
+                                  )
+                                })()}
                               </div>
                               <div className="flex flex-wrap gap-1.5">
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getReligionColor(participant.religion)}`}>
