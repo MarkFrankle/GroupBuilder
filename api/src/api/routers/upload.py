@@ -6,33 +6,47 @@ import logging
 import pandas as pd
 import uuid
 from datetime import datetime
+import re
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# Configuration constants
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB in bytes
+MAX_PARTICIPANTS = 200
+EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+
 @router.post("/")
 async def upload_file(
     file: UploadFile = File(...),
-    numTables: int = Form(...),
-    numSessions: int = Form(...),
+    numTables: int = Form(..., ge=1, le=10),
+    numSessions: int = Form(..., ge=1, le=6),
     email: str = Form(None),
 ):
     logger.info(f"Uploading file: {file.filename}, tables: {numTables}, sessions: {numSessions}")
 
-    if numTables < 1 or numTables > 10:
-        logger.warning(f"Invalid number of tables: {numTables}")
-        raise HTTPException(status_code=400, detail="Number of tables must be between 1 and 10.")
+    # Validate email format if provided
+    if email and not EMAIL_REGEX.match(email):
+        logger.warning(f"Invalid email format: {email}")
+        raise HTTPException(status_code=400, detail="Invalid email address format.")
 
-    if numSessions < 1 or numSessions > 6:
-        logger.warning(f"Invalid number of sessions: {numSessions}")
-        raise HTTPException(status_code=400, detail="Number of sessions must be between 1 and 6.")
-
+    # Validate file extension
     if not file.filename.endswith((".xlsx", ".xls")):
         logger.warning(f"Invalid file format: {file.filename}")
         raise HTTPException(status_code=400, detail="Invalid file format. Please upload an Excel file.")
 
     try:
+        # Read file with size limit
         contents = await file.read()
+
+        # Check file size
+        if len(contents) > MAX_FILE_SIZE:
+            logger.warning(f"File too large: {len(contents)} bytes (max: {MAX_FILE_SIZE})")
+            raise HTTPException(
+                status_code=400,
+                detail=f"File size ({len(contents) / 1024 / 1024:.1f}MB) exceeds maximum allowed size (10MB)."
+            )
+
         participant_dataframe = pd.read_excel(BytesIO(contents))
         logger.info(f"Parsed Excel file with {len(participant_dataframe)} participants")
 
@@ -55,11 +69,11 @@ async def upload_file(
                        f"Need at least {numTables} participants."
             )
 
-        if num_participants > 200:
+        if num_participants > MAX_PARTICIPANTS:
             logger.warning(f"Too many participants ({num_participants})")
             raise HTTPException(
                 status_code=400,
-                detail=f"Maximum 200 participants supported. You have {num_participants}."
+                detail=f"Maximum {MAX_PARTICIPANTS} participants supported. You have {num_participants}."
             )
 
         participant_dict = dataframe_to_participant_dict(participant_dataframe)

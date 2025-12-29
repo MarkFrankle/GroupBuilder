@@ -165,7 +165,11 @@ def create_storage_backend() -> StorageBackend:
     """
     Create appropriate storage backend based on environment.
     Priority: Upstash REST (serverless-optimized) > Redis > In-memory
+
+    Set REQUIRE_PERSISTENT_STORAGE=true in production to fail hard if external storage unavailable.
     """
+    require_persistent = os.getenv("REQUIRE_PERSISTENT_STORAGE", "false").lower() == "true"
+
     # First try Upstash REST (best for serverless environments)
     upstash_url = os.getenv("UPSTASH_REDIS_REST_URL", "").strip()
     upstash_token = os.getenv("UPSTASH_REDIS_REST_TOKEN", "").strip()
@@ -175,10 +179,18 @@ def create_storage_backend() -> StorageBackend:
             return UpstashRestBackend(upstash_url, upstash_token)
         except Exception as e:
             logger.error(f"Failed to connect to Upstash REST at {upstash_url}: {e}")
+            if require_persistent:
+                raise RuntimeError(
+                    "REQUIRE_PERSISTENT_STORAGE is enabled but Upstash connection failed. "
+                    "Cannot start with in-memory storage in production."
+                ) from e
             logger.warning("Falling back to in-memory storage")
             return InMemoryBackend()
     elif upstash_url and upstash_token and not UPSTASH_AVAILABLE:
-        logger.warning(f"UPSTASH_REDIS_REST_URL set, but upstash-redis library not installed")
+        error_msg = "UPSTASH_REDIS_REST_URL set, but upstash-redis library not installed"
+        logger.warning(error_msg)
+        if require_persistent:
+            raise RuntimeError(f"{error_msg}. Cannot start with in-memory storage in production.")
         logger.warning("Falling back to in-memory storage")
         return InMemoryBackend()
 
@@ -189,14 +201,28 @@ def create_storage_backend() -> StorageBackend:
             return RedisBackend(redis_url)
         except Exception as e:
             logger.error(f"Failed to connect to Redis at {redis_url}: {e}")
+            if require_persistent:
+                raise RuntimeError(
+                    "REQUIRE_PERSISTENT_STORAGE is enabled but Redis connection failed. "
+                    "Cannot start with in-memory storage in production."
+                ) from e
             logger.warning("Falling back to in-memory storage")
             return InMemoryBackend()
     elif redis_url and not REDIS_AVAILABLE:
-        logger.warning(f"REDIS_URL set, but redis library not installed")
+        error_msg = "REDIS_URL set, but redis library not installed"
+        logger.warning(error_msg)
+        if require_persistent:
+            raise RuntimeError(f"{error_msg}. Cannot start with in-memory storage in production.")
         logger.warning("Falling back to in-memory storage")
         return InMemoryBackend()
 
     # No external storage configured
+    if require_persistent:
+        raise RuntimeError(
+            "REQUIRE_PERSISTENT_STORAGE is enabled but no external storage configured. "
+            "Set UPSTASH_REDIS_REST_URL/TOKEN or REDIS_URL."
+        )
+
     logger.info("No external storage configured, using in-memory storage")
     return InMemoryBackend()
 
