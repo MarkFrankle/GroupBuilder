@@ -43,6 +43,14 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
       if (currentSize < maxSize) {
         tables[key] = [...tables[key], ...Array(maxSize - currentSize).fill(EMPTY_PARTICIPANT)]
       }
+      // Sort so empty slots are always at the bottom
+      tables[key] = tables[key].sort((a, b) => {
+        const aIsEmpty = !a || a.name === ''
+        const bIsEmpty = !b || b.name === ''
+        if (aIsEmpty && !bIsEmpty) return 1
+        if (!aIsEmpty && bIsEmpty) return -1
+        return 0
+      })
     })
 
     return tables
@@ -170,7 +178,16 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
                     {participants.map((participant, index) => {
                       const isEmpty = !participant || participant.name === ''
                       const selected = isSelected(Number(tableNumber), index)
-                      const isTarget = editMode && selectedSlot && !selected
+
+                      // Check if selected slot is empty
+                      const selectedParticipant = selectedSlot ? tablesWithEmptySlots[selectedSlot.tableNum][selectedSlot.index] : null
+                      const selectedIsEmpty = selectedParticipant ? (!selectedParticipant || selectedParticipant.name === '') : false
+
+                      // Don't highlight empty slots on same table as selected, or this slot if selected is empty on same table
+                      const sameTable = selectedSlot && selectedSlot.tableNum === Number(tableNumber)
+                      const shouldExclude = sameTable && (isEmpty || selectedIsEmpty)
+
+                      const isTarget = editMode && selectedSlot && !selected && !shouldExclude
 
                       return (
                         <div
