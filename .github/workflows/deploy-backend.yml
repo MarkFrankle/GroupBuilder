@@ -32,19 +32,15 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Configure Docker for GCR
+      - name: Build and push Docker image with Cloud Build
         run: |
-          gcloud auth configure-docker
+          gcloud builds submit --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/groupbuilder-api:${{ github.sha }} .
 
-      - name: Build Docker image
-        run: |
-          docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/groupbuilder-api:${{ github.sha }} \
-                       -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/groupbuilder-api:latest .
-
-      - name: Push Docker image to GCR
-        run: |
-          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/groupbuilder-api:${{ github.sha }}
-          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/groupbuilder-api:latest
+          # Tag the SHA image as latest
+          gcloud container images add-tag \
+            gcr.io/${{ secrets.GCP_PROJECT_ID }}/groupbuilder-api:${{ github.sha }} \
+            gcr.io/${{ secrets.GCP_PROJECT_ID }}/groupbuilder-api:latest \
+            --quiet
 
       - name: Deploy to Cloud Run
         run: |
