@@ -44,8 +44,9 @@ const TableAssignmentsPage: React.FC = () => {
         if (process.env.NODE_ENV === 'development' && !useRealData) {
           setAssignments(dummyData)
         } else {
-          // Try to get session ID from navigation state
-          const sessionId = (window.history.state?.usr as any)?.sessionId;
+          // Try to get session ID from: 1) URL query param, 2) navigation state
+          const urlParams = new URLSearchParams(window.location.search);
+          const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId;
 
           if (!sessionId) {
             // No session ID available, user might have refreshed the page
@@ -79,7 +80,8 @@ const TableAssignmentsPage: React.FC = () => {
     setLoading(true)
     setError(null)
     try {
-      const sessionId = (window.history.state?.usr as any)?.sessionId;
+      const urlParams = new URLSearchParams(window.location.search);
+      const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId;
 
       if (!sessionId) {
         throw new Error('Session ID not found. Please upload a file again.')

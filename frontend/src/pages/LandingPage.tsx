@@ -344,6 +344,7 @@ const LandingPage: React.FC = () => {
                 {recentUploads.length > 0 && (
                   <Button
                     type="button"
+                    variant="outline"
                     disabled={loading || selectedRecentUpload === "new-upload" || !recentUploads.find(u => u.session_id === selectedRecentUpload)?.has_results}
                     onClick={() => {
                       if (selectedRecentUpload !== "new-upload") {
