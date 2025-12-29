@@ -141,11 +141,11 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
             return (
               <Card key={tableNumber}>
                 <CardHeader className="pb-3">
-                  <CardTitle className={`text-lg flex items-center justify-between ${stats.hasCoupleViolation ? 'text-red-600' : ''}`}>
+                  <CardTitle className="text-lg flex items-center justify-between">
                     <span>Table {tableNumber}</span>
-                    <span className={`text-sm font-normal ${stats.hasCoupleViolation ? 'text-red-600' : 'text-muted-foreground'}`}>
+                    <span className="text-sm font-normal text-muted-foreground">
                       {stats.count} {stats.count === 1 ? 'person' : 'people'} • {stats.genderSplit} • {stats.religionCount} {stats.religionCount === 1 ? 'religion' : 'religions'}
-                      {stats.hasCoupleViolation && ' • ⚠️ Couple'}
+                      {stats.hasCoupleViolation && <span className="text-red-600"> • ⚠️ Couple</span>}
                     </span>
                   </CardTitle>
                 </CardHeader>

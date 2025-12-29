@@ -234,10 +234,12 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
           <div className="space-y-2">
             <h3 className="font-semibold text-sm text-muted-foreground">Mixing Quality</h3>
             <div className="space-y-1">
-              <div className="text-sm">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-base">👥</span>
                 Avg {stats.avgNewPeopleMet} unique tablemates per person
               </div>
-              <div className="text-sm">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-base">🔄</span>
                 {stats.repeatPairings} pairs meet more than once
               </div>
               <div className="text-xs text-muted-foreground mt-1">
@@ -252,18 +254,12 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
             {allConstraintsSatisfied ? (
               <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
                 <span className="text-3xl">✅</span>
-                <div>
-                  <div className="font-semibold text-sm text-green-900">Looks Good</div>
-                  <div className="text-xs text-green-700">All requirements met</div>
-                </div>
+                <div className="font-semibold text-sm text-green-900">Looks Good</div>
               </div>
             ) : (
               <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-300">
                 <span className="text-3xl">🚧</span>
-                <div>
-                  <div className="font-semibold text-sm text-yellow-900">Has Issues</div>
-                  <div className="text-xs text-yellow-700">Check details to the left</div>
-                </div>
+                <div className="font-semibold text-sm text-yellow-900">Has Issues</div>
               </div>
             )}
           </div>
