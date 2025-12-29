@@ -21,6 +21,9 @@ assignment-logic = {path = "../assignment_logic"}
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.9"
+pytest = "^7.4.0"
+pytest-cov = "^4.1.0"
+httpx = "^0.25.0"
 
 [build-system]
 requires = ["poetry-core"]

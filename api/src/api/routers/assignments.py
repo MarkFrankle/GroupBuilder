@@ -14,7 +14,7 @@ router = APIRouter()
 
 @router.get("/")
 def get_assignments(
-    session_id: str = Query(..., description="Session ID", min_length=36, max_length=36, regex="^[a-f0-9-]{36}$")
+    session_id: str = Query(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$")
 ):
     logger.info(f"Generating assignments for session: {session_id}")
 
