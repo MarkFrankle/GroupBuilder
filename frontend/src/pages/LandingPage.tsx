@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle, Loader2, Clock, ChevronDown } from 'lucide-react'
+import { AlertCircle, Loader2, Clock, ChevronDown, ChevronRight } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -19,6 +19,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 import { getRecentUploadIds, saveRecentUpload, removeRecentUpload, type RecentUpload } from '@/utils/recentUploads'
 import { API_BASE_URL } from '@/config/api'
 
@@ -38,8 +43,9 @@ const LandingPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false)
   const [loadingMessage, setLoadingMessage] = useState<string>("")
   const [recentUploads, setRecentUploads] = useState<RecentUpload[]>([])
-  const [selectedRecentUpload, setSelectedRecentUpload] = useState<string>("new-upload")
+  const [selectedRecentUpload, setSelectedRecentUpload] = useState<string>("")
   const [availableVersions, setAvailableVersions] = useState<ResultVersion[]>([])
+  const [advancedOpen, setAdvancedOpen] = useState<boolean>(false)
   const navigate = useNavigate()
 
   // Load recent uploads on mount
@@ -153,7 +159,7 @@ const LandingPage: React.FC = () => {
     event.preventDefault();
 
     // Check if using recent upload or new file
-    if (!file && selectedRecentUpload === "new-upload") {
+    if (!file && (!selectedRecentUpload || selectedRecentUpload === "new-upload")) {
       setError('Please select a file to upload or choose a recent upload.');
       return;
     }
@@ -360,19 +366,35 @@ const LandingPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email (optional)</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="your.email@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-                <p className="text-sm text-muted-foreground">
-                  Get a link to your results via email (bookmarkable for 30 days)
-                </p>
-              </div>
+              <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex items-center gap-1 p-0 h-auto font-normal text-muted-foreground hover:text-foreground"
+                  >
+                    {advancedOpen ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                    <span className="text-sm">Advanced Options</span>
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-2 mt-2">
+                  <Label htmlFor="email">Email (optional)</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="your.email@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Get a link to your results via email (bookmarkable for 30 days)
+                  </p>
+                </CollapsibleContent>
+              </Collapsible>
 
               {loading && (
                 <Alert>
@@ -400,7 +422,7 @@ const LandingPage: React.FC = () => {
                       <Button
                         type="button"
                         variant="outline"
-                        disabled={loading || selectedRecentUpload === "new-upload" || !recentUploads.find(u => u.session_id === selectedRecentUpload)?.has_results}
+                        disabled={loading || !selectedRecentUpload || selectedRecentUpload === "new-upload" || !recentUploads.find(u => u.session_id === selectedRecentUpload)?.has_results}
                         className="flex-1"
                       >
                         View Previous Results
