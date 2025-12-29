@@ -2,12 +2,15 @@ import React from "react"
 import ReactDOM from "react-dom/client"
 import "./styles/index.css" // Make sure this imports all your styles
 import App from "./App"
+import ErrorBoundary from "./components/ErrorBoundary"
 import reportWebVitals from './utils/reportWebVitals';
 
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement)
 root.render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>
 )
 
