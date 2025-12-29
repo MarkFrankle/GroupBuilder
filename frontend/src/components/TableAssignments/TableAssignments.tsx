@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Heart } from 'lucide-react'
 
@@ -18,14 +18,42 @@ interface Assignment {
 
 interface TableAssignmentsProps {
   assignment: Assignment;
+  editMode?: boolean;
+  onSwap?: (tableNum1: number, participantIndex1: number, tableNum2: number, participantIndex2: number) => void;
 }
 
-const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment }) => {
+const EMPTY_PARTICIPANT: Participant = {
+  name: '',
+  religion: '',
+  gender: '',
+  partner: null
+}
+
+const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMode = false, onSwap }) => {
+  const [selectedSlot, setSelectedSlot] = useState<{tableNum: number, index: number} | null>(null)
+
+  const tablesWithEmptySlots = useMemo(() => {
+    const tables = { ...assignment.tables }
+    const tableSizes = Object.values(tables).map(p => p.length)
+    const maxSize = Math.max(...tableSizes)
+
+    Object.keys(tables).forEach(tableNum => {
+      const key = Number(tableNum)
+      const currentSize = tables[key].length
+      if (currentSize < maxSize) {
+        tables[key] = [...tables[key], ...Array(maxSize - currentSize).fill(EMPTY_PARTICIPANT)]
+      }
+    })
+
+    return tables
+  }, [assignment.tables])
+
   const calculateTableStats = (participants: Participant[]) => {
+    const realParticipants = participants.filter(p => p.name !== '')
     const genderCounts: { [key: string]: number } = {}
     const religions = new Set<string>()
 
-    participants.forEach(p => {
+    realParticipants.forEach(p => {
       genderCounts[p.gender] = (genderCounts[p.gender] || 0) + 1
       religions.add(p.religion)
     })
@@ -34,10 +62,19 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment }) => {
       .map(([gender, count]) => `${count}${gender.charAt(0)}`)
       .join('/')
 
+    const coupleViolations = new Set<string>()
+    realParticipants.forEach(p => {
+      if (p.partner && realParticipants.some(other => other.name === p.partner)) {
+        const coupleKey = [p.name, p.partner].sort().join('-')
+        coupleViolations.add(coupleKey)
+      }
+    })
+
     return {
-      count: participants.length,
-      genderSplit,
-      religionCount: religions.size
+      count: realParticipants.length,
+      genderSplit: genderSplit || '0',
+      religionCount: religions.size,
+      hasCoupleViolation: coupleViolations.size > 0
     }
   }
 
@@ -52,7 +89,6 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment }) => {
       'M': 'bg-blue-100 text-blue-800',
       'F': 'bg-pink-100 text-pink-800',
     }
-    // Fallback to neutral gray for any other gender identity
     return colors[gender] || 'bg-gray-100 text-gray-800'
   }
 
@@ -64,17 +100,40 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment }) => {
       'Hindu': 'bg-orange-100 text-orange-800',
       'Buddhist': 'bg-yellow-100 text-yellow-800',
       'Sikh': 'bg-amber-100 text-amber-800',
+      'Secular': 'bg-slate-100 text-slate-800',
       'Other': 'bg-gray-100 text-gray-800',
       'None': 'bg-slate-100 text-slate-800',
     }
     return colors[religion] || 'bg-gray-100 text-gray-800'
   }
 
+  const handleSlotClick = (tableNum: number, index: number) => {
+    if (!editMode || !onSwap) return
+
+    if (!selectedSlot) {
+      setSelectedSlot({ tableNum, index })
+    } else {
+      if (selectedSlot.tableNum === tableNum && selectedSlot.index === index) {
+        setSelectedSlot(null)
+      } else {
+        onSwap(selectedSlot.tableNum, selectedSlot.index, tableNum, index)
+        setSelectedSlot(null)
+      }
+    }
+  }
+
+  const isSelected = (tableNum: number, index: number) => {
+    return selectedSlot?.tableNum === tableNum && selectedSlot?.index === index
+  }
+
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-6">Session {assignment.session}</h2>
+      <h2 className="text-2xl font-bold mb-6">
+        Session {assignment.session}
+        {editMode && <span className="text-sm font-normal text-muted-foreground ml-3">(Edit Mode)</span>}
+      </h2>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {Object.entries(assignment.tables)
+        {Object.entries(editMode ? tablesWithEmptySlots : assignment.tables)
           .sort(([a], [b]) => Number(a) - Number(b))
           .map(([tableNumber, participants]) => {
             const stats = calculateTableStats(participants)
@@ -82,41 +141,61 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment }) => {
             return (
               <Card key={tableNumber}>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center justify-between">
+                  <CardTitle className={`text-lg flex items-center justify-between ${stats.hasCoupleViolation ? 'text-red-600' : ''}`}>
                     <span>Table {tableNumber}</span>
-                    <span className="text-sm font-normal text-muted-foreground">
+                    <span className={`text-sm font-normal ${stats.hasCoupleViolation ? 'text-red-600' : 'text-muted-foreground'}`}>
                       {stats.count} {stats.count === 1 ? 'person' : 'people'} • {stats.genderSplit} • {stats.religionCount} {stats.religionCount === 1 ? 'religion' : 'religions'}
+                      {stats.hasCoupleViolation && ' • ⚠️ Couple'}
                     </span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {participants.map((participant, index) => (
-                      <div
-                        key={index}
-                        className="flex items-start gap-2 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
-                      >
-                        <div className="flex-1 space-y-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{participant.name}</span>
-                            {participant.partner && (
-                              <div className="flex items-center gap-1 text-xs text-red-600">
-                                <Heart className="h-3 w-3 fill-current" />
-                                <span className="text-muted-foreground">with {participant.partner}</span>
+                    {participants.map((participant, index) => {
+                      const isEmpty = participant.name === ''
+                      const selected = isSelected(Number(tableNumber), index)
+                      const isTarget = editMode && selectedSlot && !selected
+
+                      return (
+                        <div
+                          key={index}
+                          onClick={() => handleSlotClick(Number(tableNumber), index)}
+                          className={`
+                            flex items-start gap-2 p-3 rounded-lg transition-all
+                            ${isEmpty ? 'border-2 border-dashed border-gray-300 bg-gray-50 min-h-[60px]' : 'bg-gray-50'}
+                            ${editMode ? 'cursor-pointer' : ''}
+                            ${selected ? 'ring-4 ring-blue-500 bg-blue-50' : ''}
+                            ${isTarget ? 'ring-2 ring-green-400 hover:ring-green-500 hover:bg-green-50' : isEmpty ? '' : 'hover:bg-gray-100'}
+                          `}
+                        >
+                          {isEmpty ? (
+                            <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
+                              {editMode ? 'Empty slot' : null}
+                            </div>
+                          ) : (
+                            <div className="flex-1 space-y-1.5">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{participant.name}</span>
+                                {participant.partner && (
+                                  <div className="flex items-center gap-1 text-xs text-red-600">
+                                    <Heart className="h-3 w-3 fill-current" />
+                                    <span className="text-muted-foreground">with {participant.partner}</span>
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getReligionColor(participant.religion)}`}>
-                              {participant.religion}
-                            </span>
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getGenderColor(participant.gender)}`}>
-                              {participant.gender}
-                            </span>
-                          </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getReligionColor(participant.religion)}`}>
+                                  {participant.religion}
+                                </span>
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getGenderColor(participant.gender)}`}>
+                                  {participant.gender}
+                                </span>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </CardContent>
               </Card>
