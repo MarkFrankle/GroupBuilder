@@ -125,8 +125,11 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
       if (selectedSlot.tableNum === tableNum && selectedSlot.index === index) {
         setSelectedSlot(null)
       } else {
-        // Prevent swapping with empty slot on the same table
-        if (isEmpty && selectedSlot.tableNum === tableNum) {
+        // Prevent swapping with/from empty slots on the same table
+        const selectedParticipant = tablesWithEmptySlots[selectedSlot.tableNum][selectedSlot.index]
+        const selectedIsEmpty = !selectedParticipant || selectedParticipant.name === ''
+
+        if (selectedSlot.tableNum === tableNum && (isEmpty || selectedIsEmpty)) {
           return
         }
         onSwap(selectedSlot.tableNum, selectedSlot.index, tableNum, index)

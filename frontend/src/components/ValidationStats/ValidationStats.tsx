@@ -81,7 +81,9 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
       // Religion balance
       const religionCounts = tables.map(participants => {
         const counts: { [key: string]: number } = {}
-        participants.forEach(p => {
+        // Filter out empty/undefined participants
+        const realParticipants = participants.filter(p => p && p.name && p.name !== '')
+        realParticipants.forEach(p => {
           counts[p.religion] = (counts[p.religion] || 0) + 1
         })
         return counts
@@ -99,7 +101,9 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
       // Gender balance
       const genderCounts = tables.map(participants => {
         const counts: { [key: string]: number } = {}
-        participants.forEach(p => {
+        // Filter out empty/undefined participants
+        const realParticipants = participants.filter(p => p && p.name && p.name !== '')
+        realParticipants.forEach(p => {
           counts[p.gender] = (counts[p.gender] || 0) + 1
         })
         return counts
