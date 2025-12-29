@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 class GroupBuilder:
-    def __init__(self, participants, num_tables, num_sessions, locked_assignments=None):
+    def __init__(self, participants, num_tables, num_sessions, locked_assignments=None, historical_pairings=None):
         self.participants = participants
         self.tables = range(num_tables)
         self.sessions = range(num_sessions)
@@ -15,6 +15,7 @@ class GroupBuilder:
         self.religions = set([p["religion"] for p in self.participants])
         self.genders = set([p["gender"] for p in self.participants])
         self.locked_assignments = locked_assignments or {}
+        self.historical_pairings = historical_pairings or set()  # Pairings from previous batches
 
     def generate_assignments(self, max_time_seconds=120) -> dict:
         logger.info(f"Setting up model for {len(self.participants)} participants, "
@@ -43,6 +44,7 @@ class GroupBuilder:
         """
         all_assignments = []
         locked = {}
+        historical_pairings = set()  # Track ALL pairings from previous batches
         total_sessions = len(self.sessions)
         total_solve_time = 0
         total_branches = 0
@@ -75,6 +77,7 @@ class GroupBuilder:
             logger.info(f"=== Batch {batch_idx + 1}/{num_batches}: "
                        f"Sessions {batch_start + 1}-{batch_end} "
                        f"({batch_start} locked, {batch_end - batch_start} free, "
+                       f"{len(historical_pairings)} historical pairings, "
                        f"timeout: {batch_timeout:.1f}s) ===")
 
             # Create a new GroupBuilder for sessions 0 through batch_end
@@ -83,7 +86,8 @@ class GroupBuilder:
                 self.participants,
                 len(self.tables),
                 batch_end,  # Only model up to end of current batch
-                locked_assignments=locked
+                locked_assignments=locked,
+                historical_pairings=historical_pairings
             )
 
             result = gb.generate_assignments(max_time_seconds=batch_timeout)
@@ -118,9 +122,23 @@ class GroupBuilder:
                        f"{batch_branches:,} branches | "
                        f"{batch_conflicts:,} conflicts")
 
-            # Lock ALL sessions we've solved so far for the next batch
+            # Lock ALL sessions we've solved so far AND track historical pairings
             for assignment in result["assignments"]:
                 s = assignment["session"] - 1  # Convert to 0-indexed
+
+                # Only track pairings from newly solved sessions (not locked ones)
+                if batch_start <= s < batch_end:
+                    # Track all pairings from this session for future batches
+                    for table_num, participants in assignment["tables"].items():
+                        # Get all pairs at this table
+                        for i, p1_data in enumerate(participants):
+                            for p2_data in participants[i+1:]:
+                                p1_id = next(p["id"] for p in self.participants if p["name"] == p1_data["name"])
+                                p2_id = next(p["id"] for p in self.participants if p["name"] == p2_data["name"])
+                                pair_key = tuple(sorted([p1_id, p2_id]))
+                                historical_pairings.add(pair_key)
+
+                # Lock assignments for all sessions (both old and new)
                 for table_num, participants in assignment["tables"].items():
                     t = table_num - 1  # Convert to 0-indexed
                     for p_data in participants:
@@ -137,7 +155,8 @@ class GroupBuilder:
                                 locked[(p_id, s, other_t)] = False
 
         logger.info(f"Incremental solve complete: {total_solve_time:.2f}s total "
-                   f"({total_branches:,} branches, {total_conflicts:,} conflicts)")
+                   f"({total_branches:,} branches, {total_conflicts:,} conflicts, "
+                   f"{len(historical_pairings)} unique pairings tracked)")
 
         # Return combined results
         return {
@@ -165,6 +184,10 @@ class GroupBuilder:
 
         # Apply locked assignments from previous batches
         self._apply_locked_assignments()
+
+        # Log historical pairings tracking
+        if self.historical_pairings:
+            logger.info(f"Penalizing {len(self.historical_pairings)} historical pairings from previous batches")
 
     def _add_constraints_to_model(self):
         # Each participants sits at one table per session
@@ -266,6 +289,8 @@ class GroupBuilder:
         penalty_count = 0
         for i, p1 in enumerate(self.participants):
             for p2 in self.participants[i+1:]:
+                pair_key = tuple(sorted([p1["id"], p2["id"]]))  # Canonical pair representation
+
                 # For each session, track if this pair meets (across all tables)
                 pair_meets_session = {}
                 for s in self.sessions:
@@ -286,6 +311,10 @@ class GroupBuilder:
                         f'pair_{p1["id"]}_{p2["id"]}_meets_s{s}'
                     )
                     self.model.AddMaxEquality(pair_meets_session[s], session_meeting_vars)
+
+                    # HISTORY-AWARE: Penalize if this pair met in previous batches
+                    if pair_key in self.historical_pairings:
+                        penalty_count += pair_meets_session[s]
 
                 # Penalize if they meet in sessions within window_size of each other
                 for s1 in self.sessions:
