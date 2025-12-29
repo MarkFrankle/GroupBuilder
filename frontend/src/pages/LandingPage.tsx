@@ -212,12 +212,21 @@ const LandingPage: React.FC = () => {
         <CardContent>
           <div className="space-y-6">
             <div className="p-6 bg-secondary rounded-lg">
-              <h2 className="text-xl font-semibold mb-2">How it works</h2>
-              <p className="text-secondary-foreground">
-                Upload an Excel file with participant information, and our algorithm will generate 
-                balanced table assignments for each session. We consider factors like religion, 
-                gender, and partner status to create diverse groups.
-              </p>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <h2 className="text-xl font-semibold mb-2">How it works</h2>
+                  <p className="text-secondary-foreground mb-3">
+                    Upload an Excel file with participant information, and our algorithm will generate
+                    balanced table assignments for each session. We consider factors like religion,
+                    gender, and partner status to create diverse groups.
+                  </p>
+                  <Button variant="link" asChild className="px-0 h-auto text-sm">
+                    <a href="/template.xlsx" download>
+                      Download sample data (20 participants)
+                    </a>
+                  </Button>
+                </div>
+              </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -328,15 +337,25 @@ const LandingPage: React.FC = () => {
                 </Alert>
               )}
 
-              <div className="flex justify-between items-center">
-                <Button type="submit" variant="outline" disabled={loading}>
+              <div className="flex gap-4">
+                <Button type="submit" disabled={loading} className="flex-1">
                   Generate Assignments
                 </Button>
-                <Button variant="outline" asChild disabled={loading}>
-                  <a href="/template.xlsx" download>
-                    Download Template
-                  </a>
-                </Button>
+                {recentUploads.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={loading || selectedRecentUpload === "new-upload" || !recentUploads.find(u => u.session_id === selectedRecentUpload)?.has_results}
+                    onClick={() => {
+                      if (selectedRecentUpload !== "new-upload") {
+                        navigate(`/table-assignments?session=${selectedRecentUpload}`)
+                      }
+                    }}
+                    className="flex-1"
+                  >
+                    View Results
+                  </Button>
+                )}
               </div>
             </form>
           </div>
