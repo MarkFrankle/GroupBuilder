@@ -46,7 +46,9 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
     const firstSession = assignments[0]
     const allParticipants: Participant[] = []
     Object.values(firstSession.tables).forEach(participants => {
-      allParticipants.push(...participants)
+      // Filter out empty/undefined participants
+      const realParticipants = participants.filter(p => p && p.name && p.name !== '')
+      allParticipants.push(...realParticipants)
     })
     const totalParticipants = allParticipants.length
 
