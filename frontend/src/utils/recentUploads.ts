@@ -12,6 +12,7 @@ export interface RecentUpload {
   num_tables: number
   num_sessions: number
   created_at: string
+  has_results?: boolean
 }
 
 /**

@@ -1,6 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from assignment_logic.api_handler import handle_generate_assignments
-from api.storage import get_session, session_exists, store_result, get_result, result_exists, store_session
+from api.storage import (
+    get_session, session_exists, store_result, get_result, result_exists,
+    store_session, get_result_versions
+)
 from api.email import send_magic_link_email
 from datetime import datetime
 import logging
@@ -95,7 +98,8 @@ async def regenerate_assignments(session_id: str):
         logger.info(f"Successfully regenerated assignments (quality: {results.get('solution_quality', 'unknown')}, "
                    f"time: {results.get('solve_time', 'unknown')}s)")
 
-        store_result(session_id, {
+        # Store as new version (never overwrites)
+        version_id = store_result(session_id, {
             "assignments": results['assignments'],
             "metadata": {
                 "solution_quality": results.get('solution_quality'),
@@ -106,7 +110,12 @@ async def regenerate_assignments(session_id: str):
             "created_at": datetime.now().isoformat()
         })
 
-        return results['assignments']
+        logger.info(f"Stored results as {version_id}")
+
+        return {
+            "assignments": results['assignments'],
+            "version_id": version_id
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -115,15 +124,34 @@ async def regenerate_assignments(session_id: str):
 
 
 @router.get("/results/{session_id}")
-async def get_cached_results(session_id: str):
-    logger.info(f"Retrieving cached results for session: {session_id}")
+async def get_cached_results(session_id: str, version: str = Query(None, description="Version ID (e.g., 'v1'). Defaults to latest.")):
+    logger.info(f"Retrieving cached results for session: {session_id}, version: {version or 'latest'}")
 
     if not result_exists(session_id):
         logger.warning(f"No cached results for session: {session_id}")
         raise HTTPException(status_code=404, detail="Results not found or expired. Links expire after 30 days.")
 
-    result_data = get_result(session_id)
+    result_data = get_result(session_id, version_id=version)
+
+    if result_data is None:
+        logger.warning(f"Version {version} not found for session: {session_id}")
+        raise HTTPException(status_code=404, detail=f"Version {version} not found.")
+
     return result_data["assignments"]
+
+
+@router.get("/results/{session_id}/versions")
+async def get_result_version_list(session_id: str):
+    """Get list of all result versions for a session"""
+    logger.info(f"Retrieving version list for session: {session_id}")
+
+    versions = get_result_versions(session_id)
+
+    if not versions:
+        logger.warning(f"No versions found for session: {session_id}")
+        raise HTTPException(status_code=404, detail="No results found for this session.")
+
+    return {"versions": versions}
 
 
 @router.get("/sessions/{session_id}/metadata")
@@ -144,6 +172,7 @@ async def get_session_metadata(session_id: str):
         "num_tables": session_data.get("num_tables"),
         "num_sessions": session_data.get("num_sessions"),
         "created_at": session_data.get("created_at"),
+        "has_results": result_exists(session_id),
     }
 
 

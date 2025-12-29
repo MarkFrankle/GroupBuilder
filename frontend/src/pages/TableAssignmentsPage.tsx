@@ -7,8 +7,28 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { dummyData } from "../data/dummyData"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, LayoutGrid, List, Edit, Undo2 } from 'lucide-react'
+import { Loader2, LayoutGrid, List, Edit, Undo2, MoreVertical, Download, RotateCw, X } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { API_BASE_URL } from '@/config/api'
+
+interface ResultVersion {
+  version_id: string
+  created_at: number
+  solve_time?: number
+  solution_quality?: string
+}
 
 export interface Participant {
   name: string;
@@ -32,11 +52,34 @@ const TableAssignmentsPage: React.FC = () => {
   const [viewMode, setViewMode] = useState<'detailed' | 'compact'>('compact')
   const [editMode, setEditMode] = useState<boolean>(false)
   const [undoStack, setUndoStack] = useState<Assignment[][]>([])
+  const [availableVersions, setAvailableVersions] = useState<ResultVersion[]>([])
+  const [currentVersion, setCurrentVersion] = useState<string>('latest')
 
   const navigate = useNavigate()
 
   const useRealData = true;
 
+  const formatTimestamp = (timestamp: number): string => {
+    const date = new Date(timestamp * 1000) // Convert Unix timestamp to milliseconds
+    const now = new Date()
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+    if (seconds < 60) return 'just now'
+    const minutes = Math.floor(seconds / 60)
+    if (minutes < 60) return `${minutes} min ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`
+    const days = Math.floor(hours / 24)
+    if (days < 7) return `${days} day${days > 1 ? 's' : ''} ago`
+
+    // For older dates, show the actual date/time
+    return date.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    })
+  }
 
   useEffect(() => {
     const fetchAssignments = async () => {
@@ -44,15 +87,35 @@ const TableAssignmentsPage: React.FC = () => {
         if (process.env.NODE_ENV === 'development' && !useRealData) {
           setAssignments(dummyData)
         } else {
-          // Try to get session ID from navigation state
-          const sessionId = (window.history.state?.usr as any)?.sessionId;
+          // Try to get session ID from: 1) URL query param, 2) navigation state
+          const urlParams = new URLSearchParams(window.location.search);
+          const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId;
+          const versionParam = urlParams.get('version');
 
           if (!sessionId) {
             // No session ID available, user might have refreshed the page
             throw new Error('Session expired. Please upload a file again.')
           }
 
-          const response = await fetch(`${API_BASE_URL}/api/assignments/results/${sessionId}`)
+          // Set current version from URL param if available
+          if (versionParam) {
+            setCurrentVersion(versionParam)
+          }
+
+          // Fetch available versions
+          try {
+            const versionsResponse = await fetch(`${API_BASE_URL}/api/assignments/results/${sessionId}/versions`)
+            if (versionsResponse.ok) {
+              const versionsData = await versionsResponse.json()
+              setAvailableVersions(versionsData.versions || [])
+            }
+          } catch (err) {
+            console.error('Failed to fetch versions:', err)
+          }
+
+          // Fetch assignments for the specified version
+          const versionQuery = versionParam ? `?version=${versionParam}` : ''
+          const response = await fetch(`${API_BASE_URL}/api/assignments/results/${sessionId}${versionQuery}`)
           if (!response.ok) {
             const errorData = await response.json()
             throw new Error(errorData.detail || 'Failed to fetch assignments')
@@ -75,11 +138,47 @@ const TableAssignmentsPage: React.FC = () => {
     navigate('/')
   }
 
+  const handleVersionChange = async (versionId: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId;
+
+      if (!sessionId) {
+        throw new Error('Session ID not found. Please upload a file again.')
+      }
+
+      const versionQuery = versionId !== 'latest' ? `?version=${versionId}` : ''
+      const response = await fetch(`${API_BASE_URL}/api/assignments/results/${sessionId}${versionQuery}`)
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to fetch version')
+      }
+
+      const data = await response.json()
+      setAssignments(data)
+      setCurrentVersion(versionId)
+
+      // Update URL without reload
+      const newUrl = versionId !== 'latest'
+        ? `${window.location.pathname}?session=${sessionId}&version=${versionId}`
+        : `${window.location.pathname}?session=${sessionId}`
+      window.history.replaceState({}, '', newUrl)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load version')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleRegenerateAssignments = async () => {
     setLoading(true)
     setError(null)
     try {
-      const sessionId = (window.history.state?.usr as any)?.sessionId;
+      const urlParams = new URLSearchParams(window.location.search);
+      const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId;
 
       if (!sessionId) {
         throw new Error('Session ID not found. Please upload a file again.')
@@ -94,8 +193,25 @@ const TableAssignmentsPage: React.FC = () => {
         throw new Error(errorData.detail || 'Failed to regenerate assignments')
       }
 
-      const newAssignments = await response.json()
-      setAssignments(newAssignments)
+      const result = await response.json()
+      // Backend now returns {assignments: [...], version_id: "v2", etc.}
+      setAssignments(result.assignments)
+      setCurrentVersion(result.version_id)
+
+      // Refetch versions list to include the new version
+      try {
+        const versionsResponse = await fetch(`${API_BASE_URL}/api/assignments/results/${sessionId}/versions`)
+        if (versionsResponse.ok) {
+          const versionsData = await versionsResponse.json()
+          setAvailableVersions(versionsData.versions || [])
+        }
+      } catch (err) {
+        console.error('Failed to refresh versions:', err)
+      }
+
+      // Update URL to reflect the new version
+      const newUrl = `${window.location.pathname}?session=${sessionId}&version=${result.version_id}`
+      window.history.replaceState({}, '', newUrl)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to regenerate assignments")
     } finally {
@@ -206,7 +322,33 @@ const TableAssignmentsPage: React.FC = () => {
     <div className="container mx-auto p-4">
       <Card className="w-full">
         <CardHeader>
-          <CardTitle className="text-3xl font-bold text-center">Table Assignments</CardTitle>
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <CardTitle className="text-3xl font-bold">Table Assignments</CardTitle>
+            {availableVersions.length > 0 && (
+              <Select value={currentVersion} onValueChange={handleVersionChange} disabled={editMode}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Version" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="latest" disabled={currentVersion === 'latest'}>Latest</SelectItem>
+                  {availableVersions.map((version) => (
+                    <SelectItem
+                      key={version.version_id}
+                      value={version.version_id}
+                      disabled={currentVersion === version.version_id}
+                    >
+                      <div className="flex flex-col">
+                        <span>{version.version_id}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatTimestamp(version.created_at)}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <ValidationStats assignments={assignments} />
@@ -219,9 +361,9 @@ const TableAssignmentsPage: React.FC = () => {
                 size="sm"
                 className={viewMode === 'compact' ? 'border-2 border-primary' : ''}
                 disabled={editMode}
+                aria-label="Compact view"
               >
-                <LayoutGrid className="h-4 w-4 mr-2" />
-                Compact
+                <LayoutGrid className="h-4 w-4" />
               </Button>
               <Button
                 variant={viewMode === 'detailed' ? 'outline' : 'ghost'}
@@ -229,9 +371,9 @@ const TableAssignmentsPage: React.FC = () => {
                 size="sm"
                 className={viewMode === 'detailed' ? 'border-2 border-primary' : ''}
                 disabled={editMode}
+                aria-label="Detailed view"
               >
-                <List className="h-4 w-4 mr-2" />
-                Detailed
+                <List className="h-4 w-4" />
               </Button>
               {viewMode === 'detailed' && (
                 <Button
@@ -256,16 +398,28 @@ const TableAssignmentsPage: React.FC = () => {
               )}
             </div>
 
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={downloadCSV} size="sm">
-                Download CSV
-              </Button>
-              <Button variant="outline" onClick={handleRegenerateAssignments} size="sm" disabled={editMode}>
-                Regenerate
-              </Button>
-              <Button variant="outline" onClick={handleClearAssignments} size="sm" disabled={editMode}>
-                Clear
-              </Button>
+            <div className="flex gap-2 items-center">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-white dark:bg-slate-950">
+                  <DropdownMenuItem onClick={downloadCSV}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleRegenerateAssignments} disabled={editMode}>
+                    <RotateCw className="h-4 w-4 mr-2" />
+                    Regenerate
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleClearAssignments} disabled={editMode}>
+                    <X className="h-4 w-4 mr-2" />
+                    Clear
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 

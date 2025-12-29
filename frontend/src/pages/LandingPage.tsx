@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle, Loader2, Clock } from 'lucide-react'
+import { AlertCircle, Loader2, Clock, ChevronDown } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -13,8 +13,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { getRecentUploadIds, saveRecentUpload, removeRecentUpload, type RecentUpload } from '@/utils/recentUploads'
 import { API_BASE_URL } from '@/config/api'
+
+interface ResultVersion {
+  version_id: string
+  created_at: number
+  solve_time?: number
+  solution_quality?: string
+}
 
 const LandingPage: React.FC = () => {
   const [file, setFile] = useState<File | null>(null)
@@ -26,6 +39,7 @@ const LandingPage: React.FC = () => {
   const [loadingMessage, setLoadingMessage] = useState<string>("")
   const [recentUploads, setRecentUploads] = useState<RecentUpload[]>([])
   const [selectedRecentUpload, setSelectedRecentUpload] = useState<string>("new-upload")
+  const [availableVersions, setAvailableVersions] = useState<ResultVersion[]>([])
   const navigate = useNavigate()
 
   // Load recent uploads on mount
@@ -70,6 +84,28 @@ const LandingPage: React.FC = () => {
     return `${days} day${days > 1 ? 's' : ''} ago`
   }
 
+  const formatTimestamp = (timestamp: number): string => {
+    const date = new Date(timestamp * 1000) // Convert Unix timestamp to milliseconds
+    const now = new Date()
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+    if (seconds < 60) return 'just now'
+    const minutes = Math.floor(seconds / 60)
+    if (minutes < 60) return `${minutes} min ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`
+    const days = Math.floor(hours / 24)
+    if (days < 7) return `${days} day${days > 1 ? 's' : ''} ago`
+
+    // For older dates, show the actual date/time
+    return date.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    })
+  }
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       setFile(event.target.files[0])
@@ -77,12 +113,13 @@ const LandingPage: React.FC = () => {
     }
   }
 
-  const handleRecentUploadSelect = (sessionId: string) => {
+  const handleRecentUploadSelect = async (sessionId: string) => {
     setSelectedRecentUpload(sessionId)
 
     if (sessionId === "new-upload") {
       // "Upload new file" selected, reset form
       setFile(null)
+      setAvailableVersions([])
       return
     }
 
@@ -93,6 +130,22 @@ const LandingPage: React.FC = () => {
       setNumSessions(upload.num_sessions.toString())
       // Clear file input since we're using an existing session
       setFile(null)
+
+      // Fetch available versions
+      if (upload.has_results) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/assignments/results/${sessionId}/versions`)
+          if (response.ok) {
+            const data = await response.json()
+            setAvailableVersions(data.versions || [])
+          }
+        } catch (err) {
+          console.error('Failed to fetch versions:', err)
+          setAvailableVersions([])
+        }
+      } else {
+        setAvailableVersions([])
+      }
     }
   }
 
@@ -141,7 +194,7 @@ const LandingPage: React.FC = () => {
           sessionId = selectedRecentUpload;
         }
 
-        setLoadingMessage('Generating optimal table assignments... This may take up to 2 minutes for large groups.');
+        setLoadingMessage('Generating optimal table assignments... This will take approximately 2 minutes.');
       } else {
         // New file upload
         setLoadingMessage('Uploading participant data...');
@@ -174,7 +227,7 @@ const LandingPage: React.FC = () => {
         // Save to recent uploads
         saveRecentUpload(sessionId);
 
-        setLoadingMessage('Generating optimal table assignments... This may take up to 2 minutes for large groups.');
+        setLoadingMessage('Generating optimal table assignments... This will take approximately 2 minutes.');
       }
 
       // Generate assignments using session ID
@@ -212,12 +265,21 @@ const LandingPage: React.FC = () => {
         <CardContent>
           <div className="space-y-6">
             <div className="p-6 bg-secondary rounded-lg">
-              <h2 className="text-xl font-semibold mb-2">How it works</h2>
-              <p className="text-secondary-foreground">
-                Upload an Excel file with participant information, and our algorithm will generate 
-                balanced table assignments for each session. We consider factors like religion, 
-                gender, and partner status to create diverse groups.
-              </p>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <h2 className="text-xl font-semibold mb-2">How it works</h2>
+                  <p className="text-secondary-foreground mb-3">
+                    Upload an Excel file with participant information, and our algorithm will generate
+                    balanced table assignments for each session. We consider factors like religion,
+                    gender, and partner status to create diverse groups.
+                  </p>
+                  <Button variant="link" asChild className="px-0 h-auto text-sm">
+                    <a href="/template.xlsx" download>
+                      Download Template with Sample Data
+                    </a>
+                  </Button>
+                </div>
+              </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -328,15 +390,47 @@ const LandingPage: React.FC = () => {
                 </Alert>
               )}
 
-              <div className="flex justify-between items-center">
-                <Button type="submit" variant="outline" disabled={loading}>
+              <div className="flex gap-4">
+                <Button type="submit" disabled={loading} variant="outline" className="flex-1">
                   Generate Assignments
                 </Button>
-                <Button variant="outline" asChild disabled={loading}>
-                  <a href="/template.xlsx" download>
-                    Download Template
-                  </a>
-                </Button>
+                {recentUploads.length > 0 && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={loading || selectedRecentUpload === "new-upload" || !recentUploads.find(u => u.session_id === selectedRecentUpload)?.has_results}
+                        className="flex-1"
+                      >
+                        View Previous Results
+                        <ChevronDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-64 bg-white dark:bg-slate-950">
+                      {availableVersions.length > 0 ? (
+                        availableVersions.map((version) => (
+                          <DropdownMenuItem
+                            key={version.version_id}
+                            onClick={() => {
+                              navigate(`/table-assignments?session=${selectedRecentUpload}&version=${version.version_id}`)
+                            }}
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium">{version.version_id}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {formatTimestamp(version.created_at)}
+                                {version.solve_time && ` • ${version.solve_time.toFixed(2)}s`}
+                              </span>
+                            </div>
+                          </DropdownMenuItem>
+                        ))
+                      ) : (
+                        <DropdownMenuItem disabled>No versions available</DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
             </form>
           </div>
