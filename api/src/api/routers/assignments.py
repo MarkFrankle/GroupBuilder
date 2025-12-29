@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Path
 from assignment_logic.api_handler import handle_generate_assignments
 from api.storage import (
     get_session, session_exists, store_result, get_result, result_exists,
@@ -13,7 +13,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/")
-def get_assignments(session_id: str):
+def get_assignments(
+    session_id: str = Query(..., description="Session ID", min_length=36, max_length=36, regex="^[a-f0-9-]{36}$")
+):
     logger.info(f"Generating assignments for session: {session_id}")
 
     if not session_exists(session_id):
@@ -66,10 +68,15 @@ def get_assignments(session_id: str):
         raise
     except Exception as e:
         logger.error(f"Failed to generate assignments: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to generate assignments: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while generating assignments. Please try again or contact support if the problem persists."
+        )
 
 @router.post("/regenerate/{session_id}")
-async def regenerate_assignments(session_id: str):
+async def regenerate_assignments(
+    session_id: str = Path(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$")
+):
     """Regenerate assignments using the same upload data (within 1 hour of upload)"""
     logger.info(f"Regenerating assignments for session: {session_id}")
 
@@ -120,11 +127,17 @@ async def regenerate_assignments(session_id: str):
         raise
     except Exception as e:
         logger.error(f"Failed to regenerate assignments: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to regenerate assignments: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while regenerating assignments. Please try again or contact support if the problem persists."
+        )
 
 
 @router.get("/results/{session_id}")
-async def get_cached_results(session_id: str, version: str = Query(None, description="Version ID (e.g., 'v1'). Defaults to latest.")):
+async def get_cached_results(
+    session_id: str = Path(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$"),
+    version: str = Query(None, description="Version ID (e.g., 'v1'). Defaults to latest.", max_length=10)
+):
     logger.info(f"Retrieving cached results for session: {session_id}, version: {version or 'latest'}")
 
     if not result_exists(session_id):
@@ -141,7 +154,9 @@ async def get_cached_results(session_id: str, version: str = Query(None, descrip
 
 
 @router.get("/results/{session_id}/versions")
-async def get_result_version_list(session_id: str):
+async def get_result_version_list(
+    session_id: str = Path(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$")
+):
     """Get list of all result versions for a session"""
     logger.info(f"Retrieving version list for session: {session_id}")
 
@@ -155,7 +170,9 @@ async def get_result_version_list(session_id: str):
 
 
 @router.get("/sessions/{session_id}/metadata")
-async def get_session_metadata(session_id: str):
+async def get_session_metadata(
+    session_id: str = Path(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$")
+):
     """Get metadata about a session for displaying in Recent Uploads"""
     logger.info(f"Retrieving metadata for session: {session_id}")
 
@@ -177,7 +194,11 @@ async def get_session_metadata(session_id: str):
 
 
 @router.post("/sessions/{session_id}/clone")
-async def clone_session_with_params(session_id: str, num_tables: int, num_sessions: int):
+async def clone_session_with_params(
+    session_id: str = Path(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$"),
+    num_tables: int = Query(..., ge=1, le=10, description="Number of tables (1-10)"),
+    num_sessions: int = Query(..., ge=1, le=6, description="Number of sessions (1-6)")
+):
     """Clone a session with new table/session parameters (reuses participant data)"""
     logger.info(f"Cloning session {session_id} with new params: tables={num_tables}, sessions={num_sessions}")
 
@@ -185,13 +206,7 @@ async def clone_session_with_params(session_id: str, num_tables: int, num_sessio
         logger.warning(f"Source session not found or expired: {session_id}")
         raise HTTPException(status_code=404, detail="Source session not found or expired.")
 
-    # Validate parameters
-    if num_tables < 1 or num_tables > 10:
-        raise HTTPException(status_code=400, detail="Number of tables must be between 1 and 10.")
-    if num_sessions < 1 or num_sessions > 6:
-        raise HTTPException(status_code=400, detail="Number of sessions must be between 1 and 6.")
-
-    # Get original session data
+    # Get original session data (validation handled by FastAPI)
     original_session = get_session(session_id)
     participant_dict = original_session.get("participant_dict", [])
 
