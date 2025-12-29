@@ -54,11 +54,13 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
     let coupleViolations = 0
     assignments.forEach(assignment => {
       Object.values(assignment.tables).forEach(participants => {
+        // Filter out empty/undefined participants
+        const realParticipants = participants.filter(p => p && p.name && p.name !== '')
         const couples = new Set<string>()
-        participants.forEach(p => {
+        realParticipants.forEach(p => {
           if (p.partner) {
             // Check if partner is at same table
-            const partnerAtTable = participants.some(other => other.name === p.partner)
+            const partnerAtTable = realParticipants.some(other => other && other.name === p.partner)
             if (partnerAtTable) {
               const coupleKey = [p.name, p.partner].sort().join('-')
               couples.add(coupleKey)
@@ -117,10 +119,12 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
 
     assignments.forEach(assignment => {
       Object.values(assignment.tables).forEach(participants => {
+        // Filter out empty/undefined participants
+        const realParticipants = participants.filter(p => p && p.name && p.name !== '')
         // For each table, count all pairings
-        for (let i = 0; i < participants.length; i++) {
-          for (let j = i + 1; j < participants.length; j++) {
-            const pairKey = [participants[i].name, participants[j].name].sort().join('|')
+        for (let i = 0; i < realParticipants.length; i++) {
+          for (let j = i + 1; j < realParticipants.length; j++) {
+            const pairKey = [realParticipants[i].name, realParticipants[j].name].sort().join('|')
             pairingsCount.set(pairKey, (pairingsCount.get(pairKey) || 0) + 1)
           }
         }
@@ -145,8 +149,10 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
 
     assignments.forEach(assignment => {
       Object.values(assignment.tables).forEach(participants => {
-        participants.forEach(p1 => {
-          participants.forEach(p2 => {
+        // Filter out empty/undefined participants
+        const realParticipants = participants.filter(p => p && p.name && p.name !== '')
+        realParticipants.forEach(p1 => {
+          realParticipants.forEach(p2 => {
             if (p1.name !== p2.name) {
               participantPairings.get(p1.name)?.add(p2.name)
             }

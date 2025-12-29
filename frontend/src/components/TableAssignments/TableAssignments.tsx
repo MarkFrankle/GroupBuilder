@@ -62,6 +62,11 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
       .map(([gender, count]) => `${count}${gender.charAt(0)}`)
       .join('/')
 
+    // Check gender imbalance (deviation > 1)
+    const genderCountValues = Object.values(genderCounts)
+    const hasGenderImbalance = genderCountValues.length > 0 &&
+      (Math.max(...genderCountValues) - Math.min(...genderCountValues) > 1)
+
     const coupleViolations = new Set<string>()
     realParticipants.forEach(p => {
       if (p.partner && realParticipants.some(other => other.name === p.partner)) {
@@ -74,7 +79,8 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
       count: realParticipants.length,
       genderSplit: genderSplit || '0',
       religionCount: religions.size,
-      hasCoupleViolation: coupleViolations.size > 0
+      hasCoupleViolation: coupleViolations.size > 0,
+      hasGenderImbalance
     }
   }
 
@@ -110,12 +116,19 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
   const handleSlotClick = (tableNum: number, index: number) => {
     if (!editMode || !onSwap) return
 
+    const participant = tablesWithEmptySlots[tableNum][index]
+    const isEmpty = !participant || participant.name === ''
+
     if (!selectedSlot) {
       setSelectedSlot({ tableNum, index })
     } else {
       if (selectedSlot.tableNum === tableNum && selectedSlot.index === index) {
         setSelectedSlot(null)
       } else {
+        // Prevent swapping with empty slot on the same table
+        if (isEmpty && selectedSlot.tableNum === tableNum) {
+          return
+        }
         onSwap(selectedSlot.tableNum, selectedSlot.index, tableNum, index)
         setSelectedSlot(null)
       }
@@ -142,9 +155,9 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
               <Card key={tableNumber}>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg flex items-center justify-between">
-                    <span>Table {tableNumber}</span>
+                    <span className={stats.hasCoupleViolation ? 'text-red-600' : ''}>Table {tableNumber}</span>
                     <span className="text-sm font-normal text-muted-foreground">
-                      {stats.count} {stats.count === 1 ? 'person' : 'people'} • {stats.genderSplit} • {stats.religionCount} {stats.religionCount === 1 ? 'religion' : 'religions'}
+                      {stats.count} {stats.count === 1 ? 'person' : 'people'} • <span className={stats.hasGenderImbalance ? 'text-red-600' : ''}>{stats.genderSplit}</span> • {stats.religionCount} {stats.religionCount === 1 ? 'religion' : 'religions'}
                       {stats.hasCoupleViolation && <span className="text-red-600"> • ⚠️ Couple</span>}
                     </span>
                   </CardTitle>
