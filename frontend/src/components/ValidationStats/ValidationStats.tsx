@@ -1,7 +1,6 @@
 import React from 'react'
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { CheckCircle2, AlertCircle, Info } from 'lucide-react'
+import { CheckCircle2, AlertCircle } from 'lucide-react'
 
 interface Participant {
   name: string;
@@ -235,17 +234,11 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
           <div className="space-y-2">
             <h3 className="font-semibold text-sm text-muted-foreground">Mixing Quality</h3>
             <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-blue-600" />
-                <span className="text-sm">
-                  Avg {stats.avgNewPeopleMet} unique tablemates per person
-                </span>
+              <div className="text-sm">
+                Avg {stats.avgNewPeopleMet} unique tablemates per person
               </div>
-              <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-blue-600" />
-                <span className="text-sm">
-                  {stats.repeatPairings} pairs meet more than once
-                </span>
+              <div className="text-sm">
+                {stats.repeatPairings} pairs meet more than once
               </div>
               <div className="text-xs text-muted-foreground mt-1">
                 Across {assignments.length} session{assignments.length !== 1 ? 's' : ''}
@@ -257,21 +250,21 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
           <div className="space-y-2">
             <h3 className="font-semibold text-sm text-muted-foreground">Overall</h3>
             {allConstraintsSatisfied ? (
-              <Alert className="py-2">
-                <CheckCircle2 className="h-4 w-4" />
-                <AlertTitle className="text-sm">Looks good!</AlertTitle>
-                <AlertDescription className="text-xs">
-                  All requirements met - ready to use
-                </AlertDescription>
-              </Alert>
+              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                <span className="text-3xl">✅</span>
+                <div>
+                  <div className="font-semibold text-sm text-green-900">Looks Good</div>
+                  <div className="text-xs text-green-700">All requirements met</div>
+                </div>
+              </div>
             ) : (
-              <Alert variant="destructive" className="py-2">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle className="text-sm">Issues found</AlertTitle>
-                <AlertDescription className="text-xs">
-                  Check details above
-                </AlertDescription>
-              </Alert>
+              <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-300">
+                <span className="text-3xl">🚧</span>
+                <div>
+                  <div className="font-semibold text-sm text-yellow-900">Has Issues</div>
+                  <div className="text-xs text-yellow-700">Check details to the left</div>
+                </div>
+              </div>
             )}
           </div>
         </div>
