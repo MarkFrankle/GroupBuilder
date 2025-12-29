@@ -29,4 +29,4 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app/src
 
 # Run with uvicorn (single worker for Cloud Run autoscaling)
-CMD exec uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT} --workers 1
+CMD exec uvicorn api.main:app --host 0.0.0.0 --port ${PORT} --workers 1
