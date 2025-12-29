@@ -32,8 +32,13 @@ def get_assignments(session_id: str):
             logger.error(f"Solver failed: {error_msg}")
             raise HTTPException(status_code=400, detail=error_msg)
 
-        logger.info(f"Successfully generated assignments (quality: {results.get('solution_quality', 'unknown')}, "
-                   f"time: {results.get('solve_time', 'unknown')}s)")
+        logger.info(
+            f"Solver [{len(participants_dict)}p/{num_tables}t/{num_sessions}s]: "
+            f"{results.get('solution_quality', 'unknown').upper()} in {results.get('solve_time', 0):.2f}s | "
+            f"Deviation: {results.get('total_deviation', 'N/A')} | "
+            f"Branches: {results.get('num_branches', 'N/A'):,} | "
+            f"Conflicts: {results.get('num_conflicts', 'N/A'):,}"
+        )
 
         store_result(session_id, {
             "assignments": results['assignments'],
