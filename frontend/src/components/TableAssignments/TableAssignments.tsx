@@ -49,7 +49,7 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
   }, [assignment.tables])
 
   const calculateTableStats = (participants: Participant[]) => {
-    const realParticipants = participants.filter(p => p.name !== '')
+    const realParticipants = participants.filter(p => p && p.name !== '')
     const genderCounts: { [key: string]: number } = {}
     const religions = new Set<string>()
 
@@ -69,7 +69,7 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
 
     const coupleViolations = new Set<string>()
     realParticipants.forEach(p => {
-      if (p.partner && realParticipants.some(other => other.name === p.partner)) {
+      if (p.partner && realParticipants.some(other => other && other.name === p.partner)) {
         const coupleKey = [p.name, p.partner].sort().join('-')
         coupleViolations.add(coupleKey)
       }
@@ -168,7 +168,7 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
                 <CardContent>
                   <div className="space-y-3">
                     {participants.map((participant, index) => {
-                      const isEmpty = participant.name === ''
+                      const isEmpty = !participant || participant.name === ''
                       const selected = isSelected(Number(tableNumber), index)
                       const isTarget = editMode && selectedSlot && !selected
 
@@ -193,7 +193,7 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
                               <div className="flex items-center gap-2">
                                 <span className="font-medium">{participant.name}</span>
                                 {participant.partner && (() => {
-                                  const partnerAtSameTable = participants.some(p => p.name === participant.partner)
+                                  const partnerAtSameTable = participants.some(p => p && p.name === participant.partner)
                                   return (
                                     <div className="flex items-center gap-1 text-xs text-red-600">
                                       <Heart className="h-3 w-3 fill-current" />
