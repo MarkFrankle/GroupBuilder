@@ -222,7 +222,7 @@ const LandingPage: React.FC = () => {
                   </p>
                   <Button variant="link" asChild className="px-0 h-auto text-sm">
                     <a href="/template.xlsx" download>
-                      Download sample data (20 participants)
+                      Download Template with Sample Data
                     </a>
                   </Button>
                 </div>
@@ -344,7 +344,6 @@ const LandingPage: React.FC = () => {
                 {recentUploads.length > 0 && (
                   <Button
                     type="button"
-                    variant="outline"
                     disabled={loading || selectedRecentUpload === "new-upload" || !recentUploads.find(u => u.session_id === selectedRecentUpload)?.has_results}
                     onClick={() => {
                       if (selectedRecentUpload !== "new-upload") {
@@ -353,7 +352,7 @@ const LandingPage: React.FC = () => {
                     }}
                     className="flex-1"
                   >
-                    View Results
+                    View Previous Results
                   </Button>
                 )}
               </div>

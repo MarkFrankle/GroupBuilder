@@ -94,8 +94,9 @@ const TableAssignmentsPage: React.FC = () => {
         throw new Error(errorData.detail || 'Failed to regenerate assignments')
       }
 
-      const newAssignments = await response.json()
-      setAssignments(newAssignments)
+      const result = await response.json()
+      // Backend now returns {assignments: [...], version_id: "v1"}
+      setAssignments(result.assignments)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to regenerate assignments")
     } finally {
