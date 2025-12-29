@@ -159,11 +159,11 @@ class GroupBuilder:
     def _run_solver(self):
         self.solver = cp_model.CpSolver()
 
-        self.solver.parameters.max_time_in_seconds = 120.0
+        self.solver.parameters.max_time_in_seconds = 300.0
         self.solver.parameters.num_search_workers = 4
         self.solver.parameters.log_search_progress = False
 
-        logger.info(f"Starting CP-SAT solver (max time: 120s, {self.solver.parameters.num_search_workers} workers)")
+        logger.info(f"Starting CP-SAT solver (max time: 300s, {self.solver.parameters.num_search_workers} workers)")
         status = self.solver.Solve(self.model)
         logger.info(f"Solver completed with status: {self.solver.StatusName(status)} "
                    f"in {self.solver.WallTime():.2f}s")
