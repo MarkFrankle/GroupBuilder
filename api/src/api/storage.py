@@ -1,6 +1,6 @@
 """
-Storage abstraction layer supporting both Redis and in-memory storage.
-Automatically falls back to in-memory storage if Redis is unavailable.
+Storage abstraction layer supporting Upstash REST, Redis, and in-memory storage.
+Automatically falls back to in-memory storage if external storage is unavailable.
 """
 
 import json
@@ -11,13 +11,20 @@ from typing import Optional, Any
 
 logger = logging.getLogger(__name__)
 
-# Try to import redis, but gracefully fall back if not available
+# Try to import storage libraries, but gracefully fall back if not available
+try:
+    from upstash_redis import Redis as UpstashRedis
+    UPSTASH_AVAILABLE = True
+except ImportError:
+    UPSTASH_AVAILABLE = False
+    logger.debug("upstash-redis library not installed.")
+
 try:
     import redis
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
-    logger.warning("Redis library not installed. Using in-memory storage.")
+    logger.debug("redis library not installed.")
 
 
 class StorageBackend:
@@ -37,6 +44,41 @@ class StorageBackend:
 
     def keys(self, pattern: str = "*") -> list[str]:
         raise NotImplementedError
+
+
+class UpstashRestBackend(StorageBackend):
+    """Upstash REST API storage (serverless-optimized, no persistent connections)"""
+
+    def __init__(self, rest_url: str, rest_token: str):
+        self.client = UpstashRedis(url=rest_url, token=rest_token)
+        logger.info(f"Connected to Upstash REST at {rest_url}")
+
+    def set(self, key: str, value: Any, ttl_seconds: Optional[int] = None) -> None:
+        serialized = json.dumps(value)
+        if ttl_seconds:
+            self.client.setex(key, ttl_seconds, serialized)
+        else:
+            self.client.set(key, serialized)
+
+    def get(self, key: str) -> Optional[Any]:
+        data = self.client.get(key)
+        if data is None:
+            return None
+        # Upstash REST client returns string directly
+        if isinstance(data, str):
+            return json.loads(data)
+        return data
+
+    def delete(self, key: str) -> None:
+        self.client.delete(key)
+
+    def exists(self, key: str) -> bool:
+        return self.client.exists(key) > 0
+
+    def keys(self, pattern: str = "*") -> list[str]:
+        # Upstash REST returns list of strings directly
+        result = self.client.keys(pattern)
+        return result if result else []
 
 
 class RedisBackend(StorageBackend):
@@ -122,10 +164,26 @@ class InMemoryBackend(StorageBackend):
 def create_storage_backend() -> StorageBackend:
     """
     Create appropriate storage backend based on environment.
-    Tries Redis first, falls back to in-memory if unavailable.
+    Priority: Upstash REST (serverless-optimized) > Redis > In-memory
     """
-    redis_url = os.getenv("REDIS_URL")
+    # First try Upstash REST (best for serverless environments)
+    upstash_url = os.getenv("UPSTASH_REDIS_REST_URL")
+    upstash_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
 
+    if upstash_url and upstash_token and UPSTASH_AVAILABLE:
+        try:
+            return UpstashRestBackend(upstash_url, upstash_token)
+        except Exception as e:
+            logger.error(f"Failed to connect to Upstash REST at {upstash_url}: {e}")
+            logger.warning("Falling back to in-memory storage")
+            return InMemoryBackend()
+    elif upstash_url and upstash_token and not UPSTASH_AVAILABLE:
+        logger.warning(f"UPSTASH_REDIS_REST_URL set, but upstash-redis library not installed")
+        logger.warning("Falling back to in-memory storage")
+        return InMemoryBackend()
+
+    # Fall back to standard Redis protocol
+    redis_url = os.getenv("REDIS_URL")
     if redis_url and REDIS_AVAILABLE:
         try:
             return RedisBackend(redis_url)
@@ -134,12 +192,13 @@ def create_storage_backend() -> StorageBackend:
             logger.warning("Falling back to in-memory storage")
             return InMemoryBackend()
     elif redis_url and not REDIS_AVAILABLE:
-        logger.warning(f"REDIS_URL set to {redis_url}, but redis library not installed")
+        logger.warning(f"REDIS_URL set, but redis library not installed")
         logger.warning("Falling back to in-memory storage")
         return InMemoryBackend()
-    else:
-        logger.info("No REDIS_URL configured, using in-memory storage")
-        return InMemoryBackend()
+
+    # No external storage configured
+    logger.info("No external storage configured, using in-memory storage")
+    return InMemoryBackend()
 
 
 # Global storage instance
