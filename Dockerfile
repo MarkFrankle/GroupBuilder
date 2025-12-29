@@ -7,20 +7,13 @@ WORKDIR /app
 # Install poetry
 RUN pip install poetry==1.8.2
 
-# Copy and install assignment_logic package first
-COPY assignment_logic/ /app/assignment_logic/
-RUN cd /app/assignment_logic && \
-    poetry config virtualenvs.create false && \
-    poetry build && \
-    pip install dist/*.whl
+# Copy assignment_logic to parent directory so path dependency works
+COPY assignment_logic/ /assignment_logic/
 
 # Copy API files
 COPY api/pyproject.toml api/poetry.lock /app/
 
-# Remove the path-based assignment-logic dependency (already installed via pip)
-RUN sed -i '/assignment-logic = {path/d' /app/pyproject.toml
-
-# Install dependencies (no dev dependencies, no virtualenv in container)
+# Install dependencies (path to assignment_logic will be ../assignment_logic from /app)
 RUN poetry config virtualenvs.create false \
     && poetry install --only main --no-interaction --no-ansi
 
