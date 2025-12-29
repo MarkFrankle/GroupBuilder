@@ -188,8 +188,24 @@ const TableAssignmentsPage: React.FC = () => {
       }
 
       const result = await response.json()
-      // Backend now returns {assignments: [...], version_id: "v1"}
+      // Backend now returns {assignments: [...], version_id: "v2", etc.}
       setAssignments(result.assignments)
+      setCurrentVersion(result.version_id)
+
+      // Refetch versions list to include the new version
+      try {
+        const versionsResponse = await fetch(`${API_BASE_URL}/api/assignments/results/${sessionId}/versions`)
+        if (versionsResponse.ok) {
+          const versionsData = await versionsResponse.json()
+          setAvailableVersions(versionsData.versions || [])
+        }
+      } catch (err) {
+        console.error('Failed to refresh versions:', err)
+      }
+
+      // Update URL to reflect the new version
+      const newUrl = `${window.location.pathname}?session=${sessionId}&version=${result.version_id}`
+      window.history.replaceState({}, '', newUrl)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to regenerate assignments")
     } finally {
@@ -357,9 +373,13 @@ const TableAssignmentsPage: React.FC = () => {
                     <SelectValue placeholder="Version" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="latest">Latest</SelectItem>
+                    <SelectItem value="latest" disabled={currentVersion === 'latest'}>Latest</SelectItem>
                     {availableVersions.map((version) => (
-                      <SelectItem key={version.version_id} value={version.version_id}>
+                      <SelectItem
+                        key={version.version_id}
+                        value={version.version_id}
+                        disabled={currentVersion === version.version_id}
+                      >
                         <div className="flex flex-col">
                           <span>{version.version_id}</span>
                           <span className="text-xs text-muted-foreground">

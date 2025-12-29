@@ -194,7 +194,7 @@ const LandingPage: React.FC = () => {
           sessionId = selectedRecentUpload;
         }
 
-        setLoadingMessage('Generating optimal table assignments... This may take up to 2 minutes for large groups.');
+        setLoadingMessage('Generating optimal table assignments... This will take approximately 2 minutes.');
       } else {
         // New file upload
         setLoadingMessage('Uploading participant data...');
@@ -227,7 +227,7 @@ const LandingPage: React.FC = () => {
         // Save to recent uploads
         saveRecentUpload(sessionId);
 
-        setLoadingMessage('Generating optimal table assignments... This may take up to 2 minutes for large groups.');
+        setLoadingMessage('Generating optimal table assignments... This will take approximately 2 minutes.');
       }
 
       // Generate assignments using session ID
