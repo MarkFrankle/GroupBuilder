@@ -167,8 +167,8 @@ def create_storage_backend() -> StorageBackend:
     Priority: Upstash REST (serverless-optimized) > Redis > In-memory
     """
     # First try Upstash REST (best for serverless environments)
-    upstash_url = os.getenv("UPSTASH_REDIS_REST_URL")
-    upstash_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
+    upstash_url = os.getenv("UPSTASH_REDIS_REST_URL", "").strip()
+    upstash_token = os.getenv("UPSTASH_REDIS_REST_TOKEN", "").strip()
 
     if upstash_url and upstash_token and UPSTASH_AVAILABLE:
         try:
