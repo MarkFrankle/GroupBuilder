@@ -407,7 +407,7 @@ const LandingPage: React.FC = () => {
                         <ChevronDown className="ml-2 h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-64">
+                    <DropdownMenuContent align="end" className="w-64 bg-white dark:bg-slate-950">
                       {availableVersions.length > 0 ? (
                         availableVersions.map((version) => (
                           <DropdownMenuItem

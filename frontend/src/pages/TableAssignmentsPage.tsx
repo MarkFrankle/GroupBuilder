@@ -405,7 +405,7 @@ const TableAssignmentsPage: React.FC = () => {
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="z-[9999] bg-background border shadow-lg">
+                <DropdownMenuContent align="end" className="bg-white dark:bg-slate-950">
                   <DropdownMenuItem onClick={downloadCSV}>
                     <Download className="h-4 w-4 mr-2" />
                     Download CSV
