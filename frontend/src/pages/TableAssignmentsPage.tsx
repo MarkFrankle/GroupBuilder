@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { dummyData } from "../data/dummyData"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, LayoutGrid, List, Edit, Undo2 } from 'lucide-react'
+import { Loader2, LayoutGrid, List, Edit, Undo2, MoreVertical, Download, RotateCw, X } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -15,6 +15,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { API_BASE_URL } from '@/config/api'
 
 interface ResultVersion {
@@ -316,7 +322,33 @@ const TableAssignmentsPage: React.FC = () => {
     <div className="container mx-auto p-4">
       <Card className="w-full">
         <CardHeader>
-          <CardTitle className="text-3xl font-bold text-center">Table Assignments</CardTitle>
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <CardTitle className="text-3xl font-bold">Table Assignments</CardTitle>
+            {availableVersions.length > 0 && (
+              <Select value={currentVersion} onValueChange={handleVersionChange} disabled={editMode}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Version" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="latest" disabled={currentVersion === 'latest'}>Latest</SelectItem>
+                  {availableVersions.map((version) => (
+                    <SelectItem
+                      key={version.version_id}
+                      value={version.version_id}
+                      disabled={currentVersion === version.version_id}
+                    >
+                      <div className="flex flex-col">
+                        <span>{version.version_id}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatTimestamp(version.created_at)}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <ValidationStats assignments={assignments} />
@@ -329,9 +361,9 @@ const TableAssignmentsPage: React.FC = () => {
                 size="sm"
                 className={viewMode === 'compact' ? 'border-2 border-primary' : ''}
                 disabled={editMode}
+                aria-label="Compact view"
               >
-                <LayoutGrid className="h-4 w-4 mr-2" />
-                Compact
+                <LayoutGrid className="h-4 w-4" />
               </Button>
               <Button
                 variant={viewMode === 'detailed' ? 'outline' : 'ghost'}
@@ -339,9 +371,9 @@ const TableAssignmentsPage: React.FC = () => {
                 size="sm"
                 className={viewMode === 'detailed' ? 'border-2 border-primary' : ''}
                 disabled={editMode}
+                aria-label="Detailed view"
               >
-                <List className="h-4 w-4 mr-2" />
-                Detailed
+                <List className="h-4 w-4" />
               </Button>
               {viewMode === 'detailed' && (
                 <Button
@@ -367,39 +399,27 @@ const TableAssignmentsPage: React.FC = () => {
             </div>
 
             <div className="flex gap-2 items-center">
-              {availableVersions.length > 0 && (
-                <Select value={currentVersion} onValueChange={handleVersionChange} disabled={editMode}>
-                  <SelectTrigger className="w-[140px] h-9">
-                    <SelectValue placeholder="Version" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="latest" disabled={currentVersion === 'latest'}>Latest</SelectItem>
-                    {availableVersions.map((version) => (
-                      <SelectItem
-                        key={version.version_id}
-                        value={version.version_id}
-                        disabled={currentVersion === version.version_id}
-                      >
-                        <div className="flex flex-col">
-                          <span>{version.version_id}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {formatTimestamp(version.created_at)}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              <Button variant="outline" onClick={downloadCSV} size="sm">
-                Download CSV
-              </Button>
-              <Button variant="outline" onClick={handleRegenerateAssignments} size="sm" disabled={editMode}>
-                Regenerate
-              </Button>
-              <Button variant="outline" onClick={handleClearAssignments} size="sm" disabled={editMode}>
-                Clear
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={downloadCSV}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleRegenerateAssignments} disabled={editMode}>
+                    <RotateCw className="h-4 w-4 mr-2" />
+                    Regenerate
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleClearAssignments} disabled={editMode}>
+                    <X className="h-4 w-4 mr-2" />
+                    Clear
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
