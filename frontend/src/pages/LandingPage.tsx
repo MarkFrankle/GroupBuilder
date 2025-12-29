@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle, Loader2, Clock } from 'lucide-react'
+import { AlertCircle, Loader2, Clock, ChevronDown } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -13,8 +13,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { getRecentUploadIds, saveRecentUpload, removeRecentUpload, type RecentUpload } from '@/utils/recentUploads'
 import { API_BASE_URL } from '@/config/api'
+
+interface ResultVersion {
+  version_id: string
+  created_at: number
+  solve_time?: number
+  solution_quality?: string
+}
 
 const LandingPage: React.FC = () => {
   const [file, setFile] = useState<File | null>(null)
@@ -26,6 +39,7 @@ const LandingPage: React.FC = () => {
   const [loadingMessage, setLoadingMessage] = useState<string>("")
   const [recentUploads, setRecentUploads] = useState<RecentUpload[]>([])
   const [selectedRecentUpload, setSelectedRecentUpload] = useState<string>("new-upload")
+  const [availableVersions, setAvailableVersions] = useState<ResultVersion[]>([])
   const navigate = useNavigate()
 
   // Load recent uploads on mount
@@ -70,6 +84,28 @@ const LandingPage: React.FC = () => {
     return `${days} day${days > 1 ? 's' : ''} ago`
   }
 
+  const formatTimestamp = (timestamp: number): string => {
+    const date = new Date(timestamp * 1000) // Convert Unix timestamp to milliseconds
+    const now = new Date()
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+    if (seconds < 60) return 'just now'
+    const minutes = Math.floor(seconds / 60)
+    if (minutes < 60) return `${minutes} min ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`
+    const days = Math.floor(hours / 24)
+    if (days < 7) return `${days} day${days > 1 ? 's' : ''} ago`
+
+    // For older dates, show the actual date/time
+    return date.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    })
+  }
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       setFile(event.target.files[0])
@@ -77,12 +113,13 @@ const LandingPage: React.FC = () => {
     }
   }
 
-  const handleRecentUploadSelect = (sessionId: string) => {
+  const handleRecentUploadSelect = async (sessionId: string) => {
     setSelectedRecentUpload(sessionId)
 
     if (sessionId === "new-upload") {
       // "Upload new file" selected, reset form
       setFile(null)
+      setAvailableVersions([])
       return
     }
 
@@ -93,6 +130,22 @@ const LandingPage: React.FC = () => {
       setNumSessions(upload.num_sessions.toString())
       // Clear file input since we're using an existing session
       setFile(null)
+
+      // Fetch available versions
+      if (upload.has_results) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/assignments/results/${sessionId}/versions`)
+          if (response.ok) {
+            const data = await response.json()
+            setAvailableVersions(data.versions || [])
+          }
+        } catch (err) {
+          console.error('Failed to fetch versions:', err)
+          setAvailableVersions([])
+        }
+      } else {
+        setAvailableVersions([])
+      }
     }
   }
 
@@ -338,23 +391,45 @@ const LandingPage: React.FC = () => {
               )}
 
               <div className="flex gap-4">
-                <Button type="submit" disabled={loading} className="flex-1">
+                <Button type="submit" disabled={loading} variant="outline" className="flex-1">
                   Generate Assignments
                 </Button>
                 {recentUploads.length > 0 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={loading || selectedRecentUpload === "new-upload" || !recentUploads.find(u => u.session_id === selectedRecentUpload)?.has_results}
-                    onClick={() => {
-                      if (selectedRecentUpload !== "new-upload") {
-                        navigate(`/table-assignments?session=${selectedRecentUpload}`)
-                      }
-                    }}
-                    className="flex-1"
-                  >
-                    View Previous Results
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={loading || selectedRecentUpload === "new-upload" || !recentUploads.find(u => u.session_id === selectedRecentUpload)?.has_results}
+                        className="flex-1"
+                      >
+                        View Previous Results
+                        <ChevronDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-64">
+                      {availableVersions.length > 0 ? (
+                        availableVersions.map((version) => (
+                          <DropdownMenuItem
+                            key={version.version_id}
+                            onClick={() => {
+                              navigate(`/table-assignments?session=${selectedRecentUpload}&version=${version.version_id}`)
+                            }}
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium">{version.version_id}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {formatTimestamp(version.created_at)}
+                                {version.solve_time && ` • ${version.solve_time.toFixed(2)}s`}
+                              </span>
+                            </div>
+                          </DropdownMenuItem>
+                        ))
+                      ) : (
+                        <DropdownMenuItem disabled>No versions available</DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
               </div>
             </form>
