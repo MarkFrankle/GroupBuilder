@@ -326,7 +326,7 @@ const LandingPage: React.FC = () => {
                   onChange={handleFileChange}
                   disabled={selectedRecentUpload !== "" && selectedRecentUpload !== "new-upload"}
                 />
-                {selectedRecentUpload !== "new-upload" && (
+                {selectedRecentUpload && selectedRecentUpload !== "new-upload" && (
                   <p className="text-sm text-muted-foreground">
                     Using recent upload. Clear selection above to upload a new file.
                   </p>
