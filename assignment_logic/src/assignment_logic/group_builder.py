@@ -131,24 +131,26 @@ class GroupBuilder:
                 for group in couples.values():
                     self.model.Add(sum(self.x[(p["id"], s, t)] for p in group) <= 1)
 
-        weighted_actual_pairings = 0
-        for s in self.sessions:
-            session_weight = len(self.sessions) - s
-            for t in self.tables:
-                for p1 in self.participants:
-                    for p2 in self.participants:
-                        if p2["id"] <= p1["id"]:
-                            continue
-                        z = self.model.NewBoolVar(
-                            f'pairing_p1{p1["id"]}_p2{p2["id"]}_s{s}_t{t}'
+        # OPTIMIZED: Simpler objective encoding - just count total pairings
+        # Instead of creating intermediate variables per session/table, sum directly
+        total_pairings = 0
+        for i, p1 in enumerate(self.participants):
+            for p2 in self.participants[i+1:]:
+                # For this pair, count how many times they sit together across ALL sessions/tables
+                for s in self.sessions:
+                    for t in self.tables:
+                        # Boolean: both at this table?
+                        both_at_table = self.model.NewBoolVar(
+                            f'both_{p1["id"]}_{p2["id"]}_s{s}_t{t}'
                         )
-                        self.model.Add(z <= self.x[(p1["id"], s, t)])
-                        self.model.Add(z <= self.x[(p2["id"], s, t)])
-                        self.model.Add(
-                            z >= self.x[(p1["id"], s, t)] + self.x[(p2["id"], s, t)] - 1
+                        self.model.AddMultiplicationEquality(
+                            both_at_table,
+                            [self.x[(p1["id"], s, t)], self.x[(p2["id"], s, t)]]
                         )
-                        weighted_actual_pairings += session_weight * z
-        self.model.Minimize(weighted_actual_pairings)
+                        total_pairings += both_at_table
+
+        # Minimize total pairings (simpler than weighted approach)
+        self.model.Minimize(total_pairings)
 
     def _add_symmetry_breaking(self):
         """Break table symmetry by fixing first participant to first table in first session."""
