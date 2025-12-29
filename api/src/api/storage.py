@@ -208,8 +208,11 @@ storage = create_storage_backend()
 # Convenience functions for session and result storage
 SESSION_PREFIX = "session:"
 RESULT_PREFIX = "result:"
+RESULT_VERSIONS_SUFFIX = ":versions"
+RESULT_LATEST_SUFFIX = ":latest"
 SESSION_TTL = 3600  # 1 hour
 RESULT_TTL = 30 * 24 * 3600  # 30 days
+MAX_RESULT_VERSIONS = 5  # Keep last 5 versions
 
 
 def store_session(session_id: str, data: dict) -> None:
@@ -232,16 +235,116 @@ def session_exists(session_id: str) -> bool:
     return storage.exists(f"{SESSION_PREFIX}{session_id}")
 
 
-def store_result(session_id: str, data: dict) -> None:
-    """Store assignment results (30 day TTL)"""
-    storage.set(f"{RESULT_PREFIX}{session_id}", data, RESULT_TTL)
+def store_result(session_id: str, data: dict, version_id: Optional[str] = None) -> str:
+    """
+    Store assignment results with versioning (30 day TTL).
+
+    Args:
+        session_id: The session ID
+        data: Result data to store
+        version_id: Optional version ID. If None, auto-increments.
+
+    Returns:
+        The version ID that was stored
+    """
+    import time
+
+    # Get current versions list
+    versions_key = f"{RESULT_PREFIX}{session_id}{RESULT_VERSIONS_SUFFIX}"
+    versions = storage.get(versions_key) or []
+
+    # Generate version ID if not provided
+    if version_id is None:
+        version_num = len(versions) + 1
+        version_id = f"v{version_num}"
+
+    # Add metadata to result
+    result_with_metadata = {
+        **data,
+        "version_id": version_id,
+        "created_at": time.time()
+    }
+
+    # Store the versioned result
+    version_key = f"{RESULT_PREFIX}{session_id}:{version_id}"
+    storage.set(version_key, result_with_metadata, RESULT_TTL)
+
+    # Update versions list
+    version_info = {
+        "version_id": version_id,
+        "created_at": result_with_metadata["created_at"],
+        "solve_time": data.get("metadata", {}).get("solve_time"),
+        "solution_quality": data.get("metadata", {}).get("solution_quality")
+    }
+
+    # Append new version
+    versions.append(version_info)
+
+    # Prune old versions (keep last MAX_RESULT_VERSIONS)
+    if len(versions) > MAX_RESULT_VERSIONS:
+        old_versions = versions[:-MAX_RESULT_VERSIONS]
+        versions = versions[-MAX_RESULT_VERSIONS:]
+
+        # Delete old version data
+        for old_version in old_versions:
+            old_version_key = f"{RESULT_PREFIX}{session_id}:{old_version['version_id']}"
+            storage.delete(old_version_key)
+
+    # Update versions list
+    storage.set(versions_key, versions, RESULT_TTL)
+
+    # Update latest pointer
+    latest_key = f"{RESULT_PREFIX}{session_id}{RESULT_LATEST_SUFFIX}"
+    storage.set(latest_key, version_id, RESULT_TTL)
+
+    return version_id
 
 
-def get_result(session_id: str) -> Optional[dict]:
-    """Retrieve assignment results"""
-    return storage.get(f"{RESULT_PREFIX}{session_id}")
+def get_result(session_id: str, version_id: Optional[str] = None) -> Optional[dict]:
+    """
+    Retrieve assignment results.
+
+    Args:
+        session_id: The session ID
+        version_id: Optional version ID. If None, returns latest.
+
+    Returns:
+        The result data, or None if not found
+    """
+    # If no version specified, get latest
+    if version_id is None:
+        latest_key = f"{RESULT_PREFIX}{session_id}{RESULT_LATEST_SUFFIX}"
+        version_id = storage.get(latest_key)
+
+        # Fallback to legacy non-versioned result
+        if version_id is None:
+            legacy_key = f"{RESULT_PREFIX}{session_id}"
+            return storage.get(legacy_key)
+
+    # Get versioned result
+    version_key = f"{RESULT_PREFIX}{session_id}:{version_id}"
+    return storage.get(version_key)
+
+
+def get_result_versions(session_id: str) -> list[dict]:
+    """
+    Get list of all result versions for a session.
+
+    Returns:
+        List of version metadata dicts, sorted by creation time (newest first)
+    """
+    versions_key = f"{RESULT_PREFIX}{session_id}{RESULT_VERSIONS_SUFFIX}"
+    versions = storage.get(versions_key) or []
+    return list(reversed(versions))  # Newest first
 
 
 def result_exists(session_id: str) -> bool:
-    """Check if result exists"""
-    return storage.exists(f"{RESULT_PREFIX}{session_id}")
+    """Check if any result exists for this session"""
+    # Check for latest pointer (new versioning system)
+    latest_key = f"{RESULT_PREFIX}{session_id}{RESULT_LATEST_SUFFIX}"
+    if storage.exists(latest_key):
+        return True
+
+    # Fallback to legacy non-versioned result
+    legacy_key = f"{RESULT_PREFIX}{session_id}"
+    return storage.exists(legacy_key)
