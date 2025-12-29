@@ -85,6 +85,13 @@ async def upload_file(
             "session_id": session_id,
             "columns": list(participant_dataframe.columns)
         }
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is (they already have user-friendly messages)
+        raise
     except Exception as e:
         logger.error(f"Failed to process file {file.filename}: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to process file: {str(e)}")
+        # Don't expose internal error details to user (could contain sensitive info)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to process file. Please check that your file is a valid Excel file with the required columns."
+        )
