@@ -131,15 +131,22 @@ class GroupBuilder:
                 for group in couples.values():
                     self.model.Add(sum(self.x[(p["id"], s, t)] for p in group) <= 1)
 
-        # OPTIMIZED: Simpler objective encoding - just count total pairings
-        # Instead of creating intermediate variables per session/table, sum directly
-        total_pairings = 0
+        # OPTIMIZED: Rolling window approach - penalize pairs meeting within N sessions
+        # This balances sophistication with performance: better than "count all repeats",
+        # simpler than complex session weighting, and matches user expectations
+        # (meeting at sessions 1 & 2 is bad, but 1 & 6 is okay)
+
+        window_size = 3  # Penalize if pairs meet within 3 sessions of each other
+
+        penalty_count = 0
         for i, p1 in enumerate(self.participants):
             for p2 in self.participants[i+1:]:
-                # For this pair, count how many times they sit together across ALL sessions/tables
+                # For each session, track if this pair meets (across all tables)
+                pair_meets_session = {}
                 for s in self.sessions:
+                    # Did they meet in session s? (at any table)
+                    session_meeting_vars = []
                     for t in self.tables:
-                        # Boolean: both at this table?
                         both_at_table = self.model.NewBoolVar(
                             f'both_{p1["id"]}_{p2["id"]}_s{s}_t{t}'
                         )
@@ -147,10 +154,28 @@ class GroupBuilder:
                             both_at_table,
                             [self.x[(p1["id"], s, t)], self.x[(p2["id"], s, t)]]
                         )
-                        total_pairings += both_at_table
+                        session_meeting_vars.append(both_at_table)
 
-        # Minimize total pairings (simpler than weighted approach)
-        self.model.Minimize(total_pairings)
+                    # met_in_session = OR of all tables (did they meet at any table?)
+                    pair_meets_session[s] = self.model.NewBoolVar(
+                        f'pair_{p1["id"]}_{p2["id"]}_meets_s{s}'
+                    )
+                    self.model.AddMaxEquality(pair_meets_session[s], session_meeting_vars)
+
+                # Penalize if they meet in sessions within window_size of each other
+                for s1 in self.sessions:
+                    for s2 in range(s1 + 1, min(s1 + window_size + 1, len(self.sessions))):
+                        # Penalty if they meet in both s1 and s2 (which are close together)
+                        both_sessions = self.model.NewBoolVar(
+                            f'penalty_{p1["id"]}_{p2["id"]}_s{s1}_s{s2}'
+                        )
+                        self.model.AddMultiplicationEquality(
+                            both_sessions,
+                            [pair_meets_session[s1], pair_meets_session[s2]]
+                        )
+                        penalty_count += both_sessions
+
+        self.model.Minimize(penalty_count)
 
     def _add_symmetry_breaking(self):
         """Break table symmetry by fixing first participant to first table in first session."""
