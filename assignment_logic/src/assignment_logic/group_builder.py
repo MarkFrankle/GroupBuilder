@@ -16,7 +16,7 @@ class GroupBuilder:
         self.genders = set([p["gender"] for p in self.participants])
         self.locked_assignments = locked_assignments or {}
 
-    def generate_assignments(self) -> dict:
+    def generate_assignments(self, max_time_seconds=120) -> dict:
         logger.info(f"Setting up model for {len(self.participants)} participants, "
                    f"{len(self.tables)} tables, {len(self.sessions)} sessions")
         self.setup_model()
@@ -27,15 +27,16 @@ class GroupBuilder:
         logger.info("Adding symmetry breaking constraints")
         self._add_symmetry_breaking()
         logger.info("Running solver")
-        return self._run_solver()
+        return self._run_solver(max_time_seconds=max_time_seconds)
 
-    def generate_assignments_incremental(self, batch_size=2) -> dict:
+    def generate_assignments_incremental(self, batch_size=2, max_time_seconds=120) -> dict:
         """
         Generate assignments incrementally by solving sessions in batches.
         This dramatically reduces solve time by breaking the problem into smaller pieces.
 
         Args:
             batch_size: Number of sessions to solve at a time (default: 2)
+            max_time_seconds: Total time budget to distribute across all batches (default: 120)
 
         Returns:
             dict: Same format as generate_assignments()
@@ -47,15 +48,34 @@ class GroupBuilder:
         total_branches = 0
         total_conflicts = 0
 
+        # Calculate number of batches and distribute timeout
+        num_batches = (total_sessions + batch_size - 1) // batch_size  # Ceiling division
+
+        # Give first batch 50% of time, distribute rest evenly
+        # First batch is typically hardest (no constraints from previous batches)
+        batch_timeouts = []
+        if num_batches == 1:
+            batch_timeouts = [max_time_seconds]
+        else:
+            first_batch_time = max_time_seconds * 0.5
+            remaining_time = max_time_seconds - first_batch_time
+            other_batch_time = remaining_time / (num_batches - 1) if num_batches > 1 else 0
+            batch_timeouts = [first_batch_time] + [other_batch_time] * (num_batches - 1)
+
         logger.info(f"Starting incremental solve: {len(self.participants)} participants, "
                    f"{len(self.tables)} tables, {total_sessions} sessions "
-                   f"(batch size: {batch_size})")
+                   f"(batch size: {batch_size}, {num_batches} batches, "
+                   f"timeout: {max_time_seconds}s total)")
+        logger.info(f"Batch timeouts: {', '.join(f'{t:.1f}s' for t in batch_timeouts)}")
 
-        for batch_start in range(0, total_sessions, batch_size):
+        for batch_idx, batch_start in enumerate(range(0, total_sessions, batch_size)):
             batch_end = min(batch_start + batch_size, total_sessions)
-            logger.info(f"=== Batch {batch_start // batch_size + 1}: "
-                       f"Solving sessions {batch_start + 1}-{batch_end} "
-                       f"({batch_start} sessions locked) ===")
+            batch_timeout = batch_timeouts[batch_idx]
+
+            logger.info(f"=== Batch {batch_idx + 1}/{num_batches}: "
+                       f"Sessions {batch_start + 1}-{batch_end} "
+                       f"({batch_start} locked, {batch_end - batch_start} free, "
+                       f"timeout: {batch_timeout:.1f}s) ===")
 
             # Create a new GroupBuilder for sessions 0 through batch_end
             # This includes all previous sessions (locked) plus current batch (free)
@@ -66,16 +86,22 @@ class GroupBuilder:
                 locked_assignments=locked
             )
 
-            result = gb.generate_assignments()
+            result = gb.generate_assignments(max_time_seconds=batch_timeout)
 
             if result["status"] != "success":
-                logger.error(f"Batch {batch_start // batch_size + 1} failed: {result.get('error', 'Unknown error')}")
+                logger.error(f"Batch {batch_idx + 1} failed: {result.get('error', 'Unknown error')}")
                 return result
 
             # Accumulate stats
-            total_solve_time += result.get("solve_time", 0)
-            total_branches += result.get("num_branches", 0)
-            total_conflicts += result.get("num_conflicts", 0)
+            batch_time = result.get("solve_time", 0)
+            batch_branches = result.get("num_branches", 0)
+            batch_conflicts = result.get("num_conflicts", 0)
+            batch_quality = result.get("solution_quality", "unknown")
+            batch_deviation = result.get("total_deviation")
+
+            total_solve_time += batch_time
+            total_branches += batch_branches
+            total_conflicts += batch_conflicts
 
             # Extract assignments for this batch only (not the locked ones we already have)
             batch_assignments = [
@@ -84,9 +110,13 @@ class GroupBuilder:
             ]
             all_assignments.extend(batch_assignments)
 
-            logger.info(f"Batch {batch_start // batch_size + 1} complete: "
-                       f"Added {len(batch_assignments)} sessions in "
-                       f"{result.get('solve_time', 0):.2f}s")
+            # Enhanced logging with full solver stats
+            deviation_str = f"deviation: {batch_deviation}" if batch_deviation is not None else "deviation: N/A"
+            logger.info(f"Batch {batch_idx + 1} complete: "
+                       f"{batch_quality.upper()} in {batch_time:.2f}s | "
+                       f"{deviation_str} | "
+                       f"{batch_branches:,} branches | "
+                       f"{batch_conflicts:,} conflicts")
 
             # Lock ALL sessions we've solved so far for the next batch
             for assignment in result["assignments"]:
@@ -293,14 +323,14 @@ class GroupBuilder:
         if locked_count > 0:
             logger.info(f"Applied {locked_count} locked assignments from previous batches")
 
-    def _run_solver(self):
+    def _run_solver(self, max_time_seconds=120):
         self.solver = cp_model.CpSolver()
 
-        self.solver.parameters.max_time_in_seconds = 120.0
+        self.solver.parameters.max_time_in_seconds = float(max_time_seconds)
         self.solver.parameters.num_search_workers = 4
         self.solver.parameters.log_search_progress = False
 
-        logger.info(f"Starting CP-SAT solver (max time: 120s, {self.solver.parameters.num_search_workers} workers)")
+        logger.info(f"Starting CP-SAT solver (max time: {max_time_seconds:.1f}s, {self.solver.parameters.num_search_workers} workers)")
         status = self.solver.Solve(self.model)
         logger.info(f"Solver completed with status: {self.solver.StatusName(status)} "
                    f"in {self.solver.WallTime():.2f}s")
