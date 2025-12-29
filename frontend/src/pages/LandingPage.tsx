@@ -291,10 +291,10 @@ const LandingPage: React.FC = () => {
                   </Label>
                   <Select value={selectedRecentUpload} onValueChange={handleRecentUploadSelect}>
                     <SelectTrigger id="recent-uploads">
-                      <SelectValue placeholder="Choose a recent upload or upload new file" />
+                      <SelectValue placeholder="Select a previous upload" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="new-upload">Upload new file</SelectItem>
+                      <SelectItem value="new-upload">New upload</SelectItem>
                       {recentUploads.map((upload) => {
                         const timeAgo = getTimeAgo(upload.created_at)
                         return (
