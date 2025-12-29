@@ -7,13 +7,14 @@ logger = logging.getLogger(__name__)
 
 
 class GroupBuilder:
-    def __init__(self, participants, num_tables, num_sessions):
+    def __init__(self, participants, num_tables, num_sessions, locked_assignments=None):
         self.participants = participants
         self.tables = range(num_tables)
         self.sessions = range(num_sessions)
         self.table_size = ceil(len(self.participants) / len(self.tables))
         self.religions = set([p["religion"] for p in self.participants])
         self.genders = set([p["gender"] for p in self.participants])
+        self.locked_assignments = locked_assignments or {}
 
     def generate_assignments(self) -> dict:
         logger.info(f"Setting up model for {len(self.participants)} participants, "
@@ -28,6 +29,97 @@ class GroupBuilder:
         logger.info("Running solver")
         return self._run_solver()
 
+    def generate_assignments_incremental(self, batch_size=2) -> dict:
+        """
+        Generate assignments incrementally by solving sessions in batches.
+        This dramatically reduces solve time by breaking the problem into smaller pieces.
+
+        Args:
+            batch_size: Number of sessions to solve at a time (default: 2)
+
+        Returns:
+            dict: Same format as generate_assignments()
+        """
+        all_assignments = []
+        locked = {}
+        total_sessions = len(self.sessions)
+        total_solve_time = 0
+        total_branches = 0
+        total_conflicts = 0
+
+        logger.info(f"Starting incremental solve: {len(self.participants)} participants, "
+                   f"{len(self.tables)} tables, {total_sessions} sessions "
+                   f"(batch size: {batch_size})")
+
+        for batch_start in range(0, total_sessions, batch_size):
+            batch_end = min(batch_start + batch_size, total_sessions)
+            logger.info(f"=== Batch {batch_start // batch_size + 1}: "
+                       f"Solving sessions {batch_start + 1}-{batch_end} "
+                       f"({batch_start} sessions locked) ===")
+
+            # Create a new GroupBuilder for sessions 0 through batch_end
+            # This includes all previous sessions (locked) plus current batch (free)
+            gb = GroupBuilder(
+                self.participants,
+                len(self.tables),
+                batch_end,  # Only model up to end of current batch
+                locked_assignments=locked
+            )
+
+            result = gb.generate_assignments()
+
+            if result["status"] != "success":
+                logger.error(f"Batch {batch_start // batch_size + 1} failed: {result.get('error', 'Unknown error')}")
+                return result
+
+            # Accumulate stats
+            total_solve_time += result.get("solve_time", 0)
+            total_branches += result.get("num_branches", 0)
+            total_conflicts += result.get("num_conflicts", 0)
+
+            # Extract assignments for this batch only (not the locked ones we already have)
+            batch_assignments = [
+                a for a in result["assignments"]
+                if batch_start <= a["session"] - 1 < batch_end
+            ]
+            all_assignments.extend(batch_assignments)
+
+            logger.info(f"Batch {batch_start // batch_size + 1} complete: "
+                       f"Added {len(batch_assignments)} sessions in "
+                       f"{result.get('solve_time', 0):.2f}s")
+
+            # Lock ALL sessions we've solved so far for the next batch
+            for assignment in result["assignments"]:
+                s = assignment["session"] - 1  # Convert to 0-indexed
+                for table_num, participants in assignment["tables"].items():
+                    t = table_num - 1  # Convert to 0-indexed
+                    for p_data in participants:
+                        # Find participant ID from name
+                        p_id = next(
+                            p["id"] for p in self.participants
+                            if p["name"] == p_data["name"]
+                        )
+                        locked[(p_id, s, t)] = True
+
+                        # Also lock this participant to NOT be at other tables
+                        for other_t in self.tables:
+                            if other_t != t:
+                                locked[(p_id, s, other_t)] = False
+
+        logger.info(f"Incremental solve complete: {total_solve_time:.2f}s total "
+                   f"({total_branches:,} branches, {total_conflicts:,} conflicts)")
+
+        # Return combined results
+        return {
+            "status": "success",
+            "solution_quality": "incremental",
+            "total_deviation": None,  # Not meaningful across incremental batches
+            "solve_time": total_solve_time,
+            "num_branches": total_branches,
+            "num_conflicts": total_conflicts,
+            "assignments": all_assignments,
+        }
+
     def setup_model(self):
         self.model = cp_model.CpModel()
 
@@ -40,6 +132,9 @@ class GroupBuilder:
                     self.x[(p["id"], s, t)] = self.model.NewBoolVar(
                         f"x_p{p['id']}_s{s}_t{t}"
                     )
+
+        # Apply locked assignments from previous batches
+        self._apply_locked_assignments()
 
     def _add_constraints_to_model(self):
         # Each participants sits at one table per session
@@ -183,6 +278,21 @@ class GroupBuilder:
             first_participant_id = self.participants[0]["id"]
             self.model.Add(self.x[(first_participant_id, 0, 0)] == 1)
 
+    def _apply_locked_assignments(self):
+        """Fix variables for locked sessions based on pre-assigned seating."""
+        if not self.locked_assignments:
+            return
+
+        locked_count = 0
+        for (p_id, s, t), value in self.locked_assignments.items():
+            if (p_id, s, t) in self.x:
+                self.model.Add(self.x[(p_id, s, t)] == (1 if value else 0))
+                if value:
+                    locked_count += 1
+
+        if locked_count > 0:
+            logger.info(f"Applied {locked_count} locked assignments from previous batches")
+
     def _run_solver(self):
         self.solver = cp_model.CpSolver()
 
@@ -251,6 +361,9 @@ class GroupBuilder:
 
 
 if __name__ == "__main__":
+    # Set up logging to see the incremental progress
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+
     data = [
         {
             "id": 1,
@@ -324,5 +437,25 @@ if __name__ == "__main__":
         },
     ]
 
+    print("\n" + "="*60)
+    print("TESTING INCREMENTAL SOLVER")
+    print("="*60)
+
     gb = GroupBuilder(data, 4, 6)
-    print(gb.generate_assignments())
+    result = gb.generate_assignments_incremental(batch_size=2)
+
+    print("\n" + "="*60)
+    print("RESULTS")
+    print("="*60)
+    print(f"Status: {result['status']}")
+    print(f"Solution quality: {result['solution_quality']}")
+    print(f"Total solve time: {result['solve_time']:.2f}s")
+    print(f"Total branches: {result['num_branches']:,}")
+    print(f"Total conflicts: {result['num_conflicts']:,}")
+    print(f"Sessions generated: {len(result['assignments'])}")
+
+    # Show first session as a sanity check
+    if result['assignments']:
+        print(f"\nSession 1 preview:")
+        for table_num, participants in result['assignments'][0]['tables'].items():
+            print(f"  Table {table_num}: {', '.join(p['name'] for p in participants)}")
