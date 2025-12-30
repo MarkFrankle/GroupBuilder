@@ -1,0 +1,15 @@
+Your Table Assignments are Ready!
+
+We've generated optimized table assignments for your event:
+- {{ num_sessions }} session{{ 's' if num_sessions != 1 else '' }}
+- {{ num_tables }} table{{ 's' if num_tables != 1 else '' }} per session
+- Balanced diversity across all tables
+- Couples seated separately
+
+View your assignments here:
+{{ magic_link }}
+
+This link is valid for 30 days.
+
+---
+Made with care for communities building bridges through dialogue.

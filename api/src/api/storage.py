@@ -82,11 +82,36 @@ class UpstashRestBackend(StorageBackend):
 
 
 class RedisBackend(StorageBackend):
-    """Redis-based storage with automatic JSON serialization"""
+    """
+    Redis-based storage with automatic JSON serialization and connection pooling.
+
+    Connection pool settings can be configured via environment variables:
+    - REDIS_POOL_MAX_CONNECTIONS: Maximum connections in pool (default: 10)
+    - REDIS_POOL_TIMEOUT: Connection timeout in seconds (default: 5)
+    """
 
     def __init__(self, redis_url: str):
-        self.client = redis.from_url(redis_url, decode_responses=True)
-        logger.info(f"Connected to Redis at {redis_url}")
+        # Get pool configuration from environment
+        max_connections = int(os.getenv("REDIS_POOL_MAX_CONNECTIONS", "10"))
+        timeout = int(os.getenv("REDIS_POOL_TIMEOUT", "5"))
+
+        # Create connection pool
+        pool = redis.ConnectionPool.from_url(
+            redis_url,
+            max_connections=max_connections,
+            socket_connect_timeout=timeout,
+            socket_keepalive=True,
+            decode_responses=True
+        )
+
+        # Create client with connection pool
+        self.client = redis.Redis(connection_pool=pool)
+        self.pool = pool
+
+        logger.info(
+            f"Connected to Redis at {redis_url} "
+            f"(pool: max_connections={max_connections}, timeout={timeout}s)"
+        )
 
     def set(self, key: str, value: Any, ttl_seconds: Optional[int] = None) -> None:
         serialized = json.dumps(value)
@@ -109,6 +134,12 @@ class RedisBackend(StorageBackend):
 
     def keys(self, pattern: str = "*") -> list[str]:
         return [k.decode() if isinstance(k, bytes) else k for k in self.client.keys(pattern)]
+
+    def close(self) -> None:
+        """Close all connections in the pool."""
+        if hasattr(self, 'pool'):
+            self.pool.disconnect()
+            logger.info("Redis connection pool closed")
 
 
 class InMemoryBackend(StorageBackend):
@@ -236,9 +267,11 @@ SESSION_PREFIX = "session:"
 RESULT_PREFIX = "result:"
 RESULT_VERSIONS_SUFFIX = ":versions"
 RESULT_LATEST_SUFFIX = ":latest"
-SESSION_TTL = 3600  # 1 hour
-RESULT_TTL = 30 * 24 * 3600  # 30 days
-MAX_RESULT_VERSIONS = 5  # Keep last 5 versions
+
+# TTL constants (configurable via environment variables)
+SESSION_TTL = int(os.getenv("SESSION_TTL_SECONDS", "3600"))  # 1 hour default
+RESULT_TTL = int(os.getenv("RESULT_TTL_SECONDS", str(30 * 24 * 3600)))  # 30 days default
+MAX_RESULT_VERSIONS = int(os.getenv("MAX_RESULT_VERSIONS", "5"))  # Keep last 5 versions default
 
 
 def store_session(session_id: str, data: dict) -> None:

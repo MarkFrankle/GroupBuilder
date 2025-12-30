@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Table Assignments are Ready</title>
+  </head>
+  <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+      <h2 style="color: #2563eb; margin-top: 0;">Your Table Assignments are Ready</h2>
+
+      <p>We've generated optimized table assignments for your event:</p>
+
+      <ul style="background: #f3f4f6; padding: 15px 30px; border-radius: 8px; margin: 20px 0;">
+        <li><strong>{{ num_sessions }}</strong> session{{ 's' if num_sessions != 1 else '' }}</li>
+        <li><strong>{{ num_tables }}</strong> table{{ 's' if num_tables != 1 else '' }} per session</li>
+        <li>Balanced diversity across all tables</li>
+        <li>Couples seated separately</li>
+      </ul>
+
+      <p style="margin: 30px 0;">
+        <a href="{{ magic_link }}"
+           style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+          View Your Assignments
+        </a>
+      </p>
+
+      <p style="color: #6b7280; font-size: 14px;">
+        This link is valid for 30 days. You can bookmark it for future reference.
+      </p>
+
+      <p style="color: #6b7280; font-size: 14px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+        If the button doesn't work, copy and paste this link:<br>
+        <a href="{{ magic_link }}" style="color: #2563eb; word-break: break-all;">{{ magic_link }}</a>
+      </p>
+
+      <p style="color: #9ca3af; font-size: 12px; margin-top: 30px;">
+        Made with care for communities building bridges through dialogue.
+      </p>
+    </div>
+  </body>
+</html>

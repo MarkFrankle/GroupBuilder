@@ -25,7 +25,15 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { getRecentUploadIds, saveRecentUpload, removeRecentUpload, type RecentUpload } from '@/utils/recentUploads'
+import { formatISOTimeAgo, formatUnixTimeAgo } from '@/utils/timeFormatting'
 import { API_BASE_URL } from '@/config/api'
+import {
+  SESSION_EXPIRY_MESSAGE,
+  RESULTS_EXPIRY_MESSAGE,
+  ESTIMATED_SOLVE_TIME_MINUTES,
+  MAX_TABLES,
+  MAX_SESSIONS
+} from '@/constants'
 
 interface ResultVersion {
   version_id: string
@@ -76,42 +84,6 @@ const LandingPage: React.FC = () => {
     loadRecentUploads()
   }, [])
 
-  const getTimeAgo = (isoString: string): string => {
-    const date = new Date(isoString)
-    const now = new Date()
-    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-
-    if (seconds < 60) return 'just now'
-    const minutes = Math.floor(seconds / 60)
-    if (minutes < 60) return `${minutes} min ago`
-    const hours = Math.floor(minutes / 60)
-    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`
-    const days = Math.floor(hours / 24)
-    return `${days} day${days > 1 ? 's' : ''} ago`
-  }
-
-  const formatTimestamp = (timestamp: number): string => {
-    const date = new Date(timestamp * 1000) // Convert Unix timestamp to milliseconds
-    const now = new Date()
-    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-
-    if (seconds < 60) return 'just now'
-    const minutes = Math.floor(seconds / 60)
-    if (minutes < 60) return `${minutes} min ago`
-    const hours = Math.floor(minutes / 60)
-    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`
-    const days = Math.floor(hours / 24)
-    if (days < 7) return `${days} day${days > 1 ? 's' : ''} ago`
-
-    // For older dates, show the actual date/time
-    return date.toLocaleString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit'
-    })
-  }
-
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       setFile(event.target.files[0])
@@ -155,12 +127,123 @@ const LandingPage: React.FC = () => {
     }
   }
 
+  /**
+   * Validate form inputs before submission.
+   */
+  const validateForm = (): boolean => {
+    if (!file && (!selectedRecentUpload || selectedRecentUpload === "new-upload")) {
+      setError('Please select a file to upload or choose a recent upload.');
+      return false;
+    }
+    return true;
+  };
+
+  /**
+   * Clone an existing session with new parameters.
+   */
+  const cloneSession = async (sessionId: string): Promise<string> => {
+    setLoadingMessage('Updating configuration...');
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/assignments/sessions/${sessionId}/clone?num_tables=${numTables}&num_sessions=${numSessions}`,
+      { method: 'POST' }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to update configuration');
+    }
+
+    const data = await response.json();
+    const newSessionId = data.session_id;
+    saveRecentUpload(newSessionId);
+    return newSessionId;
+  };
+
+  /**
+   * Upload a new file and create a session.
+   */
+  const uploadNewFile = async (): Promise<string> => {
+    setLoadingMessage('Uploading participant data...');
+
+    const formData = new FormData();
+    formData.append('file', file!);
+    formData.append('numTables', numTables);
+    formData.append('numSessions', numSessions);
+    if (email) {
+      formData.append('email', email);
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/upload/`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'File upload failed');
+    }
+
+    const data = await response.json();
+    const sessionId = data.session_id;
+
+    if (!sessionId) {
+      throw new Error('No session ID received from server');
+    }
+
+    saveRecentUpload(sessionId);
+    return sessionId;
+  };
+
+  /**
+   * Get or create a session ID based on user selection.
+   */
+  const getSessionId = async (): Promise<string> => {
+    if (selectedRecentUpload !== "new-upload") {
+      // Using a recent upload - check if parameters changed
+      const selectedUpload = recentUploads.find(u => u.session_id === selectedRecentUpload);
+
+      if (selectedUpload &&
+          (selectedUpload.num_tables.toString() !== numTables ||
+           selectedUpload.num_sessions.toString() !== numSessions)) {
+        // Parameters changed - clone session with new params
+        return await cloneSession(selectedRecentUpload);
+      } else {
+        // Parameters unchanged - use existing session
+        return selectedRecentUpload;
+      }
+    } else {
+      // New file upload
+      return await uploadNewFile();
+    }
+  };
+
+  /**
+   * Generate assignments for a given session.
+   */
+  const generateAssignments = async (sessionId: string) => {
+    setLoadingMessage(`Generating optimal table assignments... This will take approximately ${ESTIMATED_SOLVE_TIME_MINUTES} minutes.`);
+
+    const response = await fetch(`${API_BASE_URL}/api/assignments/?session_id=${sessionId}`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to generate assignments');
+    }
+
+    const assignments = await response.json();
+    navigate('/table-assignments', { state: { assignments, sessionId } });
+  };
+
+  /**
+   * Handle form submission.
+   */
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    // Check if using recent upload or new file
-    if (!file && (!selectedRecentUpload || selectedRecentUpload === "new-upload")) {
-      setError('Please select a file to upload or choose a recent upload.');
+    if (!validateForm()) {
       return;
     }
 
@@ -168,88 +251,8 @@ const LandingPage: React.FC = () => {
     setLoading(true);
 
     try {
-      let sessionId: string;
-
-      if (selectedRecentUpload !== "new-upload") {
-        // Using a recent upload - check if parameters changed
-        const selectedUpload = recentUploads.find(u => u.session_id === selectedRecentUpload);
-
-        if (selectedUpload &&
-            (selectedUpload.num_tables.toString() !== numTables ||
-             selectedUpload.num_sessions.toString() !== numSessions)) {
-          // Parameters changed - clone session with new params
-          setLoadingMessage('Updating configuration...');
-
-          const cloneResponse = await fetch(
-            `${API_BASE_URL}/api/assignments/sessions/${selectedRecentUpload}/clone?num_tables=${numTables}&num_sessions=${numSessions}`,
-            { method: 'POST' }
-          );
-
-          if (!cloneResponse.ok) {
-            const errorData = await cloneResponse.json();
-            throw new Error(errorData.detail || 'Failed to update configuration');
-          }
-
-          const cloneData = await cloneResponse.json();
-          sessionId = cloneData.session_id;
-
-          // Save new session to recent uploads
-          saveRecentUpload(sessionId);
-        } else {
-          // Parameters unchanged - use existing session
-          sessionId = selectedRecentUpload;
-        }
-
-        setLoadingMessage('Generating optimal table assignments... This will take approximately 2 minutes.');
-      } else {
-        // New file upload
-        setLoadingMessage('Uploading participant data...');
-
-        const formData = new FormData();
-        formData.append('file', file!);
-        formData.append('numTables', numTables);
-        formData.append('numSessions', numSessions);
-        if (email) {
-          formData.append('email', email);
-        }
-
-        const uploadResponse = await fetch(`${API_BASE_URL}/api/upload/`, {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!uploadResponse.ok) {
-          const errorData = await uploadResponse.json();
-          throw new Error(errorData.detail || 'File upload failed');
-        }
-
-        const uploadData = await uploadResponse.json();
-        sessionId = uploadData.session_id;
-
-        if (!sessionId) {
-          throw new Error('No session ID received from server');
-        }
-
-        // Save to recent uploads
-        saveRecentUpload(sessionId);
-
-        setLoadingMessage('Generating optimal table assignments... This will take approximately 2 minutes.');
-      }
-
-      // Generate assignments using session ID
-      const assignmentsResponse = await fetch(`${API_BASE_URL}/api/assignments/?session_id=${sessionId}`, {
-        method: 'GET',
-      });
-
-      if (!assignmentsResponse.ok) {
-        const errorData = await assignmentsResponse.json();
-        throw new Error(errorData.detail || 'Failed to generate assignments');
-      }
-
-      const assignments = await assignmentsResponse.json();
-
-      // Navigate to the TableAssignmentsPage with assignments and session ID
-      navigate('/table-assignments', { state: { assignments, sessionId } });
+      const sessionId = await getSessionId();
+      await generateAssignments(sessionId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {
@@ -302,7 +305,7 @@ const LandingPage: React.FC = () => {
                     <SelectContent>
                       <SelectItem value="new-upload">New upload</SelectItem>
                       {recentUploads.map((upload) => {
-                        const timeAgo = getTimeAgo(upload.created_at)
+                        const timeAgo = formatISOTimeAgo(upload.created_at)
                         return (
                           <SelectItem key={upload.session_id} value={upload.session_id}>
                             {upload.filename} ({upload.num_participants} participants, {upload.num_tables} tables, {upload.num_sessions} sessions) - {timeAgo}
@@ -312,7 +315,7 @@ const LandingPage: React.FC = () => {
                     </SelectContent>
                   </Select>
                   <p className="text-sm text-muted-foreground">
-                    Reuse a recent upload (available for 1 hour)
+                    Reuse a recent upload ({SESSION_EXPIRY_MESSAGE})
                   </p>
                 </div>
               )}
@@ -341,7 +344,7 @@ const LandingPage: React.FC = () => {
                       <SelectValue placeholder="Select number of tables" />
                     </SelectTrigger>
                     <SelectContent>
-                      {[...Array(10)].map((_, i) => (
+                      {[...Array(MAX_TABLES)].map((_, i) => (
                         <SelectItem key={i} value={(i + 1).toString()}>
                           {i + 1}
                         </SelectItem>
@@ -356,7 +359,7 @@ const LandingPage: React.FC = () => {
                       <SelectValue placeholder="Select number of sessions" />
                     </SelectTrigger>
                     <SelectContent>
-                      {[...Array(6)].map((_, i) => (
+                      {[...Array(MAX_SESSIONS)].map((_, i) => (
                         <SelectItem key={i} value={(i + 1).toString()}>
                           {i + 1}
                         </SelectItem>
@@ -391,7 +394,7 @@ const LandingPage: React.FC = () => {
                     onChange={(e) => setEmail(e.target.value)}
                   />
                   <p className="text-sm text-muted-foreground">
-                    Get a link to your results via email (bookmarkable for 30 days)
+                    Get a link to your results via email ({RESULTS_EXPIRY_MESSAGE})
                   </p>
                 </CollapsibleContent>
               </Collapsible>
@@ -441,7 +444,7 @@ const LandingPage: React.FC = () => {
                             <div className="flex flex-col">
                               <span className="font-medium">{version.version_id}</span>
                               <span className="text-xs text-muted-foreground">
-                                {formatTimestamp(version.created_at)}
+                                {formatUnixTimeAgo(version.created_at)}
                                 {version.solve_time && ` • ${version.solve_time.toFixed(2)}s`}
                               </span>
                             </div>
