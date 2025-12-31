@@ -39,6 +39,11 @@ class StorageBackend:
     def delete(self, key: str) -> None:
         raise NotImplementedError
 
+    def delete_many(self, keys: list[str]) -> None:
+        """Delete multiple keys efficiently (uses batch/pipeline if available)."""
+        for key in keys:
+            self.delete(key)
+
     def exists(self, key: str) -> bool:
         raise NotImplementedError
 
@@ -71,6 +76,11 @@ class UpstashRestBackend(StorageBackend):
 
     def delete(self, key: str) -> None:
         self.client.delete(key)
+
+    def delete_many(self, keys: list[str]) -> None:
+        """Delete multiple keys in a single batch operation."""
+        if keys:
+            self.client.delete(*keys)
 
     def exists(self, key: str) -> bool:
         return self.client.exists(key) > 0
@@ -128,6 +138,15 @@ class RedisBackend(StorageBackend):
 
     def delete(self, key: str) -> None:
         self.client.delete(key)
+
+    def delete_many(self, keys: list[str]) -> None:
+        """Delete multiple keys using Redis pipeline for efficiency."""
+        if not keys:
+            return
+        with self.client.pipeline() as pipe:
+            for key in keys:
+                pipe.delete(key)
+            pipe.execute()
 
     def exists(self, key: str) -> bool:
         return self.client.exists(key) > 0
@@ -344,10 +363,12 @@ def store_result(session_id: str, data: dict, version_id: Optional[str] = None) 
         old_versions = versions[:-MAX_RESULT_VERSIONS]
         versions = versions[-MAX_RESULT_VERSIONS:]
 
-        # Delete old version data
-        for old_version in old_versions:
-            old_version_key = f"{RESULT_PREFIX}{session_id}:{old_version['version_id']}"
-            storage.delete(old_version_key)
+        # Delete old version data in batch
+        old_version_keys = [
+            f"{RESULT_PREFIX}{session_id}:{old_version['version_id']}"
+            for old_version in old_versions
+        ]
+        storage.delete_many(old_version_keys)
 
     # Update versions list
     storage.set(versions_key, versions, RESULT_TTL)

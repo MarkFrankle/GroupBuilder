@@ -1,69 +1,111 @@
-from fastapi import APIRouter, HTTPException, Query, Path
+from fastapi import APIRouter, HTTPException, Query, Path, Request
 from assignment_logic.api_handler import handle_generate_assignments
 from api.storage import (
     get_session, session_exists, store_result, get_result, result_exists,
     store_session, get_result_versions
 )
 from api.email import send_magic_link_email
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from datetime import datetime
 import logging
 import uuid
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
+
+
+def _generate_assignments_internal(session_id: str, send_email: bool = False, mark_regenerated: bool = False):
+    """
+    Internal helper to generate assignments (shared by get_assignments and regenerate_assignments).
+
+    Args:
+        session_id: The session ID
+        send_email: Whether to send email with magic link
+        mark_regenerated: Whether to mark results as regenerated
+
+    Returns:
+        Tuple of (assignments, version_id, metadata)
+    """
+    session_data = get_session(session_id)
+    participants_dict = session_data["participant_dict"]
+    num_tables = session_data["num_tables"]
+    num_sessions = session_data["num_sessions"]
+
+    logger.info(
+        f"{'Regenerating' if mark_regenerated else 'Generating'} assignments for session {session_id}: "
+        f"{len(participants_dict)} participants, {num_tables} tables, {num_sessions} sessions"
+    )
+
+    results = handle_generate_assignments(participants_dict, num_tables, num_sessions)
+
+    if results['status'] != 'success':
+        error_msg = results.get('error', 'No feasible solution found')
+        logger.error(f"Solver failed: {error_msg}")
+        raise HTTPException(status_code=400, detail=error_msg)
+
+    # Log solver statistics
+    num_branches = results.get('num_branches', 'N/A')
+    num_conflicts = results.get('num_conflicts', 'N/A')
+    branches_str = f"{num_branches:,}" if isinstance(num_branches, int) else num_branches
+    conflicts_str = f"{num_conflicts:,}" if isinstance(num_conflicts, int) else num_conflicts
+
+    logger.info(
+        f"Solver [{len(participants_dict)}p/{num_tables}t/{num_sessions}s]: "
+        f"{results.get('solution_quality', 'unknown').upper()} in {results.get('solve_time', 0):.2f}s | "
+        f"Deviation: {results.get('total_deviation', 'N/A')} | "
+        f"Branches: {branches_str} | "
+        f"Conflicts: {conflicts_str}"
+    )
+
+    # Prepare result data
+    result_metadata = {
+        "solution_quality": results.get('solution_quality'),
+        "solve_time": results.get('solve_time'),
+        "total_deviation": results.get('total_deviation')
+    }
+
+    if mark_regenerated:
+        result_metadata["regenerated"] = True
+
+    # Store results
+    version_id = store_result(session_id, {
+        "assignments": results['assignments'],
+        "metadata": result_metadata,
+        "created_at": datetime.now().isoformat()
+    })
+
+    # Send email if requested
+    if send_email and session_data.get("email"):
+        send_magic_link_email(
+            to_email=session_data["email"],
+            magic_link_path=f"/table-assignments?session={session_id}",
+            num_sessions=num_sessions,
+            num_tables=num_tables
+        )
+
+    return results['assignments'], version_id, result_metadata
+
 
 @router.get("/")
+@limiter.limit("5/minute")  # Limit expensive solver operations
 def get_assignments(
+    request: Request,
     session_id: str = Query(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$")
 ):
-    logger.info(f"Generating assignments for session: {session_id}")
-
+    """Generate assignments for a session and optionally send email with results link."""
     if not session_exists(session_id):
         logger.warning(f"Session not found: {session_id}")
         raise HTTPException(status_code=404, detail="Session not found. Please upload a file first.")
 
     try:
-        session_data = get_session(session_id)
-        participants_dict = session_data["participant_dict"]
-        num_tables = session_data["num_tables"]
-        num_sessions = session_data["num_sessions"]
-
-        logger.info(f"Starting solver with {len(participants_dict)} participants, {num_tables} tables, {num_sessions} sessions")
-
-        results = handle_generate_assignments(participants_dict, num_tables, num_sessions)
-
-        if results['status'] != 'success':
-            error_msg = results.get('error', 'No feasible solution found')
-            logger.error(f"Solver failed: {error_msg}")
-            raise HTTPException(status_code=400, detail=error_msg)
-
-        logger.info(
-            f"Solver [{len(participants_dict)}p/{num_tables}t/{num_sessions}s]: "
-            f"{results.get('solution_quality', 'unknown').upper()} in {results.get('solve_time', 0):.2f}s | "
-            f"Deviation: {results.get('total_deviation', 'N/A')} | "
-            f"Branches: {results.get('num_branches', 'N/A'):,} | "
-            f"Conflicts: {results.get('num_conflicts', 'N/A'):,}"
+        assignments, _, _ = _generate_assignments_internal(
+            session_id=session_id,
+            send_email=True,
+            mark_regenerated=False
         )
-
-        store_result(session_id, {
-            "assignments": results['assignments'],
-            "metadata": {
-                "solution_quality": results.get('solution_quality'),
-                "solve_time": results.get('solve_time'),
-                "total_deviation": results.get('total_deviation')
-            },
-            "created_at": datetime.now().isoformat()
-        })
-
-        if session_data.get("email"):
-            send_magic_link_email(
-                to_email=session_data["email"],
-                magic_link_path=f"/table-assignments?session={session_id}",
-                num_sessions=num_sessions,
-                num_tables=num_tables
-            )
-
-        return results['assignments']
+        return assignments
     except HTTPException:
         raise
     except Exception as e:
@@ -74,12 +116,12 @@ def get_assignments(
         )
 
 @router.post("/regenerate/{session_id}")
+@limiter.limit("5/minute")  # Limit expensive solver operations
 async def regenerate_assignments(
+    request: Request,
     session_id: str = Path(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$")
 ):
     """Regenerate assignments using the same upload data (within 1 hour of upload)"""
-    logger.info(f"Regenerating assignments for session: {session_id}")
-
     if not session_exists(session_id):
         logger.warning(f"Session not found or expired: {session_id}")
         raise HTTPException(
@@ -88,39 +130,16 @@ async def regenerate_assignments(
         )
 
     try:
-        session_data = get_session(session_id)
-        participants_dict = session_data["participant_dict"]
-        num_tables = session_data["num_tables"]
-        num_sessions = session_data["num_sessions"]
+        assignments, version_id, _ = _generate_assignments_internal(
+            session_id=session_id,
+            send_email=False,
+            mark_regenerated=True
+        )
 
-        logger.info(f"Regenerating with {len(participants_dict)} participants, {num_tables} tables, {num_sessions} sessions")
-
-        results = handle_generate_assignments(participants_dict, num_tables, num_sessions)
-
-        if results['status'] != 'success':
-            error_msg = results.get('error', 'No feasible solution found')
-            logger.error(f"Regeneration failed: {error_msg}")
-            raise HTTPException(status_code=400, detail=error_msg)
-
-        logger.info(f"Successfully regenerated assignments (quality: {results.get('solution_quality', 'unknown')}, "
-                   f"time: {results.get('solve_time', 'unknown')}s)")
-
-        # Store as new version (never overwrites)
-        version_id = store_result(session_id, {
-            "assignments": results['assignments'],
-            "metadata": {
-                "solution_quality": results.get('solution_quality'),
-                "solve_time": results.get('solve_time'),
-                "total_deviation": results.get('total_deviation'),
-                "regenerated": True
-            },
-            "created_at": datetime.now().isoformat()
-        })
-
-        logger.info(f"Stored results as {version_id}")
+        logger.info(f"Stored regenerated results as {version_id}")
 
         return {
-            "assignments": results['assignments'],
+            "assignments": assignments,
             "version_id": version_id
         }
     except HTTPException:

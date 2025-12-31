@@ -18,6 +18,7 @@ redis = "^5.0.0"
 upstash-redis = "^0.15.0"
 sendgrid = "^6.11.0"
 jinja2 = "^3.1.0"
+slowapi = "^0.1.9"
 assignment-logic = {path = "../assignment_logic"}
 
 [tool.poetry.group.dev.dependencies]
@@ -25,6 +26,7 @@ debugpy = "^1.8.9"
 pytest = "^7.4.0"
 pytest-cov = "^4.1.0"
 httpx = "^0.25.0"
+black = "^23.12.0"
 
 [build-system]
 requires = ["poetry-core"]

@@ -193,7 +193,6 @@ describe('CompactAssignments', () => {
   it('renders tip message', () => {
     render(<CompactAssignments assignments={sampleAssignments} />)
 
-    expect(screen.getByText(/💡 Tip:/i)).toBeInTheDocument()
     expect(screen.getByText(/Click any name to highlight/i)).toBeInTheDocument()
   })
 

@@ -9,11 +9,31 @@ import pandas as pd
 from unittest.mock import MagicMock, patch
 
 
+def _no_op_limit(*args, **kwargs):
+    """No-op decorator for disabling rate limiting."""
+    def decorator(func):
+        return func
+    return decorator
+
+
 @pytest.fixture
 def client():
-    """Create a test client for the FastAPI application."""
-    # Import here to avoid circular dependencies
+    """Create a test client for the FastAPI application with rate limiting disabled."""
+    # Import routers to patch their limiters
     from api.main import app
+    from api.routers import upload, assignments
+
+    # Patch the limiters in each router
+    with patch.object(upload.limiter, 'limit', _no_op_limit), \
+         patch.object(assignments.limiter, 'limit', _no_op_limit):
+        yield TestClient(app)
+
+
+@pytest.fixture
+def client_with_rate_limiting():
+    """Create a test client with rate limiting enabled for rate limit tests."""
+    from api.main import app
+    # Use the actual limiter for rate limiting tests (no patching)
     return TestClient(app)
 
 

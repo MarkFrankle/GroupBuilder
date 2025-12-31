@@ -35,6 +35,9 @@ import {
   MAX_SESSIONS
 } from '@/constants'
 
+// Constant for new upload selection value
+const NEW_UPLOAD_VALUE = "new-upload"
+
 interface ResultVersion {
   version_id: string
   created_at: number
@@ -87,14 +90,14 @@ const LandingPage: React.FC = () => {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       setFile(event.target.files[0])
-      setSelectedRecentUpload("new-upload") // Clear recent upload selection when new file chosen
+      setSelectedRecentUpload(NEW_UPLOAD_VALUE) // Clear recent upload selection when new file chosen
     }
   }
 
   const handleRecentUploadSelect = async (sessionId: string) => {
     setSelectedRecentUpload(sessionId)
 
-    if (sessionId === "new-upload") {
+    if (sessionId === NEW_UPLOAD_VALUE) {
       // "Upload new file" selected, reset form
       setFile(null)
       setAvailableVersions([])
@@ -131,7 +134,7 @@ const LandingPage: React.FC = () => {
    * Validate form inputs before submission.
    */
   const validateForm = (): boolean => {
-    if (!file && (!selectedRecentUpload || selectedRecentUpload === "new-upload")) {
+    if (!file && (!selectedRecentUpload || selectedRecentUpload === NEW_UPLOAD_VALUE)) {
       setError('Please select a file to upload or choose a recent upload.');
       return false;
     }
@@ -199,7 +202,7 @@ const LandingPage: React.FC = () => {
    * Get or create a session ID based on user selection.
    */
   const getSessionId = async (): Promise<string> => {
-    if (selectedRecentUpload !== "new-upload") {
+    if (selectedRecentUpload !== NEW_UPLOAD_VALUE) {
       // Using a recent upload - check if parameters changed
       const selectedUpload = recentUploads.find(u => u.session_id === selectedRecentUpload);
 
@@ -303,7 +306,7 @@ const LandingPage: React.FC = () => {
                       <SelectValue placeholder="Select a previous upload" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="new-upload">New upload</SelectItem>
+                      <SelectItem value={NEW_UPLOAD_VALUE}>New upload</SelectItem>
                       {recentUploads.map((upload) => {
                         const timeAgo = formatISOTimeAgo(upload.created_at)
                         return (
@@ -327,9 +330,9 @@ const LandingPage: React.FC = () => {
                   type="file"
                   accept=".xlsx, .xls"
                   onChange={handleFileChange}
-                  disabled={selectedRecentUpload !== "" && selectedRecentUpload !== "new-upload"}
+                  disabled={selectedRecentUpload !== "" && selectedRecentUpload !== NEW_UPLOAD_VALUE}
                 />
-                {selectedRecentUpload && selectedRecentUpload !== "new-upload" && (
+                {selectedRecentUpload && selectedRecentUpload !== NEW_UPLOAD_VALUE && (
                   <p className="text-sm text-muted-foreground">
                     Using recent upload. Clear selection above to upload a new file.
                   </p>
@@ -425,7 +428,7 @@ const LandingPage: React.FC = () => {
                       <Button
                         type="button"
                         variant="outline"
-                        disabled={loading || !selectedRecentUpload || selectedRecentUpload === "new-upload" || !recentUploads.find(u => u.session_id === selectedRecentUpload)?.has_results}
+                        disabled={loading || !selectedRecentUpload || selectedRecentUpload === NEW_UPLOAD_VALUE || !recentUploads.find(u => u.session_id === selectedRecentUpload)?.has_results}
                         className="flex-1"
                       >
                         View Previous Results

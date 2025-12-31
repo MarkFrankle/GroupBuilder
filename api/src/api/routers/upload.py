@@ -1,7 +1,9 @@
 from api.utils.dataframe_to_participant_dict import dataframe_to_participant_dict
 from api.storage import store_session
-from fastapi import APIRouter, File, UploadFile, HTTPException, Form
+from fastapi import APIRouter, File, UploadFile, HTTPException, Form, Request
 from io import BytesIO
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 import logging
 import pandas as pd
 import uuid
@@ -10,6 +12,7 @@ import re
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 # Configuration constants
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB in bytes
@@ -17,7 +20,9 @@ MAX_PARTICIPANTS = 200
 EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
 
 @router.post("/")
+@limiter.limit("10/minute")  # Limit expensive file uploads
 async def upload_file(
+    request: Request,
     file: UploadFile = File(...),
     numTables: int = Form(..., ge=1, le=10),
     numSessions: int = Form(..., ge=1, le=6),

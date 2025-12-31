@@ -24,10 +24,10 @@ const CompactAssignments: React.FC<CompactAssignmentsProps> = ({ assignments }) 
 
   // Generate consistent color for each participant based on their name
   const getPersonColor = (name: string): string => {
-    // Simple hash function to get consistent color
-    let hash = 0
+    // djb2 hash function - better distribution than simple character sum
+    let hash = 5381
     for (let i = 0; i < name.length; i++) {
-      hash = name.charCodeAt(i) + ((hash << 5) - hash)
+      hash = ((hash << 5) + hash) + name.charCodeAt(i) // hash * 33 + char
     }
 
     // Use predefined color palette for better visibility
@@ -104,7 +104,7 @@ const CompactAssignments: React.FC<CompactAssignmentsProps> = ({ assignments }) 
       </div>
 
       <div className="text-xs text-muted-foreground text-center mt-4">
-        💡 Tip: Click any name to highlight them across all sessions. Hover to see details.
+        Click any name to highlight them across all sessions. Hover to see details.
       </div>
     </div>
   )
