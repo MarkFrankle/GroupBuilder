@@ -2,6 +2,10 @@
 Pytest configuration and shared fixtures for API tests.
 """
 
+import os
+# Set environment variable to disable rate limiting before importing app
+os.environ['TESTING'] = 'true'
+
 import pytest
 from fastapi.testclient import TestClient
 from io import BytesIO
@@ -9,32 +13,76 @@ import pandas as pd
 from unittest.mock import MagicMock, patch
 
 
-def _no_op_limit(*args, **kwargs):
-    """No-op decorator for disabling rate limiting."""
-    def decorator(func):
-        return func
-    return decorator
-
-
 @pytest.fixture
 def client():
     """Create a test client for the FastAPI application with rate limiting disabled."""
-    # Import routers to patch their limiters
+    # Rate limiting is disabled via TESTING=true env var set at top of conftest
     from api.main import app
-    from api.routers import upload, assignments
 
-    # Patch the limiters in each router
-    with patch.object(upload.limiter, 'limit', _no_op_limit), \
-         patch.object(assignments.limiter, 'limit', _no_op_limit):
-        yield TestClient(app)
+    # Clear any existing rate limiter state before test
+    if hasattr(app.state, 'limiter') and hasattr(app.state.limiter, '_storage'):
+        try:
+            app.state.limiter._storage.storage.clear()
+        except:
+            pass
+
+    yield TestClient(app)
+
+    # Clear rate limiter state after test
+    if hasattr(app.state, 'limiter') and hasattr(app.state.limiter, '_storage'):
+        try:
+            app.state.limiter._storage.storage.clear()
+        except:
+            pass
 
 
 @pytest.fixture
 def client_with_rate_limiting():
     """Create a test client with rate limiting enabled for rate limit tests."""
-    from api.main import app
-    # Use the actual limiter for rate limiting tests (no patching)
-    return TestClient(app)
+    # For rate limiting tests, we need to reimport with TESTING=false
+    # Save current modules to restore later
+    import sys
+    saved_modules = {}
+    modules_to_reload = [
+        'api.main',
+        'api.routers.upload',
+        'api.routers.assignments'
+    ]
+
+    for mod_name in modules_to_reload:
+        if mod_name in sys.modules:
+            saved_modules[mod_name] = sys.modules[mod_name]
+            del sys.modules[mod_name]
+
+    # Temporarily disable TESTING mode
+    old_val = os.environ.get('TESTING')
+    os.environ['TESTING'] = 'false'
+
+    try:
+        # Import with rate limiting enabled
+        from api.main import app
+
+        # Clear any existing rate limiter state before test
+        if hasattr(app.state.limiter, '_storage'):
+            app.state.limiter._storage.storage.clear()
+
+        yield TestClient(app)
+
+        # Clear rate limiter state after test
+        if hasattr(app.state.limiter, '_storage'):
+            app.state.limiter._storage.storage.clear()
+    finally:
+        # Restore environment
+        if old_val is not None:
+            os.environ['TESTING'] = old_val
+        else:
+            os.environ['TESTING'] = 'true'
+
+        # Restore original modules
+        for mod_name in modules_to_reload:
+            if mod_name in sys.modules:
+                del sys.modules[mod_name]
+        sys.modules.update(saved_modules)
 
 
 @pytest.fixture
@@ -57,10 +105,16 @@ def mock_storage():
             if key in mock.data:
                 del mock.data[key]
 
+        def mock_delete_many(keys):
+            for key in keys:
+                if key in mock.data:
+                    del mock.data[key]
+
         mock.set = mock_set
         mock.get = mock_get
         mock.exists = mock_exists
         mock.delete = mock_delete
+        mock.delete_many = mock_delete_many
 
         yield mock
 

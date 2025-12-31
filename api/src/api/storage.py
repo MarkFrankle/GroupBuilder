@@ -333,7 +333,14 @@ def store_result(session_id: str, data: dict, version_id: Optional[str] = None) 
 
     # Generate version ID if not provided
     if version_id is None:
-        version_num = len(versions) + 1
+        # Calculate version number based on max existing version, not list length
+        # (list length can decrease due to pruning)
+        if versions:
+            # Extract version numbers from existing versions (format: "v1", "v2", etc.)
+            version_nums = [int(v['version_id'][1:]) for v in versions if v['version_id'].startswith('v')]
+            version_num = max(version_nums) + 1 if version_nums else 1
+        else:
+            version_num = 1
         version_id = f"v{version_num}"
 
     # Add metadata to result

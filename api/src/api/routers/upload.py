@@ -9,10 +9,18 @@ import pandas as pd
 import uuid
 from datetime import datetime
 import re
+import os
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
+
+# Helper to conditionally apply rate limiting (skip in tests)
+def conditional_limit(rate):
+    """Apply rate limit only if not in testing mode."""
+    if os.getenv('TESTING') == 'true':
+        return lambda f: f  # No-op decorator in test mode
+    return limiter.limit(rate)
 
 # Configuration constants
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB in bytes
@@ -20,7 +28,7 @@ MAX_PARTICIPANTS = 200
 EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
 
 @router.post("/")
-@limiter.limit("10/minute")  # Limit expensive file uploads
+@conditional_limit("10/minute")  # Limit expensive file uploads
 async def upload_file(
     request: Request,
     file: UploadFile = File(...),

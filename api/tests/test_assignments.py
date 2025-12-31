@@ -209,6 +209,8 @@ class TestGetCachedResults:
             "version_id": "v2",
             "created_at": 1234567890
         }
+        # Need to set latest pointer for result_exists() check
+        mock_storage.data[f"result:{session_id}:latest"] = "v2"
 
         response = client.get(f"/api/assignments/results/{session_id}?version=v2")
 
