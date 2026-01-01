@@ -8,6 +8,7 @@ from api.email import send_magic_link_email
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from datetime import datetime
+from typing import Optional
 import logging
 import uuid
 import os
@@ -16,7 +17,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
-def _generate_assignments_internal(session_id: str, send_email: bool = False, mark_regenerated: bool = False):
+
+def _generate_assignments_internal(session_id: str, send_email: bool = False, mark_regenerated: bool = False, max_time_seconds: int = 120):
     """
     Internal helper to generate assignments (shared by get_assignments and regenerate_assignments).
 
@@ -24,6 +26,7 @@ def _generate_assignments_internal(session_id: str, send_email: bool = False, ma
         session_id: The session ID
         send_email: Whether to send email with magic link
         mark_regenerated: Whether to mark results as regenerated
+        max_time_seconds: Maximum solver time in seconds (default: 120)
 
     Returns:
         Tuple of (assignments, version_id, metadata)
@@ -35,10 +38,11 @@ def _generate_assignments_internal(session_id: str, send_email: bool = False, ma
 
     logger.info(
         f"{'Regenerating' if mark_regenerated else 'Generating'} assignments for session {session_id}: "
-        f"{len(participants_dict)} participants, {num_tables} tables, {num_sessions} sessions"
+        f"{len(participants_dict)} participants, {num_tables} tables, {num_sessions} sessions, "
+        f"max_time={max_time_seconds}s"
     )
 
-    results = handle_generate_assignments(participants_dict, num_tables, num_sessions)
+    results = handle_generate_assignments(participants_dict, num_tables, num_sessions, max_time_seconds=max_time_seconds)
 
     if results['status'] != 'success':
         error_msg = results.get('error', 'No feasible solution found')
@@ -63,7 +67,8 @@ def _generate_assignments_internal(session_id: str, send_email: bool = False, ma
     result_metadata = {
         "solution_quality": results.get('solution_quality'),
         "solve_time": results.get('solve_time'),
-        "total_deviation": results.get('total_deviation')
+        "total_deviation": results.get('total_deviation'),
+        "max_time_seconds": max_time_seconds
     }
 
     if mark_regenerated:
@@ -92,7 +97,8 @@ def _generate_assignments_internal(session_id: str, send_email: bool = False, ma
 @limiter.limit("5/minute")  # Limit expensive solver operations
 def get_assignments(
     request: Request,
-    session_id: str = Query(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$")
+    session_id: str = Query(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$"),
+    max_time_seconds: int = Query(120, ge=30, le=240, description="Maximum solver time in seconds (30-240)")
 ):
     """Generate assignments for a session and optionally send email with results link."""
     if not session_exists(session_id):
@@ -103,7 +109,8 @@ def get_assignments(
         assignments, _, _ = _generate_assignments_internal(
             session_id=session_id,
             send_email=True,
-            mark_regenerated=False
+            mark_regenerated=False,
+            max_time_seconds=max_time_seconds
         )
         return assignments
     except HTTPException:
@@ -119,7 +126,8 @@ def get_assignments(
 @limiter.limit("5/minute")  # Limit expensive solver operations
 async def regenerate_assignments(
     request: Request,
-    session_id: str = Path(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$")
+    session_id: str = Path(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$"),
+    max_time_seconds: int = Query(120, ge=30, le=240, description="Maximum solver time in seconds (30-240)")
 ):
     """Regenerate assignments using the same upload data (within 1 hour of upload)"""
     if not session_exists(session_id):
@@ -133,7 +141,8 @@ async def regenerate_assignments(
         assignments, version_id, _ = _generate_assignments_internal(
             session_id=session_id,
             send_email=False,
-            mark_regenerated=True
+            mark_regenerated=True,
+            max_time_seconds=max_time_seconds
         )
 
         logger.info(f"Stored regenerated results as {version_id}")
@@ -155,7 +164,7 @@ async def regenerate_assignments(
 @router.get("/results/{session_id}")
 async def get_cached_results(
     session_id: str = Path(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$"),
-    version: str = Query(None, description="Version ID (e.g., 'v1'). Defaults to latest.", max_length=10)
+    version: Optional[str] = Query(None, description="Version ID (e.g., 'v1'). Defaults to latest.", max_length=10)
 ):
     logger.info(f"Retrieving cached results for session: {session_id}, version: {version or 'latest'}")
 
@@ -240,6 +249,7 @@ async def clone_session_with_params(
 
     # Create new session with same participant data but new parameters
     new_session_id = str(uuid.uuid4())
+
     store_session(new_session_id, {
         "participant_dict": participant_dict,
         "num_tables": num_tables,

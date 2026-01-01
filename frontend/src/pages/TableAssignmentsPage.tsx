@@ -6,6 +6,8 @@ import CompactAssignments from "../components/CompactAssignments/CompactAssignme
 import ValidationStats from "../components/ValidationStats/ValidationStats"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { Slider } from "@/components/ui/slider"
 import { dummyData } from "../data/dummyData"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Loader2, LayoutGrid, List, Edit, Undo2, MoreVertical, Download, RotateCw, X } from 'lucide-react'
@@ -22,6 +24,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { API_BASE_URL } from '@/config/api'
 
 interface ResultVersion {
@@ -29,6 +39,7 @@ interface ResultVersion {
   created_at: number
   solve_time?: number
   solution_quality?: string
+  max_time_seconds?: number
 }
 
 export interface Participant {
@@ -55,6 +66,10 @@ const TableAssignmentsPage: React.FC = () => {
   const [undoStack, setUndoStack] = useState<Assignment[][]>([])
   const [availableVersions, setAvailableVersions] = useState<ResultVersion[]>([])
   const [currentVersion, setCurrentVersion] = useState<string>('latest')
+  const [showRegenerateDialog, setShowRegenerateDialog] = useState<boolean>(false)
+  const [regenerateSolverTime, setRegenerateSolverTime] = useState<number>(120)
+  const [currentMaxTime, setCurrentMaxTime] = useState<number>(120)
+  const [currentSolveTime, setCurrentSolveTime] = useState<number>(0)
 
   const navigate = useNavigate()
 
@@ -109,6 +124,17 @@ const TableAssignmentsPage: React.FC = () => {
             if (versionsResponse.ok) {
               const versionsData = await versionsResponse.json()
               setAvailableVersions(versionsData.versions || [])
+
+              // Set current version's metadata for regenerate dialog
+              const currentVersionData = versionsData.versions?.find((v: ResultVersion) =>
+                v.version_id === (versionParam || 'latest')
+              ) || versionsData.versions?.[versionsData.versions.length - 1]
+
+              if (currentVersionData) {
+                setCurrentMaxTime(currentVersionData.max_time_seconds || 120)
+                setCurrentSolveTime(currentVersionData.solve_time || 0)
+                setRegenerateSolverTime(currentVersionData.max_time_seconds || 120)
+              }
             }
           } catch (err) {
             console.error('Failed to fetch versions:', err)
@@ -175,7 +201,12 @@ const TableAssignmentsPage: React.FC = () => {
     }
   }
 
-  const handleRegenerateAssignments = async () => {
+  const handleRegenerateClick = () => {
+    setShowRegenerateDialog(true)
+  }
+
+  const handleRegenerateConfirm = async () => {
+    setShowRegenerateDialog(false)
     setLoading(true)
     setError(null)
     try {
@@ -186,7 +217,7 @@ const TableAssignmentsPage: React.FC = () => {
         throw new Error('Session ID not found. Please upload a file again.')
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/assignments/regenerate/${sessionId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/assignments/regenerate/${sessionId}?max_time_seconds=${regenerateSolverTime}`, {
         method: 'POST',
       })
 
@@ -206,6 +237,16 @@ const TableAssignmentsPage: React.FC = () => {
         if (versionsResponse.ok) {
           const versionsData = await versionsResponse.json()
           setAvailableVersions(versionsData.versions || [])
+
+          // Update metadata for the new version
+          const newVersionData = versionsData.versions?.find((v: ResultVersion) =>
+            v.version_id === result.version_id
+          )
+          if (newVersionData) {
+            setCurrentMaxTime(newVersionData.max_time_seconds || 120)
+            setCurrentSolveTime(newVersionData.solve_time || 0)
+            setRegenerateSolverTime(newVersionData.max_time_seconds || 120)
+          }
         }
       } catch (err) {
         console.error('Failed to refresh versions:', err)
@@ -410,7 +451,7 @@ const TableAssignmentsPage: React.FC = () => {
                     <Download className="h-4 w-4 mr-2" />
                     Download CSV
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleRegenerateAssignments} disabled={editMode}>
+                  <DropdownMenuItem onClick={handleRegenerateClick} disabled={editMode}>
                     <RotateCw className="h-4 w-4 mr-2" />
                     Regenerate
                   </DropdownMenuItem>
@@ -449,6 +490,61 @@ const TableAssignmentsPage: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Regenerate Dialog */}
+      <Dialog open={showRegenerateDialog} onOpenChange={setShowRegenerateDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Regenerate Assignments</DialogTitle>
+            <DialogDescription>
+              Configure solver time to balance speed vs. quality
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-baseline gap-2">
+                <Label htmlFor="regenerate-solver-time">Solver Time:</Label>
+                <span className="text-sm font-medium">
+                  {Math.floor(regenerateSolverTime / 60)} min {regenerateSolverTime % 60}s
+                </span>
+              </div>
+              <Slider
+                id="regenerate-solver-time"
+                min={30}
+                max={240}
+                step={1}
+                value={[regenerateSolverTime]}
+                onValueChange={(value) => setRegenerateSolverTime(value[0])}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Quick (30s)</span>
+                <span>Better (2m, default)</span>
+                <span>Best (4m)</span>
+              </div>
+            </div>
+            <div className="rounded-lg bg-muted p-3 text-sm">
+              <p className="text-muted-foreground">
+                ℹ️ Current results used <strong>{currentMaxTime < 60 ? `${currentMaxTime}s` : `${Math.round(currentMaxTime / 60)}m`}</strong> and
+                completed in <strong>{currentSolveTime < 1 ? `${(currentSolveTime * 1000).toFixed(0)}ms` : `${currentSolveTime.toFixed(1)}s`}</strong>.
+                {regenerateSolverTime > currentMaxTime && (
+                  <span className="block mt-1">
+                    More time often yields better balanced groups.
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRegenerateDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleRegenerateConfirm}>
+              Regenerate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

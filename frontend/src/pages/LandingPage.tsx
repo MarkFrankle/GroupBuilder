@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Slider } from "@/components/ui/slider"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle, Loader2, Clock, ChevronDown, ChevronRight } from 'lucide-react'
 import {
@@ -58,6 +59,7 @@ const LandingPage: React.FC = () => {
   const [selectedRecentUpload, setSelectedRecentUpload] = useState<string>("")
   const [availableVersions, setAvailableVersions] = useState<ResultVersion[]>([])
   const [advancedOpen, setAdvancedOpen] = useState<boolean>(false)
+  const [solverTime, setSolverTime] = useState<number>(120) // Default: 2 minutes
   const navigate = useNavigate()
 
   // Load recent uploads on mount
@@ -226,9 +228,10 @@ const LandingPage: React.FC = () => {
    * Generate assignments for a given session.
    */
   const generateAssignments = async (sessionId: string) => {
-    setLoadingMessage(`Generating optimal table assignments... This will take approximately ${ESTIMATED_SOLVE_TIME_MINUTES} minutes.`);
+    const estimatedMinutes = Math.ceil(solverTime / 60);
+    setLoadingMessage(`Generating optimal table assignments... This may take up to ${estimatedMinutes} minute${estimatedMinutes > 1 ? 's' : ''}.`);
 
-    const response = await fetchWithRetry(`${API_BASE_URL}/api/assignments/?session_id=${sessionId}`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/api/assignments/?session_id=${sessionId}&max_time_seconds=${solverTime}`, {
       method: 'GET',
     });
 
@@ -264,7 +267,7 @@ const LandingPage: React.FC = () => {
       setLoadingMessage('');
     }
   };
-  
+
 
   return (
     <div className="container mx-auto p-4">
@@ -388,18 +391,48 @@ const LandingPage: React.FC = () => {
                     <span className="text-sm">Advanced Options</span>
                   </Button>
                 </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-2 mt-2">
-                  <Label htmlFor="email">Email (optional)</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="your.email@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    Get a link to your results via email ({RESULTS_EXPIRY_MESSAGE})
-                  </p>
+                <CollapsibleContent className="space-y-4 mt-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email (optional)</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="your.email@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Get a link to your results via email ({RESULTS_EXPIRY_MESSAGE})
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-baseline gap-2">
+                      <Label htmlFor="solver-time">Solver Time:</Label>
+                      <span className="text-sm font-medium">
+                        {Math.floor(solverTime / 60)} min {solverTime % 60}s
+                      </span>
+                    </div>
+                    <Slider
+                      id="solver-time"
+                      min={30}
+                      max={240}
+                      step={1}
+                      value={[solverTime]}
+                      onValueChange={(value) => setSolverTime(value[0])}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Quick (30s)</span>
+                      <span>Better (2m, default)</span>
+                      <span>Best (4m)</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      More time often yields better balanced groups
+                    </p>
+                  </div>
+
+                  <div className="border-t pt-4" />
                 </CollapsibleContent>
               </Collapsible>
 
