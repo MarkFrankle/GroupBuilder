@@ -88,8 +88,10 @@ describe('CompactAssignments', () => {
     const aliceButton = screen.getAllByText('Alice Johnson')[0]
     fireEvent.click(aliceButton)
 
-    expect(screen.getByText(/Alice Johnson.*is highlighted/i)).toBeInTheDocument()
-    expect(screen.getByText(/Click again to clear/i)).toBeInTheDocument()
+    // Check for the highlight message (text is split across <strong> tag)
+    const highlightMessage = screen.getByText(/is highlighted across all sessions/i)
+    expect(highlightMessage).toBeInTheDocument()
+    expect(highlightMessage.parentElement).toHaveTextContent('Alice Johnson is highlighted across all sessions. Click again to clear.')
   })
 
   it('removes highlight when clicking same person again', () => {
@@ -99,11 +101,11 @@ describe('CompactAssignments', () => {
 
     // Click to highlight
     fireEvent.click(aliceButton)
-    expect(screen.getByText(/Alice Johnson.*is highlighted/i)).toBeInTheDocument()
+    expect(screen.getByText(/is highlighted across all sessions/i)).toBeInTheDocument()
 
     // Click again to unhighlight
     fireEvent.click(aliceButton)
-    expect(screen.queryByText(/Alice Johnson.*is highlighted/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/is highlighted across all sessions/i)).not.toBeInTheDocument()
   })
 
   it('switches highlight when clicking different person', () => {
@@ -114,12 +116,17 @@ describe('CompactAssignments', () => {
 
     // Highlight Alice
     fireEvent.click(aliceButton)
-    expect(screen.getByText(/Alice Johnson.*is highlighted/i)).toBeInTheDocument()
+    expect(screen.getByText(/is highlighted across all sessions/i)).toBeInTheDocument()
+    // Alice's name should be in the highlight message (in the strong tag)
+    const highlightDiv = screen.getByText(/is highlighted across all sessions/i).parentElement
+    expect(highlightDiv).toHaveTextContent('Alice Johnson')
 
     // Highlight Bob (should replace Alice)
     fireEvent.click(bobButton)
-    expect(screen.queryByText(/Alice Johnson.*is highlighted/i)).not.toBeInTheDocument()
-    expect(screen.getByText(/Bob Smith.*is highlighted/i)).toBeInTheDocument()
+    const newHighlightDiv = screen.getByText(/is highlighted across all sessions/i).parentElement
+    // Check that the highlight message contains Bob and full message doesn't start with Alice
+    expect(newHighlightDiv).toHaveTextContent('Bob Smith is highlighted across all sessions')
+    expect(newHighlightDiv?.textContent?.startsWith('Alice')).toBe(false)
   })
 
   it('shows person details in title attribute', () => {
@@ -234,13 +241,15 @@ describe('CompactAssignments', () => {
     const aliceButton = screen.getAllByText('Alice Johnson')[0]
     fireEvent.click(aliceButton)
 
-    expect(screen.getByText(/Alice Johnson.*is highlighted/i)).toBeInTheDocument()
+    let highlightDiv = screen.getByText(/is highlighted across all sessions/i).parentElement
+    expect(highlightDiv).toHaveTextContent('Alice Johnson')
 
     // Re-render with same props
     rerender(<CompactAssignments assignments={sampleAssignments} />)
 
     // Highlight should persist
-    expect(screen.getByText(/Alice Johnson.*is highlighted/i)).toBeInTheDocument()
+    highlightDiv = screen.getByText(/is highlighted across all sessions/i).parentElement
+    expect(highlightDiv).toHaveTextContent('Alice Johnson')
   })
 
   it('uses button elements for clickable names', () => {

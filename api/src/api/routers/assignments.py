@@ -19,9 +19,13 @@ limiter = Limiter(key_func=get_remote_address)
 # Helper to conditionally apply rate limiting (skip in tests)
 def conditional_limit(rate):
     """Apply rate limit only if not in testing mode."""
-    if os.getenv('TESTING') == 'true':
-        return lambda f: f  # No-op decorator in test mode
-    return limiter.limit(rate)
+    def decorator(func):
+        # Check at call time, not import time
+        if os.getenv('TESTING') == 'true':
+            return func  # No rate limiting in test mode
+        # Apply rate limiting decorator
+        return limiter.limit(rate)(func)
+    return decorator
 
 
 def _generate_assignments_internal(session_id: str, send_email: bool = False, mark_regenerated: bool = False):
