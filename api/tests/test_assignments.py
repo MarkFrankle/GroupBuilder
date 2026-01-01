@@ -78,8 +78,9 @@ def sample_assignments_result():
 class TestGetAssignments:
     """Test suite for GET /api/assignments/ endpoint."""
 
+    @patch('api.routers.assignments.send_magic_link_email')
     @patch('api.routers.assignments.handle_generate_assignments')
-    def test_generate_assignments_success(self, mock_generate, client, mock_storage, sample_session_data, sample_assignments_result):
+    def test_generate_assignments_success(self, mock_generate, mock_send_email, client, mock_storage, sample_session_data, sample_assignments_result):
         """Test successful assignment generation."""
         session_id = str(uuid.uuid4())
         mock_storage.data[f"session:{session_id}"] = sample_session_data
@@ -95,6 +96,9 @@ class TestGetAssignments:
 
         # Verify result was stored
         assert f"result:{session_id}:latest" in mock_storage.data
+
+        # Verify email was sent (since sample_session_data includes email)
+        mock_send_email.assert_called_once()
 
     def test_generate_assignments_session_not_found(self, client, mock_storage):
         """Test that nonexistent session returns 404."""
