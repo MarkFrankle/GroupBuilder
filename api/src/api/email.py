@@ -5,12 +5,29 @@ Falls back to logging if SendGrid is not configured.
 
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Optional
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 logger = logging.getLogger(__name__)
+
+# Email validation regex
+EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+
+
+def _mask_email(email: str) -> str:
+    """Mask email address for logging (GDPR compliance)."""
+    if not email or '@' not in email:
+        return "invalid@email"
+    local, domain = email.rsplit('@', 1)
+    if len(local) <= 2:
+        masked_local = local[0] + '*'
+    else:
+        masked_local = local[0] + '*' * (len(local) - 2) + local[-1]
+    return f"{masked_local}@{domain}"
+
 
 # Try to import SendGrid, but gracefully fall back if not available
 try:
@@ -48,12 +65,27 @@ def send_magic_link_email(
 
     Returns:
         True if email was sent successfully, False otherwise
+
+    Raises:
+        ValueError: If email address format is invalid
     """
+    # Validate email format
+    if not to_email or not EMAIL_REGEX.match(to_email):
+        logger.error(f"Invalid email address format: {_mask_email(to_email)}")
+        raise ValueError(f"Invalid email address format")
+
     sendgrid_api_key = os.getenv("SENDGRID_API_KEY")
     from_email = os.getenv("FROM_EMAIL", "noreply@groupbuilder.app")
 
     if base_url is None:
-        base_url = os.getenv("FRONTEND_URL", "https://group-builder.netlify.app")
+        base_url = os.getenv("FRONTEND_URL")
+        if not base_url:
+            logger.error("FRONTEND_URL environment variable is not set")
+            raise ValueError(
+                "FRONTEND_URL environment variable must be set. "
+                "Set it to your frontend URL (e.g., http://localhost:3000 for development, "
+                "https://group-builder.netlify.app for production)"
+            )
 
     full_magic_link = f"{base_url}{magic_link_path}"
 
@@ -77,7 +109,7 @@ def send_magic_link_email(
     # If SendGrid is not configured, just log
     if not sendgrid_api_key or not SENDGRID_AVAILABLE:
         logger.info(
-            f"Email would be sent to {to_email}:\n"
+            f"Email would be sent to {_mask_email(to_email)}:\n"
             f"Subject: {subject}\n"
             f"Magic Link: {full_magic_link}\n"
             f"(Set SENDGRID_API_KEY to enable actual email sending)"
@@ -97,12 +129,12 @@ def send_magic_link_email(
         response = sg.send(message)
 
         if response.status_code >= 200 and response.status_code < 300:
-            logger.info(f"Successfully sent magic link email to {to_email}")
+            logger.info(f"Successfully sent magic link email to {_mask_email(to_email)}")
             return True
         else:
-            logger.error(f"SendGrid returned status {response.status_code} for {to_email}")
+            logger.error(f"SendGrid returned status {response.status_code} for {_mask_email(to_email)}")
             return False
 
     except Exception as e:
-        logger.error(f"Failed to send email to {to_email}: {str(e)}", exc_info=True)
+        logger.error(f"Failed to send email to {_mask_email(to_email)}: {str(e)}", exc_info=True)
         return False

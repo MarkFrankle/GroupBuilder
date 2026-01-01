@@ -40,6 +40,8 @@ describe('LandingPage', () => {
     jest.clearAllMocks()
     ;(global.fetch as jest.Mock).mockClear()
     localStorage.clear()
+    // Mock getRecentUploadIds to return empty array by default
+    jest.spyOn(recentUploadsModule, 'getRecentUploadIds').mockReturnValue([])
   })
 
   describe('Rendering', () => {
