@@ -15,24 +15,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
-# Helper to conditionally apply rate limiting (skip in tests)
-def conditional_limit(rate):
-    """Apply rate limit only if not in testing mode."""
-    def decorator(func):
-        # Check at call time, not import time
-        if os.getenv('TESTING') == 'true':
-            return func  # No rate limiting in test mode
-        # Apply rate limiting decorator
-        return limiter.limit(rate)(func)
-    return decorator
-
 # Configuration constants
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB in bytes
 MAX_PARTICIPANTS = 200
 EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
 
 @router.post("/")
-@conditional_limit("10/minute")  # Limit expensive file uploads
+@limiter.limit("10/minute")  # Limit expensive file uploads
 async def upload_file(
     request: Request,
     file: UploadFile = File(...),

@@ -9,7 +9,7 @@
  */
 
 import React from 'react'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import CompactAssignments from '../CompactAssignments'
 
@@ -70,72 +70,70 @@ describe('CompactAssignments', () => {
   it('highlights person across all sessions when clicked', () => {
     render(<CompactAssignments assignments={sampleAssignments} />)
 
-    const aliceButtons = screen.getAllByText('Alice Johnson')
+    const aliceButtons = screen.getAllByRole('button', { name: 'Alice Johnson' })
 
     // Click first Alice
     fireEvent.click(aliceButtons[0])
 
     // All Alice instances should have highlight ring
     aliceButtons.forEach(button => {
-      expect(button.closest('button')).toHaveClass('ring-2')
-      expect(button.closest('button')).toHaveClass('ring-blue-500')
+      expect(button).toHaveClass('ring-2')
+      expect(button).toHaveClass('ring-blue-500')
     })
   })
 
   it('shows highlight message when person is selected', () => {
     render(<CompactAssignments assignments={sampleAssignments} />)
 
-    const aliceButton = screen.getAllByText('Alice Johnson')[0]
+    const aliceButton = screen.getAllByRole('button', { name: 'Alice Johnson' })[0]
     fireEvent.click(aliceButton)
 
-    // Check for the highlight message (text is split across <strong> tag)
-    const highlightMessage = screen.getByText(/is highlighted across all sessions/i)
+    // Check for the highlight message
+    const highlightMessage = screen.getByTestId('highlight-message')
     expect(highlightMessage).toBeInTheDocument()
-    expect(highlightMessage.parentElement).toHaveTextContent('Alice Johnson is highlighted across all sessions. Click again to clear.')
+    expect(highlightMessage).toHaveTextContent('Alice Johnson is highlighted across all sessions. Click again to clear.')
   })
 
   it('removes highlight when clicking same person again', () => {
     render(<CompactAssignments assignments={sampleAssignments} />)
 
-    const aliceButton = screen.getAllByText('Alice Johnson')[0]
+    const aliceButton = screen.getAllByRole('button', { name: 'Alice Johnson' })[0]
 
     // Click to highlight
     fireEvent.click(aliceButton)
-    expect(screen.getByText(/is highlighted across all sessions/i)).toBeInTheDocument()
+    expect(screen.getByTestId('highlight-message')).toBeInTheDocument()
 
     // Click again to unhighlight
     fireEvent.click(aliceButton)
-    expect(screen.queryByText(/is highlighted across all sessions/i)).not.toBeInTheDocument()
+    expect(screen.queryByTestId('highlight-message')).not.toBeInTheDocument()
   })
 
   it('switches highlight when clicking different person', () => {
     render(<CompactAssignments assignments={sampleAssignments} />)
 
-    const aliceButton = screen.getAllByText('Alice Johnson')[0]
-    const bobButton = screen.getAllByText('Bob Smith')[0]
+    const aliceButton = screen.getAllByRole('button', { name: 'Alice Johnson' })[0]
+    const bobButton = screen.getAllByRole('button', { name: 'Bob Smith' })[0]
 
     // Highlight Alice
     fireEvent.click(aliceButton)
-    expect(screen.getByText(/is highlighted across all sessions/i)).toBeInTheDocument()
-    // Alice's name should be in the highlight message (in the strong tag)
-    const highlightDiv = screen.getByText(/is highlighted across all sessions/i).parentElement
+    const highlightDiv = screen.getByTestId('highlight-message')
+    expect(highlightDiv).toBeInTheDocument()
     expect(highlightDiv).toHaveTextContent('Alice Johnson')
 
     // Highlight Bob (should replace Alice)
     fireEvent.click(bobButton)
-    const newHighlightDiv = screen.getByText(/is highlighted across all sessions/i).parentElement
-    // Check that the highlight message contains Bob and full message doesn't start with Alice
+    const newHighlightDiv = screen.getByTestId('highlight-message')
     expect(newHighlightDiv).toHaveTextContent('Bob Smith is highlighted across all sessions')
-    expect(newHighlightDiv?.textContent?.startsWith('Alice')).toBe(false)
+    expect(newHighlightDiv.textContent?.startsWith('Alice')).toBe(false)
   })
 
   it('shows person details in title attribute', () => {
     render(<CompactAssignments assignments={sampleAssignments} />)
 
-    const aliceButton = screen.getAllByText('Alice Johnson')[0].closest('button')
+    const aliceButton = screen.getAllByRole('button', { name: 'Alice Johnson' })[0]
     expect(aliceButton).toHaveAttribute('title')
 
-    const title = aliceButton?.getAttribute('title') || ''
+    const title = aliceButton.getAttribute('title') || ''
     expect(title).toContain('Alice Johnson')
     expect(title).toContain('Christian')
     expect(title).toContain('Female')
@@ -144,8 +142,8 @@ describe('CompactAssignments', () => {
   it('shows partner info in tooltip for couples', () => {
     render(<CompactAssignments assignments={sampleAssignments} />)
 
-    const bobButton = screen.getAllByText('Bob Smith')[0].closest('button')
-    const title = bobButton?.getAttribute('title') || ''
+    const bobButton = screen.getAllByRole('button', { name: 'Bob Smith' })[0]
+    const title = bobButton.getAttribute('title') || ''
 
     expect(title).toContain('Partner: Alice Johnson')
   })
@@ -153,20 +151,19 @@ describe('CompactAssignments', () => {
   it('applies consistent colors to same person across sessions', () => {
     render(<CompactAssignments assignments={sampleAssignments} />)
 
-    const aliceButtons = screen.getAllByText('Alice Johnson')
+    const aliceButtons = screen.getAllByRole('button', { name: 'Alice Johnson' })
 
     // Get class names from all Alice buttons
-    const class1 = aliceButtons[0].closest('button')?.className
-    const class2 = aliceButtons[1].closest('button')?.className
+    const class1 = aliceButtons[0].className
+    const class2 = aliceButtons[1].className
 
     // Should have same background color class
     expect(class1).toBe(class2)
   })
 
   it('renders empty state when no assignments', () => {
-    const { container } = render(<CompactAssignments assignments={[]} />)
+    render(<CompactAssignments assignments={[]} />)
 
-    expect(container.querySelector('.space-y-4')).toBeInTheDocument()
     expect(screen.queryByText(/Session \d/)).not.toBeInTheDocument()
   })
 
@@ -228,8 +225,8 @@ describe('CompactAssignments', () => {
   it('handles participants with null partners', () => {
     render(<CompactAssignments assignments={sampleAssignments} />)
 
-    const charlieButton = screen.getAllByText('Charlie Davis')[0].closest('button')
-    const title = charlieButton?.getAttribute('title') || ''
+    const charlieButton = screen.getAllByRole('button', { name: 'Charlie Davis' })[0]
+    const title = charlieButton.getAttribute('title') || ''
 
     // Should not show "Partner:" when partner is null
     expect(title).not.toContain('Partner:')
@@ -238,24 +235,24 @@ describe('CompactAssignments', () => {
   it('maintains highlight state across re-renders', () => {
     const { rerender } = render(<CompactAssignments assignments={sampleAssignments} />)
 
-    const aliceButton = screen.getAllByText('Alice Johnson')[0]
+    const aliceButton = screen.getAllByRole('button', { name: 'Alice Johnson' })[0]
     fireEvent.click(aliceButton)
 
-    let highlightDiv = screen.getByText(/is highlighted across all sessions/i).parentElement
+    let highlightDiv = screen.getByTestId('highlight-message')
     expect(highlightDiv).toHaveTextContent('Alice Johnson')
 
     // Re-render with same props
     rerender(<CompactAssignments assignments={sampleAssignments} />)
 
     // Highlight should persist
-    highlightDiv = screen.getByText(/is highlighted across all sessions/i).parentElement
+    highlightDiv = screen.getByTestId('highlight-message')
     expect(highlightDiv).toHaveTextContent('Alice Johnson')
   })
 
   it('uses button elements for clickable names', () => {
     render(<CompactAssignments assignments={sampleAssignments} />)
 
-    const aliceButton = screen.getAllByText('Alice Johnson')[0].closest('button')
+    const aliceButton = screen.getAllByRole('button', { name: 'Alice Johnson' })[0]
 
     expect(aliceButton).toBeInstanceOf(HTMLButtonElement)
     expect(aliceButton).toHaveClass('cursor-pointer')
@@ -264,9 +261,9 @@ describe('CompactAssignments', () => {
   it('applies hover styles to person buttons', () => {
     render(<CompactAssignments assignments={sampleAssignments} />)
 
-    const aliceButton = screen.getAllByText('Alice Johnson')[0].closest('button')
+    const aliceButton = screen.getAllByRole('button', { name: 'Alice Johnson' })[0]
 
     // Should have a hover class (specific to the color)
-    expect(aliceButton?.className).toMatch(/hover:/)
+    expect(aliceButton.className).toMatch(/hover:/)
   })
 })

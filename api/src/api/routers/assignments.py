@@ -16,18 +16,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
-# Helper to conditionally apply rate limiting (skip in tests)
-def conditional_limit(rate):
-    """Apply rate limit only if not in testing mode."""
-    def decorator(func):
-        # Check at call time, not import time
-        if os.getenv('TESTING') == 'true':
-            return func  # No rate limiting in test mode
-        # Apply rate limiting decorator
-        return limiter.limit(rate)(func)
-    return decorator
-
-
 def _generate_assignments_internal(session_id: str, send_email: bool = False, mark_regenerated: bool = False):
     """
     Internal helper to generate assignments (shared by get_assignments and regenerate_assignments).
@@ -101,7 +89,7 @@ def _generate_assignments_internal(session_id: str, send_email: bool = False, ma
 
 
 @router.get("/")
-@conditional_limit("5/minute")  # Limit expensive solver operations
+@limiter.limit("5/minute")  # Limit expensive solver operations
 def get_assignments(
     request: Request,
     session_id: str = Query(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$")
@@ -128,7 +116,7 @@ def get_assignments(
         )
 
 @router.post("/regenerate/{session_id}")
-@conditional_limit("5/minute")  # Limit expensive solver operations
+@limiter.limit("5/minute")  # Limit expensive solver operations
 async def regenerate_assignments(
     request: Request,
     session_id: str = Path(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$")

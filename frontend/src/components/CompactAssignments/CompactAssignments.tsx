@@ -57,7 +57,10 @@ const CompactAssignments: React.FC<CompactAssignmentsProps> = ({ assignments }) 
   return (
     <div className="space-y-4">
       {highlightedPerson && (
-        <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm">
+        <div
+          className="bg-blue-50 border border-blue-200 rounded p-3 text-sm"
+          data-testid="highlight-message"
+        >
           <strong>{highlightedPerson}</strong> is highlighted across all sessions. Click again to clear.
         </div>
       )}

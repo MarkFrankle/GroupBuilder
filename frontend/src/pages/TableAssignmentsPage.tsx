@@ -131,6 +131,7 @@ const TableAssignmentsPage: React.FC = () => {
     }
 
     fetchAssignments()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   
 
