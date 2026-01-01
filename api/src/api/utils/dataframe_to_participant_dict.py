@@ -1,11 +1,92 @@
 from collections import defaultdict
 import pandas as pd
+import re
+
+
+def _sanitize_name(name: str) -> str:
+    """
+    Sanitize participant names to prevent injection attacks and ensure data integrity.
+
+    - Removes potentially dangerous characters (<, >, &, ", ', /, \)
+    - Limits length to 100 characters
+    - Strips leading/trailing whitespace
+    - Collapses multiple spaces to single space
+    """
+    if not name or pd.isnull(name):
+        return ""
+
+    # Convert to string and strip whitespace
+    name = str(name).strip()
+
+    # Remove potentially dangerous characters (XSS, injection)
+    dangerous_chars = ['<', '>', '&', '"', "'", '/', '\\', '{', '}', '[', ']']
+    for char in dangerous_chars:
+        name = name.replace(char, '')
+
+    # Collapse multiple spaces to single space
+    name = re.sub(r'\s+', ' ', name)
+
+    # Limit length
+    max_length = 100
+    if len(name) > max_length:
+        name = name[:max_length].strip()
+
+    return name
+
+
+def _validate_partner_relationships(participants: list[dict]) -> None:
+    """
+    Validate partner relationships to ensure data integrity.
+
+    Raises ValueError if:
+    - Partner name doesn't exist in participant list
+    - Partner relationship is asymmetric (A→B but B→C)
+    - Participant is their own partner
+    """
+    # Create name lookup for fast validation
+    participant_names = {p['name'] for p in participants}
+
+    for participant in participants:
+        partner_name = participant.get('partner')
+        if not partner_name:
+            continue
+
+        # Check 1: Self-referential partnership
+        if partner_name == participant['name']:
+            raise ValueError(
+                f"Invalid partnership: {participant['name']} cannot be their own partner. "
+                f"Please check row {participant['id']} in your Excel file."
+            )
+
+        # Check 2: Partner exists in participant list
+        if partner_name not in participant_names:
+            raise ValueError(
+                f"Invalid partnership: {participant['name']} lists '{partner_name}' as partner, "
+                f"but '{partner_name}' is not in the participant list. "
+                f"Please check row {participant['id']} in your Excel file."
+            )
+
+        # Check 3: Symmetric partnership (A→B implies B→A)
+        partner = next((p for p in participants if p['name'] == partner_name), None)
+        if partner:
+            partner_of_partner = partner.get('partner')
+            if partner_of_partner != participant['name']:
+                raise ValueError(
+                    f"Asymmetric partnership detected: {participant['name']} lists '{partner_name}' as partner, "
+                    f"but '{partner_name}' lists '{partner_of_partner or 'no one'}' as partner. "
+                    f"Both partners must list each other. Please check rows {participant['id']} and {partner['id']} in your Excel file."
+                )
+
 
 def dataframe_to_participant_dict(df: pd.DataFrame):
-    df['Partner'] = df['Partner'].apply(lambda x: None if pd.isnull(x) else x)
-    df['Religion'] = df['Religion'].apply(lambda x: '' if pd.isnull(x) else x)
-    df['Gender'] = df['Gender'].apply(lambda x: '' if pd.isnull(x) else x)
-    df['Name'] = df['Name'].apply(lambda x: '' if pd.isnull(x) else x)
+    # Sanitize all name fields to prevent injection attacks
+    df['Name'] = df['Name'].apply(_sanitize_name)
+    df['Partner'] = df['Partner'].apply(lambda x: _sanitize_name(x) if x and not pd.isnull(x) else None)
+
+    # Handle other fields
+    df['Religion'] = df['Religion'].apply(lambda x: '' if pd.isnull(x) else str(x).strip())
+    df['Gender'] = df['Gender'].apply(lambda x: '' if pd.isnull(x) else str(x).strip())
+
     participants = df.to_dict('records')
 
     transformed_participants = [
@@ -19,6 +100,10 @@ def dataframe_to_participant_dict(df: pd.DataFrame):
         }
         for index, row in enumerate(participants)
     ]
+
+    # Validate partner relationships before assigning couple IDs
+    _validate_partner_relationships(transformed_participants)
+
     transformed_participants = _assign_couple_ids(transformed_participants)
     return transformed_participants
 

@@ -50,6 +50,14 @@ class StorageBackend:
     def keys(self, pattern: str = "*") -> list[str]:
         raise NotImplementedError
 
+    def expire(self, key: str, ttl_seconds: int) -> bool:
+        """Refresh TTL on an existing key. Returns True if key exists and TTL was set."""
+        raise NotImplementedError
+
+    def incr(self, key: str) -> int:
+        """Atomically increment a counter. Returns the new value."""
+        raise NotImplementedError
+
 
 class UpstashRestBackend(StorageBackend):
     """Upstash REST API storage (serverless-optimized, no persistent connections)"""
@@ -89,6 +97,14 @@ class UpstashRestBackend(StorageBackend):
         # Upstash REST returns list of strings directly
         result = self.client.keys(pattern)
         return result if result else []
+
+    def expire(self, key: str, ttl_seconds: int) -> bool:
+        """Refresh TTL on an existing key."""
+        return self.client.expire(key, ttl_seconds) > 0
+
+    def incr(self, key: str) -> int:
+        """Atomically increment a counter."""
+        return self.client.incr(key)
 
 
 class RedisBackend(StorageBackend):
@@ -154,6 +170,14 @@ class RedisBackend(StorageBackend):
     def keys(self, pattern: str = "*") -> list[str]:
         return [k.decode() if isinstance(k, bytes) else k for k in self.client.keys(pattern)]
 
+    def expire(self, key: str, ttl_seconds: int) -> bool:
+        """Refresh TTL on an existing key."""
+        return self.client.expire(key, ttl_seconds) > 0
+
+    def incr(self, key: str) -> int:
+        """Atomically increment a counter."""
+        return self.client.incr(key)
+
     def close(self) -> None:
         """Close all connections in the pool."""
         if hasattr(self, 'pool'):
@@ -209,6 +233,26 @@ class InMemoryBackend(StorageBackend):
         # Simple pattern matching (only supports "*" wildcard)
         import fnmatch
         return [key for key in self.data.keys() if fnmatch.fnmatch(key, pattern)]
+
+    def expire(self, key: str, ttl_seconds: int) -> bool:
+        """Refresh TTL on an existing key."""
+        if key not in self.data:
+            return False
+        value, _ = self.data[key]
+        expiry = datetime.now() + timedelta(seconds=ttl_seconds)
+        self.data[key] = (value, expiry)
+        return True
+
+    def incr(self, key: str) -> int:
+        """Atomically increment a counter."""
+        if key in self.data:
+            value, expiry = self.data[key]
+            new_value = int(value) + 1
+        else:
+            new_value = 1
+            expiry = None
+        self.data[key] = (new_value, expiry)
+        return new_value
 
 
 def create_storage_backend() -> StorageBackend:
@@ -299,8 +343,13 @@ def store_session(session_id: str, data: dict) -> None:
 
 
 def get_session(session_id: str) -> Optional[dict]:
-    """Retrieve upload session data"""
-    return storage.get(f"{SESSION_PREFIX}{session_id}")
+    """Retrieve upload session data and refresh TTL to prevent expiry during active use"""
+    key = f"{SESSION_PREFIX}{session_id}"
+    data = storage.get(key)
+    if data:
+        # Extend TTL on access so active users don't lose their session
+        storage.expire(key, SESSION_TTL)
+    return data
 
 
 def delete_session(session_id: str) -> None:
@@ -333,14 +382,11 @@ def store_result(session_id: str, data: dict, version_id: Optional[str] = None) 
 
     # Generate version ID if not provided
     if version_id is None:
-        # Calculate version number based on max existing version, not list length
-        # (list length can decrease due to pruning)
-        if versions:
-            # Extract version numbers from existing versions (format: "v1", "v2", etc.)
-            version_nums = [int(v['version_id'][1:]) for v in versions if v['version_id'].startswith('v')]
-            version_num = max(version_nums) + 1 if version_nums else 1
-        else:
-            version_num = 1
+        # Use atomic increment to prevent race conditions
+        counter_key = f"{RESULT_PREFIX}{session_id}:version_counter"
+        version_num = storage.incr(counter_key)
+        # Set TTL on counter to match result TTL
+        storage.expire(counter_key, RESULT_TTL)
         version_id = f"v{version_num}"
 
     # Add metadata to result

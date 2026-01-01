@@ -56,6 +56,32 @@ app.include_router(upload.router, prefix="/api/upload", tags=["upload"])
 app.include_router(assignments.router, prefix="/api/assignments", tags=["assignments"])
 
 
+@app.get("/health", tags=["health"])
+async def health_check():
+    """
+    Health check endpoint for Cloud Run and monitoring.
+
+    Returns 200 if the service is healthy and can connect to storage.
+    Returns 503 if storage is unavailable (only if REQUIRE_PERSISTENT_STORAGE=true).
+    """
+    from api.storage import storage
+
+    try:
+        # Verify storage connectivity
+        test_key = "__health_check__"
+        storage.set(test_key, {"timestamp": "test"}, ttl_seconds=10)
+        storage.delete(test_key)
+
+        return {
+            "status": "healthy",
+            "storage": "connected"
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        from fastapi import HTTPException
+        raise HTTPException(status_code=503, detail=f"Storage unavailable: {str(e)}")
+
+
 @app.on_event("shutdown")
 async def shutdown_event():
     """Clean up resources on shutdown."""

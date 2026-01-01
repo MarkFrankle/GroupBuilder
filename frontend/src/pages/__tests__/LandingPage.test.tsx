@@ -278,8 +278,10 @@ describe('LandingPage', () => {
     })
 
     it('displays error message on upload failure', async () => {
+      // Mock fetch to return 400 error (client error - won't retry)
       ;(global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: false,
+        status: 400,
         json: async () => ({ detail: 'File upload failed' })
       })
 

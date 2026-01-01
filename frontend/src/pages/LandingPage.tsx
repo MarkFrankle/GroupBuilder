@@ -25,6 +25,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { getRecentUploadIds, saveRecentUpload, removeRecentUpload, type RecentUpload } from '@/utils/recentUploads'
+import { fetchWithRetry } from '@/utils/fetchWithRetry'
 import { formatISOTimeAgo, formatUnixTimeAgo } from '@/utils/timeFormatting'
 import { API_BASE_URL } from '@/config/api'
 import {
@@ -147,7 +148,7 @@ const LandingPage: React.FC = () => {
   const cloneSession = async (sessionId: string): Promise<string> => {
     setLoadingMessage('Updating configuration...');
 
-    const response = await fetch(
+    const response = await fetchWithRetry(
       `${API_BASE_URL}/api/assignments/sessions/${sessionId}/clone?num_tables=${numTables}&num_sessions=${numSessions}`,
       { method: 'POST' }
     );
@@ -177,7 +178,7 @@ const LandingPage: React.FC = () => {
       formData.append('email', email);
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/upload/`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/api/upload/`, {
       method: 'POST',
       body: formData,
     });
@@ -227,7 +228,7 @@ const LandingPage: React.FC = () => {
   const generateAssignments = async (sessionId: string) => {
     setLoadingMessage(`Generating optimal table assignments... This will take approximately ${ESTIMATED_SOLVE_TIME_MINUTES} minutes.`);
 
-    const response = await fetch(`${API_BASE_URL}/api/assignments/?session_id=${sessionId}`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/api/assignments/?session_id=${sessionId}`, {
       method: 'GET',
     });
 

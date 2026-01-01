@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { useNavigate } from 'react-router-dom'
+import { produce } from 'immer'
 import TableAssignments from "../components/TableAssignments/TableAssignments"
 import CompactAssignments from "../components/CompactAssignments/CompactAssignments"
 import ValidationStats from "../components/ValidationStats/ValidationStats"
@@ -262,21 +263,19 @@ const TableAssignmentsPage: React.FC = () => {
   }
 
   const handleSwap = (sessionIndex: number, tableNum1: number, participantIndex1: number, tableNum2: number, participantIndex2: number) => {
+    // Save current state to undo stack using immer for efficient cloning
     setUndoStack(prev => {
-      const newStack = [...prev, JSON.parse(JSON.stringify(assignments))].slice(-10)
+      const newStack = [...prev, produce(assignments, draft => draft)].slice(-10)
       return newStack
     })
 
-    setAssignments(prev => {
-      const newAssignments = JSON.parse(JSON.stringify(prev)) as Assignment[]
-      const session = newAssignments[sessionIndex]
-
+    // Swap participants using immer for efficient immutable update
+    setAssignments(prev => produce(prev, draft => {
+      const session = draft[sessionIndex]
       const temp = session.tables[tableNum1][participantIndex1]
       session.tables[tableNum1][participantIndex1] = session.tables[tableNum2][participantIndex2]
       session.tables[tableNum2][participantIndex2] = temp
-
-      return newAssignments
-    })
+    }))
   }
 
   const handleUndo = () => {
