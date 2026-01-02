@@ -81,6 +81,7 @@ const TableAssignmentsPage: React.FC = () => {
   const [newVersionId, setNewVersionId] = useState<string | null>(null)
   const [abortController, setAbortController] = useState<AbortController | null>(null)
   const [hasUnsavedEdits, setHasUnsavedEdits] = useState<boolean>(false)
+  const [regeneratingSession, setRegeneratingSession] = useState<number | null>(null)
 
   const navigate = useNavigate()
 
@@ -407,6 +408,87 @@ const TableAssignmentsPage: React.FC = () => {
     }
   }
 
+  const handleRegenerateSession = async (sessionNumber: number) => {
+    // Save current state to undo stack
+    setUndoStack(prev => {
+      const newStack = [...prev, produce(assignments, draft => draft)].slice(-10)
+      return newStack
+    })
+
+    setRegeneratingSession(sessionNumber)
+    setError(null)
+
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId;
+
+      if (!sessionId) {
+        throw new Error('Session ID not found. Please upload a file again.')
+      }
+
+      const sessionAssignment = assignments.find(a => a.session === sessionNumber)
+      if (!sessionAssignment) {
+        throw new Error(`Session ${sessionNumber} not found`)
+      }
+
+      // Use existing absent participants from the session
+      const absentParticipants = sessionAssignment.absentParticipants || []
+
+      console.log('[Regenerate Session] Regenerating session:', {
+        session: sessionNumber,
+        max_time_seconds: 30,
+        version_id: currentVersion !== 'latest' ? currentVersion : undefined,
+        absent_count: absentParticipants.length
+      })
+
+      const queryParams = new URLSearchParams({
+        max_time_seconds: '30'  // Fast 30-second timeout for single session
+      })
+
+      if (currentVersion !== 'latest') {
+        queryParams.append('version_id', currentVersion)
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/assignments/regenerate/${sessionId}/session/${sessionNumber}?${queryParams}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(absentParticipants),
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to regenerate session')
+      }
+
+      const result = await response.json()
+
+      // Update assignments in-place (no new version)
+      setAssignments(result.assignments)
+
+      // Clear any saved edits for this version since we just regenerated
+      clearEditsFromStorage()
+
+      console.log('[Regenerate Session] Successfully regenerated session', sessionNumber,
+        'in', result.solve_time?.toFixed(2), 's')
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to regenerate session")
+      // Restore from undo stack on error
+      if (undoStack.length > 0) {
+        const previousState = undoStack[undoStack.length - 1]
+        setAssignments(previousState)
+        setUndoStack(prev => prev.slice(0, -1))
+      }
+    } finally {
+      setRegeneratingSession(null)
+    }
+  }
+
   const handleViewNewAssignments = async () => {
     if (!newVersionId) return
 
@@ -511,6 +593,9 @@ const TableAssignmentsPage: React.FC = () => {
         session.tables[tableNum] = newTable
       }
     }))
+
+    // Clear selection after marking absent
+    setSelectedParticipantSlot(null)
 
     setHasUnsavedEdits(true)
   }
@@ -707,14 +792,36 @@ const TableAssignmentsPage: React.FC = () => {
                 <List className="h-4 w-4" />
               </Button>
               {viewMode === 'detailed' && (
-                <Button
-                  variant={editMode ? 'default' : 'outline'}
-                  onClick={toggleEditMode}
-                  size="sm"
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  {editMode ? 'Done Editing' : 'Edit'}
-                </Button>
+                <>
+                  <Button
+                    variant={editMode ? 'default' : 'outline'}
+                    onClick={toggleEditMode}
+                    size="sm"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    {editMode ? 'Done Editing' : 'Edit'}
+                  </Button>
+                  {!editMode && (
+                    <Button
+                      variant="outline"
+                      onClick={() => handleRegenerateSession(currentSession)}
+                      size="sm"
+                      disabled={regeneratingSession !== null}
+                    >
+                      {regeneratingSession === currentSession ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Regenerating...
+                        </>
+                      ) : (
+                        <>
+                          <RotateCw className="h-4 w-4 mr-2" />
+                          Regenerate Session
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </>
               )}
               {editMode && (
                 <>
@@ -850,7 +957,7 @@ const TableAssignmentsPage: React.FC = () => {
         <Dialog open={true} onOpenChange={setShowRegenerateDialog}>
           <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Regenerate Assignments</DialogTitle>
+            <DialogTitle>Regenerate All Sessions</DialogTitle>
             <DialogDescription>
               Configure solver time to balance speed vs. quality
             </DialogDescription>
@@ -903,7 +1010,7 @@ const TableAssignmentsPage: React.FC = () => {
               Cancel
             </Button>
             <Button variant="outline" onClick={handleRegenerateConfirm}>
-              Regenerate
+              Regenerate All
             </Button>
           </DialogFooter>
         </DialogContent>

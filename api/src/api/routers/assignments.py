@@ -72,6 +72,27 @@ def _get_active_participants(all_participants: List[Dict[str, Any]], absent_part
     return active
 
 
+def _extract_current_table_assignments(session_assignment: Dict[str, Any]) -> Dict[str, int]:
+    """
+    Extract current table assignments for a session to prefer variety when regenerating.
+
+    Args:
+        session_assignment: The session assignment data containing tables
+
+    Returns:
+        Dict mapping participant names to their current table numbers
+    """
+    current_assignments = {}
+
+    for table_num, participants in session_assignment['tables'].items():
+        for participant in participants:
+            if participant:  # Skip None/null entries
+                current_assignments[participant['name']] = int(table_num)
+
+    logger.info(f"Extracted {len(current_assignments)} current table assignments to prefer avoiding")
+    return current_assignments
+
+
 def _generate_assignments_internal(session_id: str, send_email: bool = False, mark_regenerated: bool = False, max_time_seconds: int = 120):
     """
     Internal helper to generate assignments (shared by get_assignments and regenerate_assignments).
@@ -216,7 +237,7 @@ async def regenerate_assignments(
 
 
 @router.post("/regenerate/{session_id}/session/{session_number}")
-@limiter.limit("5/minute")  # Limit expensive solver operations
+@limiter.limit("20/minute")  # More lenient for single session (much cheaper than full regeneration)
 async def regenerate_single_session(
     request: Request,
     session_id: str = Path(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$"),
@@ -279,7 +300,11 @@ async def regenerate_single_session(
             exclude_session=session_number
         )
 
-        # 4. Get active participants for this session
+        # 4. Extract current table assignments to prefer variety
+        session_assignment = existing_assignments[session_number - 1]
+        current_table_assignments = _extract_current_table_assignments(session_assignment)
+
+        # 5. Get active participants for this session
         active_participants = _get_active_participants(
             all_participants,
             absent_participants
@@ -297,31 +322,63 @@ async def regenerate_single_session(
             f"Regenerating session {session_number} for session_id {session_id}: "
             f"{len(active_participants)} active participants, {num_tables} tables, "
             f"{len(historical_pairings)} historical pairings to avoid, "
+            f"{len(current_table_assignments)} current assignments to FORBID (hard constraint), "
             f"max_time={max_time_seconds}s"
         )
 
-        # 5. Run solver for ONE session with historical context
+        # 6. Try to solve with HARD constraint: participants cannot be assigned to same tables
+        logger.info("Attempt 1: Solving with HARD constraint (must generate different assignments)")
         builder = GroupBuilder(
             participants=active_participants,
             num_tables=num_tables,
             num_sessions=1,  # Only regenerating one session
             historical_pairings=historical_pairings,  # Pass existing pairings
+            current_table_assignments=current_table_assignments,  # FORBID same assignments
             pairing_window_size=session_data.get('pairing_window_size'),
-            solver_num_workers=4
+            solver_num_workers=4,
+            require_different_assignments=True  # HARD CONSTRAINT
         )
 
         result = builder.generate_assignments(max_time_seconds=max_time_seconds)
+        assignments_unchanged = False
 
+        # If hard constraint fails, try again without it (current assignments may be optimal)
         if result['status'] != 'success':
-            error_msg = result.get('error', 'No feasible solution found')
-            logger.error(f"Solver failed for single session regeneration: {error_msg}")
-            raise HTTPException(status_code=400, detail=error_msg)
+            logger.warning(
+                f"Hard constraint failed (status: {result.get('status')}). "
+                f"Attempting fallback: same assignments may be optimal"
+            )
+            logger.info("Attempt 2: Solving WITHOUT hard constraint (may return same assignments)")
+
+            # Retry without hard constraint
+            builder_fallback = GroupBuilder(
+                participants=active_participants,
+                num_tables=num_tables,
+                num_sessions=1,
+                historical_pairings=historical_pairings,
+                current_table_assignments=current_table_assignments,  # Soft penalty, not forbidden
+                pairing_window_size=session_data.get('pairing_window_size'),
+                solver_num_workers=4,
+                require_different_assignments=False  # SOFT CONSTRAINT (allow same assignments)
+            )
+
+            result = builder_fallback.generate_assignments(max_time_seconds=max_time_seconds)
+
+            if result['status'] != 'success':
+                error_msg = result.get('error', 'No feasible solution found')
+                logger.error(f"Solver failed even without hard constraint: {error_msg}")
+                raise HTTPException(status_code=400, detail=error_msg)
+
+            # Mark that assignments are unchanged
+            assignments_unchanged = True
+            logger.info("Fallback succeeded: returning same assignments (these are already optimal)")
 
         # Log solver statistics
         logger.info(
             f"Solver [{len(active_participants)}p/{num_tables}t/1s]: "
             f"{result.get('solution_quality', 'unknown').upper()} in {result.get('solve_time', 0):.2f}s | "
-            f"Deviation: {result.get('total_deviation', 'N/A')}"
+            f"Deviation: {result.get('total_deviation', 'N/A')} | "
+            f"Unchanged: {assignments_unchanged}"
         )
 
         # 6. Merge regenerated session back into full assignments
@@ -339,7 +396,8 @@ async def regenerate_single_session(
             "total_deviation": result.get('total_deviation'),
             "max_time_seconds": max_time_seconds,
             "regenerated": True,
-            "regenerated_session": session_number
+            "regenerated_session": session_number,
+            "assignments_unchanged": assignments_unchanged  # Flag if same assignments returned
         }
 
         version_id = store_result(session_id, {
@@ -348,14 +406,15 @@ async def regenerate_single_session(
             "created_at": datetime.now().isoformat()
         })
 
-        logger.info(f"Stored regenerated session {session_number} as version {version_id}")
+        logger.info(f"Stored regenerated session {session_number} as version {version_id} (unchanged: {assignments_unchanged})")
 
         return {
             "assignments": new_assignments,
             "version_id": version_id,
             "session": session_number,
             "solve_time": result.get('solve_time'),
-            "quality": result.get('solution_quality')
+            "quality": result.get('solution_quality'),
+            "assignments_unchanged": assignments_unchanged  # Frontend can show notification
         }
 
     except HTTPException:
