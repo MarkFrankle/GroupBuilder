@@ -7,7 +7,6 @@ import ValidationStats from "../components/ValidationStats/ValidationStats"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Slider } from "@/components/ui/slider"
 import { dummyData } from "../data/dummyData"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Loader2, LayoutGrid, List, Edit, Undo2, MoreVertical, Download, RotateCw, X } from 'lucide-react'
@@ -70,10 +69,32 @@ const TableAssignmentsPage: React.FC = () => {
   const [regenerateSolverTime, setRegenerateSolverTime] = useState<number>(120)
   const [currentMaxTime, setCurrentMaxTime] = useState<number>(120)
   const [currentSolveTime, setCurrentSolveTime] = useState<number>(0)
+  const [regenerating, setRegenerating] = useState<boolean>(false)
+  const [regenerateSuccess, setRegenerateSuccess] = useState<boolean>(false)
+  const [newVersionId, setNewVersionId] = useState<string | null>(null)
+  const [abortController, setAbortController] = useState<AbortController | null>(null)
 
   const navigate = useNavigate()
 
   const useRealData = true;
+
+  // Ensure dialog cleanup when component unmounts
+  useEffect(() => {
+    return () => {
+      setShowRegenerateDialog(false)
+      document.body.style.removeProperty('pointer-events')
+      if (abortController) {
+        abortController.abort()
+      }
+    }
+  }, [abortController])
+
+  // Clean up body pointer-events whenever dialog closes
+  useEffect(() => {
+    if (!showRegenerateDialog) {
+      document.body.style.removeProperty('pointer-events')
+    }
+  }, [showRegenerateDialog])
 
   const formatTimestamp = (timestamp: number): string => {
     const date = new Date(timestamp * 1000) // Convert Unix timestamp to milliseconds
@@ -206,9 +227,24 @@ const TableAssignmentsPage: React.FC = () => {
   }
 
   const handleRegenerateConfirm = async () => {
+    // Close dialog first and wait for state update
     setShowRegenerateDialog(false)
-    setLoading(true)
+
+    // Force cleanup of body pointer-events that Radix Dialog sets
+    document.body.style.removeProperty('pointer-events')
+
+    // Use setTimeout to ensure dialog is fully closed before starting regeneration
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    setRegenerating(true)
+    setRegenerateSuccess(false)
+    setNewVersionId(null)
     setError(null)
+
+    // Create abort controller for cancellation
+    const controller = new AbortController()
+    setAbortController(controller)
+
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId;
@@ -219,6 +255,7 @@ const TableAssignmentsPage: React.FC = () => {
 
       const response = await fetch(`${API_BASE_URL}/api/assignments/regenerate/${sessionId}?max_time_seconds=${regenerateSolverTime}`, {
         method: 'POST',
+        signal: controller.signal,
       })
 
       if (!response.ok) {
@@ -227,9 +264,9 @@ const TableAssignmentsPage: React.FC = () => {
       }
 
       const result = await response.json()
-      // Backend now returns {assignments: [...], version_id: "v2", etc.}
-      setAssignments(result.assignments)
-      setCurrentVersion(result.version_id)
+      // Save new version ID but don't auto-switch
+      setNewVersionId(result.version_id)
+      setRegenerateSuccess(true)
 
       // Refetch versions list to include the new version
       try {
@@ -237,29 +274,37 @@ const TableAssignmentsPage: React.FC = () => {
         if (versionsResponse.ok) {
           const versionsData = await versionsResponse.json()
           setAvailableVersions(versionsData.versions || [])
-
-          // Update metadata for the new version
-          const newVersionData = versionsData.versions?.find((v: ResultVersion) =>
-            v.version_id === result.version_id
-          )
-          if (newVersionData) {
-            setCurrentMaxTime(newVersionData.max_time_seconds || 120)
-            setCurrentSolveTime(newVersionData.solve_time || 0)
-            setRegenerateSolverTime(newVersionData.max_time_seconds || 120)
-          }
         }
       } catch (err) {
         console.error('Failed to refresh versions:', err)
       }
-
-      // Update URL to reflect the new version
-      const newUrl = `${window.location.pathname}?session=${sessionId}&version=${result.version_id}`
-      window.history.replaceState({}, '', newUrl)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to regenerate assignments")
+      if (err instanceof Error && err.name === 'AbortError') {
+        // Regeneration was cancelled
+        setError(null)
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to regenerate assignments")
+      }
     } finally {
-      setLoading(false)
+      setRegenerating(false)
+      setAbortController(null)
     }
+  }
+
+  const handleCancelRegenerate = () => {
+    if (abortController) {
+      abortController.abort()
+    }
+  }
+
+  const handleViewNewAssignments = async () => {
+    if (!newVersionId) return
+
+    setRegenerateSuccess(false)
+    setNewVersionId(null)
+
+    // Load the new version
+    await handleVersionChange(newVersionId)
   }
 
   const downloadCSV = () => {
@@ -392,6 +437,42 @@ const TableAssignmentsPage: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent>
+          {regenerating && (
+            <Alert className="mb-4">
+              <div className="flex items-start justify-between">
+                <div className="flex gap-3">
+                  <Loader2 className="h-4 w-4 animate-spin mt-0.5" />
+                  <div>
+                    <AlertTitle>Regenerating Assignments</AlertTitle>
+                    <AlertDescription>
+                      Creating new assignments for a maximum of {Math.floor(regenerateSolverTime / 60)} min {regenerateSolverTime % 60}s.
+                      You can continue browsing while we work.
+                    </AlertDescription>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleCancelRegenerate}>
+                  Cancel
+                </Button>
+              </div>
+            </Alert>
+          )}
+
+          {regenerateSuccess && !regenerating && (
+            <Alert className="mb-4 bg-green-50 border-green-200">
+              <div className="flex items-start justify-between">
+                <div>
+                  <AlertTitle>Regeneration Complete!</AlertTitle>
+                  <AlertDescription>
+                    New assignments saved as {newVersionId}
+                  </AlertDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleViewNewAssignments}>
+                  View New Assignments
+                </Button>
+              </div>
+            </Alert>
+          )}
+
           <ValidationStats assignments={assignments} />
 
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
@@ -451,7 +532,7 @@ const TableAssignmentsPage: React.FC = () => {
                     <Download className="h-4 w-4 mr-2" />
                     Download CSV
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleRegenerateClick} disabled={editMode}>
+                  <DropdownMenuItem onClick={handleRegenerateClick} disabled={editMode || regenerating}>
                     <RotateCw className="h-4 w-4 mr-2" />
                     Regenerate
                   </DropdownMenuItem>
@@ -492,8 +573,9 @@ const TableAssignmentsPage: React.FC = () => {
       </Card>
 
       {/* Regenerate Dialog */}
-      <Dialog open={showRegenerateDialog} onOpenChange={setShowRegenerateDialog}>
-        <DialogContent className="sm:max-w-md">
+      {showRegenerateDialog && (
+        <Dialog open={true} onOpenChange={setShowRegenerateDialog}>
+          <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Regenerate Assignments</DialogTitle>
             <DialogDescription>
@@ -501,37 +583,45 @@ const TableAssignmentsPage: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-baseline gap-2">
-                <Label htmlFor="regenerate-solver-time">Solver Time:</Label>
-                <span className="text-sm font-medium">
-                  {Math.floor(regenerateSolverTime / 60)} min {regenerateSolverTime % 60}s
-                </span>
-              </div>
-              <Slider
-                id="regenerate-solver-time"
-                min={30}
-                max={240}
-                step={1}
-                value={[regenerateSolverTime]}
-                onValueChange={(value) => setRegenerateSolverTime(value[0])}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Quick (30s)</span>
-                <span>Better (2m, default)</span>
-                <span>Best (4m)</span>
+            <div className="space-y-3">
+              <Label>Solver Time</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setRegenerateSolverTime(60)}
+                  className={`flex flex-col h-auto py-3 ${regenerateSolverTime === 60 ? 'border-2 border-black bg-gray-100' : ''}`}
+                >
+                  <span className="font-semibold">Fast</span>
+                  <span className="text-xs opacity-80">1 min</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setRegenerateSolverTime(120)}
+                  className={`flex flex-col h-auto py-3 ${regenerateSolverTime === 120 ? 'border-2 border-black bg-gray-100' : ''}`}
+                >
+                  <span className="font-semibold">Default</span>
+                  <span className="text-xs opacity-80">2 min</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setRegenerateSolverTime(240)}
+                  className={`flex flex-col h-auto py-3 ${regenerateSolverTime === 240 ? 'border-2 border-black bg-gray-100' : ''}`}
+                >
+                  <span className="font-semibold">Slow</span>
+                  <span className="text-xs opacity-80">4 min</span>
+                </Button>
               </div>
             </div>
             <div className="rounded-lg bg-muted p-3 text-sm">
               <p className="text-muted-foreground">
                 ℹ️ Current results used <strong>{currentMaxTime < 60 ? `${currentMaxTime}s` : `${Math.round(currentMaxTime / 60)}m`}</strong> and
                 completed in <strong>{currentSolveTime < 1 ? `${(currentSolveTime * 1000).toFixed(0)}ms` : `${currentSolveTime.toFixed(1)}s`}</strong>.
-                {regenerateSolverTime > currentMaxTime && (
-                  <span className="block mt-1">
-                    More time often yields better balanced groups.
-                  </span>
-                )}
+                <span className="block mt-1">
+                  More time often yields better balanced groups.
+                </span>
               </p>
             </div>
           </div>
@@ -539,12 +629,13 @@ const TableAssignmentsPage: React.FC = () => {
             <Button variant="outline" onClick={() => setShowRegenerateDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleRegenerateConfirm}>
+            <Button variant="outline" onClick={handleRegenerateConfirm}>
               Regenerate
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      )}
     </div>
   )
 }

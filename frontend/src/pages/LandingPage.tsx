@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Slider } from "@/components/ui/slider"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle, Loader2, Clock, ChevronDown, ChevronRight } from 'lucide-react'
 import {
@@ -406,26 +405,36 @@ const LandingPage: React.FC = () => {
                     </p>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex items-baseline gap-2">
-                      <Label htmlFor="solver-time">Solver Time:</Label>
-                      <span className="text-sm font-medium">
-                        {Math.floor(solverTime / 60)} min {solverTime % 60}s
-                      </span>
-                    </div>
-                    <Slider
-                      id="solver-time"
-                      min={30}
-                      max={240}
-                      step={1}
-                      value={[solverTime]}
-                      onValueChange={(value) => setSolverTime(value[0])}
-                      className="w-full"
-                    />
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Quick (30s)</span>
-                      <span>Better (2m, default)</span>
-                      <span>Best (4m)</span>
+                  <div className="space-y-3">
+                    <Label>Solver Time</Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setSolverTime(60)}
+                        className={`flex flex-col h-auto py-3 ${solverTime === 60 ? 'border-2 border-black bg-gray-100' : ''}`}
+                      >
+                        <span className="font-semibold">Fast</span>
+                        <span className="text-xs opacity-80">1 min</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setSolverTime(120)}
+                        className={`flex flex-col h-auto py-3 ${solverTime === 120 ? 'border-2 border-black bg-gray-100' : ''}`}
+                      >
+                        <span className="font-semibold">Default</span>
+                        <span className="text-xs opacity-80">2 min</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setSolverTime(240)}
+                        className={`flex flex-col h-auto py-3 ${solverTime === 240 ? 'border-2 border-black bg-gray-100' : ''}`}
+                      >
+                        <span className="font-semibold">Slow</span>
+                        <span className="text-xs opacity-80">4 min</span>
+                      </Button>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       More time often yields better balanced groups
