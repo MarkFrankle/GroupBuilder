@@ -377,3 +377,251 @@ class TestCloneSession:
 
         assert response.status_code == 400
         assert "Not enough participants" in response.json()["detail"]
+
+
+class TestRegenerateSingleSession:
+    """Test suite for POST /api/assignments/regenerate/{session_id}/session/{session_number} endpoint."""
+
+    @patch('api.routers.assignments.GroupBuilder')
+    def test_regenerate_single_session_success(self, mock_builder_class, client, mock_storage, sample_session_data, sample_assignments_result):
+        """Test successful single-session regeneration."""
+        session_id = str(uuid.uuid4())
+        version_id = "v_test123"
+
+        # Setup: store session and existing results with proper versioning
+        mock_storage.data[f"session:{session_id}"] = sample_session_data
+        mock_storage.data[f"result:{session_id}:latest"] = version_id  # Latest pointer
+        mock_storage.data[f"result:{session_id}:{version_id}"] = {  # Actual result
+            "assignments": sample_assignments_result["assignments"],
+            "metadata": {"solution_quality": "optimal", "solve_time": 1.5, "max_time_seconds": 120},
+            "created_at": datetime.now().isoformat()
+        }
+
+        # Mock the solver to return new assignments for session 1
+        mock_builder = MagicMock()
+        mock_builder_class.return_value = mock_builder
+        mock_builder.generate_assignments.return_value = {
+            "status": "success",
+            "solution_quality": "optimal",
+            "solve_time": 2.0,
+            "total_deviation": 5,
+            "assignments": [{
+                "session": 1,
+                "tables": {
+                    "1": [
+                        {"name": "Charlie", "religion": "Muslim", "gender": "Male", "partner": None},
+                        {"name": "Diana", "religion": "Christian", "gender": "Female", "partner": None}
+                    ],
+                    "2": [
+                        {"name": "Alice", "religion": "Christian", "gender": "Female", "partner": None},
+                        {"name": "Bob", "religion": "Jewish", "gender": "Male", "partner": None}
+                    ]
+                }
+            }]
+        }
+
+        # Regenerate session 1
+        response = client.post(
+            f"/api/assignments/regenerate/{session_id}/session/1?max_time_seconds=60",
+            json=[]  # No absent participants
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify response structure
+        assert "assignments" in data
+        assert "version_id" in data
+        assert "session" in data
+        assert data["session"] == 1
+        assert "solve_time" in data
+        assert "quality" in data
+        assert "assignments_unchanged" in data
+
+        # Verify session 1 was regenerated, session 2 unchanged
+        assert len(data["assignments"]) == 2
+        assert data["assignments"][0]["session"] == 1
+        assert data["assignments"][1]["session"] == 2
+
+        # Verify GroupBuilder was called with require_different_assignments=True
+        mock_builder_class.assert_called()
+        call_kwargs = mock_builder_class.call_args[1]
+        assert call_kwargs["require_different_assignments"] == True
+        assert call_kwargs["num_sessions"] == 1
+        assert call_kwargs["current_table_assignments"] is not None
+
+    @patch('api.routers.assignments.GroupBuilder')
+    def test_regenerate_single_session_with_absent_participants(self, mock_builder_class, client, mock_storage, sample_session_data, sample_assignments_result):
+        """Test single-session regeneration with absent participants."""
+        session_id = str(uuid.uuid4())
+        version_id = "v_test456"
+
+        mock_storage.data[f"session:{session_id}"] = sample_session_data
+        mock_storage.data[f"result:{session_id}:latest"] = version_id
+        mock_storage.data[f"result:{session_id}:{version_id}"] = {
+            "assignments": sample_assignments_result["assignments"],
+            "metadata": {"solution_quality": "optimal"},
+            "created_at": datetime.now().isoformat()
+        }
+
+        mock_builder = MagicMock()
+        mock_builder_class.return_value = mock_builder
+        mock_builder.generate_assignments.return_value = {
+            "status": "success",
+            "solution_quality": "optimal",
+            "solve_time": 1.0,
+            "total_deviation": 0,
+            "assignments": [{
+                "session": 1,
+                "tables": {
+                    "1": [{"name": "Charlie", "religion": "Muslim", "gender": "Male", "partner": None}],
+                    "2": [{"name": "Diana", "religion": "Christian", "gender": "Female", "partner": None}]
+                }
+            }]
+        }
+
+        # Mark Alice and Bob as absent
+        absent_participants = [
+            {"name": "Alice", "religion": "Christian", "gender": "Female", "partner": None},
+            {"name": "Bob", "religion": "Jewish", "gender": "Male", "partner": None}
+        ]
+
+        response = client.post(
+            f"/api/assignments/regenerate/{session_id}/session/1",
+            json=absent_participants
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify absent participants are stored in the session
+        assert "absentParticipants" in data["assignments"][0]
+        assert len(data["assignments"][0]["absentParticipants"]) == 2
+
+        # Verify GroupBuilder was called with only 2 active participants
+        mock_builder_class.assert_called()
+        call_kwargs = mock_builder_class.call_args[1]
+        assert len(call_kwargs["participants"]) == 2  # Only Charlie and Diana
+
+    @patch('api.routers.assignments.GroupBuilder')
+    def test_regenerate_single_session_fallback_when_impossible(self, mock_builder_class, client, mock_storage, sample_session_data, sample_assignments_result):
+        """Test that fallback occurs when hard constraint makes problem infeasible."""
+        session_id = str(uuid.uuid4())
+        version_id = "v_test789"
+
+        mock_storage.data[f"session:{session_id}"] = sample_session_data
+        mock_storage.data[f"result:{session_id}:latest"] = version_id
+        mock_storage.data[f"result:{session_id}:{version_id}"] = {
+            "assignments": sample_assignments_result["assignments"],
+            "metadata": {"solution_quality": "optimal"},
+            "created_at": datetime.now().isoformat()
+        }
+
+        # First call (hard constraint) fails, second call (soft constraint) succeeds
+        mock_builder_hard = MagicMock()
+        mock_builder_soft = MagicMock()
+        mock_builder_class.side_effect = [mock_builder_hard, mock_builder_soft]
+
+        mock_builder_hard.generate_assignments.return_value = {"status": "failure", "error": "Infeasible"}
+        mock_builder_soft.generate_assignments.return_value = {
+            "status": "success",
+            "solution_quality": "optimal",
+            "solve_time": 1.0,
+            "assignments": sample_assignments_result["assignments"][:1]  # Return session 1
+        }
+
+        response = client.post(f"/api/assignments/regenerate/{session_id}/session/1", json=[])
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify assignments_unchanged flag is set
+        assert data["assignments_unchanged"] == True
+
+        # Verify GroupBuilder was called twice (hard then soft)
+        assert mock_builder_class.call_count == 2
+
+    def test_regenerate_single_session_not_found(self, client, mock_storage):
+        """Test regeneration of expired session."""
+        fake_session_id = str(uuid.uuid4())
+
+        response = client.post(f"/api/assignments/regenerate/{fake_session_id}/session/1", json=[])
+
+        assert response.status_code == 404
+        assert "Session expired" in response.json()["detail"]
+
+    def test_regenerate_single_session_invalid_session_number(self, client, mock_storage, sample_session_data, sample_assignments_result):
+        """Test regeneration with invalid session number."""
+        session_id = str(uuid.uuid4())
+        version_id = "v_testABC"
+
+        mock_storage.data[f"session:{session_id}"] = sample_session_data  # num_sessions = 2
+        mock_storage.data[f"result:{session_id}:latest"] = version_id
+        mock_storage.data[f"result:{session_id}:{version_id}"] = {
+            "assignments": sample_assignments_result["assignments"],
+            "metadata": {},
+            "created_at": datetime.now().isoformat()
+        }
+
+        # Try to regenerate session 5 when only 2 sessions exist
+        response = client.post(f"/api/assignments/regenerate/{session_id}/session/5", json=[])
+
+        assert response.status_code == 400
+        assert "Invalid session number" in response.json()["detail"]
+
+    def test_regenerate_single_session_max_time_validation(self, client, mock_storage, sample_session_data, sample_assignments_result):
+        """Test that max_time_seconds is validated (30-240 range)."""
+        session_id = str(uuid.uuid4())
+        version_id = "v_testDEF"
+
+        mock_storage.data[f"session:{session_id}"] = sample_session_data
+        mock_storage.data[f"result:{session_id}:latest"] = version_id
+        mock_storage.data[f"result:{session_id}:{version_id}"] = {
+            "assignments": sample_assignments_result["assignments"],
+            "metadata": {},
+            "created_at": datetime.now().isoformat()
+        }
+
+        # Too low
+        response = client.post(f"/api/assignments/regenerate/{session_id}/session/1?max_time_seconds=10", json=[])
+        assert response.status_code == 422  # Validation error
+
+        # Too high
+        response = client.post(f"/api/assignments/regenerate/{session_id}/session/1?max_time_seconds=300", json=[])
+        assert response.status_code == 422
+
+    @patch('api.routers.assignments.GroupBuilder')
+    def test_regenerate_single_session_metadata_persistence(self, mock_builder_class, client, mock_storage, sample_session_data, sample_assignments_result):
+        """Test that max_time_seconds and regenerated metadata are persisted correctly."""
+        session_id = str(uuid.uuid4())
+        version_id = "v_testGHI"
+
+        mock_storage.data[f"session:{session_id}"] = sample_session_data
+        mock_storage.data[f"result:{session_id}:latest"] = version_id
+        mock_storage.data[f"result:{session_id}:{version_id}"] = {
+            "assignments": sample_assignments_result["assignments"],
+            "metadata": {"max_time_seconds": 120},
+            "created_at": datetime.now().isoformat()
+        }
+
+        mock_builder = MagicMock()
+        mock_builder_class.return_value = mock_builder
+        mock_builder.generate_assignments.return_value = {
+            "status": "success",
+            "solution_quality": "optimal",
+            "solve_time": 1.5,
+            "total_deviation": 3,
+            "assignments": sample_assignments_result["assignments"][:1]
+        }
+
+        response = client.post(f"/api/assignments/regenerate/{session_id}/session/1?max_time_seconds=60", json=[])
+
+        assert response.status_code == 200
+
+        # Verify metadata was stored with correct max_time_seconds
+        # Get the new version_id that was created
+        new_version_id = mock_storage.data[f"result:{session_id}:latest"]
+        stored_result = mock_storage.data[f"result:{session_id}:{new_version_id}"]
+        assert stored_result["metadata"]["max_time_seconds"] == 60
+        assert stored_result["metadata"]["regenerated"] == True
+        assert stored_result["metadata"]["regenerated_session"] == 1

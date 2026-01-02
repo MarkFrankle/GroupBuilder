@@ -39,10 +39,14 @@ class TestGroupBuilder:
         session = result["assignments"][0]
         tables = session["tables"]
 
+        # Build map of participant names to their couple_id
+        couple_map = {p["name"]: p["couple_id"] for p in participants if p.get("couple_id")}
+
         for table_id, participants_at_table in tables.items():
-            couple_ids = [p["couple_id"] for p in participants_at_table if p["couple_id"] is not None]
+            # Get couple_ids for participants at this table
+            couple_ids = [couple_map.get(p["name"]) for p in participants_at_table if couple_map.get(p["name"]) is not None]
             # No duplicate couple_ids should exist at the same table
-            assert len(couple_ids) == len(set(couple_ids))
+            assert len(couple_ids) == len(set(couple_ids)), f"Table {table_id} has couples together: {couple_ids}"
 
     def test_balanced_table_sizes(self):
         """Test that all tables have balanced sizes (within 1 person)"""

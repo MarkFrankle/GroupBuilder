@@ -80,7 +80,6 @@ const TableAssignmentsPage: React.FC = () => {
   const [regenerateSuccess, setRegenerateSuccess] = useState<boolean>(false)
   const [newVersionId, setNewVersionId] = useState<string | null>(null)
   const [abortController, setAbortController] = useState<AbortController | null>(null)
-  const [hasUnsavedEdits, setHasUnsavedEdits] = useState<boolean>(false)
   const [regeneratingSession, setRegeneratingSession] = useState<number | null>(null)
 
   const navigate = useNavigate()
@@ -98,7 +97,7 @@ const TableAssignmentsPage: React.FC = () => {
   const saveEditsToStorage = (assignments: Assignment[], versionId?: string) => {
     try {
       localStorage.setItem(getEditsKey(versionId), JSON.stringify(assignments))
-      setHasUnsavedEdits(false)
+      // Edits cleared (hasUnsavedEdits tracking removed)
     } catch (err) {
       console.error('Failed to save edits to localStorage:', err)
     }
@@ -117,7 +116,7 @@ const TableAssignmentsPage: React.FC = () => {
   const clearEditsFromStorage = (versionId?: string) => {
     try {
       localStorage.removeItem(getEditsKey(versionId))
-      setHasUnsavedEdits(false)
+      // Edits cleared (hasUnsavedEdits tracking removed)
     } catch (err) {
       console.error('Failed to clear edits from localStorage:', err)
     }
@@ -241,7 +240,7 @@ const TableAssignmentsPage: React.FC = () => {
           const savedEdits = loadEditsFromStorage(loadingVersion)
           if (savedEdits) {
             setAssignments(savedEdits)
-            setHasUnsavedEdits(false) // Edits are saved, just not to backend
+            // Edits cleared (hasUnsavedEdits tracking removed) // Edits are saved, just not to backend
           } else {
             setAssignments(data)
           }
@@ -290,7 +289,7 @@ const TableAssignmentsPage: React.FC = () => {
       const savedEdits = loadEditsFromStorage(versionId)
       if (savedEdits) {
         setAssignments(savedEdits)
-        setHasUnsavedEdits(false) // Edits are saved in localStorage
+        // Edits cleared (hasUnsavedEdits tracking removed) // Edits are saved in localStorage
       } else {
         setAssignments(data)
       }
@@ -561,7 +560,7 @@ const TableAssignmentsPage: React.FC = () => {
       session.tables[tableNum2] = session.tables[tableNum2].filter((p): p is Participant => p !== null && p !== undefined)
     }))
 
-    setHasUnsavedEdits(true)
+    // Edit made (hasUnsavedEdits tracking removed)
   }
 
   const handleMarkAbsent = (sessionIndex: number, tableNum: number, participantIndex: number) => {
@@ -597,7 +596,7 @@ const TableAssignmentsPage: React.FC = () => {
     // Clear selection after marking absent
     setSelectedParticipantSlot(null)
 
-    setHasUnsavedEdits(true)
+    // Edit made (hasUnsavedEdits tracking removed)
   }
 
   const handlePlaceAbsentParticipant = (sessionIndex: number, tableNum: number, seatIndex: number) => {
@@ -630,7 +629,7 @@ const TableAssignmentsPage: React.FC = () => {
     }))
 
     setSelectedAbsentParticipant(null)
-    setHasUnsavedEdits(true)
+    // Edit made (hasUnsavedEdits tracking removed)
   }
 
   const handleUndo = () => {
