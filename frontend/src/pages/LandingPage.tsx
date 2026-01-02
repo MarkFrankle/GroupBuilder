@@ -25,12 +25,12 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { getRecentUploadIds, saveRecentUpload, removeRecentUpload, type RecentUpload } from '@/utils/recentUploads'
+import { fetchWithRetry } from '@/utils/fetchWithRetry'
 import { formatISOTimeAgo, formatUnixTimeAgo } from '@/utils/timeFormatting'
 import { API_BASE_URL } from '@/config/api'
 import {
   SESSION_EXPIRY_MESSAGE,
   RESULTS_EXPIRY_MESSAGE,
-  ESTIMATED_SOLVE_TIME_MINUTES,
   MAX_TABLES,
   MAX_SESSIONS
 } from '@/constants'
@@ -57,6 +57,7 @@ const LandingPage: React.FC = () => {
   const [selectedRecentUpload, setSelectedRecentUpload] = useState<string>("")
   const [availableVersions, setAvailableVersions] = useState<ResultVersion[]>([])
   const [advancedOpen, setAdvancedOpen] = useState<boolean>(false)
+  const [solverTime, setSolverTime] = useState<number>(120) // Default: 2 minutes
   const navigate = useNavigate()
 
   // Load recent uploads on mount
@@ -147,7 +148,7 @@ const LandingPage: React.FC = () => {
   const cloneSession = async (sessionId: string): Promise<string> => {
     setLoadingMessage('Updating configuration...');
 
-    const response = await fetch(
+    const response = await fetchWithRetry(
       `${API_BASE_URL}/api/assignments/sessions/${sessionId}/clone?num_tables=${numTables}&num_sessions=${numSessions}`,
       { method: 'POST' }
     );
@@ -177,7 +178,7 @@ const LandingPage: React.FC = () => {
       formData.append('email', email);
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/upload/`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/api/upload/`, {
       method: 'POST',
       body: formData,
     });
@@ -225,9 +226,10 @@ const LandingPage: React.FC = () => {
    * Generate assignments for a given session.
    */
   const generateAssignments = async (sessionId: string) => {
-    setLoadingMessage(`Generating optimal table assignments... This will take approximately ${ESTIMATED_SOLVE_TIME_MINUTES} minutes.`);
+    const estimatedMinutes = Math.ceil(solverTime / 60);
+    setLoadingMessage(`Generating optimal table assignments... This may take up to ${estimatedMinutes} minute${estimatedMinutes > 1 ? 's' : ''}.`);
 
-    const response = await fetch(`${API_BASE_URL}/api/assignments/?session_id=${sessionId}`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/api/assignments/?session_id=${sessionId}&max_time_seconds=${solverTime}`, {
       method: 'GET',
     });
 
@@ -263,7 +265,7 @@ const LandingPage: React.FC = () => {
       setLoadingMessage('');
     }
   };
-  
+
 
   return (
     <div className="container mx-auto p-4">
@@ -387,18 +389,58 @@ const LandingPage: React.FC = () => {
                     <span className="text-sm">Advanced Options</span>
                   </Button>
                 </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-2 mt-2">
-                  <Label htmlFor="email">Email (optional)</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="your.email@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    Get a link to your results via email ({RESULTS_EXPIRY_MESSAGE})
-                  </p>
+                <CollapsibleContent className="space-y-4 mt-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email (optional)</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="your.email@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Get a link to your results via email ({RESULTS_EXPIRY_MESSAGE})
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label>Solver Time</Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setSolverTime(60)}
+                        className={`flex flex-col h-auto py-3 ${solverTime === 60 ? 'border-2 border-black bg-gray-100' : ''}`}
+                      >
+                        <span className="font-semibold">Fast</span>
+                        <span className="text-xs opacity-80">1 min</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setSolverTime(120)}
+                        className={`flex flex-col h-auto py-3 ${solverTime === 120 ? 'border-2 border-black bg-gray-100' : ''}`}
+                      >
+                        <span className="font-semibold">Default</span>
+                        <span className="text-xs opacity-80">2 min</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setSolverTime(240)}
+                        className={`flex flex-col h-auto py-3 ${solverTime === 240 ? 'border-2 border-black bg-gray-100' : ''}`}
+                      >
+                        <span className="font-semibold">Slow</span>
+                        <span className="text-xs opacity-80">4 min</span>
+                      </Button>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      More time often yields better balanced groups
+                    </p>
+                  </div>
+
+                  <div className="border-t pt-4" />
                 </CollapsibleContent>
               </Collapsible>
 

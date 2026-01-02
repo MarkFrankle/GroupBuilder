@@ -25,6 +25,14 @@ jest.mock('react-router-dom', () => ({
 // Mock fetch
 global.fetch = jest.fn()
 
+// Mock ResizeObserver (needed by Radix UI Slider)
+class ResizeObserverMock {
+  observe = jest.fn()
+  unobserve = jest.fn()
+  disconnect = jest.fn()
+}
+global.ResizeObserver = ResizeObserverMock as any
+
 // Helper to render component with router
 const renderWithRouter = (component: React.ReactElement) => {
   return render(<BrowserRouter>{component}</BrowserRouter>)
@@ -278,8 +286,10 @@ describe('LandingPage', () => {
     })
 
     it('displays error message on upload failure', async () => {
+      // Mock fetch to return 400 error (client error - won't retry)
       ;(global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: false,
+        status: 400,
         json: async () => ({ detail: 'File upload failed' })
       })
 

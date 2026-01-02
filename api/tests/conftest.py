@@ -64,11 +64,25 @@ def mock_storage():
                 if key in mock.data:
                     del mock.data[key]
 
+        def mock_expire(key, ttl_seconds):
+            # In real storage, this extends TTL. For mock, just return success if key exists
+            return key in mock.data
+
+        def mock_incr(key):
+            # Atomic increment - simulate counter behavior
+            if key in mock.data:
+                mock.data[key] = int(mock.data[key]) + 1
+            else:
+                mock.data[key] = 1
+            return mock.data[key]
+
         mock.set = mock_set
         mock.get = mock_get
         mock.exists = mock_exists
         mock.delete = mock_delete
         mock.delete_many = mock_delete_many
+        mock.expire = mock_expire
+        mock.incr = mock_incr
 
         yield mock
 
