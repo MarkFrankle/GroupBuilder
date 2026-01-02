@@ -72,22 +72,32 @@ def _get_active_participants(all_participants: List[Dict[str, Any]], absent_part
     return active
 
 
-def _extract_current_table_assignments(session_assignment: Dict[str, Any]) -> Dict[str, int]:
+def _extract_current_table_assignments(
+    session_assignment: Dict[str, Any],
+    participant_dict: List[Dict[str, Any]]
+) -> Dict[int, int]:
     """
     Extract current table assignments for a session to prefer variety when regenerating.
 
     Args:
         session_assignment: The session assignment data containing tables
+        participant_dict: List of participant dicts with id and name
 
     Returns:
-        Dict mapping participant names to their current table numbers
+        Dict mapping participant_id -> table_number (0-indexed)
     """
+    # Build name-to-id mapping
+    name_to_id = {p['name']: p['id'] for p in participant_dict}
+
     current_assignments = {}
 
-    for table_num, participants in session_assignment['tables'].items():
+    for table_num_str, participants in session_assignment['tables'].items():
+        table_idx = int(table_num_str) - 1  # Convert from 1-indexed to 0-indexed
         for participant in participants:
             if participant:  # Skip None/null entries
-                current_assignments[participant['name']] = int(table_num)
+                participant_id = name_to_id.get(participant['name'])
+                if participant_id is not None:
+                    current_assignments[participant_id] = table_idx
 
     logger.info(f"Extracted {len(current_assignments)} current table assignments to prefer avoiding")
     return current_assignments
@@ -302,7 +312,10 @@ async def regenerate_single_session(
 
         # 4. Extract current table assignments to prefer variety
         session_assignment = existing_assignments[session_number - 1]
-        current_table_assignments = _extract_current_table_assignments(session_assignment)
+        current_table_assignments = _extract_current_table_assignments(
+            session_assignment,
+            all_participants
+        )
 
         # 5. Get active participants for this session
         active_participants = _get_active_participants(

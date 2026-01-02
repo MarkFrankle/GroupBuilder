@@ -866,7 +866,7 @@ const TableAssignmentsPage: React.FC = () => {
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleRegenerateClick} disabled={editMode || regenerating}>
                     <RotateCw className="h-4 w-4 mr-2" />
-                    Regenerate
+                    Regenerate All Sessions
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleClearAssignments}>
                     <X className="h-4 w-4 mr-2" />
