@@ -405,7 +405,8 @@ def store_result(session_id: str, data: dict, version_id: Optional[str] = None) 
         "version_id": version_id,
         "created_at": result_with_metadata["created_at"],
         "solve_time": data.get("metadata", {}).get("solve_time"),
-        "solution_quality": data.get("metadata", {}).get("solution_quality")
+        "solution_quality": data.get("metadata", {}).get("solution_quality"),
+        "max_time_seconds": data.get("metadata", {}).get("max_time_seconds")
     }
 
     # Append new version
@@ -435,7 +436,7 @@ def store_result(session_id: str, data: dict, version_id: Optional[str] = None) 
 
 def get_result(session_id: str, version_id: Optional[str] = None) -> Optional[dict]:
     """
-    Retrieve assignment results.
+    Retrieve assignment results and refresh TTL to prevent expiry during active use.
 
     Args:
         session_id: The session ID
@@ -448,26 +449,41 @@ def get_result(session_id: str, version_id: Optional[str] = None) -> Optional[di
     if version_id is None:
         latest_key = f"{RESULT_PREFIX}{session_id}{RESULT_LATEST_SUFFIX}"
         version_id = storage.get(latest_key)
+        # Refresh TTL on latest pointer
+        if version_id:
+            storage.expire(latest_key, RESULT_TTL)
 
         # Fallback to legacy non-versioned result
         if version_id is None:
             legacy_key = f"{RESULT_PREFIX}{session_id}"
-            return storage.get(legacy_key)
+            result = storage.get(legacy_key)
+            if result:
+                storage.expire(legacy_key, RESULT_TTL)
+            return result
 
-    # Get versioned result
+    # Get versioned result and refresh TTL
     version_key = f"{RESULT_PREFIX}{session_id}:{version_id}"
-    return storage.get(version_key)
+    result = storage.get(version_key)
+    if result:
+        # Refresh TTL on the specific version and the versions list
+        storage.expire(version_key, RESULT_TTL)
+        versions_key = f"{RESULT_PREFIX}{session_id}{RESULT_VERSIONS_SUFFIX}"
+        storage.expire(versions_key, RESULT_TTL)
+    return result
 
 
 def get_result_versions(session_id: str) -> list[dict]:
     """
-    Get list of all result versions for a session.
+    Get list of all result versions for a session and refresh TTL.
 
     Returns:
         List of version metadata dicts, sorted by creation time (newest first)
     """
     versions_key = f"{RESULT_PREFIX}{session_id}{RESULT_VERSIONS_SUFFIX}"
     versions = storage.get(versions_key) or []
+    if versions:
+        # Refresh TTL on versions list to prevent expiry during active use
+        storage.expire(versions_key, RESULT_TTL)
     return list(reversed(versions))  # Newest first
 
 
