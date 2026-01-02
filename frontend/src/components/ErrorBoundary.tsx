@@ -81,25 +81,38 @@ class ErrorBoundary extends Component<Props, State> {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Error Details</AlertTitle>
-                <AlertDescription className="mt-2">
-                  <div className="font-mono text-sm">
-                    {this.state.error?.toString()}
-                  </div>
-                </AlertDescription>
-              </Alert>
+              {process.env.NODE_ENV === 'development' && (
+                <>
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Error Details</AlertTitle>
+                    <AlertDescription className="mt-2">
+                      <div className="font-mono text-sm">
+                        {this.state.error?.toString()}
+                      </div>
+                    </AlertDescription>
+                  </Alert>
 
-              {process.env.NODE_ENV === 'development' && this.state.errorInfo && (
-                <details className="bg-gray-100 p-4 rounded-lg">
-                  <summary className="cursor-pointer font-semibold text-sm mb-2">
-                    Stack Trace (Development Only)
-                  </summary>
-                  <pre className="text-xs overflow-auto max-h-64 text-gray-700">
-                    {this.state.errorInfo.componentStack}
-                  </pre>
-                </details>
+                  {this.state.errorInfo && (
+                    <details className="bg-gray-100 p-4 rounded-lg">
+                      <summary className="cursor-pointer font-semibold text-sm mb-2">
+                        Stack Trace (Development Only)
+                      </summary>
+                      <pre className="text-xs overflow-auto max-h-64 text-gray-700">
+                        {this.state.errorInfo.componentStack}
+                      </pre>
+                    </details>
+                  )}
+                </>
+              )}
+
+              {process.env.NODE_ENV !== 'development' && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    An unexpected error occurred. Please try refreshing the page or contact support if the problem persists.
+                  </AlertDescription>
+                </Alert>
               )}
 
               <div className="flex gap-3">

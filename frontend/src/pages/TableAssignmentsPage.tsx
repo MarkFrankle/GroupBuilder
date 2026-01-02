@@ -51,8 +51,9 @@ export interface Participant {
 export interface Assignment {
   session: number;
   tables: {
-    [key: number]: Participant[];
+    [key: number]: (Participant | null)[];
   };
+  absentParticipants?: Participant[];
 }
 
 const TableAssignmentsPage: React.FC = () => {
@@ -60,9 +61,15 @@ const TableAssignmentsPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [currentSession, setCurrentSession] = useState<number>(1)
-  const [viewMode, setViewMode] = useState<'detailed' | 'compact'>('compact')
+  const [viewMode, setViewMode] = useState<'detailed' | 'compact'>(() => {
+    // Restore view mode from localStorage
+    const saved = localStorage.getItem('tableAssignments_viewMode')
+    return (saved === 'detailed' || saved === 'compact') ? saved : 'compact'
+  })
   const [editMode, setEditMode] = useState<boolean>(false)
   const [undoStack, setUndoStack] = useState<Assignment[][]>([])
+  const [selectedAbsentParticipant, setSelectedAbsentParticipant] = useState<Participant | null>(null)
+  const [selectedParticipantSlot, setSelectedParticipantSlot] = useState<{tableNum: number, participantIndex: number} | null>(null)
   const [availableVersions, setAvailableVersions] = useState<ResultVersion[]>([])
   const [currentVersion, setCurrentVersion] = useState<string>('latest')
   const [showRegenerateDialog, setShowRegenerateDialog] = useState<boolean>(false)
@@ -73,10 +80,47 @@ const TableAssignmentsPage: React.FC = () => {
   const [regenerateSuccess, setRegenerateSuccess] = useState<boolean>(false)
   const [newVersionId, setNewVersionId] = useState<string | null>(null)
   const [abortController, setAbortController] = useState<AbortController | null>(null)
+  const [hasUnsavedEdits, setHasUnsavedEdits] = useState<boolean>(false)
 
   const navigate = useNavigate()
 
   const useRealData = true;
+
+  // Helper functions for persisting edits to localStorage
+  const getEditsKey = (versionId?: string) => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId;
+    const version = versionId || currentVersion
+    return `edits_${sessionId}_${version}`
+  }
+
+  const saveEditsToStorage = (assignments: Assignment[], versionId?: string) => {
+    try {
+      localStorage.setItem(getEditsKey(versionId), JSON.stringify(assignments))
+      setHasUnsavedEdits(false)
+    } catch (err) {
+      console.error('Failed to save edits to localStorage:', err)
+    }
+  }
+
+  const loadEditsFromStorage = (versionId?: string): Assignment[] | null => {
+    try {
+      const saved = localStorage.getItem(getEditsKey(versionId))
+      return saved ? JSON.parse(saved) : null
+    } catch (err) {
+      console.error('Failed to load edits from localStorage:', err)
+      return null
+    }
+  }
+
+  const clearEditsFromStorage = (versionId?: string) => {
+    try {
+      localStorage.removeItem(getEditsKey(versionId))
+      setHasUnsavedEdits(false)
+    } catch (err) {
+      console.error('Failed to clear edits from localStorage:', err)
+    }
+  }
 
   // Ensure dialog cleanup when component unmounts
   useEffect(() => {
@@ -95,6 +139,11 @@ const TableAssignmentsPage: React.FC = () => {
       document.body.style.removeProperty('pointer-events')
     }
   }, [showRegenerateDialog])
+
+  // Persist view mode to localStorage
+  useEffect(() => {
+    localStorage.setItem('tableAssignments_viewMode', viewMode)
+  }, [viewMode])
 
   const formatTimestamp = (timestamp: number): string => {
     const date = new Date(timestamp * 1000) // Convert Unix timestamp to milliseconds
@@ -134,6 +183,9 @@ const TableAssignmentsPage: React.FC = () => {
             throw new Error('Session expired. Please upload a file again.')
           }
 
+          // Determine which version we're loading
+          const loadingVersion = versionParam || 'latest'
+
           // Set current version from URL param if available
           if (versionParam) {
             setCurrentVersion(versionParam)
@@ -147,14 +199,28 @@ const TableAssignmentsPage: React.FC = () => {
               setAvailableVersions(versionsData.versions || [])
 
               // Set current version's metadata for regenerate dialog
-              const currentVersionData = versionsData.versions?.find((v: ResultVersion) =>
-                v.version_id === (versionParam || 'latest')
-              ) || versionsData.versions?.[versionsData.versions.length - 1]
+              let currentVersionData: ResultVersion | undefined
+
+              if (loadingVersion === 'latest') {
+                // Find the actual latest version by timestamp
+                currentVersionData = versionsData.versions?.reduce((latest: ResultVersion | undefined, v: ResultVersion) => {
+                  if (!latest || v.created_at > latest.created_at) return v
+                  return latest
+                }, undefined)
+              } else {
+                // Find by version ID
+                currentVersionData = versionsData.versions?.find((v: ResultVersion) =>
+                  v.version_id === loadingVersion
+                )
+              }
 
               if (currentVersionData) {
+                console.log('[Version Metadata] Loading version:', loadingVersion, 'Found metadata:', currentVersionData)
                 setCurrentMaxTime(currentVersionData.max_time_seconds || 120)
                 setCurrentSolveTime(currentVersionData.solve_time || 0)
                 setRegenerateSolverTime(currentVersionData.max_time_seconds || 120)
+              } else {
+                console.warn('[Version Metadata] No metadata found for version:', loadingVersion)
               }
             }
           } catch (err) {
@@ -169,7 +235,15 @@ const TableAssignmentsPage: React.FC = () => {
             throw new Error(errorData.detail || 'Failed to fetch assignments')
           }
           const data = await response.json()
-          setAssignments(data)
+
+          // Check for saved edits in localStorage for this specific version
+          const savedEdits = loadEditsFromStorage(loadingVersion)
+          if (savedEdits) {
+            setAssignments(savedEdits)
+            setHasUnsavedEdits(false) // Edits are saved, just not to backend
+          } else {
+            setAssignments(data)
+          }
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An unknown error occurred')
@@ -190,6 +264,8 @@ const TableAssignmentsPage: React.FC = () => {
   const handleVersionChange = async (versionId: string) => {
     setLoading(true)
     setError(null)
+    // Clear undo history when switching versions
+    setUndoStack([])
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId;
@@ -207,8 +283,41 @@ const TableAssignmentsPage: React.FC = () => {
       }
 
       const data = await response.json()
-      setAssignments(data)
       setCurrentVersion(versionId)
+
+      // Check for saved edits in localStorage for this specific version
+      const savedEdits = loadEditsFromStorage(versionId)
+      if (savedEdits) {
+        setAssignments(savedEdits)
+        setHasUnsavedEdits(false) // Edits are saved in localStorage
+      } else {
+        setAssignments(data)
+      }
+
+      // Update version metadata for regenerate dialog
+      let currentVersionData: ResultVersion | undefined
+
+      if (versionId === 'latest') {
+        // Find the actual latest version by timestamp
+        currentVersionData = availableVersions.reduce((latest: ResultVersion | undefined, v: ResultVersion) => {
+          if (!latest || v.created_at > latest.created_at) return v
+          return latest
+        }, undefined)
+      } else {
+        // Find by version ID
+        currentVersionData = availableVersions.find((v: ResultVersion) =>
+          v.version_id === versionId
+        )
+      }
+
+      if (currentVersionData) {
+        console.log('[Version Metadata] Switching to version:', versionId, 'Found metadata:', currentVersionData)
+        setCurrentMaxTime(currentVersionData.max_time_seconds || 120)
+        setCurrentSolveTime(currentVersionData.solve_time || 0)
+        setRegenerateSolverTime(currentVersionData.max_time_seconds || 120)
+      } else {
+        console.warn('[Version Metadata] No metadata found for version:', versionId)
+      }
 
       // Update URL without reload
       const newUrl = versionId !== 'latest'
@@ -253,6 +362,7 @@ const TableAssignmentsPage: React.FC = () => {
         throw new Error('Session ID not found. Please upload a file again.')
       }
 
+      console.log('[Regenerate] Requesting regeneration with max_time_seconds:', regenerateSolverTime)
       const response = await fetch(`${API_BASE_URL}/api/assignments/regenerate/${sessionId}?max_time_seconds=${regenerateSolverTime}`, {
         method: 'POST',
         signal: controller.signal,
@@ -318,8 +428,10 @@ const TableAssignmentsPage: React.FC = () => {
       // Iterate through each table in the session
       Object.entries(assignment.tables).forEach(([tableNum, participants]) => {
         participants.forEach(participant => {
-          const partner = participant.partner || ""
-          csvContent += `${tableNum},"${participant.name}","${participant.religion}","${participant.gender}","${partner}"\n`
+          if (participant !== null) {
+            const partner = participant.partner || ""
+            csvContent += `${tableNum},"${participant.name}","${participant.religion}","${participant.gender}","${partner}"\n`
+          }
         })
       })
 
@@ -361,7 +473,79 @@ const TableAssignmentsPage: React.FC = () => {
       const temp = session.tables[tableNum1][participantIndex1]
       session.tables[tableNum1][participantIndex1] = session.tables[tableNum2][participantIndex2]
       session.tables[tableNum2][participantIndex2] = temp
+
+      // Remove any nulls created by swapping with empty slots to avoid index mismatch
+      session.tables[tableNum1] = session.tables[tableNum1].filter((p): p is Participant => p !== null && p !== undefined)
+      session.tables[tableNum2] = session.tables[tableNum2].filter((p): p is Participant => p !== null && p !== undefined)
     }))
+
+    setHasUnsavedEdits(true)
+  }
+
+  const handleMarkAbsent = (sessionIndex: number, tableNum: number, participantIndex: number) => {
+    // Save current state to undo stack
+    setUndoStack(prev => {
+      const newStack = [...prev, produce(assignments, draft => draft)].slice(-10)
+      return newStack
+    })
+
+    setAssignments(prev => produce(prev, draft => {
+      const session = draft[sessionIndex]
+      if (!session || !session.tables || !session.tables[tableNum]) {
+        console.error('Invalid session or table:', { sessionIndex, tableNum, session })
+        return
+      }
+
+      const table = session.tables[tableNum]
+      const participant = table[participantIndex]
+
+      if (participant) {
+        // Add to absent participants
+        if (!session.absentParticipants) {
+          session.absentParticipants = []
+        }
+        session.absentParticipants.push(participant)
+
+        // Remove from table entirely (filter out) to avoid index mismatch with tablesWithEmptySlots
+        const newTable = table.filter((_, i) => i !== participantIndex)
+        session.tables[tableNum] = newTable
+      }
+    }))
+
+    setHasUnsavedEdits(true)
+  }
+
+  const handlePlaceAbsentParticipant = (sessionIndex: number, tableNum: number, seatIndex: number) => {
+    if (!selectedAbsentParticipant) return
+
+    // Save current state to undo stack
+    setUndoStack(prev => {
+      const newStack = [...prev, produce(assignments, draft => draft)].slice(-10)
+      return newStack
+    })
+
+    setAssignments(prev => produce(prev, draft => {
+      const session = draft[sessionIndex]
+      if (!session || !session.tables || !session.tables[tableNum]) {
+        console.error('Invalid session or table:', { sessionIndex, tableNum, session })
+        return
+      }
+
+      // Remove from absent participants
+      if (session.absentParticipants) {
+        const index = session.absentParticipants.findIndex(p => p.name === selectedAbsentParticipant.name)
+        if (index !== -1) {
+          session.absentParticipants.splice(index, 1)
+        }
+      }
+
+      // Simply append to the end of the table (avoiding nulls to prevent index mismatch)
+      const table = session.tables[tableNum]
+      session.tables[tableNum] = [...table, selectedAbsentParticipant]
+    }))
+
+    setSelectedAbsentParticipant(null)
+    setHasUnsavedEdits(true)
   }
 
   const handleUndo = () => {
@@ -374,6 +558,31 @@ const TableAssignmentsPage: React.FC = () => {
   const toggleEditMode = () => {
     if (!editMode) {
       setViewMode('detailed')
+    } else {
+      // Clean up nulls from tables when exiting edit mode
+      const cleanedAssignments = produce(assignments, draft => {
+        draft.forEach(session => {
+          Object.keys(session.tables).forEach(tableNum => {
+            const key = Number(tableNum)
+            // Filter out all null/undefined values
+            session.tables[key] = session.tables[key].filter((p): p is Participant => p !== null && p !== undefined)
+          })
+        })
+      })
+
+      setAssignments(cleanedAssignments)
+
+      // Only save edits if actual changes were made (undo stack not empty)
+      if (undoStack.length > 0) {
+        saveEditsToStorage(cleanedAssignments)
+      } else {
+        // No edits were made, clear any existing saved edits
+        clearEditsFromStorage()
+      }
+
+      // Clear selections when exiting edit mode
+      setSelectedAbsentParticipant(null)
+      setSelectedParticipantSlot(null)
     }
     setEditMode(!editMode)
   }
@@ -508,15 +717,32 @@ const TableAssignmentsPage: React.FC = () => {
                 </Button>
               )}
               {editMode && (
-                <Button
-                  variant="outline"
-                  onClick={handleUndo}
-                  size="sm"
-                  disabled={undoStack.length === 0}
-                >
-                  <Undo2 className="h-4 w-4 mr-2" />
-                  Undo ({undoStack.length})
-                </Button>
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={handleUndo}
+                    size="sm"
+                    disabled={undoStack.length === 0}
+                  >
+                    <Undo2 className="h-4 w-4 mr-2" />
+                    Undo ({undoStack.length})
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (selectedParticipantSlot && !selectedAbsentParticipant) {
+                        const sessionIndex = assignments.findIndex(a => a.session === currentSession)
+                        handleMarkAbsent(sessionIndex, selectedParticipantSlot.tableNum, selectedParticipantSlot.participantIndex)
+                        setSelectedParticipantSlot(null)
+                      }
+                    }}
+                    size="sm"
+                    disabled={!selectedParticipantSlot || selectedAbsentParticipant !== null}
+                    title={selectedAbsentParticipant ? "Cannot mark absent participant as absent" : selectedParticipantSlot ? "Mark selected participant as absent" : "Select a participant to mark them absent"}
+                  >
+                    Mark Absent
+                  </Button>
+                </>
               )}
             </div>
 
@@ -549,6 +775,41 @@ const TableAssignmentsPage: React.FC = () => {
             <CompactAssignments assignments={assignments} />
           ) : (
             <>
+              {/* Show indicator when viewing edited version */}
+              {loadEditsFromStorage() !== null && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+                  <span className="font-semibold">✓ Viewing edited version</span>
+                </div>
+              )}
+
+              {/* Absent Participants Box */}
+              {currentAssignment && currentAssignment.absentParticipants && currentAssignment.absentParticipants.length > 0 && (
+                <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <h3 className="font-semibold mb-2 text-amber-900">Absent Participants</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {currentAssignment.absentParticipants.map((participant, index) => (
+                      <div
+                        key={index}
+                        onClick={() => editMode ? setSelectedAbsentParticipant(participant) : null}
+                        className={`px-3 py-2 bg-white border rounded-md cursor-pointer hover:bg-gray-50 ${
+                          selectedAbsentParticipant?.name === participant.name ? 'ring-2 ring-blue-500' : 'border-amber-300'
+                        }`}
+                      >
+                        <div className="font-medium">{participant.name}</div>
+                        <div className="text-xs text-gray-600">
+                          {participant.religion} • {participant.gender}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {editMode && (
+                    <p className="text-sm text-amber-700 mt-2">
+                      Click an absent participant, then click an empty seat to place them
+                    </p>
+                  )}
+                </div>
+              )}
+
               {currentAssignment && (
                 <TableAssignments
                   assignment={currentAssignment}
@@ -556,6 +817,18 @@ const TableAssignmentsPage: React.FC = () => {
                   onSwap={(tableNum1, participantIndex1, tableNum2, participantIndex2) => {
                     const sessionIndex = assignments.findIndex(a => a.session === currentSession)
                     handleSwap(sessionIndex, tableNum1, participantIndex1, tableNum2, participantIndex2)
+                  }}
+                  selectedAbsentParticipant={selectedAbsentParticipant}
+                  onPlaceAbsent={(tableNum, seatIndex) => {
+                    const sessionIndex = assignments.findIndex(a => a.session === currentSession)
+                    handlePlaceAbsentParticipant(sessionIndex, tableNum, seatIndex)
+                  }}
+                  onSelectionChange={(tableNum, participantIndex) => {
+                    if (tableNum !== null && participantIndex !== null) {
+                      setSelectedParticipantSlot({ tableNum, participantIndex })
+                    } else {
+                      setSelectedParticipantSlot(null)
+                    }
                   }}
                 />
               )}
