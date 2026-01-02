@@ -12,52 +12,95 @@ interface Participant {
 interface Assignment {
   session: number;
   tables: {
-    [key: number]: Participant[];
+    [key: number]: (Participant | null)[];
   };
+  absentParticipants?: Participant[];
 }
 
 interface TableAssignmentsProps {
   assignment: Assignment;
   editMode?: boolean;
   onSwap?: (tableNum1: number, participantIndex1: number, tableNum2: number, participantIndex2: number) => void;
+  selectedAbsentParticipant?: Participant | null;
+  onMarkAbsent?: (tableNum: number, participantIndex: number) => void;
+  onPlaceAbsent?: (tableNum: number, seatIndex: number) => void;
+  onSelectionChange?: (tableNum: number | null, participantIndex: number | null) => void;
 }
 
-const EMPTY_PARTICIPANT: Participant = {
-  name: '',
-  religion: '',
-  gender: '',
-  partner: null
-}
-
-const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMode = false, onSwap }) => {
+const TableAssignments: React.FC<TableAssignmentsProps> = ({
+  assignment,
+  editMode = false,
+  onSwap,
+  selectedAbsentParticipant = null,
+  onMarkAbsent,
+  onPlaceAbsent,
+  onSelectionChange
+}) => {
   const [selectedSlot, setSelectedSlot] = useState<{tableNum: number, index: number} | null>(null)
 
-  const tablesWithEmptySlots = useMemo(() => {
-    const tables = { ...assignment.tables }
-    const tableSizes = Object.values(tables).map(p => p.length)
-    const maxSize = Math.max(...tableSizes)
-
-    Object.keys(tables).forEach(tableNum => {
-      const key = Number(tableNum)
-      const currentSize = tables[key].length
-      if (currentSize < maxSize) {
-        tables[key] = [...tables[key], ...Array(maxSize - currentSize).fill(EMPTY_PARTICIPANT)]
+  // Notify parent when selection changes
+  React.useEffect(() => {
+    if (onSelectionChange) {
+      if (selectedSlot) {
+        onSelectionChange(selectedSlot.tableNum, selectedSlot.index)
+      } else {
+        onSelectionChange(null, null)
       }
-      // Sort so empty slots are always at the bottom
-      tables[key] = tables[key].sort((a, b) => {
-        const aIsEmpty = !a || a.name === ''
-        const bIsEmpty = !b || b.name === ''
-        if (aIsEmpty && !bIsEmpty) return 1
-        if (!aIsEmpty && bIsEmpty) return -1
-        return 0
-      })
+    }
+  }, [selectedSlot, onSelectionChange])
+
+  // Clear selection when exiting edit mode or when absent participant is selected
+  React.useEffect(() => {
+    if (!editMode || selectedAbsentParticipant) {
+      setSelectedSlot(null)
+    }
+  }, [editMode, selectedAbsentParticipant])
+
+  // Clear selection if the selected participant was removed or is null
+  React.useEffect(() => {
+    if (selectedSlot) {
+      const table = assignment.tables[selectedSlot.tableNum]
+
+      if (!table) {
+        // Table doesn't exist anymore
+        setSelectedSlot(null)
+        return
+      }
+
+      // Check if index is out of bounds (participant was removed)
+      if (selectedSlot.index >= table.length) {
+        setSelectedSlot(null)
+        return
+      }
+
+      // Check if participant is null/undefined
+      const participant = table[selectedSlot.index]
+      if (participant === null || participant === undefined) {
+        setSelectedSlot(null)
+      }
+    }
+  }, [selectedSlot, assignment.tables])
+
+  const tablesWithEmptySlots = useMemo(() => {
+    if (!editMode) return assignment.tables
+
+    const tables: { [key: number]: (Participant | null)[] } = {}
+
+    Object.keys(assignment.tables).forEach(tableNum => {
+      const key = Number(tableNum)
+      const table = assignment.tables[key]
+      // Get only real participants, filtering out existing nulls/undefineds
+      const realParticipants = table.filter((p): p is Participant => p !== null && p !== undefined)
+
+      // Add exactly one empty slot to every table for placing absent participants
+      tables[key] = [...realParticipants, null]
     })
 
     return tables
-  }, [assignment.tables])
+  }, [assignment.tables, editMode])
 
-  const calculateTableStats = (participants: Participant[]) => {
-    const realParticipants = participants.filter(p => p && p.name !== '')
+  const calculateTableStats = (participants: (Participant | null)[]) => {
+    const realParticipants = participants.filter((p): p is Participant => p !== null)
     const genderCounts: { [key: string]: number } = {}
     const religions = new Set<string>()
 
@@ -122,20 +165,37 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
   }
 
   const handleSlotClick = (tableNum: number, index: number) => {
-    if (!editMode || !onSwap) return
+    if (!editMode) return
 
     const participant = tablesWithEmptySlots[tableNum][index]
-    const isEmpty = !participant || participant.name === ''
+    const isEmpty = participant === null || participant === undefined
+
+    // If an absent participant is selected and user clicks an empty seat, place them there
+    if (selectedAbsentParticipant && isEmpty && onPlaceAbsent) {
+      onPlaceAbsent(tableNum, index)
+      return
+    }
+
+    // If an absent participant is selected but they click a non-empty seat, ignore
+    if (selectedAbsentParticipant) {
+      return
+    }
+
+    // Normal swap logic
+    if (!onSwap) return
 
     if (!selectedSlot) {
-      setSelectedSlot({ tableNum, index })
+      // Don't allow selecting empty slots
+      if (!isEmpty) {
+        setSelectedSlot({ tableNum, index })
+      }
     } else {
       if (selectedSlot.tableNum === tableNum && selectedSlot.index === index) {
         setSelectedSlot(null)
       } else {
         // Prevent swapping with/from empty slots on the same table
         const selectedParticipant = tablesWithEmptySlots[selectedSlot.tableNum][selectedSlot.index]
-        const selectedIsEmpty = !selectedParticipant || selectedParticipant.name === ''
+        const selectedIsEmpty = selectedParticipant === null || selectedParticipant === undefined
 
         if (selectedSlot.tableNum === tableNum && (isEmpty || selectedIsEmpty)) {
           return
@@ -150,6 +210,26 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
     return selectedSlot?.tableNum === tableNum && selectedSlot?.index === index
   }
 
+  // Calculate table sizes and balance info
+  const tableSizeInfo = useMemo(() => {
+    const tables = editMode ? tablesWithEmptySlots : assignment.tables
+    const sizeMap = new Map<number, number>()
+
+    // Count total non-absent participants
+    let totalParticipants = 0
+    Object.entries(tables).forEach(([tableNum, participants]) => {
+      const count = participants.filter((p): p is Participant => p !== null && p !== undefined).length
+      sizeMap.set(Number(tableNum), count)
+      totalParticipants += count
+    })
+
+    const numTables = Object.keys(tables).length
+    const expectedMin = Math.floor(totalParticipants / numTables)
+    const expectedMax = Math.ceil(totalParticipants / numTables)
+
+    return { sizeMap, expectedMin, expectedMax }
+  }, [editMode, tablesWithEmptySlots, assignment.tables])
+
   return (
     <div>
       <h2 className="text-2xl font-bold mb-6">
@@ -159,16 +239,19 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {Object.entries(editMode ? tablesWithEmptySlots : assignment.tables)
           .sort(([a], [b]) => Number(a) - Number(b))
-          .map(([tableNumber, participants]) => {
+          .map(([tableNumber, participants], tableIndex) => {
             const stats = calculateTableStats(participants)
+            // Show red when table size is outside expected range (based on total participants / number of tables)
+            const tableSize = tableSizeInfo.sizeMap.get(Number(tableNumber)) || 0
+            const isUnbalanced = tableSize < tableSizeInfo.expectedMin || tableSize > tableSizeInfo.expectedMax
 
             return (
               <Card key={tableNumber}>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg flex items-center justify-between">
-                    <span className={stats.hasCoupleViolation ? 'text-red-600' : ''}>Table {tableNumber}</span>
+                    <span className={stats.hasCoupleViolation || isUnbalanced ? 'text-red-600' : ''}>Table {tableNumber}</span>
                     <span className="text-sm font-normal text-muted-foreground">
-                      {stats.count} {stats.count === 1 ? 'person' : 'people'} • <span className={stats.hasGenderImbalance ? 'text-red-600' : ''}>{stats.genderSplit}</span> • {stats.religionCount} {stats.religionCount === 1 ? 'religion' : 'religions'}
+                      <span className={isUnbalanced ? 'text-red-600' : ''}>{stats.count} {stats.count === 1 ? 'person' : 'people'}</span> • <span className={stats.hasGenderImbalance ? 'text-red-600' : ''}>{stats.genderSplit}</span> • {stats.religionCount} {stats.religionCount === 1 ? 'religion' : 'religions'}
                       {stats.hasCoupleViolation && <span className="text-red-600"> • ⚠️ Couple</span>}
                     </span>
                   </CardTitle>
@@ -176,18 +259,19 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
                 <CardContent>
                   <div className="space-y-3">
                     {participants.map((participant, index) => {
-                      const isEmpty = !participant || participant.name === ''
+                      const isEmpty = participant === null || participant === undefined
                       const selected = isSelected(Number(tableNumber), index)
 
                       // Check if selected slot is empty
                       const selectedParticipant = selectedSlot ? tablesWithEmptySlots[selectedSlot.tableNum][selectedSlot.index] : null
-                      const selectedIsEmpty = selectedParticipant ? (!selectedParticipant || selectedParticipant.name === '') : false
+                      const selectedIsEmpty = selectedParticipant === null || selectedParticipant === undefined
 
                       // Don't highlight empty slots on same table as selected, or this slot if selected is empty on same table
                       const sameTable = selectedSlot && selectedSlot.tableNum === Number(tableNumber)
                       const shouldExclude = sameTable && (isEmpty || selectedIsEmpty)
 
                       const isTarget = editMode && selectedSlot && !selected && !shouldExclude
+                      const isAbsentTarget = editMode && selectedAbsentParticipant && isEmpty
 
                       return (
                         <div
@@ -198,19 +282,21 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({ assignment, editMod
                             ${isEmpty ? 'border-2 border-dashed border-gray-300 bg-gray-50 min-h-[60px]' : 'bg-gray-50'}
                             ${editMode ? 'cursor-pointer' : ''}
                             ${selected ? 'ring-4 ring-blue-500 bg-blue-50' : ''}
-                            ${isTarget ? 'ring-2 ring-green-400 hover:ring-green-500 hover:bg-green-50' : isEmpty ? '' : 'hover:bg-gray-100'}
+                            ${isTarget ? 'ring-2 ring-green-400 hover:ring-green-500 hover:bg-green-50' : ''}
+                            ${isAbsentTarget ? 'ring-2 ring-amber-400 hover:ring-amber-500 hover:bg-amber-50' : ''}
+                            ${!isEmpty && !selected && !isTarget && editMode ? 'hover:bg-gray-100' : ''}
                           `}
                         >
                           {isEmpty ? (
                             <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
-                              {editMode ? 'Empty slot' : null}
+                              Empty slot
                             </div>
                           ) : (
                             <div className="flex-1 space-y-1.5">
                               <div className="flex items-center gap-2">
                                 <span className="font-medium">{participant.name}</span>
                                 {participant.partner && (() => {
-                                  const partnerAtSameTable = participants.some(p => p && p.name === participant.partner)
+                                  const partnerAtSameTable = participants.some(p => p !== null && p.name === participant.partner)
                                   return (
                                     <div className="flex items-center gap-1 text-xs text-red-600">
                                       <Heart className="h-3 w-3 fill-current" />

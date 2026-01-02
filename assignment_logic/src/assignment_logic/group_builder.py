@@ -8,7 +8,8 @@ logger = logging.getLogger(__name__)
 
 class GroupBuilder:
     def __init__(self, participants, num_tables, num_sessions, locked_assignments=None, historical_pairings=None,
-                 pairing_window_size=None, solver_num_workers=None):
+                 current_table_assignments=None, pairing_window_size=None, solver_num_workers=None,
+                 require_different_assignments=False):
         """
         Initialize the GroupBuilder.
 
@@ -18,8 +19,12 @@ class GroupBuilder:
             num_sessions: Number of sessions
             locked_assignments: Pre-assigned participant placements (optional)
             historical_pairings: Set of participant pairs from previous batches (optional)
+            current_table_assignments: Dict mapping participant_id -> table_number for current assignments (optional)
+                                       Used to require different table assignments when regenerating
             pairing_window_size: Window size for penalizing repeat pairings (default: 3 sessions)
             solver_num_workers: Number of parallel search workers for solver (default: 4)
+            require_different_assignments: If True, enforces hard constraint that participants CANNOT be assigned
+                                          to their previous tables (fails if impossible)
         """
         self.participants = participants
         self.tables = range(num_tables)
@@ -28,6 +33,8 @@ class GroupBuilder:
         self.genders = set([participant["gender"] for participant in self.participants])
         self.locked_assignments = locked_assignments or {}
         self.historical_pairings = historical_pairings or set()  # Pairings from previous batches
+        self.current_table_assignments = current_table_assignments or {}  # Current table assignments to forbid
+        self.require_different_assignments = require_different_assignments  # Hard vs soft constraint
 
         # Configurable solver parameters (can be overridden by env vars or constructor args)
         self.pairing_window_size = pairing_window_size or int(os.getenv("SOLVER_PAIRING_WINDOW", "3"))
@@ -360,6 +367,32 @@ class GroupBuilder:
                             [pair_meets_session[s1], pair_meets_session[s2]]
                         )
                         penalty_count += both_sessions
+
+        # VARIETY-SEEKING: Prevent or penalize same table assignments as current (when regenerating)
+        if self.current_table_assignments:
+            if self.require_different_assignments:
+                # HARD CONSTRAINT: Participants MUST be assigned to different tables than before
+                # Used when user explicitly regenerates a session - they want something different
+                for p in self.participants:
+                    p_id = p["id"]
+                    if p_id in self.current_table_assignments:
+                        current_table = self.current_table_assignments[p_id]
+                        # Forbid assignment to same table in session 0 (only regenerating one session)
+                        # Note: When regenerating, num_sessions=1, so we only check session 0
+                        if 0 in self.sessions and current_table in self.tables:
+                            self.model.Add(self.participant_table_assignments[(p_id, 0, current_table)] == 0)
+                logger.info(f"Added HARD constraints: {len(self.current_table_assignments)} participants "
+                           f"CANNOT be assigned to their previous tables")
+            else:
+                # SOFT CONSTRAINT: Penalize same table assignments
+                # This gives users the feeling that "something happened" when they click regenerate
+                # Can be violated if the current assignment is actually optimal
+                for p in self.participants:
+                    p_id = p["id"]
+                    if p_id in self.current_table_assignments:
+                        current_table = self.current_table_assignments[p_id]
+                        if 0 in self.sessions and current_table in self.tables:
+                            penalty_count += self.participant_table_assignments[(p_id, 0, current_table)]
 
         self.model.Minimize(penalty_count)
 

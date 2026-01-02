@@ -11,8 +11,9 @@ interface Participant {
 interface Assignment {
   session: number;
   tables: {
-    [key: number]: Participant[];
+    [key: number]: (Participant | null)[];
   };
+  absentParticipants?: Participant[];
 }
 
 interface CompactAssignmentsProps {
@@ -78,7 +79,7 @@ const CompactAssignments: React.FC<CompactAssignmentsProps> = ({ assignments }) 
                   <div key={tableNum} className="space-y-1">
                     <div className="text-xs font-semibold text-gray-600">Table {tableNum}</div>
                     <div className="flex flex-wrap gap-1">
-                      {participants.map((participant, idx) => {
+                      {participants.filter((p): p is Participant => p !== null).map((participant, idx) => {
                         const isHighlighted = participant.name === highlightedPerson
                         const colorClass = getPersonColor(participant.name)
 
@@ -101,6 +102,35 @@ const CompactAssignments: React.FC<CompactAssignmentsProps> = ({ assignments }) 
                     </div>
                   </div>
                 ))}
+
+              {/* Show absent participants if any */}
+              {assignment.absentParticipants && assignment.absentParticipants.length > 0 && (
+                <div className="space-y-1 pt-2 border-t border-amber-200">
+                  <div className="text-xs font-semibold text-amber-700">Absent</div>
+                  <div className="flex flex-wrap gap-1">
+                    {assignment.absentParticipants.map((participant, idx) => {
+                      const isHighlighted = participant.name === highlightedPerson
+                      const colorClass = getPersonColor(participant.name)
+
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => handlePersonClick(participant.name)}
+                          className={`
+                            px-2 py-1 rounded text-xs font-medium transition-all opacity-60
+                            ${colorClass}
+                            ${isHighlighted ? 'ring-2 ring-blue-500 ring-offset-1' : ''}
+                            cursor-pointer
+                          `}
+                          title={`${participant.name}\n${participant.religion}, ${participant.gender}${participant.partner ? `\nPartner: ${participant.partner}` : ''}\n(Absent)`}
+                        >
+                          {participant.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}

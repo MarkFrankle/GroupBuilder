@@ -12,7 +12,7 @@ interface Participant {
 interface Assignment {
   session: number;
   tables: {
-    [key: number]: Participant[];
+    [key: number]: (Participant | null)[];
   };
 }
 
@@ -46,8 +46,8 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
     const firstSession = assignments[0]
     const allParticipants: Participant[] = []
     Object.values(firstSession.tables).forEach(participants => {
-      // Filter out empty/undefined participants
-      const realParticipants = participants.filter(p => p && p.name && p.name !== '')
+      // Filter out empty/undefined/null participants
+      const realParticipants = participants.filter((p): p is Participant => p !== null && p !== undefined && p.name !== '')
       allParticipants.push(...realParticipants)
     })
     const totalParticipants = allParticipants.length
@@ -56,8 +56,8 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
     let coupleViolations = 0
     assignments.forEach(assignment => {
       Object.values(assignment.tables).forEach(participants => {
-        // Filter out empty/undefined participants
-        const realParticipants = participants.filter(p => p && p.name && p.name !== '')
+        // Filter out empty/undefined/null participants
+        const realParticipants = participants.filter((p): p is Participant => p !== null && p !== undefined && p.name !== '')
         const couples = new Set<string>()
         realParticipants.forEach(p => {
           if (p.partner) {
@@ -83,8 +83,8 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
       // Religion balance
       const religionCounts = tables.map(participants => {
         const counts: { [key: string]: number } = {}
-        // Filter out empty/undefined participants
-        const realParticipants = participants.filter(p => p && p.name && p.name !== '')
+        // Filter out empty/undefined/null participants
+        const realParticipants = participants.filter((p): p is Participant => p !== null && p !== undefined && p.name !== '')
         realParticipants.forEach(p => {
           counts[p.religion] = (counts[p.religion] || 0) + 1
         })
@@ -103,8 +103,8 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
       // Gender balance
       const genderCounts = tables.map(participants => {
         const counts: { [key: string]: number } = {}
-        // Filter out empty/undefined participants
-        const realParticipants = participants.filter(p => p && p.name && p.name !== '')
+        // Filter out empty/undefined/null participants
+        const realParticipants = participants.filter((p): p is Participant => p !== null && p !== undefined && p.name !== '')
         realParticipants.forEach(p => {
           counts[p.gender] = (counts[p.gender] || 0) + 1
         })
@@ -125,8 +125,8 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
 
     assignments.forEach(assignment => {
       Object.values(assignment.tables).forEach(participants => {
-        // Filter out empty/undefined participants
-        const realParticipants = participants.filter(p => p && p.name && p.name !== '')
+        // Filter out empty/undefined/null participants
+        const realParticipants = participants.filter((p): p is Participant => p !== null && p !== undefined && p.name !== '')
         // For each table, count all pairings
         for (let i = 0; i < realParticipants.length; i++) {
           for (let j = i + 1; j < realParticipants.length; j++) {
@@ -155,8 +155,8 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
 
     assignments.forEach(assignment => {
       Object.values(assignment.tables).forEach(participants => {
-        // Filter out empty/undefined participants
-        const realParticipants = participants.filter(p => p && p.name && p.name !== '')
+        // Filter out empty/undefined/null participants
+        const realParticipants = participants.filter((p): p is Participant => p !== null && p !== undefined && p.name !== '')
         realParticipants.forEach(p1 => {
           realParticipants.forEach(p2 => {
             if (p1.name !== p2.name) {
