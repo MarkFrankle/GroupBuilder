@@ -31,7 +31,6 @@ import { API_BASE_URL } from '@/config/api'
 import {
   SESSION_EXPIRY_MESSAGE,
   RESULTS_EXPIRY_MESSAGE,
-  ESTIMATED_SOLVE_TIME_MINUTES,
   MAX_TABLES,
   MAX_SESSIONS
 } from '@/constants'
