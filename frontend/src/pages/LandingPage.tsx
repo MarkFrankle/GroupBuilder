@@ -32,7 +32,8 @@ import {
   SESSION_EXPIRY_MESSAGE,
   RESULTS_EXPIRY_MESSAGE,
   MAX_TABLES,
-  MAX_SESSIONS
+  MAX_SESSIONS,
+  MAX_PARTICIPANTS
 } from '@/constants'
 
 // Constant for new upload selection value
@@ -294,6 +295,15 @@ const LandingPage: React.FC = () => {
                   </Button>
                 </div>
               </div>
+            </div>
+
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm text-blue-900">
+                <strong>Maximum participants:</strong> {MAX_PARTICIPANTS}
+              </p>
+              <p className="text-xs text-blue-700 mt-1">
+                If your participant list exceeds this limit, please split into multiple events.
+              </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">

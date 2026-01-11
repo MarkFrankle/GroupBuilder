@@ -14,6 +14,7 @@ import { BrowserRouter } from 'react-router-dom'
 import '@testing-library/jest-dom'
 import LandingPage from '../LandingPage'
 import * as recentUploadsModule from '@/utils/recentUploads'
+import { MAX_PARTICIPANTS } from '@/constants'
 
 // Mock react-router-dom's useNavigate
 const mockNavigate = jest.fn()
@@ -393,6 +394,24 @@ describe('LandingPage', () => {
 
       const submitButton = screen.getByRole('button', { name: /Generate Assignments/i })
       expect(submitButton).toBeInstanceOf(HTMLButtonElement)
+    })
+  })
+
+  describe('LandingPage capacity information', () => {
+    it('displays maximum participant count before file upload', () => {
+      renderWithRouter(<LandingPage />)
+
+      // Should show max participants text
+      expect(screen.getByText(/maximum participants:/i)).toBeInTheDocument()
+      expect(screen.getByText(MAX_PARTICIPANTS.toString())).toBeInTheDocument()
+
+      // Should appear before the file input (check DOM order)
+      const maxText = screen.getByText(/maximum participants:/i)
+      const fileInput = screen.getByLabelText(/upload participant data/i)
+
+      // maxText should come before fileInput in the DOM
+      const maxTextPosition = maxText.compareDocumentPosition(fileInput)
+      expect(maxTextPosition & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
   })
 })
