@@ -52,7 +52,11 @@
       "Skill(imbue:feature-review)",
       "Bash(git mv:*)",
       "Bash(tree:*)",
-      "Bash(git check-ignore:*)"
+      "Bash(git check-ignore:*)",
+      "Bash(git fetch:*)",
+      "Bash(chmod:*)",
+      "Bash(test:*)",
+      "Bash(git checkout:*)"
     ]
   },
   "outputStyle": "Explanatory"
