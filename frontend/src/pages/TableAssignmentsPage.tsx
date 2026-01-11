@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { dummyData } from "../data/dummyData"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, LayoutGrid, List, Edit, Undo2, MoreVertical, Download, RotateCw, X } from 'lucide-react'
+import { Loader2, LayoutGrid, List, Edit, Undo2, MoreVertical, Download, RotateCw, X, Check, Link } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -81,6 +81,7 @@ const TableAssignmentsPage: React.FC = () => {
   const [newVersionId, setNewVersionId] = useState<string | null>(null)
   const [abortController, setAbortController] = useState<AbortController | null>(null)
   const [regeneratingSession, setRegeneratingSession] = useState<number | null>(null)
+  const [copySuccess, setCopySuccess] = useState<boolean>(false)
 
   const navigate = useNavigate()
 
@@ -255,7 +256,22 @@ const TableAssignmentsPage: React.FC = () => {
     fetchAssignments()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  
+
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      setCopySuccess(true)
+
+      // Reset success message after 2 seconds
+      setTimeout(() => {
+        setCopySuccess(false)
+      }, 2000)
+    } catch (err) {
+      console.error('Failed to copy link:', err)
+      // Could add error state here, but keeping it simple for now
+    }
+  }
 
   const handleClearAssignments = () => {
     navigate('/')
@@ -770,6 +786,24 @@ const TableAssignmentsPage: React.FC = () => {
 
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
             <div className="flex gap-2">
+              <Button
+                onClick={handleCopyLink}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                {copySuccess ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Link className="h-4 w-4" />
+                    Copy Link
+                  </>
+                )}
+              </Button>
               <Button
                 variant={viewMode === 'compact' ? 'outline' : 'ghost'}
                 onClick={() => setViewMode('compact')}
