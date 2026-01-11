@@ -51,7 +51,6 @@ const LandingPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [numTables, setNumTables] = useState<string>("1")
   const [numSessions, setNumSessions] = useState<string>("1")
-  const [email, setEmail] = useState<string>("")
   const [loading, setLoading] = useState<boolean>(false)
   const [loadingMessage, setLoadingMessage] = useState<string>("")
   const [recentUploads, setRecentUploads] = useState<RecentUpload[]>([])
@@ -175,9 +174,6 @@ const LandingPage: React.FC = () => {
     formData.append('file', file!);
     formData.append('numTables', numTables);
     formData.append('numSessions', numSessions);
-    if (email) {
-      formData.append('email', email);
-    }
 
     const response = await fetchWithRetry(`${API_BASE_URL}/api/upload/`, {
       method: 'POST',
@@ -400,20 +396,6 @@ const LandingPage: React.FC = () => {
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-4 mt-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email (optional)</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="your.email@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Get a link to your results via email ({RESULTS_EXPIRY_MESSAGE})
-                    </p>
-                  </div>
-
                   <div className="space-y-3">
                     <Label>Solver Time</Label>
                     <div className="grid grid-cols-3 gap-2">
