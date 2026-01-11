@@ -1,5 +1,12 @@
 """
 Email utility for sending magic links via SendGrid.
+
+DEPRECATED: This module is no longer used as of 2026-01-11.
+Email functionality has been replaced with a copy link workflow.
+Keeping this file for historical reference only.
+
+DO NOT USE IN NEW CODE.
+
 Falls back to logging if SendGrid is not configured.
 """
 
