@@ -4,7 +4,6 @@ Tests for the /api/upload/ endpoint.
 Tests cover:
 - Valid file uploads
 - File size limits
-- Email validation
 - Parameter validation (numTables, numSessions)
 - Missing columns
 - Invalid file formats
@@ -33,46 +32,6 @@ class TestUploadEndpoint:
         assert "columns" in data
         assert "Name" in data["columns"]
         assert "Religion" in data["columns"]
-
-    def test_valid_upload_with_email(self, client, mock_storage, sample_excel_file):
-        """Test upload with valid email address."""
-        response = client.post(
-            "/api/upload/",
-            files={"file": ("test.xlsx", sample_excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-            data={
-                "numTables": "2",
-                "numSessions": "3",
-                "email": "test@example.com"
-            }
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "session_id" in data
-
-    def test_invalid_email_format(self, client, mock_storage, sample_excel_file):
-        """Test that invalid email formats are rejected."""
-        invalid_emails = [
-            "not-an-email",
-            "missing@domain",
-            "@nodomain.com",
-            "spaces in@email.com",
-            "no-tld@domain",
-        ]
-
-        for invalid_email in invalid_emails:
-            response = client.post(
-                "/api/upload/",
-                files={"file": ("test.xlsx", sample_excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-                data={
-                    "numTables": "2",
-                    "numSessions": "3",
-                    "email": invalid_email
-                }
-            )
-
-            assert response.status_code == 400, f"Email '{invalid_email}' should have been rejected"
-            assert "Invalid email address format" in response.json()["detail"]
 
     def test_file_too_large(self, client, mock_storage):
         """Test that files larger than 10MB are rejected."""
@@ -265,7 +224,7 @@ class TestUploadEndpoint:
         response = client.post(
             "/api/upload/",
             files={"file": ("test.xlsx", sample_excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-            data={"numTables": "2", "numSessions": "3", "email": "test@example.com"}
+            data={"numTables": "2", "numSessions": "3"}
         )
 
         assert response.status_code == 200
@@ -278,8 +237,6 @@ class TestUploadEndpoint:
         assert "num_tables" in stored_data
         assert "num_sessions" in stored_data
         assert "filename" in stored_data
-        assert "email" in stored_data
         assert "created_at" in stored_data
         assert stored_data["num_tables"] == 2
         assert stored_data["num_sessions"] == 3
-        assert stored_data["email"] == "test@example.com"
