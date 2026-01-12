@@ -56,7 +56,17 @@
       "Bash(git fetch:*)",
       "Bash(chmod:*)",
       "Bash(test:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(git branch:*)",
+      "Bash(.specify/scripts/bash/create-new-feature.sh:*)",
+      "Bash(git merge-base:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)",
+      "Bash(git worktree:*)",
+      "mcp__plugin_greptile_greptile__list_pull_requests",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr diff:*)"
     ]
   },
   "outputStyle": "Explanatory"
