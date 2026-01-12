@@ -30,7 +30,6 @@ import { formatISOTimeAgo, formatUnixTimeAgo } from '@/utils/timeFormatting'
 import { API_BASE_URL } from '@/config/api'
 import {
   SESSION_EXPIRY_MESSAGE,
-  RESULTS_EXPIRY_MESSAGE,
   MAX_TABLES,
   MAX_SESSIONS
 } from '@/constants'
