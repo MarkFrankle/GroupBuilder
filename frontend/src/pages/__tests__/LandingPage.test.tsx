@@ -274,7 +274,7 @@ describe('LandingPage', () => {
 
       await waitFor(() => {
         expect(mockNavigate).toHaveBeenCalledWith(
-          '/table-assignments',
+          '/table-assignments?session=session-123',
           expect.objectContaining({
             state: expect.objectContaining({
               assignments: mockAssignments,

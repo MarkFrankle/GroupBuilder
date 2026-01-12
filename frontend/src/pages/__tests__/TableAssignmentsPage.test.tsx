@@ -30,6 +30,8 @@ describe('TableAssignmentsPage copy link functionality', () => {
     delete (window as any).location
     window.location = {
       href: 'http://localhost:3000/results?session=test-123',
+      origin: 'http://localhost:3000',
+      pathname: '/results',
       search: '?session=test-123',
     } as any
 
