@@ -260,7 +260,27 @@ const TableAssignmentsPage: React.FC = () => {
 
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(window.location.href)
+      // Get session ID from URL or navigation state
+      const urlParams = new URLSearchParams(window.location.search);
+      const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId;
+      
+      if (!sessionId) {
+        console.error('No session ID available to copy')
+        return
+      }
+
+      // Construct URL with session and version
+      const baseUrl = `${window.location.origin}${window.location.pathname}`
+      const params = new URLSearchParams({ session: sessionId })
+      
+      // Only include version if it's not 'latest'
+      if (currentVersion !== 'latest') {
+        params.append('version', currentVersion)
+      }
+      
+      const linkToCopy = `${baseUrl}?${params.toString()}`
+      
+      await navigator.clipboard.writeText(linkToCopy)
       setCopySuccess(true)
 
       // Reset success message after 2 seconds
@@ -719,30 +739,50 @@ const TableAssignmentsPage: React.FC = () => {
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <CardTitle className="text-3xl font-bold">Table Assignments</CardTitle>
-            {availableVersions.length > 0 && (
-              <Select value={currentVersion} onValueChange={handleVersionChange} disabled={editMode}>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="Version" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="latest" disabled={currentVersion === 'latest'}>Latest</SelectItem>
-                  {availableVersions.map((version) => (
-                    <SelectItem
-                      key={version.version_id}
-                      value={version.version_id}
-                      disabled={currentVersion === version.version_id}
-                    >
-                      <div className="flex flex-col">
-                        <span>{version.version_id}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {formatTimestamp(version.created_at)}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleCopyLink}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                {copySuccess ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Link className="h-4 w-4" />
+                    Copy Link
+                  </>
+                )}
+              </Button>
+              {availableVersions.length > 0 && (
+                <Select value={currentVersion} onValueChange={handleVersionChange} disabled={editMode}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Version" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="latest" disabled={currentVersion === 'latest'}>Latest</SelectItem>
+                    {availableVersions.map((version) => (
+                      <SelectItem
+                        key={version.version_id}
+                        value={version.version_id}
+                        disabled={currentVersion === version.version_id}
+                      >
+                        <div className="flex flex-col">
+                          <span>{version.version_id}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatTimestamp(version.created_at)}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -786,24 +826,6 @@ const TableAssignmentsPage: React.FC = () => {
 
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
             <div className="flex gap-2">
-              <Button
-                onClick={handleCopyLink}
-                variant="outline"
-                size="sm"
-                className="gap-2"
-              >
-                {copySuccess ? (
-                  <>
-                    <Check className="h-4 w-4" />
-                    Copied!
-                  </>
-                ) : (
-                  <>
-                    <Link className="h-4 w-4" />
-                    Copy Link
-                  </>
-                )}
-              </Button>
               <Button
                 variant={viewMode === 'compact' ? 'outline' : 'ghost'}
                 onClick={() => setViewMode('compact')}
