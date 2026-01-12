@@ -8,7 +8,6 @@ import logging
 import pandas as pd
 import uuid
 from datetime import datetime
-import re
 import os
 
 logger = logging.getLogger(__name__)
@@ -18,7 +17,6 @@ limiter = Limiter(key_func=get_remote_address)
 # Configuration constants
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB in bytes
 MAX_PARTICIPANTS = 200
-EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
 
 @router.post("/")
 @limiter.limit("10/minute")  # Limit expensive file uploads

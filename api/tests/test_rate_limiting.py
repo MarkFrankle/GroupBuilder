@@ -198,6 +198,5 @@ def sample_session_data():
         "num_tables": 2,
         "num_sessions": 2,
         "filename": "test.xlsx",
-        "email": "test@example.com",
         "created_at": datetime.now().isoformat()
     }

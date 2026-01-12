@@ -395,14 +395,4 @@ describe('LandingPage', () => {
       expect(submitButton).toBeInstanceOf(HTMLButtonElement)
     })
   })
-
-  describe('LandingPage email removal', () => {
-    it('does not display email input field', () => {
-      renderWithRouter(<LandingPage />)
-
-      // Should not find email input
-      expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument()
-      expect(screen.queryByPlaceholderText(/email/i)).not.toBeInTheDocument()
-    })
-  })
 })
