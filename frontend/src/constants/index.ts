@@ -16,7 +16,6 @@ export const MAX_TABLES = 10
 export const MIN_TABLES = 1
 export const MAX_SESSIONS = 6
 export const MIN_SESSIONS = 1
-export const MAX_PARTICIPANTS = 100
 
 // Storage limits
 export const MAX_RECENT_UPLOADS = 10

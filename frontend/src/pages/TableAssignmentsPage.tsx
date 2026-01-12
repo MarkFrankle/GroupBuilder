@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { dummyData } from "../data/dummyData"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, LayoutGrid, List, Edit, Undo2, MoreVertical, Download, RotateCw, X, Check, Link } from 'lucide-react'
+import { Loader2, LayoutGrid, List, Edit, Undo2, MoreVertical, Download, RotateCw, X, Check, Link, AlertCircle } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -82,6 +82,7 @@ const TableAssignmentsPage: React.FC = () => {
   const [abortController, setAbortController] = useState<AbortController | null>(null)
   const [regeneratingSession, setRegeneratingSession] = useState<number | null>(null)
   const [copySuccess, setCopySuccess] = useState<boolean>(false)
+  const [copyError, setCopyError] = useState<boolean>(false)
 
   const navigate = useNavigate()
 
@@ -266,6 +267,10 @@ const TableAssignmentsPage: React.FC = () => {
       
       if (!sessionId) {
         console.error('No session ID available to copy')
+        setCopyError(true)
+        setTimeout(() => {
+          setCopyError(false)
+        }, 2000)
         return
       }
 
@@ -289,7 +294,10 @@ const TableAssignmentsPage: React.FC = () => {
       }, 2000)
     } catch (err) {
       console.error('Failed to copy link:', err)
-      // Could add error state here, but keeping it simple for now
+      setCopyError(true)
+      setTimeout(() => {
+        setCopyError(false)
+      }, 2000)
     }
   }
 
@@ -750,6 +758,11 @@ const TableAssignmentsPage: React.FC = () => {
                   <>
                     <Check className="h-4 w-4" />
                     Copied!
+                  </>
+                ) : copyError ? (
+                  <>
+                    <AlertCircle className="h-4 w-4" />
+                    Failed
                   </>
                 ) : (
                   <>

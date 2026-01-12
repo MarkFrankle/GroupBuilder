@@ -235,7 +235,7 @@ const LandingPage: React.FC = () => {
     }
 
     const assignments = await response.json();
-    navigate('/table-assignments', { state: { assignments, sessionId } });
+    navigate(`/table-assignments?session=${sessionId}`, { state: { assignments, sessionId } });
   };
 
   /**
