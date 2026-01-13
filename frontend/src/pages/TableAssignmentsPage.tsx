@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { dummyData } from "../data/dummyData"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, LayoutGrid, List, Edit, Undo2, MoreVertical, Download, RotateCw, X } from 'lucide-react'
+import { Loader2, LayoutGrid, List, Edit, Undo2, MoreVertical, Download, RotateCw, X, Check, Link, AlertCircle } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -81,6 +81,8 @@ const TableAssignmentsPage: React.FC = () => {
   const [newVersionId, setNewVersionId] = useState<string | null>(null)
   const [abortController, setAbortController] = useState<AbortController | null>(null)
   const [regeneratingSession, setRegeneratingSession] = useState<number | null>(null)
+  const [copySuccess, setCopySuccess] = useState<boolean>(false)
+  const [copyError, setCopyError] = useState<boolean>(false)
 
   const navigate = useNavigate()
 
@@ -255,7 +257,49 @@ const TableAssignmentsPage: React.FC = () => {
     fetchAssignments()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  
+
+
+  const handleCopyLink = async () => {
+    try {
+      // Get session ID from URL or navigation state
+      const urlParams = new URLSearchParams(window.location.search);
+      const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId;
+      
+      if (!sessionId) {
+        console.error('No session ID available to copy')
+        setCopyError(true)
+        setTimeout(() => {
+          setCopyError(false)
+        }, 2000)
+        return
+      }
+
+      // Construct URL with session and version
+      const baseUrl = `${window.location.origin}${window.location.pathname}`
+      const params = new URLSearchParams({ session: sessionId })
+      
+      // Only include version if it's not 'latest'
+      if (currentVersion !== 'latest') {
+        params.append('version', currentVersion)
+      }
+      
+      const linkToCopy = `${baseUrl}?${params.toString()}`
+      
+      await navigator.clipboard.writeText(linkToCopy)
+      setCopySuccess(true)
+
+      // Reset success message after 2 seconds
+      setTimeout(() => {
+        setCopySuccess(false)
+      }, 2000)
+    } catch (err) {
+      console.error('Failed to copy link:', err)
+      setCopyError(true)
+      setTimeout(() => {
+        setCopyError(false)
+      }, 2000)
+    }
+  }
 
   const handleClearAssignments = () => {
     navigate('/')
@@ -703,30 +747,55 @@ const TableAssignmentsPage: React.FC = () => {
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <CardTitle className="text-3xl font-bold">Table Assignments</CardTitle>
-            {availableVersions.length > 0 && (
-              <Select value={currentVersion} onValueChange={handleVersionChange} disabled={editMode}>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="Version" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="latest" disabled={currentVersion === 'latest'}>Latest</SelectItem>
-                  {availableVersions.map((version) => (
-                    <SelectItem
-                      key={version.version_id}
-                      value={version.version_id}
-                      disabled={currentVersion === version.version_id}
-                    >
-                      <div className="flex flex-col">
-                        <span>{version.version_id}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {formatTimestamp(version.created_at)}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleCopyLink}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                {copySuccess ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    Copied!
+                  </>
+                ) : copyError ? (
+                  <>
+                    <AlertCircle className="h-4 w-4" />
+                    Failed
+                  </>
+                ) : (
+                  <>
+                    <Link className="h-4 w-4" />
+                    Copy Link
+                  </>
+                )}
+              </Button>
+              {availableVersions.length > 0 && (
+                <Select value={currentVersion} onValueChange={handleVersionChange} disabled={editMode}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Version" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="latest" disabled={currentVersion === 'latest'}>Latest</SelectItem>
+                    {availableVersions.map((version) => (
+                      <SelectItem
+                        key={version.version_id}
+                        value={version.version_id}
+                        disabled={currentVersion === version.version_id}
+                      >
+                        <div className="flex flex-col">
+                          <span>{version.version_id}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatTimestamp(version.created_at)}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>

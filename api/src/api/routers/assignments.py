@@ -5,7 +5,6 @@ from api.storage import (
     get_session, session_exists, store_result, get_result, result_exists,
     store_session, get_result_versions
 )
-from api.email import send_magic_link_email
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from datetime import datetime
@@ -103,13 +102,12 @@ def _extract_current_table_assignments(
     return current_assignments
 
 
-def _generate_assignments_internal(session_id: str, send_email: bool = False, mark_regenerated: bool = False, max_time_seconds: int = 120):
+def _generate_assignments_internal(session_id: str, mark_regenerated: bool = False, max_time_seconds: int = 120):
     """
     Internal helper to generate assignments (shared by get_assignments and regenerate_assignments).
 
     Args:
         session_id: The session ID
-        send_email: Whether to send email with magic link
         mark_regenerated: Whether to mark results as regenerated
         max_time_seconds: Maximum solver time in seconds (default: 120)
 
@@ -166,15 +164,6 @@ def _generate_assignments_internal(session_id: str, send_email: bool = False, ma
         "created_at": datetime.now().isoformat()
     })
 
-    # Send email if requested
-    if send_email and session_data.get("email"):
-        send_magic_link_email(
-            to_email=session_data["email"],
-            magic_link_path=f"/table-assignments?session={session_id}",
-            num_sessions=num_sessions,
-            num_tables=num_tables
-        )
-
     return results['assignments'], version_id, result_metadata
 
 
@@ -185,7 +174,7 @@ def get_assignments(
     session_id: str = Query(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$"),
     max_time_seconds: int = Query(120, ge=30, le=240, description="Maximum solver time in seconds (30-240)")
 ):
-    """Generate assignments for a session and optionally send email with results link."""
+    """Generate assignments for a session."""
     if not session_exists(session_id):
         logger.warning(f"Session not found: {session_id}")
         raise HTTPException(status_code=404, detail="Session not found. Please upload a file first.")
@@ -193,7 +182,6 @@ def get_assignments(
     try:
         assignments, _, _ = _generate_assignments_internal(
             session_id=session_id,
-            send_email=True,
             mark_regenerated=False,
             max_time_seconds=max_time_seconds
         )
@@ -225,7 +213,6 @@ async def regenerate_assignments(
     try:
         assignments, version_id, _ = _generate_assignments_internal(
             session_id=session_id,
-            send_email=False,
             mark_regenerated=True,
             max_time_seconds=max_time_seconds
         )
@@ -534,7 +521,6 @@ async def clone_session_with_params(
         "num_tables": num_tables,
         "num_sessions": num_sessions,
         "filename": original_session.get("filename", "Unknown"),
-        "email": original_session.get("email"),
         "created_at": datetime.now().isoformat(),
         "cloned_from": session_id
     })

@@ -90,23 +90,23 @@ describe('LandingPage', () => {
   })
 
   describe('Advanced Options', () => {
-    it('hides email input by default', () => {
+    it('hides solver time options by default', () => {
       renderWithRouter(<LandingPage />)
-      expect(screen.queryByLabelText(/Email.*optional/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/Solver Time/i)).not.toBeInTheDocument()
     })
 
-    it('shows email input when Advanced Options clicked', async () => {
+    it('shows solver time options when Advanced Options clicked', async () => {
       renderWithRouter(<LandingPage />)
 
       const advancedButton = screen.getByText('Advanced Options')
       fireEvent.click(advancedButton)
 
       await waitFor(() => {
-        expect(screen.getByLabelText(/Email.*optional/i)).toBeInTheDocument()
+        expect(screen.getByText(/Solver Time/i)).toBeInTheDocument()
       })
     })
 
-    it('hides email input when Advanced Options clicked again', async () => {
+    it('hides solver time options when Advanced Options clicked again', async () => {
       renderWithRouter(<LandingPage />)
 
       const advancedButton = screen.getByText('Advanced Options')
@@ -114,13 +114,13 @@ describe('LandingPage', () => {
       // Click to open
       fireEvent.click(advancedButton)
       await waitFor(() => {
-        expect(screen.getByLabelText(/Email.*optional/i)).toBeInTheDocument()
+        expect(screen.getByText(/Solver Time/i)).toBeInTheDocument()
       })
 
       // Click to close
       fireEvent.click(advancedButton)
       await waitFor(() => {
-        expect(screen.queryByLabelText(/Email.*optional/i)).not.toBeInTheDocument()
+        expect(screen.queryByText(/Solver Time/i)).not.toBeInTheDocument()
       })
     })
   })
@@ -274,7 +274,7 @@ describe('LandingPage', () => {
 
       await waitFor(() => {
         expect(mockNavigate).toHaveBeenCalledWith(
-          '/table-assignments',
+          '/table-assignments?session=session-123',
           expect.objectContaining({
             state: expect.objectContaining({
               assignments: mockAssignments,

@@ -29,7 +29,6 @@ def sample_session_data():
         "num_tables": 2,
         "num_sessions": 2,
         "filename": "test.xlsx",
-        "email": "test@example.com",
         "created_at": datetime.now().isoformat()
     }
 
@@ -78,9 +77,8 @@ def sample_assignments_result():
 class TestGetAssignments:
     """Test suite for GET /api/assignments/ endpoint."""
 
-    @patch('api.routers.assignments.send_magic_link_email')
     @patch('api.routers.assignments.handle_generate_assignments')
-    def test_generate_assignments_success(self, mock_generate, mock_send_email, client, mock_storage, sample_session_data, sample_assignments_result):
+    def test_generate_assignments_success(self, mock_generate, client, mock_storage, sample_session_data, sample_assignments_result):
         """Test successful assignment generation."""
         session_id = str(uuid.uuid4())
         mock_storage.data[f"session:{session_id}"] = sample_session_data
@@ -96,9 +94,6 @@ class TestGetAssignments:
 
         # Verify result was stored
         assert f"result:{session_id}:latest" in mock_storage.data
-
-        # Verify email was sent (since sample_session_data includes email)
-        mock_send_email.assert_called_once()
 
     def test_generate_assignments_session_not_found(self, client, mock_storage):
         """Test that nonexistent session returns 404."""
@@ -136,22 +131,6 @@ class TestGetAssignments:
 
         assert response.status_code == 400
         assert "No feasible solution" in response.json()["detail"]
-
-    @patch('api.routers.assignments.handle_generate_assignments')
-    def test_generate_assignments_sends_email(self, mock_generate, client, mock_storage, sample_session_data, sample_assignments_result):
-        """Test that email is sent when provided."""
-        with patch('api.routers.assignments.send_magic_link_email') as mock_email:
-            session_id = str(uuid.uuid4())
-            sample_session_data["email"] = "user@example.com"
-            mock_storage.data[f"session:{session_id}"] = sample_session_data
-            mock_generate.return_value = sample_assignments_result
-
-            response = client.get(f"/api/assignments/?session_id={session_id}")
-
-            assert response.status_code == 200
-            mock_email.assert_called_once()
-            assert mock_email.call_args[1]["to_email"] == "user@example.com"
-
 
 class TestRegenerateAssignments:
     """Test suite for POST /api/assignments/regenerate/{session_id} endpoint."""

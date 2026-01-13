@@ -8,7 +8,6 @@ import logging
 import pandas as pd
 import uuid
 from datetime import datetime
-import re
 import os
 
 logger = logging.getLogger(__name__)
@@ -18,7 +17,6 @@ limiter = Limiter(key_func=get_remote_address)
 # Configuration constants
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB in bytes
 MAX_PARTICIPANTS = 200
-EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
 
 @router.post("/")
 @limiter.limit("10/minute")  # Limit expensive file uploads
@@ -27,14 +25,8 @@ async def upload_file(
     file: UploadFile = File(...),
     numTables: int = Form(..., ge=1, le=10),
     numSessions: int = Form(..., ge=1, le=6),
-    email: str = Form(None),
 ):
     logger.info(f"Uploading file: {file.filename}, tables: {numTables}, sessions: {numSessions}")
-
-    # Validate email format if provided
-    if email and not EMAIL_REGEX.match(email):
-        logger.warning(f"Invalid email format: {email}")
-        raise HTTPException(status_code=400, detail="Invalid email address format.")
 
     # Validate file extension
     if not file.filename.endswith((".xlsx", ".xls")):
@@ -91,14 +83,10 @@ async def upload_file(
             "num_tables": numTables,
             "num_sessions": numSessions,
             "filename": file.filename,
-            "email": email,
             "created_at": datetime.now().isoformat()
         })
 
         logger.info(f"Successfully stored data for {file.filename} with session ID: {session_id}")
-
-        if email:
-            logger.info(f"Email provided: {email}. Magic link will be sent after assignment generation.")
 
         return {
             "message": "File uploaded successfully",
