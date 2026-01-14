@@ -107,3 +107,71 @@ describe('TableAssignmentsPage copy link functionality', () => {
     })
   })
 })
+
+describe('TableAssignmentsPage session dropdown', () => {
+  const mockMultipleSessionsData = [
+    { session: 1, tables: { 1: [] } },
+    { session: 2, tables: { 1: [] } },
+    { session: 3, tables: { 1: [] } },
+  ]
+
+  beforeEach(() => {
+    delete (window as any).location
+    window.location = {
+      href: 'http://localhost:3000/results?session=test-123',
+      origin: 'http://localhost:3000',
+      pathname: '/results',
+      search: '?session=test-123',
+    } as any
+
+    ;(global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/api/assignments/')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockMultipleSessionsData),
+        })
+      }
+      if (url.includes('/sessions/') && url.includes('/versions')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve([]),
+        })
+      }
+      return Promise.resolve({
+        ok: false,
+        json: () => Promise.resolve({}),
+      })
+    })
+  })
+
+  it('session dropdown allows quick navigation', async () => {
+    render(
+      <BrowserRouter>
+        <TableAssignmentsPage />
+      </BrowserRouter>
+    )
+
+    // Switch to detailed view first
+    const detailedButton = await screen.findByRole('button', { name: /detailed view/i })
+    fireEvent.click(detailedButton)
+
+    // Wait for component to load and find session dropdown trigger
+    const dropdownTrigger = await screen.findByRole('combobox', { name: /select session/i })
+    expect(dropdownTrigger).toBeInTheDocument()
+
+    // Should show current session (session 1 by default)
+    expect(dropdownTrigger).toHaveTextContent('Session 1')
+
+    // Click to open dropdown
+    fireEvent.click(dropdownTrigger)
+
+    // Select session 3
+    const session3Option = await screen.findByRole('option', { name: /session 3/i })
+    fireEvent.click(session3Option)
+
+    // Should update current session
+    await waitFor(() => {
+      expect(dropdownTrigger).toHaveTextContent('Session 3')
+    })
+  })
+})

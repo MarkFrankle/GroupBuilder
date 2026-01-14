@@ -950,6 +950,47 @@ const TableAssignmentsPage: React.FC = () => {
             <CompactAssignments assignments={assignments} />
           ) : (
             <>
+              {/* Session navigation controls */}
+              <div className="mb-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <Select
+                    value={currentSession.toString()}
+                    onValueChange={(value) => setCurrentSession(parseInt(value))}
+                    disabled={editMode}
+                  >
+                    <SelectTrigger className="w-[180px]" aria-label="Select session">
+                      <SelectValue placeholder="Select session" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {assignments.map((assignment) => (
+                        <SelectItem key={assignment.session} value={assignment.session.toString()}>
+                          Session {assignment.session}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={handlePreviousSession}
+                      disabled={currentSession === 1 || editMode}
+                      size="sm"
+                    >
+                      ← Prev
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleNextSession}
+                      disabled={currentSession === assignments.length || editMode}
+                      size="sm"
+                    >
+                      Next →
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
               {/* Show indicator when viewing edited version */}
               {loadEditsFromStorage() !== null && (
                 <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
@@ -1007,14 +1048,6 @@ const TableAssignmentsPage: React.FC = () => {
                   }}
                 />
               )}
-              <div className="flex justify-between mt-6">
-                <Button variant="outline" onClick={handlePreviousSession} disabled={currentSession === 1 || editMode}>
-                  Previous Session
-                </Button>
-                <Button variant="outline" onClick={handleNextSession} disabled={currentSession === assignments.length || editMode}>
-                  Next Session
-                </Button>
-              </div>
             </>
           )}
         </CardContent>
