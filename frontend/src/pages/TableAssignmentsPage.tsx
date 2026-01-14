@@ -837,7 +837,8 @@ const TableAssignmentsPage: React.FC = () => {
 
           <ValidationStats assignments={assignments} />
 
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
+          {/* View mode toggles */}
+          <div className="flex justify-between items-center mb-6">
             <div className="flex gap-2">
               <Button
                 variant={viewMode === 'compact' ? 'outline' : 'ghost'}
@@ -859,66 +860,6 @@ const TableAssignmentsPage: React.FC = () => {
               >
                 <List className="h-4 w-4" />
               </Button>
-              {viewMode === 'detailed' && (
-                <>
-                  <Button
-                    variant={editMode ? 'default' : 'outline'}
-                    onClick={toggleEditMode}
-                    size="sm"
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    {editMode ? 'Done Editing' : 'Edit'}
-                  </Button>
-                  {!editMode && (
-                    <Button
-                      variant="outline"
-                      onClick={() => handleRegenerateSession(currentSession)}
-                      size="sm"
-                      disabled={regeneratingSession !== null}
-                    >
-                      {regeneratingSession === currentSession ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Regenerating...
-                        </>
-                      ) : (
-                        <>
-                          <RotateCw className="h-4 w-4 mr-2" />
-                          Regenerate Session
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </>
-              )}
-              {editMode && (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={handleUndo}
-                    size="sm"
-                    disabled={undoStack.length === 0}
-                  >
-                    <Undo2 className="h-4 w-4 mr-2" />
-                    Undo ({undoStack.length})
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      if (selectedParticipantSlot && !selectedAbsentParticipant) {
-                        const sessionIndex = assignments.findIndex(a => a.session === currentSession)
-                        handleMarkAbsent(sessionIndex, selectedParticipantSlot.tableNum, selectedParticipantSlot.participantIndex)
-                        setSelectedParticipantSlot(null)
-                      }
-                    }}
-                    size="sm"
-                    disabled={!selectedParticipantSlot || selectedAbsentParticipant !== null}
-                    title={selectedAbsentParticipant ? "Cannot mark absent participant as absent" : selectedParticipantSlot ? "Mark selected participant as absent" : "Select a participant to mark them absent"}
-                  >
-                    Mark Absent
-                  </Button>
-                </>
-              )}
             </div>
 
             <div className="flex gap-2 items-center">
@@ -946,51 +887,112 @@ const TableAssignmentsPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Unified session control bar (only in detailed view) */}
+          {viewMode === 'detailed' && (
+            <div className="flex justify-between items-center mb-6 gap-4">
+              <div className="flex gap-2 items-center">
+                <Select
+                  value={currentSession.toString()}
+                  onValueChange={(value) => setCurrentSession(parseInt(value))}
+                  disabled={editMode}
+                >
+                  <SelectTrigger className="w-[180px]" aria-label="Select session">
+                    <SelectValue placeholder="Select session" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {assignments.map((assignment) => (
+                      <SelectItem key={assignment.session} value={assignment.session.toString()}>
+                        Session {assignment.session}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Button
+                  variant={editMode ? 'default' : 'outline'}
+                  onClick={toggleEditMode}
+                  size="sm"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  {editMode ? 'Done Editing' : 'Edit'}
+                </Button>
+
+                {!editMode && (
+                  <Button
+                    variant="outline"
+                    onClick={() => handleRegenerateSession(currentSession)}
+                    size="sm"
+                    disabled={regeneratingSession !== null}
+                  >
+                    {regeneratingSession === currentSession ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Regenerating...
+                      </>
+                    ) : (
+                      <>
+                        <RotateCw className="h-4 w-4 mr-2" />
+                        Regenerate Session
+                      </>
+                    )}
+                  </Button>
+                )}
+
+                {editMode && (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={handleUndo}
+                      size="sm"
+                      disabled={undoStack.length === 0}
+                    >
+                      <Undo2 className="h-4 w-4 mr-2" />
+                      Undo ({undoStack.length})
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        if (selectedParticipantSlot && !selectedAbsentParticipant) {
+                          const sessionIndex = assignments.findIndex(a => a.session === currentSession)
+                          handleMarkAbsent(sessionIndex, selectedParticipantSlot.tableNum, selectedParticipantSlot.participantIndex)
+                          setSelectedParticipantSlot(null)
+                        }
+                      }}
+                      size="sm"
+                      disabled={!selectedParticipantSlot || selectedAbsentParticipant !== null}
+                      title={selectedAbsentParticipant ? "Cannot mark absent participant as absent" : selectedParticipantSlot ? "Mark selected participant as absent" : "Select a participant to mark them absent"}
+                    >
+                      Mark Absent
+                    </Button>
+                  </>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handlePreviousSession}
+                  disabled={currentSession === 1 || editMode}
+                  size="sm"
+                >
+                  ← Prev
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleNextSession}
+                  disabled={currentSession === assignments.length || editMode}
+                  size="sm"
+                >
+                  Next →
+                </Button>
+              </div>
+            </div>
+          )}
+
           {viewMode === 'compact' ? (
             <CompactAssignments assignments={assignments} />
           ) : (
             <>
-              {/* Session navigation controls */}
-              <div className="mb-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <Select
-                    value={currentSession.toString()}
-                    onValueChange={(value) => setCurrentSession(parseInt(value))}
-                    disabled={editMode}
-                  >
-                    <SelectTrigger className="w-[180px]" aria-label="Select session">
-                      <SelectValue placeholder="Select session" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {assignments.map((assignment) => (
-                        <SelectItem key={assignment.session} value={assignment.session.toString()}>
-                          Session {assignment.session}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={handlePreviousSession}
-                      disabled={currentSession === 1 || editMode}
-                      size="sm"
-                    >
-                      ← Prev
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={handleNextSession}
-                      disabled={currentSession === assignments.length || editMode}
-                      size="sm"
-                    >
-                      Next →
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
               {/* Show indicator when viewing edited version */}
               {loadEditsFromStorage() !== null && (
                 <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">

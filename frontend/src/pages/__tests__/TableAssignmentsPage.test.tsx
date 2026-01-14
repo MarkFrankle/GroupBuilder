@@ -175,3 +175,72 @@ describe('TableAssignmentsPage session dropdown', () => {
     })
   })
 })
+
+describe('TableAssignmentsPage unified control bar', () => {
+  beforeEach(() => {
+    delete (window as any).location
+    window.location = {
+      href: 'http://localhost:3000/results?session=test-123',
+      origin: 'http://localhost:3000',
+      pathname: '/results',
+      search: '?session=test-123',
+    } as any
+
+    ;(global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/api/assignments/')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve([
+            { session: 1, tables: { 1: [] } },
+            { session: 2, tables: { 1: [] } },
+          ]),
+        })
+      }
+      if (url.includes('/versions')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ versions: [] }),
+        })
+      }
+      return Promise.resolve({
+        ok: false,
+        json: () => Promise.resolve({}),
+      })
+    })
+  })
+
+  it('shows session controls with action buttons in unified bar in detailed view', async () => {
+    render(
+      <BrowserRouter>
+        <TableAssignmentsPage />
+      </BrowserRouter>
+    )
+
+    // Switch to detailed view
+    const detailedButton = await screen.findByRole('button', { name: /detailed view/i })
+    fireEvent.click(detailedButton)
+
+    // Session dropdown, Edit, Regenerate, Prev/Next should all be visible
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: /select session/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /regenerate session/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /prev/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /next/i })).toBeInTheDocument()
+    })
+  })
+
+  it('hides session controls in compact view', async () => {
+    render(
+      <BrowserRouter>
+        <TableAssignmentsPage />
+      </BrowserRouter>
+    )
+
+    // Should be in compact view by default
+    await waitFor(() => {
+      expect(screen.queryByRole('combobox', { name: /select session/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument()
+    })
+  })
+})
