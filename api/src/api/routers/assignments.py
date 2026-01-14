@@ -5,10 +5,12 @@ from api.storage import (
     get_session, session_exists, store_result, get_result, result_exists,
     store_session, get_result_versions
 )
+from api.utils.seating_arrangement import arrange_circular_seating
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from datetime import datetime
 from typing import Optional, List, Dict, Any
+from pydantic import BaseModel
 import logging
 import uuid
 import os
@@ -530,4 +532,54 @@ async def clone_session_with_params(
     return {
         "message": "Session cloned successfully",
         "session_id": new_session_id
+    }
+
+
+class SeatingRequest(BaseModel):
+    assignments: List[Dict[str, Any]]
+
+
+@router.post("/seating/{session_id}")
+async def generate_seating_chart(
+    session_id: str,
+    session: int,
+    request: SeatingRequest
+):
+    """
+    Generate circular seating arrangements for a session.
+
+    Distributes religions evenly around each table.
+    """
+    # Find the requested session
+    session_data = next(
+        (a for a in request.assignments if a["session"] == session),
+        None
+    )
+
+    if not session_data:
+        raise HTTPException(status_code=404, detail=f"Session {session} not found")
+
+    # Arrange each table
+    tables = []
+    for table_num_str, participants in session_data["tables"].items():
+        table_num = int(table_num_str)
+
+        # Filter out any null/empty participants
+        valid_participants = [p for p in participants if p]
+
+        # Arrange seats
+        arranged_seats = arrange_circular_seating(valid_participants)
+
+        tables.append({
+            "table_number": table_num,
+            "seats": arranged_seats
+        })
+
+    # Sort tables by number
+    tables.sort(key=lambda t: t["table_number"])
+
+    return {
+        "session": session,
+        "tables": tables,
+        "absent_participants": session_data.get("absentParticipants", [])
     }
