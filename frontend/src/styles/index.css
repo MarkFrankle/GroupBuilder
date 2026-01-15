@@ -15,3 +15,104 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* Print-specific styles for seating charts */
+@media print {
+  /* Hide UI controls when printing */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Show print-only elements */
+  .print-only {
+    display: block !important;
+  }
+
+  /* Page setup for letter size paper */
+  @page {
+    size: letter;
+    margin: 0.5in;
+  }
+
+  /* Remove default backgrounds and ensure black text */
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Ensure seating grid prints properly - use 2 columns for printing */
+  .seating-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 1rem !important;
+    page-break-inside: avoid;
+  }
+
+  /* Ensure individual tables don't break across pages */
+  .seating-grid > * {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    background: white !important;
+    border: 2px solid black !important;
+    box-shadow: none !important;
+    padding: 0.5rem !important;
+  }
+
+  /* Optimize SVG for printing */
+  .circular-table-svg {
+    width: 100%;
+    max-width: 280px;
+    height: auto;
+    margin: 0 auto;
+  }
+
+  /* Ensure text is crisp and black */
+  svg text {
+    fill: black !important;
+    font-weight: bold !important;
+  }
+
+  /* Simplify circle styling for print - but position markers stay filled */
+  svg circle:not([r="8"]) {
+    stroke: black !important;
+    stroke-width: 2 !important;
+    fill: white !important;
+  }
+
+  /* Position markers (small circles) should be solid black */
+  svg circle[r="8"] {
+    fill: black !important;
+    stroke: none !important;
+  }
+
+  /* Connecting lines should be visible */
+  svg line {
+    stroke: black !important;
+    stroke-width: 1 !important;
+  }
+
+  /* Name background rectangles */
+  svg rect {
+    fill: white !important;
+    stroke: black !important;
+    stroke-width: 1 !important;
+  }
+
+  /* Table number badges should be simple for print */
+  [data-testid="circular-table"] > div {
+    background: black !important;
+    color: white !important;
+    border: none !important;
+  }
+
+  /* Remove any box shadows, gradients, or effects that don't print well */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Remove page background gradient */
+  html, body, #root {
+    background: white !important;
+  }
+}
