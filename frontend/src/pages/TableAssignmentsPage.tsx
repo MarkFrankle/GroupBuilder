@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { dummyData } from "../data/dummyData"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, LayoutGrid, List, Edit, Undo2, MoreVertical, Download, RotateCw, X, Check, Link, AlertCircle } from 'lucide-react'
+import { Loader2, LayoutGrid, List, Edit, Undo2, MoreVertical, Download, RotateCw, X, Check, Link, AlertCircle, Printer } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -303,6 +303,49 @@ const TableAssignmentsPage: React.FC = () => {
 
   const handleClearAssignments = () => {
     navigate('/')
+  }
+
+  const handlePrintSeating = async () => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId;
+
+      if (!sessionId) {
+        throw new Error('Session ID not found. Please upload a file again.')
+      }
+
+      // Find the current session assignment
+      const sessionAssignment = assignments.find(a => a.session === currentSession)
+      if (!sessionAssignment) {
+        throw new Error(`Session ${currentSession} not found`)
+      }
+
+      // POST to backend seating API endpoint
+      const response = await fetch(
+        `${API_BASE_URL}/api/assignments/seating/${sessionId}?session=${currentSession}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ assignments: [sessionAssignment] }),
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to generate seating chart')
+      }
+
+      const seatingData = await response.json()
+
+      // Navigate to seating chart page with the data
+      navigate(`/table-assignments/seating?session=${sessionId}&sessionNum=${currentSession}`, {
+        state: { seatingData }
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate seating chart")
+    }
   }
 
   const handleVersionChange = async (versionId: string) => {
@@ -937,6 +980,16 @@ const TableAssignmentsPage: React.FC = () => {
                     )}
                   </Button>
                 )}
+
+                <Button
+                  variant="outline"
+                  onClick={handlePrintSeating}
+                  size="sm"
+                  disabled={editMode}
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print Seating
+                </Button>
 
                 {editMode && (
                   <>

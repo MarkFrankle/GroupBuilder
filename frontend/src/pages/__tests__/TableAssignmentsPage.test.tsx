@@ -243,4 +243,58 @@ describe('TableAssignmentsPage unified control bar', () => {
       expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument()
     })
   })
+
+  it('shows Print Seating button in detailed view when not in edit mode', async () => {
+    render(
+      <BrowserRouter>
+        <TableAssignmentsPage />
+      </BrowserRouter>
+    )
+
+    // Switch to detailed view
+    const detailedButton = await screen.findByRole('button', { name: /detailed view/i })
+    fireEvent.click(detailedButton)
+
+    // Print Seating button should appear
+    await waitFor(() => {
+      const printButton = screen.getByRole('button', { name: /print seating/i })
+      expect(printButton).toBeInTheDocument()
+      expect(printButton).toBeEnabled()
+    })
+  })
+
+  it('disables Print Seating button in edit mode', async () => {
+    render(
+      <BrowserRouter>
+        <TableAssignmentsPage />
+      </BrowserRouter>
+    )
+
+    // Switch to detailed view
+    const detailedButton = await screen.findByRole('button', { name: /detailed view/i })
+    fireEvent.click(detailedButton)
+
+    // Enter edit mode
+    const editButton = await screen.findByRole('button', { name: /^edit$/i })
+    fireEvent.click(editButton)
+
+    // Print Seating button should be disabled
+    await waitFor(() => {
+      const printButton = screen.getByRole('button', { name: /print seating/i })
+      expect(printButton).toBeDisabled()
+    })
+  })
+
+  it('hides Print Seating button in compact view', async () => {
+    render(
+      <BrowserRouter>
+        <TableAssignmentsPage />
+      </BrowserRouter>
+    )
+
+    // Should be in compact view by default
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /print seating/i })).not.toBeInTheDocument()
+    })
+  })
 })
