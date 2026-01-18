@@ -3,6 +3,7 @@ load_dotenv()
 
 from api.routers import upload, assignments
 from api.middleware import RequestIDMiddleware, RequestIDLogFilter
+from api.firebase_admin import initialize_firebase
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -80,6 +81,16 @@ async def health_check():
         logger.error(f"Health check failed: {str(e)}")
         from fastapi import HTTPException
         raise HTTPException(status_code=503, detail=f"Storage unavailable: {str(e)}")
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize Firebase Admin SDK on startup."""
+    try:
+        initialize_firebase()
+    except Exception as e:
+        logger.error(f"Failed to initialize Firebase: {str(e)}")
+        logger.warning("Continuing without Firebase authentication")
 
 
 @app.on_event("shutdown")
