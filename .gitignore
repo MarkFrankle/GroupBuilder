@@ -169,3 +169,4 @@ cython_debug/
 .worktrees/
 
 firebase-service-account.json
+.claude/settings.local.json
