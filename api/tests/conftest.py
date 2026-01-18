@@ -27,6 +27,31 @@ slowapi.Limiter.limit = _no_op_decorator
 def client():
     """Create a test client for the FastAPI application with rate limiting disabled."""
     from api.main import app
+    from api.middleware.auth import require_session_access, AuthUser
+
+    # Mock auth to return a test user for all requests
+    async def mock_auth():
+        return AuthUser(
+            user_id="test_user",
+            email="test@example.com",
+            email_verified=True
+        )
+
+    # Override the auth dependency
+    app.dependency_overrides[require_session_access] = mock_auth
+
+    client = TestClient(app)
+
+    yield client
+
+    # Clean up overrides after test
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def client_with_auth():
+    """Create a test client WITHOUT auth bypass for testing auth protection."""
+    from api.main import app
     return TestClient(app)
 
 

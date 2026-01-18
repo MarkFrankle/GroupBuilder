@@ -604,3 +604,19 @@ class TestRegenerateSingleSession:
         assert stored_result["metadata"]["max_time_seconds"] == 60
         assert stored_result["metadata"]["regenerated"] == True
         assert stored_result["metadata"]["regenerated_session"] == 1
+
+
+class TestAuthProtection:
+    """Tests for authentication and authorization on protected endpoints."""
+
+    def test_get_results_requires_auth(self, client_with_auth):
+        """Should return 401 if no auth token provided."""
+        response = client_with_auth.get("/api/assignments/results/session123")
+        assert response.status_code == 401
+
+    def test_get_results_requires_session_access(self, client, monkeypatch):
+        """Should return 403 if user doesn't have access to session."""
+        # TODO: Implement when test infrastructure ready
+        # Will need to mock auth to return a user
+        # and mock firestore to deny access
+        pass
