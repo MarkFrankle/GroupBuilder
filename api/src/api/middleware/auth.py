@@ -1,8 +1,9 @@
 """Authentication middleware for Firebase tokens."""
-from fastapi import Header, HTTPException, status
+from fastapi import Header, HTTPException, status, Depends, Path
 from typing import Optional
 from pydantic import BaseModel
 from ..firebase_admin import verify_firebase_token
+from ..services.firestore_service import FirestoreService
 from firebase_admin import auth as firebase_auth
 
 
@@ -67,3 +68,35 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Token verification failed: {str(e)}"
         )
+
+
+async def require_session_access(
+    session_id: str = Path(..., description="Session ID from URL"),
+    user: AuthUser = Depends(get_current_user)
+) -> AuthUser:
+    """Require that the current user has access to the specified session.
+
+    Args:
+        session_id: Session ID from path parameter
+        user: Current authenticated user
+
+    Returns:
+        AuthUser if access granted
+
+    Raises:
+        HTTPException: 403 if user doesn't have access to session
+    """
+    firestore_service = FirestoreService()
+
+    has_access = firestore_service.check_user_can_access_session(
+        user_id=user.user_id,
+        session_id=session_id
+    )
+
+    if not has_access:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access denied to session {session_id}"
+        )
+
+    return user
