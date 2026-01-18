@@ -6,6 +6,7 @@ import AuthVerifyPage from "./pages/AuthVerifyPage"
 import LandingPage from "./pages/LandingPage"
 import TableAssignmentsPage from "./pages/TableAssignmentsPage"
 import SeatingChartPage from "./pages/SeatingChartPage"
+import { AdminDashboard } from "./pages/admin/AdminDashboard"
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -34,6 +35,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute>
                 <LandingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <AdminDashboard />
               </ProtectedRoute>
             }
           />
