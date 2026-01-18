@@ -1,6 +1,7 @@
 from api.utils.dataframe_to_participant_dict import dataframe_to_participant_dict
 from api.storage import store_session
-from fastapi import APIRouter, File, UploadFile, HTTPException, Form, Request
+from fastapi import APIRouter, File, UploadFile, HTTPException, Form, Request, Depends
+from api.middleware.auth import get_current_user, AuthUser
 from io import BytesIO
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -25,6 +26,7 @@ async def upload_file(
     file: UploadFile = File(...),
     numTables: int = Form(..., ge=1, le=10),
     numSessions: int = Form(..., ge=1, le=6),
+    user: AuthUser = Depends(get_current_user)
 ):
     logger.info(f"Uploading file: {file.filename}, tables: {numTables}, sessions: {numSessions}")
 
