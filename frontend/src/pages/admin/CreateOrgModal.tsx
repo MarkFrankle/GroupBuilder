@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
@@ -85,6 +86,9 @@ export function CreateOrgModal({ open, onClose, onSuccess }: CreateOrgModalProps
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>✓ Organization Created</DialogTitle>
+            <DialogDescription>
+              Your organization has been created and invites have been sent.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -120,6 +124,9 @@ export function CreateOrgModal({ open, onClose, onSuccess }: CreateOrgModalProps
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Create Organization</DialogTitle>
+          <DialogDescription>
+            Set up a new group and invite facilitators to collaborate.
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -129,7 +136,7 @@ export function CreateOrgModal({ open, onClose, onSuccess }: CreateOrgModalProps
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Austin BB March 2026"
+              placeholder="Springfield Dialogue Series - Spring 2026"
               required
               maxLength={100}
             />
@@ -144,7 +151,7 @@ export function CreateOrgModal({ open, onClose, onSuccess }: CreateOrgModalProps
               id="emails"
               value={emails}
               onChange={(e) => setEmails(e.target.value)}
-              placeholder="sarah@austin-synagogue.org&#10;david@austin-synagogue.org&#10;imam@austin-mosque.org"
+              placeholder="facilitator1@example.org&#10;facilitator2@example.org&#10;facilitator3@example.org"
               required
               rows={6}
               className="w-full px-3 py-2 border rounded-md resize-y"
@@ -166,7 +173,7 @@ export function CreateOrgModal({ open, onClose, onSuccess }: CreateOrgModalProps
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" variant="outline" disabled={loading}>
               {loading ? 'Creating...' : 'Create & Send Invites'}
             </Button>
           </DialogFooter>
