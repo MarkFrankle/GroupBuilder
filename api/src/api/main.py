@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from api.routers import upload, assignments
+from api.routers import upload, assignments, admin
 from api.middleware import RequestIDMiddleware, RequestIDLogFilter
 from api.firebase_admin import initialize_firebase
 from fastapi import FastAPI, Request
@@ -55,6 +55,7 @@ logger.info(f"CORS enabled for origins: {allowed_origins}")
 
 app.include_router(upload.router, prefix="/api/upload", tags=["upload"])
 app.include_router(assignments.router, prefix="/api/assignments", tags=["assignments"])
+app.include_router(admin.router)
 
 
 @app.get("/health", tags=["health"])
