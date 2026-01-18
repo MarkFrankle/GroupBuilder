@@ -167,3 +167,5 @@ cython_debug/
 !.vscode/launch.json
 !.vscode/tasks.json
 .worktrees/
+
+firebase-service-account.json
