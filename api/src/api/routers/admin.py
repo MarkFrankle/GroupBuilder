@@ -32,10 +32,12 @@ async def require_bb_admin(user: AuthUser = Depends(get_current_user)) -> AuthUs
         HTTPException: 403 if user is not BB admin
     """
     db = get_firestore_client()
-    admin_ref = db.collection("bb_admins").document(user.user_id)
+
+    # Check by email (bootstrap script uses email as document ID)
+    admin_ref = db.collection("bb_admins").document(user.email)
     admin_doc = admin_ref.get()
 
-    if not admin_doc.exists:
+    if not admin_doc.exists or not admin_doc.to_dict().get("active", False):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required"
