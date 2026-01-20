@@ -1,0 +1,20 @@
+You're Invited to Facilitate!
+
+You've been invited to join {{ org_name }} as a facilitator on GroupBuilder.
+{% if inviter_email %}
+Invited by: {{ inviter_email }}
+{% endif %}
+
+WHAT IS GROUPBUILDER?
+
+GroupBuilder helps create balanced, diverse seating arrangements for dialogue events.
+As a facilitator, you'll be able to upload participant data and generate optimized
+table assignments.
+
+Accept your invitation here:
+{{ invite_link }}
+
+This invitation expires in 7 days.
+
+---
+Made with care for communities building bridges through dialogue.
