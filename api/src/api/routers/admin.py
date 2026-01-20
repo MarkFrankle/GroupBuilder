@@ -7,6 +7,7 @@ from ..middleware.auth import get_current_user, AuthUser
 from ..firebase_admin import get_firestore_client
 import secrets
 import os
+from ..services.email_service import get_email_service
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -79,10 +80,19 @@ async def create_organization(
             "status": "pending",
         })
 
-        # TODO: Send invite email via SendGrid
+        # Send invite email
+        email_service = get_email_service()
+        email_sent = email_service.send_facilitator_invite(
+            to_email=email,
+            org_name=request.name,
+            invite_token=invite_token,
+            inviter_email=user.email
+        )
+
         invites.append({
             "email": email,
-            "invite_link": f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/invite/{invite_token}"
+            "invite_link": f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/invite/{invite_token}",
+            "email_sent": email_sent
         })
 
     return {
