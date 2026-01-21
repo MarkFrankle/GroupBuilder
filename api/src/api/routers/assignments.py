@@ -1,10 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, Path, Request, Body, Depends
 from assignment_logic.api_handler import handle_generate_assignments
 from assignment_logic.group_builder import GroupBuilder
-from api.storage import (
-    get_session, session_exists, store_result, get_result, result_exists,
-    store_session, get_result_versions
-)
+from api.services.session_storage import SessionStorage
 from api.utils.seating_arrangement import arrange_circular_seating
 from api.middleware.auth import require_session_access, get_current_user, AuthUser
 from slowapi import Limiter
@@ -19,6 +16,16 @@ import os
 logger = logging.getLogger(__name__)
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
+
+# Lazy-initialize session storage (created when first used, not at import time)
+_session_storage = None
+
+def get_session_storage() -> SessionStorage:
+    """Get or create SessionStorage instance."""
+    global _session_storage
+    if _session_storage is None:
+        _session_storage = SessionStorage()
+    return _session_storage
 
 
 def _extract_pairings_from_sessions(assignments: List[Dict[str, Any]], exclude_session: int) -> set:
@@ -117,8 +124,9 @@ def _generate_assignments_internal(session_id: str, mark_regenerated: bool = Fal
     Returns:
         Tuple of (assignments, version_id, metadata)
     """
-    session_data = get_session(session_id)
-    participants_dict = session_data["participant_dict"]
+    session_storage = get_session_storage()
+    session_data = session_storage.get_session(session_id)
+    participants_dict = session_data["participant_data"]  # Note: key is "participant_data" in Firestore
     num_tables = session_data["num_tables"]
     num_sessions = session_data["num_sessions"]
 
@@ -160,12 +168,18 @@ def _generate_assignments_internal(session_id: str, mark_regenerated: bool = Fal
     if mark_regenerated:
         result_metadata["regenerated"] = True
 
-    # Store results
-    version_id = store_result(session_id, {
-        "assignments": results['assignments'],
-        "metadata": result_metadata,
-        "created_at": datetime.now().isoformat()
-    })
+    # Store results - generate version ID
+    # Get existing versions to determine next version number  
+    existing_versions = session_storage.get_result_versions(session_id)
+    version_num = len(existing_versions) + 1
+    version_id = f"v{version_num}"
+    
+    session_storage.save_results(
+        session_id=session_id,
+        version_id=version_id,
+        assignments=results['assignments'],
+        metadata=result_metadata
+    )
 
     return results['assignments'], version_id, result_metadata
 
@@ -179,7 +193,8 @@ def get_assignments(
     user: AuthUser = Depends(get_current_user)
 ):
     """Generate assignments for a session."""
-    if not session_exists(session_id):
+    session_storage = get_session_storage()
+    if not session_storage.session_exists(session_id):
         logger.warning(f"Session not found: {session_id}")
         raise HTTPException(status_code=404, detail="Session not found. Please upload a file first.")
 
@@ -206,12 +221,13 @@ async def regenerate_assignments(
     session_id: str = Path(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$"),
     max_time_seconds: int = Query(120, ge=30, le=240, description="Maximum solver time in seconds (30-240)")
 ):
-    """Regenerate assignments using the same upload data (within 1 hour of upload)"""
-    if not session_exists(session_id):
-        logger.warning(f"Session not found or expired: {session_id}")
+    """Regenerate assignments using the same upload data"""
+    session_storage = get_session_storage()
+    if not session_storage.session_exists(session_id):
+        logger.warning(f"Session not found: {session_id}")
         raise HTTPException(
             status_code=404,
-            detail="Session expired. Upload data is only kept for 1 hour. Please upload again."
+            detail="Session not found. Please upload a file first."
         )
 
     try:
@@ -264,19 +280,20 @@ async def regenerate_single_session(
     Returns:
         New version with the regenerated session merged in
     """
-    if not session_exists(session_id):
-        logger.warning(f"Session not found or expired: {session_id}")
+    session_storage = get_session_storage()
+    if not session_storage.session_exists(session_id):
+        logger.warning(f"Session not found: {session_id}")
         raise HTTPException(
             status_code=404,
-            detail="Session expired. Upload data is only kept for 1 hour. Please upload again."
+            detail="Session not found. Please upload a file first."
         )
 
     try:
         # 1. Get existing session data
-        session_data = get_session(session_id)
+        session_data = session_storage.get_session(session_id)
         num_tables = session_data["num_tables"]
         num_sessions = session_data["num_sessions"]
-        all_participants = session_data["participant_dict"]
+        all_participants = session_data["participant_data"]  # Note: key is "participant_data" in Firestore
 
         # Validate session number
         if session_number > num_sessions:
@@ -286,7 +303,7 @@ async def regenerate_single_session(
             )
 
         # 2. Get current assignments (from specified version or latest)
-        current_result = get_result(session_id, version_id=version_id)
+        current_result = session_storage.get_results(session_id, version_id=version_id)
         if current_result is None:
             raise HTTPException(
                 status_code=404,
@@ -404,11 +421,17 @@ async def regenerate_single_session(
             "assignments_unchanged": assignments_unchanged  # Flag if same assignments returned
         }
 
-        version_id = store_result(session_id, {
-            "assignments": new_assignments,
-            "metadata": result_metadata,
-            "created_at": datetime.now().isoformat()
-        })
+        # Generate next version ID
+        existing_versions = session_storage.get_result_versions(session_id)
+        version_num = len(existing_versions) + 1
+        version_id = f"v{version_num}"
+        
+        session_storage.save_results(
+            session_id=session_id,
+            version_id=version_id,
+            assignments=new_assignments,
+            metadata=result_metadata
+        )
 
         logger.info(f"Stored regenerated session {session_number} as version {version_id} (unchanged: {assignments_unchanged})")
 
@@ -441,13 +464,14 @@ async def get_cached_results(
 
     Now requires authentication and org membership.
     """
+    session_storage = get_session_storage()
     logger.info(f"Retrieving cached results for session: {session_id}, version: {version or 'latest'}")
 
-    if not result_exists(session_id):
+    if not session_storage.result_exists(session_id):
         logger.warning(f"No cached results for session: {session_id}")
-        raise HTTPException(status_code=404, detail="Results not found or expired. Links expire after 30 days.")
+        raise HTTPException(status_code=404, detail="Results not found.")
 
-    result_data = get_result(session_id, version_id=version)
+    result_data = session_storage.get_results(session_id, version_id=version)
 
     if result_data is None:
         logger.warning(f"Version {version} not found for session: {session_id}")
@@ -461,9 +485,10 @@ async def get_result_version_list(
     session_id: str = Path(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$")
 ):
     """Get list of all result versions for a session"""
+    session_storage = get_session_storage()
     logger.info(f"Retrieving version list for session: {session_id}")
 
-    versions = get_result_versions(session_id)
+    versions = session_storage.get_result_versions(session_id)
 
     if not versions:
         logger.warning(f"No versions found for session: {session_id}")
@@ -477,22 +502,27 @@ async def get_session_metadata(
     session_id: str = Path(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$")
 ):
     """Get metadata about a session for displaying in Recent Uploads"""
+    session_storage = get_session_storage()
     logger.info(f"Retrieving metadata for session: {session_id}")
 
-    if not session_exists(session_id):
-        logger.warning(f"Session not found or expired: {session_id}")
-        raise HTTPException(status_code=404, detail="Session not found or expired.")
+    if not session_storage.session_exists(session_id):
+        logger.warning(f"Session not found: {session_id}")
+        raise HTTPException(status_code=404, detail="Session not found.")
 
-    session_data = get_session(session_id)
+    session_data = session_storage.get_session(session_id)
+    
+    # Convert Firestore timestamp to Unix timestamp
+    created_at = session_data.get("created_at")
+    created_at_unix = created_at.timestamp() if created_at else None
 
     return {
         "session_id": session_id,
         "filename": session_data.get("filename", "Unknown"),
-        "num_participants": len(session_data.get("participant_dict", {})),
+        "num_participants": len(session_data.get("participant_data", [])),
         "num_tables": session_data.get("num_tables"),
         "num_sessions": session_data.get("num_sessions"),
-        "created_at": session_data.get("created_at"),
-        "has_results": result_exists(session_id),
+        "created_at": created_at_unix,
+        "has_results": session_storage.result_exists(session_id),
     }
 
 
@@ -500,18 +530,20 @@ async def get_session_metadata(
 async def clone_session_with_params(
     session_id: str = Path(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$"),
     num_tables: int = Query(..., ge=1, le=10, description="Number of tables (1-10)"),
-    num_sessions: int = Query(..., ge=1, le=6, description="Number of sessions (1-6)")
+    num_sessions: int = Query(..., ge=1, le=6, description="Number of sessions (1-6)"),
+    user: AuthUser = Depends(get_current_user)
 ):
     """Clone a session with new table/session parameters (reuses participant data)"""
+    session_storage = get_session_storage()
     logger.info(f"Cloning session {session_id} with new params: tables={num_tables}, sessions={num_sessions}")
 
-    if not session_exists(session_id):
-        logger.warning(f"Source session not found or expired: {session_id}")
-        raise HTTPException(status_code=404, detail="Source session not found or expired.")
+    if not session_storage.session_exists(session_id):
+        logger.warning(f"Source session not found: {session_id}")
+        raise HTTPException(status_code=404, detail="Source session not found.")
 
-    # Get original session data (validation handled by FastAPI)
-    original_session = get_session(session_id)
-    participant_dict = original_session.get("participant_dict", [])
+    # Get original session data (includes org_id)
+    original_session = session_storage.get_session(session_id)
+    participant_dict = original_session.get("participant_data", [])
 
     # Validate participant count vs tables
     num_participants = len(participant_dict)
@@ -524,17 +556,19 @@ async def clone_session_with_params(
 
     # Create new session with same participant data but new parameters
     new_session_id = str(uuid.uuid4())
+    org_id = original_session.get("org_id")
 
-    store_session(new_session_id, {
-        "participant_dict": participant_dict,
-        "num_tables": num_tables,
-        "num_sessions": num_sessions,
-        "filename": original_session.get("filename", "Unknown"),
-        "created_at": datetime.now().isoformat(),
-        "cloned_from": session_id
-    })
+    session_storage.save_session(
+        org_id=org_id,
+        session_id=new_session_id,
+        user_id=user.user_id,
+        participant_data=participant_dict,
+        filename=original_session.get("filename", "Unknown"),
+        num_tables=num_tables,
+        num_sessions=num_sessions
+    )
 
-    logger.info(f"Successfully cloned session. New session ID: {new_session_id}")
+    logger.info(f"Successfully cloned session. New session ID: {new_session_id} in org {org_id}")
 
     return {
         "message": "Session cloned successfully",

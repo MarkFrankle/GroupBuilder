@@ -1,5 +1,6 @@
 from api.utils.dataframe_to_participant_dict import dataframe_to_participant_dict
-from api.storage import store_session
+from api.services.session_storage import SessionStorage
+from api.services.firestore_service import FirestoreService
 from fastapi import APIRouter, File, UploadFile, HTTPException, Form, Request, Depends
 from api.middleware.auth import get_current_user, AuthUser
 from io import BytesIO
@@ -78,17 +79,36 @@ async def upload_file(
 
         participant_dict = dataframe_to_participant_dict(participant_dataframe)
 
+        # Get user's organizations
+        firestore_service = FirestoreService()
+        user_orgs = firestore_service.get_user_organizations(user.user_id)
+        
+        if not user_orgs:
+            logger.error(f"User {user.email} has no organizations")
+            raise HTTPException(
+                status_code=403,
+                detail="You are not a member of any organization. Please contact your administrator."
+            )
+        
+        # Auto-select organization (first org for now - frontend will handle multi-org later)
+        org_id = user_orgs[0]["id"]
+        logger.info(f"User {user.email} uploading to organization {org_id}")
+
         session_id = str(uuid.uuid4())
 
-        store_session(session_id, {
-            "participant_dict": participant_dict,
-            "num_tables": numTables,
-            "num_sessions": numSessions,
-            "filename": file.filename,
-            "created_at": datetime.now().isoformat()
-        })
+        # Use Firestore SessionStorage instead of Redis
+        session_storage = SessionStorage()
+        session_storage.save_session(
+            org_id=org_id,
+            session_id=session_id,
+            user_id=user.user_id,
+            participant_data=participant_dict,
+            filename=file.filename,
+            num_tables=numTables,
+            num_sessions=numSessions
+        )
 
-        logger.info(f"Successfully stored data for {file.filename} with session ID: {session_id}")
+        logger.info(f"Successfully stored data for {file.filename} with session ID: {session_id} in org {org_id}")
 
         return {
             "message": "File uploaded successfully",

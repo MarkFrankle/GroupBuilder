@@ -28,6 +28,7 @@ import { getRecentUploadIds, saveRecentUpload, removeRecentUpload, type RecentUp
 import { fetchWithRetry } from '@/utils/fetchWithRetry'
 import { formatISOTimeAgo, formatUnixTimeAgo } from '@/utils/timeFormatting'
 import { API_BASE_URL } from '@/config/api'
+import { authenticatedFetch } from '@/utils/apiClient'
 import {
   SESSION_EXPIRY_MESSAGE,
   MAX_TABLES,
@@ -66,7 +67,7 @@ const LandingPage: React.FC = () => {
 
       for (const sessionId of sessionIds) {
         try {
-          const response = await fetch(`${API_BASE_URL}/api/assignments/sessions/${sessionId}/metadata`)
+          const response = await authenticatedFetch(`/api/assignments/sessions/${sessionId}/metadata`)
           if (response.ok) {
             const metadata = await response.json()
             uploads.push(metadata)
@@ -114,7 +115,7 @@ const LandingPage: React.FC = () => {
       // Fetch available versions
       if (upload.has_results) {
         try {
-          const response = await fetch(`${API_BASE_URL}/api/assignments/results/${sessionId}/versions`)
+          const response = await authenticatedFetch(`/api/assignments/results/${sessionId}/versions`)
           if (response.ok) {
             const data = await response.json()
             setAvailableVersions(data.versions || [])

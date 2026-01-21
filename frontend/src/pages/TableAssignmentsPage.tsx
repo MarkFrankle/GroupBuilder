@@ -32,6 +32,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { API_BASE_URL } from '@/config/api'
+import { authenticatedFetch } from '@/utils/apiClient'
 
 interface ResultVersion {
   version_id: string
@@ -195,7 +196,7 @@ const TableAssignmentsPage: React.FC = () => {
 
           // Fetch available versions
           try {
-            const versionsResponse = await fetch(`${API_BASE_URL}/api/assignments/results/${sessionId}/versions`)
+            const versionsResponse = await authenticatedFetch(`/api/assignments/results/${sessionId}/versions`)
             if (versionsResponse.ok) {
               const versionsData = await versionsResponse.json()
               setAvailableVersions(versionsData.versions || [])
@@ -231,7 +232,7 @@ const TableAssignmentsPage: React.FC = () => {
 
           // Fetch assignments for the specified version
           const versionQuery = versionParam ? `?version=${versionParam}` : ''
-          const response = await fetch(`${API_BASE_URL}/api/assignments/results/${sessionId}${versionQuery}`)
+          const response = await authenticatedFetch(`/api/assignments/results/${sessionId}${versionQuery}`)
           if (!response.ok) {
             const errorData = await response.json()
             throw new Error(errorData.detail || 'Failed to fetch assignments')
@@ -362,7 +363,7 @@ const TableAssignmentsPage: React.FC = () => {
       }
 
       const versionQuery = versionId !== 'latest' ? `?version=${versionId}` : ''
-      const response = await fetch(`${API_BASE_URL}/api/assignments/results/${sessionId}${versionQuery}`)
+      const response = await authenticatedFetch(`/api/assignments/results/${sessionId}${versionQuery}`)
 
       if (!response.ok) {
         const errorData = await response.json()
@@ -450,7 +451,7 @@ const TableAssignmentsPage: React.FC = () => {
       }
 
       console.log('[Regenerate] Requesting regeneration with max_time_seconds:', regenerateSolverTime)
-      const response = await fetch(`${API_BASE_URL}/api/assignments/regenerate/${sessionId}?max_time_seconds=${regenerateSolverTime}`, {
+      const response = await authenticatedFetch(`/api/assignments/regenerate/${sessionId}?max_time_seconds=${regenerateSolverTime}`, {
         method: 'POST',
         signal: controller.signal,
       })
@@ -467,7 +468,7 @@ const TableAssignmentsPage: React.FC = () => {
 
       // Refetch versions list to include the new version
       try {
-        const versionsResponse = await fetch(`${API_BASE_URL}/api/assignments/results/${sessionId}/versions`)
+        const versionsResponse = await authenticatedFetch(`/api/assignments/results/${sessionId}/versions`)
         if (versionsResponse.ok) {
           const versionsData = await versionsResponse.json()
           setAvailableVersions(versionsData.versions || [])
