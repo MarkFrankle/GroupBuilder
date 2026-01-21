@@ -1,7 +1,7 @@
 /**
  * Admin dashboard for organization management
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { CreateOrgModal } from './CreateOrgModal';
@@ -29,7 +29,7 @@ export function AdminDashboard() {
   const [deletingOrgId, setDeletingOrgId] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
 
-  const loadOrganizations = useCallback(async () => {
+  const loadOrganizations = async () => {
     setLoading(true);
     setError(null);
 
@@ -43,11 +43,11 @@ export function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [showInactive]);
+  };
 
   useEffect(() => {
     loadOrganizations();
-  }, [loadOrganizations]);
+  }, [showInactive]);
 
   const handleCreateSuccess = () => {
     loadOrganizations();
