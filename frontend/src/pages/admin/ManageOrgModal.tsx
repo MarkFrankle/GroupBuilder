@@ -1,0 +1,344 @@
+/**
+ * Modal for managing organization details, members, and invites
+ */
+import React, { useState, useEffect } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '../../components/ui/dialog';
+import { Button } from '../../components/ui/button';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { apiRequest } from '../../utils/apiClient';
+
+interface Member {
+  user_id: string;
+  email: string;
+  role: string;
+  joined_at: number;  // Unix timestamp
+}
+
+interface Invite {
+  id: string;
+  email: string;
+  status: string;
+  created_at: number;  // Unix timestamp
+  expires_at: number;  // Unix timestamp
+  accepted_at?: number;  // Unix timestamp
+  accepted_by_user_id?: string;
+  removed_at?: number;  // Unix timestamp
+}
+
+interface OrgDetails {
+  id: string;
+  name: string;
+  created_at: number;  // Unix timestamp
+  created_by: string;
+  members: Member[];
+  invites: Invite[];
+}
+
+interface ManageOrgModalProps {
+  open: boolean;
+  onClose: () => void;
+  orgId: string | null;
+}
+
+export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
+  const [orgDetails, setOrgDetails] = useState<OrgDetails | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [newInviteEmail, setNewInviteEmail] = useState('');
+  const [sendingInvite, setSendingInvite] = useState(false);
+  const [revokingInviteId, setRevokingInviteId] = useState<string | null>(null);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<{ userId: string; email: string } | null>(null);
+
+  useEffect(() => {
+    if (open && orgId) {
+      loadOrgDetails();
+    }
+  }, [open, orgId]);
+
+  const loadOrgDetails = async () => {
+    if (!orgId) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const details = await apiRequest<OrgDetails>(`/api/admin/organizations/${orgId}`);
+      setOrgDetails(details);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load organization details');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!orgId || !newInviteEmail.trim()) return;
+
+    setSendingInvite(true);
+    setError(null);
+
+    try {
+      await apiRequest(`/api/admin/organizations/${orgId}/invites`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          facilitator_emails: [newInviteEmail.trim()],
+        }),
+      });
+
+      setNewInviteEmail('');
+      await loadOrgDetails(); // Reload to show new invite
+    } catch (err: any) {
+      setError(err.message || 'Failed to send invite');
+    } finally {
+      setSendingInvite(false);
+    }
+  };
+
+  const handleRevokeInvite = async (inviteId: string) => {
+    if (!orgId) return;
+
+    setRevokingInviteId(inviteId);
+    setError(null);
+
+    try {
+      await apiRequest(`/api/admin/organizations/${orgId}/invites/${inviteId}`, {
+        method: 'DELETE',
+      });
+
+      await loadOrgDetails(); // Reload to update invite status
+    } catch (err: any) {
+      setError(err.message || 'Failed to revoke invite');
+    } finally {
+      setRevokingInviteId(null);
+    }
+  };
+
+  const handleRemoveMember = async (userId: string, email: string) => {
+    if (!orgId) return;
+    
+    setConfirmRemove({ userId, email });
+  };
+
+  const confirmRemoveMember = async () => {
+    if (!orgId || !confirmRemove) return;
+
+    setRemovingMemberId(confirmRemove.userId);
+    setError(null);
+
+    try {
+      await apiRequest(`/api/admin/organizations/${orgId}/members/${confirmRemove.userId}`, {
+        method: 'DELETE',
+      });
+
+      await loadOrgDetails(); // Reload to update members list
+    } catch (err: any) {
+      setError(err.message || 'Failed to remove member');
+    } finally {
+      setRemovingMemberId(null);
+      setConfirmRemove(null);
+    }
+  };
+
+  const formatDate = (timestamp: string | number) => {
+    // Handle Unix timestamps (numbers) by converting to milliseconds
+    const date = typeof timestamp === 'number' 
+      ? new Date(timestamp * 1000) 
+      : new Date(timestamp);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getStatusBadge = (status: string) => {
+    const styles = {
+      pending: 'bg-yellow-100 text-yellow-800',
+      accepted: 'bg-green-100 text-green-800',
+      expired: 'bg-gray-100 text-gray-800',
+      rejected: 'bg-red-100 text-red-800',
+      revoked: 'bg-red-100 text-red-800',
+      removed: 'bg-orange-100 text-orange-800'
+    };
+    
+    const style = styles[status as keyof typeof styles] || 'bg-gray-100 text-gray-800';
+    
+    return (
+      <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${style}`}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </span>
+    );
+  };
+
+  const handleClose = () => {
+    setOrgDetails(null);
+    setError(null);
+    setNewInviteEmail('');
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            {orgDetails?.name || 'Organization Details'}
+          </DialogTitle>
+          <DialogDescription>
+            View members and invites for this organization
+          </DialogDescription>
+        </DialogHeader>
+
+        {error && (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            {error}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="py-12 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading details...</p>
+          </div>
+        ) : orgDetails ? (
+          <div className="space-y-6">
+            {/* Members Section */}
+            <div>
+              <h3 className="text-lg font-semibold mb-3">
+                Members ({orgDetails.members.length})
+              </h3>
+              {orgDetails.members.length === 0 ? (
+                <p className="text-gray-500 text-sm">No members yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {orgDetails.members.map((member) => (
+                    <div
+                      key={member.user_id}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    >
+                      <div>
+                        <p className="font-medium">{member.email}</p>
+                        <p className="text-sm text-gray-600">
+                          Joined {formatDate(member.joined_at)} • {member.role}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRemoveMember(member.user_id, member.email)}
+                        disabled={removingMemberId === member.user_id}
+                        className="text-red-600 hover:bg-red-50"
+                      >
+                        {removingMemberId === member.user_id ? 'Removing...' : 'Remove'}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Invites Section */}
+            <div>
+              <h3 className="text-lg font-semibold mb-3">
+                Invites ({orgDetails.invites.length})
+              </h3>
+
+              {/* Add Invite Form */}
+              <form onSubmit={handleAddInvite} className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Add New Invite
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={newInviteEmail}
+                    onChange={(e) => setNewInviteEmail(e.target.value)}
+                    placeholder="facilitator@example.com"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={sendingInvite}
+                  />
+                  <Button type="submit" variant="outline" disabled={sendingInvite || !newInviteEmail.trim()}>
+                    {sendingInvite ? 'Sending...' : 'Send Invite'}
+                  </Button>
+                </div>
+              </form>
+
+              {orgDetails.invites.length === 0 ? (
+                <p className="text-gray-500 text-sm">No invites sent yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {orgDetails.invites.map((invite) => (
+                    <div
+                      key={invite.id}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    >
+                      <div className="flex-1">
+                        <p className="font-medium">{invite.email}</p>
+                        <p className="text-sm text-gray-600">
+                          Sent {formatDate(invite.created_at)}
+                          {invite.status === 'accepted' && invite.accepted_at && (
+                            <> • Accepted {formatDate(invite.accepted_at)}</>
+                          )}
+                          {invite.status === 'removed' && invite.removed_at && (
+                            <> • Removed {formatDate(invite.removed_at)}</>
+                          )}
+                          {invite.status === 'pending' && (
+                            <> • Expires {formatDate(invite.expires_at)}</>
+                          )}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(invite.status)}
+                        {invite.status === 'pending' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRevokeInvite(invite.id)}
+                            disabled={revokingInviteId === invite.id}
+                            className="text-red-600 hover:bg-red-50"
+                          >
+                            {revokingInviteId === invite.id ? 'Revoking...' : 'Revoke'}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="flex justify-end gap-2 pt-4 border-t">
+          <Button variant="outline" onClick={handleClose}>
+            Close
+          </Button>
+        </div>
+      </DialogContent>
+
+      {/* Confirmation dialog for removing members */}
+      <ConfirmDialog
+        open={confirmRemove !== null}
+        onClose={() => setConfirmRemove(null)}
+        onConfirm={confirmRemoveMember}
+        title="Remove Member"
+        description={`Remove ${confirmRemove?.email} from this organization?`}
+        confirmText="Remove"
+        variant="danger"
+      />
+    </Dialog>
+  );
+}

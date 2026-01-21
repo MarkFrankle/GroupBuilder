@@ -5,6 +5,8 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { CreateOrgModal } from './CreateOrgModal';
+import { ManageOrgModal } from './ManageOrgModal';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { apiRequest } from '../../utils/apiClient';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -13,6 +15,7 @@ interface Organization {
   name: string;
   created_at: string;
   member_count: number;
+  active?: boolean;
 }
 
 export function AdminDashboard() {
@@ -21,13 +24,17 @@ export function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [managingOrgId, setManagingOrgId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
+  const [deletingOrgId, setDeletingOrgId] = useState<string | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
 
   const loadOrganizations = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const orgs = await apiRequest<Organization[]>('/api/admin/organizations');
+      const orgs = await apiRequest<Organization[]>(`/api/admin/organizations?show_inactive=${showInactive}`);
       // Sort by created date (newest first)
       orgs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setOrganizations(orgs);
@@ -40,10 +47,34 @@ export function AdminDashboard() {
 
   useEffect(() => {
     loadOrganizations();
-  }, []);
+  }, [showInactive]);
 
   const handleCreateSuccess = () => {
     loadOrganizations();
+  };
+
+  const handleDelete = (orgId: string, orgName: string) => {
+    setConfirmDelete({ id: orgId, name: orgName });
+  };
+
+  const confirmDeleteOrg = async () => {
+    if (!confirmDelete) return;
+
+    setDeletingOrgId(confirmDelete.id);
+    setError(null);
+
+    try {
+      await apiRequest(`/api/admin/organizations/${confirmDelete.id}`, {
+        method: 'DELETE',
+      });
+
+      await loadOrganizations(); // Reload list
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete organization');
+    } finally {
+      setDeletingOrgId(null);
+      setConfirmDelete(null);
+    }
   };
 
   const formatDate = (dateStr: string) => {
@@ -79,6 +110,18 @@ export function AdminDashboard() {
           </Button>
         </div>
 
+        <div className="mb-4 flex items-center gap-2">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showInactive}
+              onChange={(e) => setShowInactive(e.target.checked)}
+              className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700">Show deleted organizations</span>
+          </label>
+        </div>
+
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
             {error}
@@ -100,10 +143,17 @@ export function AdminDashboard() {
         ) : (
           <div className="space-y-4">
             {organizations.map((org) => (
-              <Card key={org.id} className="p-6">
+              <Card key={org.id} className={`p-6 ${org.active === false ? 'bg-gray-100 opacity-75' : ''}`}>
                 <div className="flex justify-between items-start">
                   <div>
-                    <h3 className="text-lg font-semibold mb-1">{org.name}</h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-lg font-semibold">{org.name}</h3>
+                      {org.active === false && (
+                        <span className="px-2 py-0.5 text-xs font-medium bg-gray-300 text-gray-700 rounded">
+                          Deleted
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-600">
                       Created {formatDate(org.created_at)}
                     </p>
@@ -112,9 +162,24 @@ export function AdminDashboard() {
                     <span className="text-sm text-gray-600">
                       {org.member_count} member{org.member_count !== 1 ? 's' : ''}
                     </span>
-                    <Button variant="outline" size="sm">
-                      Manage
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setManagingOrgId(org.id)}
+                      >
+                        Manage
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleDelete(org.id, org.name)}
+                        disabled={deletingOrgId === org.id || org.active === false}
+                        className="text-red-600 hover:bg-red-50"
+                      >
+                        {deletingOrgId === org.id ? 'Deleting...' : 'Delete'}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -128,6 +193,24 @@ export function AdminDashboard() {
         open={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onSuccess={handleCreateSuccess}
+      />
+
+      {/* Manage Organization Modal */}
+      <ManageOrgModal
+        open={managingOrgId !== null}
+        onClose={() => setManagingOrgId(null)}
+        orgId={managingOrgId}
+      />
+
+      {/* Confirmation dialog for deleting organizations */}
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={confirmDeleteOrg}
+        title="Delete Organization"
+        description={`Are you sure you want to delete "${confirmDelete?.name}"? This will hide the organization from the list but preserve all data.`}
+        confirmText="Delete"
+        variant="danger"
       />
     </div>
   );

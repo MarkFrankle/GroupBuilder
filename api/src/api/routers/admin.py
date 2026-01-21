@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from typing import List
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from ..middleware.auth import get_current_user, AuthUser
 from ..firebase_admin import get_firestore_client
 import secrets
@@ -22,8 +22,9 @@ class OrganizationResponse(BaseModel):
     """Organization summary."""
     id: str
     name: str
-    created_at: datetime
+    created_at: float  # Unix timestamp
     member_count: int
+    active: bool = True
 
 
 async def require_bb_admin(user: AuthUser = Depends(get_current_user)) -> AuthUser:
@@ -63,8 +64,9 @@ async def create_organization(
     org_ref = db.collection("organizations").document()
     org_ref.set({
         "name": request.name,
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
         "created_by": user.user_id,
+        "active": True,
     })
 
     # Create invite records
@@ -75,8 +77,8 @@ async def create_organization(
         invite_ref.set({
             "email": email,
             "token": invite_token,
-            "created_at": datetime.utcnow(),
-            "expires_at": datetime.utcnow() + timedelta(days=7),
+            "created_at": datetime.now(timezone.utc),
+            "expires_at": datetime.now(timezone.utc) + timedelta(days=7),
             "status": "pending",
         })
 
@@ -103,9 +105,14 @@ async def create_organization(
 
 @router.get("/organizations", response_model=List[OrganizationResponse])
 async def list_organizations(
+    show_inactive: bool = False,
     user: AuthUser = Depends(require_bb_admin)
 ):
-    """List all organizations (admin only)."""
+    """List organizations (admin only).
+    
+    Args:
+        show_inactive: If True, include inactive organizations
+    """
     db = get_firestore_client()
 
     orgs = []
@@ -113,16 +120,68 @@ async def list_organizations(
 
     for org_doc in org_docs:
         org_data = org_doc.to_dict()
+        
+        # Filter inactive orgs unless show_inactive is True
+        is_active = org_data.get("active", True)  # Default to True for legacy orgs
+        if not show_inactive and not is_active:
+            continue
 
         # Count members
         members = org_doc.reference.collection("members").stream()
         member_count = sum(1 for _ in members)
 
+        # Convert Firestore timestamp to Unix timestamp
+        created_at = org_data["created_at"]
+        created_at_unix = created_at.timestamp() if created_at else 0
+
         orgs.append({
             "id": org_doc.id,
             "name": org_data["name"],
-            "created_at": org_data["created_at"],
+            "created_at": created_at_unix,
             "member_count": member_count,
+            "active": is_active,
         })
 
     return orgs
+
+
+@router.delete("/organizations/{org_id}")
+async def delete_organization(
+    org_id: str,
+    user: AuthUser = Depends(require_bb_admin)
+):
+    """Soft delete an organization by marking it as inactive.
+    
+    Args:
+        org_id: Organization ID
+        user: Authenticated admin user
+        
+    Returns:
+        Success message
+        
+    Raises:
+        HTTPException: 404 if organization not found
+    """
+    db = get_firestore_client()
+    
+    # Get organization
+    org_ref = db.collection("organizations").document(org_id)
+    org_doc = org_ref.get()
+    
+    if not org_doc.exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organization not found"
+        )
+    
+    # Soft delete by marking as inactive
+    org_ref.update({
+        "active": False,
+        "deleted_at": datetime.now(timezone.utc),
+        "deleted_by": user.user_id
+    })
+    
+    return {
+        "success": True,
+        "message": "Organization deleted successfully"
+    }
