@@ -12,13 +12,13 @@ class FirestoreService:
         self.db: Client = get_firestore_client()
 
     def get_user_organizations(self, user_id: str) -> List[Dict[str, Any]]:
-        """Get all organizations a user belongs to.
+        """Get all active organizations a user belongs to.
 
         Args:
             user_id: Firebase user ID
 
         Returns:
-            List of organization documents with id and data
+            List of active organization documents with id and data
         """
         orgs = []
 
@@ -27,6 +27,12 @@ class FirestoreService:
         org_docs = orgs_ref.stream()
 
         for org_doc in org_docs:
+            org_data = org_doc.to_dict()
+            
+            # Skip inactive organizations
+            if not org_data.get("active", True):
+                continue
+            
             # Check if user is a member of this org
             member_ref = org_doc.reference.collection("members").document(user_id)
             member_doc = member_ref.get()
@@ -34,7 +40,7 @@ class FirestoreService:
             if member_doc.exists:
                 orgs.append({
                     "id": org_doc.id,
-                    **org_doc.to_dict()
+                    **org_data
                 })
 
         return orgs
@@ -63,7 +69,7 @@ class FirestoreService:
         # Find which org owns this session
         # Use collection group query to search across all orgs
         sessions_ref = self.db.collection_group("sessions")
-        session_query = sessions_ref.where("__name__", "==", session_id).limit(1)
+        session_query = sessions_ref.where("session_id", "==", session_id).limit(1)
         session_docs = list(session_query.stream())
 
         if not session_docs:
@@ -85,7 +91,7 @@ class FirestoreService:
             Organization ID or None if session not found
         """
         sessions_ref = self.db.collection_group("sessions")
-        session_query = sessions_ref.where("__name__", "==", session_id).limit(1)
+        session_query = sessions_ref.where("session_id", "==", session_id).limit(1)
         session_docs = list(session_query.stream())
 
         if not session_docs:
