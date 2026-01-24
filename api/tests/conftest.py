@@ -107,12 +107,47 @@ class MockFirestoreCollection:
         return query
     
     def order_by(self, field, direction="ASCENDING"):
-        """Order by filter."""
-        query = MagicMock()
-        query.limit = lambda n: query
-        query.order_by = lambda *args, **kwargs: query
-        query.stream = lambda: []
-        return query
+        """Order by filter - returns documents from this collection."""
+        parent_collection = self
+        sort_field = field
+        sort_direction = direction
+        
+        class OrderedQuery:
+            def __init__(self, collection, field, direction):
+                self.collection = collection
+                self.field = field
+                self.direction = direction
+                self._limit_count = None
+            
+            def limit(self, count):
+                self._limit_count = count
+                return self
+            
+            def stream(self):
+                """Return documents from the collection, sorted by field."""
+                docs = []
+                for doc_id, data in self.collection._documents.items():
+                    doc_ref = self.collection.document(doc_id)
+                    doc = MockFirestoreDocument(doc_id, data, exists=True, doc_ref=doc_ref)
+                    docs.append(doc)
+                
+                # Sort documents by the specified field
+                def get_sort_key(doc):
+                    data = doc.to_dict()
+                    value = data.get(self.field)
+                    # Handle datetime objects
+                    if hasattr(value, 'timestamp'):
+                        return value.timestamp()
+                    return value if value is not None else 0
+                
+                docs.sort(key=get_sort_key, reverse=(self.direction == "DESCENDING"))
+                
+                # Apply limit if specified
+                if self._limit_count:
+                    docs = docs[:self._limit_count]
+                return docs
+        
+        return OrderedQuery(parent_collection, sort_field, sort_direction)
 
 
 class MockFirestoreClient:
@@ -427,3 +462,34 @@ def add_session_to_firestore():
             num_sessions=session_data["num_sessions"]
         )
     return _add_session
+
+
+@pytest.fixture
+def add_results_to_firestore():
+    """Fixture that returns a function to add results to mock Firestore."""
+    def _add_results(session_id: str, version_id: str, assignments: dict, metadata: dict = None, org_id: str = "test_org_id"):
+        """Helper to add results to mock Firestore.
+        
+        Args:
+            session_id: Session UUID
+            version_id: Version identifier (e.g., "v1")
+            assignments: Assignment data
+            metadata: Result metadata
+            org_id: Organization ID (default: test_org_id)
+        """
+        from api.services.session_storage import SessionStorage
+        from datetime import datetime, timezone
+        
+        storage = SessionStorage()
+        
+        if metadata is None:
+            metadata = {"solution_quality": "optimal", "solve_time": 1.5}
+        
+        storage.save_results(
+            session_id=session_id,
+            version_id=version_id,
+            assignments=assignments,
+            metadata=metadata,
+            org_id=org_id
+        )
+    return _add_results
