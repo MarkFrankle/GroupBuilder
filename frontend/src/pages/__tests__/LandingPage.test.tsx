@@ -14,6 +14,8 @@ import { BrowserRouter } from 'react-router-dom'
 import '@testing-library/jest-dom'
 import LandingPage from '../LandingPage'
 import * as recentUploadsModule from '@/utils/recentUploads'
+import { authenticatedFetch } from '@/utils/apiClient'
+import { fetchWithRetry } from '@/utils/fetchWithRetry'
 
 // Mock react-router-dom's useNavigate
 const mockNavigate = jest.fn()
@@ -22,7 +24,11 @@ jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
 }))
 
-// Mock fetch
+// Get the mocked functions (already mocked in setupTests.ts)
+const mockAuthenticatedFetch = authenticatedFetch as jest.MockedFunction<typeof authenticatedFetch>
+const mockFetchWithRetry = fetchWithRetry as jest.MockedFunction<typeof fetchWithRetry>
+
+// Mock fetch is no longer needed since fetchWithRetry is mocked
 global.fetch = jest.fn()
 
 // Mock ResizeObserver (needed by Radix UI Slider)
@@ -47,6 +53,8 @@ describe('LandingPage', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     ;(global.fetch as jest.Mock).mockClear()
+    mockAuthenticatedFetch.mockClear()
+    mockFetchWithRetry.mockClear()
     localStorage.clear()
     // Mock getRecentUploadIds to return empty array by default
     jest.spyOn(recentUploadsModule, 'getRecentUploadIds').mockReturnValue([])
@@ -165,15 +173,16 @@ describe('LandingPage', () => {
     })
 
     it('submits form with valid file', async () => {
-      ;(global.fetch as jest.Mock)
+      // Mock fetchWithRetry for upload and assignment generation
+      mockFetchWithRetry
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({ session_id: 'session-123' })
-        })
+        } as Response)
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({ assignments: [] })
-        })
+        } as Response)
 
       renderWithRouter(<LandingPage />)
 
@@ -190,7 +199,7 @@ describe('LandingPage', () => {
       fireEvent.click(submitButton)
 
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(
+        expect(mockFetchWithRetry).toHaveBeenCalledWith(
           expect.stringContaining('/api/upload/'),
           expect.any(Object)
         )
@@ -198,7 +207,7 @@ describe('LandingPage', () => {
     })
 
     it('shows loading state during submission', async () => {
-      ;(global.fetch as jest.Mock).mockImplementation(() =>
+      mockFetchWithRetry.mockImplementation(() =>
         new Promise(resolve => setTimeout(resolve, 1000))
       )
 
@@ -222,7 +231,7 @@ describe('LandingPage', () => {
     })
 
     it('disables button during submission', async () => {
-      ;(global.fetch as jest.Mock).mockImplementation(() =>
+      mockFetchWithRetry.mockImplementation(() =>
         new Promise(resolve => setTimeout(resolve, 1000))
       )
 
@@ -248,15 +257,15 @@ describe('LandingPage', () => {
     it('navigates to results page on success', async () => {
       const mockAssignments = [{ session: 1, tables: {} }]
 
-      ;(global.fetch as jest.Mock)
+      mockFetchWithRetry
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({ session_id: 'session-123' })
-        })
+        } as Response)
         .mockResolvedValueOnce({
           ok: true,
           json: async () => mockAssignments
-        })
+        } as Response)
 
       renderWithRouter(<LandingPage />)
 
@@ -286,12 +295,12 @@ describe('LandingPage', () => {
     })
 
     it('displays error message on upload failure', async () => {
-      // Mock fetch to return 400 error (client error - won't retry)
-      ;(global.fetch as jest.Mock).mockResolvedValueOnce({
+      // Mock fetchWithRetry to return 400 error (client error - won't retry)
+      mockFetchWithRetry.mockResolvedValueOnce({
         ok: false,
         status: 400,
         json: async () => ({ detail: 'File upload failed' })
-      })
+      } as Response)
 
       renderWithRouter(<LandingPage />)
 
@@ -325,7 +334,8 @@ describe('LandingPage', () => {
     it('shows recent uploads when available', async () => {
       jest.spyOn(recentUploadsModule, 'getRecentUploadIds').mockReturnValue(['session-123'])
 
-      ;(global.fetch as jest.Mock).mockResolvedValueOnce({
+      // Mock authenticatedFetch for metadata API call (PR #35 uses authenticated calls)
+      mockAuthenticatedFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           session_id: 'session-123',
@@ -336,7 +346,7 @@ describe('LandingPage', () => {
           created_at: new Date().toISOString(),
           has_results: false
         })
-      })
+      } as Response)
 
       renderWithRouter(<LandingPage />)
 
@@ -349,10 +359,11 @@ describe('LandingPage', () => {
       jest.spyOn(recentUploadsModule, 'getRecentUploadIds').mockReturnValue(['expired-session'])
       const removeRecentUploadSpy = jest.spyOn(recentUploadsModule, 'removeRecentUpload')
 
-      ;(global.fetch as jest.Mock).mockResolvedValueOnce({
+      // Mock authenticatedFetch to return 404 for expired session (PR #35 uses authenticated calls)
+      mockAuthenticatedFetch.mockResolvedValueOnce({
         ok: false,
         status: 404
-      })
+      } as Response)
 
       renderWithRouter(<LandingPage />)
 

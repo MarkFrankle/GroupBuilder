@@ -1,4 +1,26 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "invites",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "token", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "sessions",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "session_id", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "versions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

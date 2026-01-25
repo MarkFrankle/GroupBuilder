@@ -99,3 +99,18 @@ class FirestoreService:
 
         session_doc = session_docs[0]
         return session_doc.reference.parent.parent.id
+
+
+# Singleton instance for dependency injection
+_firestore_service: Optional[FirestoreService] = None
+
+
+def get_firestore_service() -> FirestoreService:
+    """FastAPI dependency for FirestoreService.
+    
+    Returns a singleton instance to avoid creating new connections per request.
+    """
+    global _firestore_service
+    if _firestore_service is None:
+        _firestore_service = FirestoreService()
+    return _firestore_service
