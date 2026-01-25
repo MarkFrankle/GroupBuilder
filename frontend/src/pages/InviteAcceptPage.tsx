@@ -96,9 +96,9 @@ export function InviteAcceptPage() {
   // Loading state
   if (loading || authLoading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
-        <div style={{ maxWidth: '28rem', width: '100%', padding: '2rem', backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
-          <p style={{ textAlign: 'center', color: '#4b5563' }}>Loading invite...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full p-8 bg-white rounded-lg shadow">
+          <p className="text-center text-gray-600">Loading invite...</p>
         </div>
       </div>
     );
@@ -107,17 +107,17 @@ export function InviteAcceptPage() {
   // Success state
   if (success) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
-        <div style={{ maxWidth: '28rem', width: '100%', padding: '2rem', backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✓</div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#10b981' }}>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full p-8 bg-white rounded-lg shadow">
+          <div className="text-center">
+            <div className="text-5xl mb-4">✓</div>
+            <h1 className="text-2xl font-bold mb-4 text-green-500">
               Invite Accepted!
             </h1>
-            <p style={{ color: '#4b5563', marginBottom: '1rem' }}>
+            <p className="text-gray-600 mb-4">
               You've successfully joined <strong>{inviteDetails?.org_name}</strong>
             </p>
-            <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+            <p className="text-sm text-gray-500">
               Redirecting you to the app...
             </p>
           </div>
@@ -129,29 +129,19 @@ export function InviteAcceptPage() {
   // Error state
   if (error) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
-        <div style={{ maxWidth: '28rem', width: '100%', padding: '2rem', backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#ef4444' }}>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full p-8 bg-white rounded-lg shadow">
+          <div className="text-center">
+            <div className="text-5xl mb-4">⚠️</div>
+            <h1 className="text-2xl font-bold mb-4 text-red-500">
               Invite Error
             </h1>
-            <p style={{ color: '#4b5563', marginBottom: '1.5rem' }}>
+            <p className="text-gray-600 mb-6">
               {error}
             </p>
             <button
               onClick={() => navigate('/login')}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                backgroundColor: '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.375rem',
-                fontSize: '1rem',
-                fontWeight: '500',
-                cursor: 'pointer',
-              }}
+              className="w-full py-3 bg-blue-500 text-white rounded-md font-medium hover:bg-blue-600 transition-colors"
             >
               Go to Login
             </button>
@@ -164,50 +154,32 @@ export function InviteAcceptPage() {
   // Not logged in state
   if (!user && inviteDetails) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
-        <div style={{ maxWidth: '28rem', width: '100%', padding: '2rem', backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
-          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-            <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full p-8 bg-white rounded-lg shadow">
+          <div className="text-center mb-6">
+            <h1 className="text-3xl font-bold mb-2">
               You're Invited!
             </h1>
-            <p style={{ fontSize: '1.125rem', color: '#4b5563', marginBottom: '1rem' }}>
+            <p className="text-lg text-gray-600 mb-4">
               Join <strong>{inviteDetails.org_name}</strong> on GroupBuilder
             </p>
-            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>
+            <p className="text-sm text-gray-500 mb-2">
               Invited as: <strong>{inviteDetails.invited_email}</strong>
             </p>
-            <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+            <p className="text-sm text-gray-500">
               Expires: {new Date(inviteDetails.expires_at).toLocaleDateString()}
             </p>
           </div>
 
-          <div style={{
-            padding: '1rem',
-            backgroundColor: '#fef3c7',
-            borderRadius: '0.375rem',
-            marginBottom: '1.5rem',
-            border: '1px solid #fbbf24'
-          }}>
-            <p style={{ fontSize: '0.875rem', color: '#92400e', textAlign: 'center' }}>
+          <div className="p-4 bg-amber-50 rounded-md mb-6 border border-amber-400">
+            <p className="text-sm text-amber-800 text-center">
               Please sign in to accept this invite
             </p>
           </div>
 
           <button
             onClick={() => navigate('/login', { state: { returnTo: `/invite/${token}` } })}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              backgroundColor: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.375rem',
-              fontSize: '1rem',
-              fontWeight: '500',
-              cursor: 'pointer',
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}
+            className="w-full py-3 bg-blue-500 text-white rounded-md font-medium hover:bg-blue-600 transition-colors"
           >
             Sign In to Accept
           </button>
@@ -222,32 +194,26 @@ export function InviteAcceptPage() {
     const emailMismatch = user.email?.toLowerCase() !== inviteDetails.invited_email.toLowerCase();
 
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
-        <div style={{ maxWidth: '28rem', width: '100%', padding: '2rem', backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
-          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-            <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full p-8 bg-white rounded-lg shadow">
+          <div className="text-center mb-6">
+            <h1 className="text-3xl font-bold mb-2">
               You're Invited!
             </h1>
-            <p style={{ fontSize: '1.125rem', color: '#4b5563', marginBottom: '1rem' }}>
+            <p className="text-lg text-gray-600 mb-4">
               Join <strong>{inviteDetails.org_name}</strong> as a facilitator
             </p>
-            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>
+            <p className="text-sm text-gray-500 mb-2">
               Invited as: <strong>{inviteDetails.invited_email}</strong>
             </p>
-            <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+            <p className="text-sm text-gray-500">
               Signed in as: <strong>{user.email}</strong>
             </p>
           </div>
 
           {emailMismatch && (
-            <div style={{
-              padding: '1rem',
-              backgroundColor: '#fee2e2',
-              borderRadius: '0.375rem',
-              marginBottom: '1.5rem',
-              border: '1px solid #ef4444'
-            }}>
-              <p style={{ fontSize: '0.875rem', color: '#991b1b', textAlign: 'center' }}>
+            <div className="p-4 bg-red-50 rounded-md mb-6 border border-red-500">
+              <p className="text-sm text-red-800 text-center">
                 ⚠️ This invite is for {inviteDetails.invited_email}, but you're signed in as {user.email}. 
                 Please sign in with the correct email address.
               </p>
@@ -257,28 +223,13 @@ export function InviteAcceptPage() {
           <button
             onClick={handleAcceptInvite}
             disabled={accepting || emailMismatch}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              backgroundColor: emailMismatch ? '#9ca3af' : '#10b981',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.375rem',
-              fontSize: '1rem',
-              fontWeight: '500',
-              cursor: emailMismatch ? 'not-allowed' : 'pointer',
-              opacity: accepting ? 0.7 : 1,
-            }}
-            onMouseEnter={(e) => {
-              if (!emailMismatch && !accepting) {
-                e.currentTarget.style.backgroundColor = '#059669';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!emailMismatch) {
-                e.currentTarget.style.backgroundColor = '#10b981';
-              }
-            }}
+            className={`w-full py-3 text-white rounded-md font-medium transition-colors ${
+              emailMismatch
+                ? 'bg-gray-400 cursor-not-allowed'
+                : accepting
+                ? 'bg-green-500 opacity-70 cursor-wait'
+                : 'bg-green-500 hover:bg-green-600 cursor-pointer'
+            }`}
           >
             {accepting ? 'Accepting...' : emailMismatch ? 'Wrong Email Address' : 'Accept Invite'}
           </button>
@@ -286,24 +237,7 @@ export function InviteAcceptPage() {
           {emailMismatch && (
             <button
               onClick={() => navigate('/login')}
-              style={{
-                width: '100%',
-                marginTop: '0.75rem',
-                padding: '0.75rem',
-                backgroundColor: 'white',
-                color: '#3b82f6',
-                border: '1px solid #3b82f6',
-                borderRadius: '0.375rem',
-                fontSize: '1rem',
-                fontWeight: '500',
-                cursor: 'pointer',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#eff6ff';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'white';
-              }}
+              className="w-full mt-3 py-3 bg-white text-blue-500 border border-blue-500 rounded-md font-medium hover:bg-blue-50 transition-colors"
             >
               Sign In with Different Email
             </button>

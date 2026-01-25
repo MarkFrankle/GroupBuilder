@@ -37,13 +37,13 @@ export function AuthVerifyPage() {
 
   if (error) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
-        <div style={{ maxWidth: '28rem', width: '100%', padding: '2rem', backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' }}>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', textAlign: 'center', color: '#dc2626', marginBottom: '1rem' }}>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full p-8 bg-white rounded-lg shadow">
+          <h1 className="text-2xl font-bold text-center text-red-600 mb-4">
             Sign-in failed
           </h1>
-          <p style={{ textAlign: 'center', color: '#4b5563', marginBottom: '1rem' }}>{error}</p>
-          <a href="/login" style={{ display: 'block', textAlign: 'center', color: '#2563eb', textDecoration: 'underline' }}>
+          <p className="text-center text-gray-600 mb-4">{error}</p>
+          <a href="/login" className="block text-center text-blue-600 underline hover:text-blue-800">
             Try again
           </a>
         </div>
@@ -52,24 +52,12 @@ export function AuthVerifyPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
-      <div style={{ maxWidth: '28rem', width: '100%', padding: '2rem', backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
-          <div style={{
-            width: '3rem',
-            height: '3rem',
-            border: '2px solid #2563eb',
-            borderTopColor: 'transparent',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite'
-          }}></div>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="max-w-md w-full p-8 bg-white rounded-lg shadow">
+        <div className="flex justify-center mb-4">
+          <div className="w-12 h-12 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
         </div>
-        <p style={{ textAlign: 'center', color: '#4b5563' }}>Signing you in...</p>
-        <style>{`
-          @keyframes spin {
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
+        <p className="text-center text-gray-600">Signing you in...</p>
       </div>
     </div>
   );

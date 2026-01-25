@@ -57,27 +57,18 @@ export function LoginPage() {
 
   if (sent) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
-        <div style={{ maxWidth: '28rem', width: '100%', padding: '2rem', backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' }}>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', textAlign: 'center', marginBottom: '1rem' }}>Check your email</h1>
-          <p style={{ textAlign: 'center', color: '#4b5563', marginBottom: '1rem' }}>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full p-8 bg-white rounded-lg shadow">
+          <h1 className="text-2xl font-bold text-center mb-4">Check your email</h1>
+          <p className="text-center text-gray-600 mb-4">
             We've sent a sign-in link to <strong>{email}</strong>
           </p>
-          <p style={{ fontSize: '0.875rem', textAlign: 'center', color: '#6b7280', marginBottom: '1rem' }}>
+          <p className="text-sm text-center text-gray-500 mb-4">
             Click the link in the email to sign in. The link expires in 60 minutes.
           </p>
           <button
             onClick={handleResend}
-            style={{
-              width: '100%',
-              padding: '0.5rem 1rem',
-              backgroundColor: 'transparent',
-              color: '#2563eb',
-              border: '1px solid #2563eb',
-              borderRadius: '0.375rem',
-              cursor: 'pointer',
-              fontWeight: '500'
-            }}
+            className="w-full px-4 py-2 bg-transparent text-blue-600 border border-blue-600 rounded-md font-medium hover:bg-blue-50 transition-colors"
           >
             Use a different email
           </button>
@@ -87,18 +78,18 @@ export function LoginPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
-      <div style={{ maxWidth: '28rem', width: '100%', padding: '2rem', backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' }}>
-        <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
-          <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold' }}>GroupBuilder</h1>
-          <p style={{ color: '#4b5563' }}>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="max-w-md w-full p-8 bg-white rounded-lg shadow">
+        <div className="mb-6 text-center">
+          <h1 className="text-3xl font-bold">GroupBuilder</h1>
+          <p className="text-gray-600">
             Sign in to create balanced and diverse groups
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
-            <label htmlFor="email" style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem' }}>
+            <label htmlFor="email" className="block text-sm font-medium mb-2">
               Email address
             </label>
             <input
@@ -107,13 +98,13 @@ export function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              style={{ width: '100%', padding: '0.5rem 1rem', border: '1px solid #d1d5db', borderRadius: '0.375rem' }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               placeholder="your@email.com"
             />
           </div>
 
           {error && (
-            <div style={{ fontSize: '0.875rem', color: '#dc2626', backgroundColor: '#fef2f2', padding: '0.75rem', borderRadius: '0.375rem' }}>
+            <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md">
               {error}
             </div>
           )}
@@ -121,22 +112,17 @@ export function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            style={{
-              width: '100%',
-              padding: '0.5rem 1rem',
-              backgroundColor: loading ? '#9ca3af' : '#2563eb',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.375rem',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              fontWeight: '500'
-            }}
+            className={`w-full px-4 py-2 text-white rounded-md font-medium transition-colors ${
+              loading
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700 cursor-pointer'
+            }`}
           >
             {loading ? 'Sending...' : 'Send me a login link'}
           </button>
         </form>
 
-        <p style={{ fontSize: '0.75rem', textAlign: 'center', color: '#6b7280', marginTop: '1rem' }}>
+        <p className="text-xs text-center text-gray-500 mt-4">
           By signing in, you agree to our terms of service and privacy policy.
         </p>
       </div>
