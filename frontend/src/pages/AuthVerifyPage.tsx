@@ -1,7 +1,7 @@
 /**
  * Email link verification page
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { completeMagicLinkSignIn } from '../services/firebase';
 
@@ -9,8 +9,15 @@ export function AuthVerifyPage() {
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  
+  // Prevent duplicate sign-in attempts if deps change during async operation
+  const attemptedRef = useRef(false);
 
   useEffect(() => {
+    // Only attempt sign-in once
+    if (attemptedRef.current) return;
+    attemptedRef.current = true;
+
     const completeSignIn = async () => {
       try {
         await completeMagicLinkSignIn(window.location.href);

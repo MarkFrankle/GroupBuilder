@@ -1,8 +1,11 @@
 /**
  * Login page with magic link email input
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { sendMagicLink } from '../services/firebase';
+
+// Email validation regex
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -10,10 +13,30 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Check if there's a pending magic link (user clicked back)
+  useEffect(() => {
+    const pendingEmail = localStorage.getItem('emailForSignIn');
+    if (pendingEmail) {
+      setEmail(pendingEmail);
+      setSent(true);
+    }
+  }, []);
+
+  const validateEmail = (email: string): boolean => {
+    return EMAIL_REGEX.test(email);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
+
+    // Validate email format
+    if (!validateEmail(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    setLoading(true);
 
     try {
       await sendMagicLink(email);
@@ -25,6 +48,13 @@ export function LoginPage() {
     }
   };
 
+  const handleResend = () => {
+    // Clear pending email and allow user to try again
+    localStorage.removeItem('emailForSignIn');
+    setSent(false);
+    setError(null);
+  };
+
   if (sent) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
@@ -33,9 +63,24 @@ export function LoginPage() {
           <p style={{ textAlign: 'center', color: '#4b5563', marginBottom: '1rem' }}>
             We've sent a sign-in link to <strong>{email}</strong>
           </p>
-          <p style={{ fontSize: '0.875rem', textAlign: 'center', color: '#6b7280' }}>
+          <p style={{ fontSize: '0.875rem', textAlign: 'center', color: '#6b7280', marginBottom: '1rem' }}>
             Click the link in the email to sign in. The link expires in 60 minutes.
           </p>
+          <button
+            onClick={handleResend}
+            style={{
+              width: '100%',
+              padding: '0.5rem 1rem',
+              backgroundColor: 'transparent',
+              color: '#2563eb',
+              border: '1px solid #2563eb',
+              borderRadius: '0.375rem',
+              cursor: 'pointer',
+              fontWeight: '500'
+            }}
+          >
+            Use a different email
+          </button>
         </div>
       </div>
     );

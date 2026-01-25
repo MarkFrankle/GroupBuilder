@@ -3,14 +3,36 @@
  */
 import { getCurrentUserToken } from '../services/firebase';
 
+/**
+ * Error thrown when authentication fails and user needs to re-login
+ */
+export class AuthenticationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AuthenticationError';
+  }
+}
+
 export async function authenticatedFetch(
   url: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  const token = await getCurrentUserToken();
+  let token: string | null;
+
+  try {
+    token = await getCurrentUserToken();
+  } catch (error: any) {
+    // Token refresh failed - user needs to re-authenticate
+    // Common causes: session revoked, user deleted, token expired beyond refresh
+    console.error('Token refresh failed:', error);
+    
+    // Redirect to login
+    window.location.href = '/login';
+    throw new AuthenticationError('Session expired. Please sign in again.');
+  }
 
   if (!token) {
-    throw new Error('Not authenticated');
+    throw new AuthenticationError('Not authenticated');
   }
 
   const headers = new Headers(options.headers);
@@ -32,29 +54,14 @@ export async function apiRequest<T>(
   const response = await authenticatedFetch(url, options);
 
   if (!response.ok) {
-    // Try to parse error as JSON, fallback to text if it fails
-    let errorMessage = `HTTP ${response.status}`;
-
-    try {
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        const error = await response.json();
-        errorMessage = error.detail || errorMessage;
-      } else {
-        // Non-JSON response (likely HTML error page)
-        const text = await response.text();
-        // For 403, provide a clearer message
-        if (response.status === 403) {
-          errorMessage = 'Access denied. You may not have admin privileges.';
-        } else {
-          errorMessage = text.substring(0, 100) || errorMessage;
-        }
-      }
-    } catch (e) {
-      // Keep the default HTTP status message
+    // Handle 401 - token may have been invalidated server-side
+    if (response.status === 401) {
+      window.location.href = '/login';
+      throw new AuthenticationError('Session expired. Please sign in again.');
     }
 
-    throw new Error(errorMessage);
+    const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+    throw new Error(error.detail || `HTTP ${response.status}`);
   }
 
   return response.json();

@@ -18,6 +18,14 @@ const firebaseConfig = {
   projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
 };
 
+// Validate config - fail fast with clear message
+if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId) {
+  throw new Error(
+    'Missing Firebase config. Ensure REACT_APP_FIREBASE_API_KEY, ' +
+    'REACT_APP_FIREBASE_AUTH_DOMAIN, and REACT_APP_FIREBASE_PROJECT_ID are set in .env'
+  );
+}
+
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -32,26 +40,10 @@ export async function sendMagicLink(email: string): Promise<void> {
     handleCodeInApp: true,
   };
 
-  console.log('🔥 Firebase: Attempting to send magic link to:', email);
-  console.log('🔥 Firebase: Config:', {
-    apiKey: firebaseConfig.apiKey?.substring(0, 10) + '...',
-    authDomain: firebaseConfig.authDomain,
-    projectId: firebaseConfig.projectId
-  });
-  console.log('🔥 Firebase: Action code settings:', actionCodeSettings);
+  await sendSignInLinkToEmail(auth, email, actionCodeSettings);
 
-  try {
-    await sendSignInLinkToEmail(auth, email, actionCodeSettings);
-    console.log('✅ Firebase: Magic link sent successfully!');
-
-    // Save email to localStorage for verification step
-    window.localStorage.setItem('emailForSignIn', email);
-  } catch (error: any) {
-    console.error('❌ Firebase: Failed to send magic link:', error);
-    console.error('❌ Firebase: Error code:', error.code);
-    console.error('❌ Firebase: Error message:', error.message);
-    throw error;
-  }
+  // Save email to localStorage for verification step
+  window.localStorage.setItem('emailForSignIn', email);
 }
 
 /**
