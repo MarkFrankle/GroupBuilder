@@ -18,6 +18,14 @@ const firebaseConfig = {
   projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
 };
 
+// Validate config - fail fast with clear message
+if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId) {
+  throw new Error(
+    'Missing Firebase config. Ensure REACT_APP_FIREBASE_API_KEY, ' +
+    'REACT_APP_FIREBASE_AUTH_DOMAIN, and REACT_APP_FIREBASE_PROJECT_ID are set in .env'
+  );
+}
+
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
