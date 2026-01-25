@@ -2,7 +2,12 @@
 import pytest
 from fastapi import FastAPI, Depends
 from fastapi.testclient import TestClient
-from api.middleware.auth import get_current_user, require_session_access, AuthUser
+from api.middleware.auth import (
+    get_current_user,
+    require_session_access,
+    get_firestore_service,
+    AuthUser
+)
 
 
 @pytest.fixture
@@ -38,7 +43,7 @@ def test_invalid_authorization_format(test_app):
     assert response.json() == {"detail": "Invalid authorization header format"}
 
 
-def test_require_session_access_forbidden(monkeypatch):
+def test_require_session_access_forbidden():
     """Should return 403 if user doesn't have access to session."""
     # Create test app with session route
     app = FastAPI()
@@ -50,7 +55,7 @@ def test_require_session_access_forbidden(monkeypatch):
     ):
         return {"message": "Access granted"}
 
-    # Mock get_current_user to return a user (using dependency override)
+    # Mock get_current_user to return a user
     async def mock_get_current_user():
         return AuthUser(
             user_id="user123",
@@ -63,16 +68,51 @@ def test_require_session_access_forbidden(monkeypatch):
         def check_user_can_access_session(self, user_id, session_id):
             return False
 
-    # Use FastAPI's dependency override instead of monkeypatch
-    app.dependency_overrides[get_current_user] = mock_get_current_user
+    def mock_get_firestore_service():
+        return MockFirestoreService()
 
-    # Monkeypatch FirestoreService
-    monkeypatch.setattr(
-        "api.middleware.auth.FirestoreService",
-        lambda: MockFirestoreService()
-    )
+    # Use FastAPI's dependency override
+    app.dependency_overrides[get_current_user] = mock_get_current_user
+    app.dependency_overrides[get_firestore_service] = mock_get_firestore_service
 
     client = TestClient(app)
     response = client.get("/session/session456")
     assert response.status_code == 403
     assert "Access denied" in response.json()["detail"]
+
+
+def test_require_session_access_granted():
+    """Should return 200 if user has access to session."""
+    app = FastAPI()
+
+    @app.get("/session/{session_id}")
+    async def session_route(
+        session_id: str,
+        user: AuthUser = Depends(require_session_access)
+    ):
+        return {"message": "Access granted", "user_id": user.user_id}
+
+    # Mock get_current_user to return a user
+    async def mock_get_current_user():
+        return AuthUser(
+            user_id="user123",
+            email="test@example.com",
+            email_verified=True
+        )
+
+    # Mock FirestoreService to return True for access check
+    class MockFirestoreService:
+        def check_user_can_access_session(self, user_id, session_id):
+            return True
+
+    def mock_get_firestore_service():
+        return MockFirestoreService()
+
+    # Use FastAPI's dependency override
+    app.dependency_overrides[get_current_user] = mock_get_current_user
+    app.dependency_overrides[get_firestore_service] = mock_get_firestore_service
+
+    client = TestClient(app)
+    response = client.get("/session/session456")
+    assert response.status_code == 200
+    assert response.json() == {"message": "Access granted", "user_id": "user123"}

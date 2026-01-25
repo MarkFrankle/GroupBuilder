@@ -1,4 +1,5 @@
 """Authentication middleware for Firebase tokens."""
+import logging
 from fastapi import Header, HTTPException, status, Depends, Path
 from typing import Optional
 from pydantic import BaseModel
@@ -6,12 +7,23 @@ from ..firebase_admin import verify_firebase_token
 from ..services.firestore_service import FirestoreService
 from firebase_admin import auth as firebase_auth
 
+logger = logging.getLogger(__name__)
+
 
 class AuthUser(BaseModel):
     """Authenticated user information."""
     user_id: str
     email: str
     email_verified: bool
+
+
+def get_firestore_service() -> FirestoreService:
+    """Dependency provider for FirestoreService.
+    
+    Returns:
+        FirestoreService instance
+    """
+    return FirestoreService()
 
 
 async def get_current_user(
@@ -64,21 +76,25 @@ async def get_current_user(
             detail="Firebase token expired"
         )
     except Exception as e:
+        # Log the actual error internally but don't expose details to client
+        logger.error(f"Token verification failed: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Token verification failed: {str(e)}"
+            detail="Token verification failed"
         )
 
 
 async def require_session_access(
     session_id: str = Path(..., description="Session ID from URL"),
-    user: AuthUser = Depends(get_current_user)
+    user: AuthUser = Depends(get_current_user),
+    firestore_service: FirestoreService = Depends(get_firestore_service)
 ) -> AuthUser:
     """Require that the current user has access to the specified session.
 
     Args:
         session_id: Session ID from path parameter
         user: Current authenticated user
+        firestore_service: Firestore service instance (injected)
 
     Returns:
         AuthUser if access granted
@@ -86,8 +102,6 @@ async def require_session_access(
     Raises:
         HTTPException: 403 if user doesn't have access to session
     """
-    firestore_service = FirestoreService()
-
     has_access = firestore_service.check_user_can_access_session(
         user_id=user.user_id,
         session_id=session_id
