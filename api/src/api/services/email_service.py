@@ -1,11 +1,14 @@
 """Email service using SendGrid for transactional emails."""
+import logging
 import os
 from pathlib import Path
 from typing import Optional
+
 from jinja2 import Environment, FileSystemLoader
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, Content
 
+logger = logging.getLogger(__name__)
 
 # Template directory
 TEMPLATE_DIR = Path(__file__).parent.parent / "templates"
@@ -28,7 +31,7 @@ class EmailService:
 
         if not self.api_key:
             # Log warning but don't fail - allows running without SendGrid configured
-            print("⚠️  SENDGRID_API_KEY not set - emails will be skipped")
+            logger.warning("SENDGRID_API_KEY not set - emails will be skipped")
 
     def _send_email(
         self,
@@ -49,7 +52,7 @@ class EmailService:
             True if sent successfully, False otherwise
         """
         if not self.api_key:
-            print(f"📧 [DRY RUN] Would send email to {to_email}: {subject}")
+            logger.info(f"[DRY RUN] Would send email to {to_email}: {subject}")
             return False
 
         try:
@@ -65,14 +68,14 @@ class EmailService:
             response = client.send(message)
 
             if response.status_code in (200, 201, 202):
-                print(f"✅ Email sent to {to_email}")
+                logger.info(f"Email sent successfully to {to_email}")
                 return True
             else:
-                print(f"❌ Email failed: {response.status_code}")
+                logger.error(f"Email delivery failed to {to_email}: HTTP {response.status_code}")
                 return False
 
         except Exception as e:
-            print(f"❌ Email error: {e}")
+            logger.exception(f"Exception sending email to {to_email}: {e}")
             return False
 
     def _render_template(self, template_name: str, **context) -> str:

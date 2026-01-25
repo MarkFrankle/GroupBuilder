@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import TableAssignmentsPage from '../TableAssignmentsPage'
+import { authenticatedFetch } from '@/utils/apiClient'
 
 // Mock clipboard API
 Object.assign(navigator, {
@@ -9,7 +10,10 @@ Object.assign(navigator, {
   },
 })
 
-// Mock fetch globally
+// Get the mocked authenticatedFetch (already mocked in setupTests.ts)
+const mockAuthenticatedFetch = authenticatedFetch as jest.MockedFunction<typeof authenticatedFetch>
+
+// Keep global.fetch mock for non-authenticated calls (e.g., seating chart POST)
 global.fetch = jest.fn()
 
 const mockAssignmentsData = [
@@ -38,24 +42,24 @@ describe('TableAssignmentsPage copy link functionality', () => {
     // Clear clipboard mock
     ;(navigator.clipboard.writeText as jest.Mock).mockClear()
 
-    // Mock fetch responses
+    // Mock global.fetch responses (component uses bare fetch, not authenticatedFetch)
     ;(global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/api/assignments/results/') && url.includes('/versions')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ versions: [] }),
+        } as Response)
+      }
       if (url.includes('/api/assignments/')) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve(mockAssignmentsData),
-        })
-      }
-      if (url.includes('/sessions/') && url.includes('/versions')) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve([]),
-        })
+        } as Response)
       }
       return Promise.resolve({
         ok: false,
         json: () => Promise.resolve({}),
-      })
+      } as Response)
     })
   })
 
@@ -124,23 +128,24 @@ describe('TableAssignmentsPage session dropdown', () => {
       search: '?session=test-123',
     } as any
 
+    // Mock global.fetch responses (component uses bare fetch, not authenticatedFetch)
     ;(global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/api/assignments/results/') && url.includes('/versions')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ versions: [] }),
+        } as Response)
+      }
       if (url.includes('/api/assignments/')) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve(mockMultipleSessionsData),
-        })
-      }
-      if (url.includes('/sessions/') && url.includes('/versions')) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve([]),
-        })
+        } as Response)
       }
       return Promise.resolve({
         ok: false,
         json: () => Promise.resolve({}),
-      })
+      } as Response)
     })
   })
 
@@ -186,7 +191,14 @@ describe('TableAssignmentsPage unified control bar', () => {
       search: '?session=test-123',
     } as any
 
+    // Mock global.fetch responses (component uses bare fetch, not authenticatedFetch)
     ;(global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/versions')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ versions: [] }),
+        } as Response)
+      }
       if (url.includes('/api/assignments/')) {
         return Promise.resolve({
           ok: true,
@@ -194,18 +206,12 @@ describe('TableAssignmentsPage unified control bar', () => {
             { session: 1, tables: { 1: [] } },
             { session: 2, tables: { 1: [] } },
           ]),
-        })
-      }
-      if (url.includes('/versions')) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ versions: [] }),
-        })
+        } as Response)
       }
       return Promise.resolve({
         ok: false,
         json: () => Promise.resolve({}),
-      })
+      } as Response)
     })
   })
 

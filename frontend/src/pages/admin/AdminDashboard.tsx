@@ -15,6 +15,13 @@ interface Organization {
   member_count: number;
 }
 
+interface PaginatedOrgsResponse {
+  organizations: Organization[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export function AdminDashboard() {
   const { user, signOut } = useAuth();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -27,8 +34,9 @@ export function AdminDashboard() {
     setError(null);
 
     try {
-      const orgs = await apiRequest<Organization[]>('/api/admin/organizations');
+      const response = await apiRequest<PaginatedOrgsResponse>('/api/admin/organizations?limit=100');
       // Sort by created date (newest first)
+      const orgs = response.organizations;
       orgs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setOrganizations(orgs);
     } catch (err: any) {
