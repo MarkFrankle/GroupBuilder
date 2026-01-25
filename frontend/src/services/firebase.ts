@@ -40,26 +40,10 @@ export async function sendMagicLink(email: string): Promise<void> {
     handleCodeInApp: true,
   };
 
-  console.log('🔥 Firebase: Attempting to send magic link to:', email);
-  console.log('🔥 Firebase: Config:', {
-    apiKey: firebaseConfig.apiKey?.substring(0, 10) + '...',
-    authDomain: firebaseConfig.authDomain,
-    projectId: firebaseConfig.projectId
-  });
-  console.log('🔥 Firebase: Action code settings:', actionCodeSettings);
+  await sendSignInLinkToEmail(auth, email, actionCodeSettings);
 
-  try {
-    await sendSignInLinkToEmail(auth, email, actionCodeSettings);
-    console.log('✅ Firebase: Magic link sent successfully!');
-
-    // Save email to localStorage for verification step
-    window.localStorage.setItem('emailForSignIn', email);
-  } catch (error: any) {
-    console.error('❌ Firebase: Failed to send magic link:', error);
-    console.error('❌ Firebase: Error code:', error.code);
-    console.error('❌ Firebase: Error message:', error.message);
-    throw error;
-  }
+  // Save email to localStorage for verification step
+  window.localStorage.setItem('emailForSignIn', email);
 }
 
 /**
