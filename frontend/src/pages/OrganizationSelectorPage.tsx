@@ -15,65 +15,21 @@ export default function OrganizationSelectorPage() {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: '#f5f5f5'
-    }}>
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '8px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        padding: '40px',
-        maxWidth: '500px',
-        width: '100%'
-      }}>
-        <h1 style={{
-          fontSize: '24px',
-          fontWeight: '600',
-          marginBottom: '8px',
-          textAlign: 'center'
-        }}>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="bg-white rounded-lg shadow-lg p-10 max-w-lg w-full">
+        <h1 className="text-2xl font-semibold mb-2 text-center">
           Select Your Organization
         </h1>
-        <p style={{
-          color: '#666',
-          textAlign: 'center',
-          marginBottom: '32px'
-        }}>
+        <p className="text-gray-500 text-center mb-8">
           You're a facilitator for multiple cohorts. Which one are you working on?
         </p>
 
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px'
-        }}>
+        <div className="flex flex-col gap-3">
           {organizations.map((org) => (
             <button
               key={org.id}
               onClick={() => handleSelectOrg(org)}
-              style={{
-                padding: '16px 20px',
-                border: '2px solid #e0e0e0',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                cursor: 'pointer',
-                textAlign: 'left',
-                fontSize: '16px',
-                fontWeight: '500',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#2196F3';
-                e.currentTarget.style.backgroundColor = '#f0f8ff';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = '#e0e0e0';
-                e.currentTarget.style.backgroundColor = 'white';
-              }}
+              className="p-4 border-2 border-gray-200 rounded-lg bg-white text-left text-base font-medium transition-all hover:border-blue-500 hover:bg-blue-50"
             >
               {org.name}
             </button>
