@@ -334,8 +334,8 @@ describe('LandingPage', () => {
     it('shows recent uploads when available', async () => {
       jest.spyOn(recentUploadsModule, 'getRecentUploadIds').mockReturnValue(['session-123'])
 
-      // Mock global.fetch for metadata API call (component uses bare fetch)
-      ;(global.fetch as jest.Mock).mockResolvedValueOnce({
+      // Mock authenticatedFetch for metadata API call (PR #35 uses authenticated calls)
+      mockAuthenticatedFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           session_id: 'session-123',
@@ -359,8 +359,8 @@ describe('LandingPage', () => {
       jest.spyOn(recentUploadsModule, 'getRecentUploadIds').mockReturnValue(['expired-session'])
       const removeRecentUploadSpy = jest.spyOn(recentUploadsModule, 'removeRecentUpload')
 
-      // Mock global.fetch to return 404 for expired session (component uses bare fetch)
-      ;(global.fetch as jest.Mock).mockResolvedValueOnce({
+      // Mock authenticatedFetch to return 404 for expired session (PR #35 uses authenticated calls)
+      mockAuthenticatedFetch.mockResolvedValueOnce({
         ok: false,
         status: 404
       } as Response)

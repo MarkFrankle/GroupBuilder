@@ -42,8 +42,8 @@ describe('TableAssignmentsPage copy link functionality', () => {
     // Clear clipboard mock
     ;(navigator.clipboard.writeText as jest.Mock).mockClear()
 
-    // Mock global.fetch responses (component uses bare fetch, not authenticatedFetch)
-    ;(global.fetch as jest.Mock).mockImplementation((url: string) => {
+    // Mock authenticatedFetch responses (PR #35 uses authenticated API calls)
+    mockAuthenticatedFetch.mockImplementation((url: string) => {
       if (url.includes('/api/assignments/results/') && url.includes('/versions')) {
         return Promise.resolve({
           ok: true,
@@ -128,8 +128,8 @@ describe('TableAssignmentsPage session dropdown', () => {
       search: '?session=test-123',
     } as any
 
-    // Mock global.fetch responses (component uses bare fetch, not authenticatedFetch)
-    ;(global.fetch as jest.Mock).mockImplementation((url: string) => {
+    // Mock authenticatedFetch responses (PR #35 uses authenticated API calls)
+    mockAuthenticatedFetch.mockImplementation((url: string) => {
       if (url.includes('/api/assignments/results/') && url.includes('/versions')) {
         return Promise.resolve({
           ok: true,
@@ -191,8 +191,8 @@ describe('TableAssignmentsPage unified control bar', () => {
       search: '?session=test-123',
     } as any
 
-    // Mock global.fetch responses (component uses bare fetch, not authenticatedFetch)
-    ;(global.fetch as jest.Mock).mockImplementation((url: string) => {
+    // Mock authenticatedFetch responses (PR #35 uses authenticated API calls)
+    mockAuthenticatedFetch.mockImplementation((url: string) => {
       if (url.includes('/versions')) {
         return Promise.resolve({
           ok: true,
