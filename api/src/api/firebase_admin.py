@@ -1,10 +1,14 @@
 """Firebase Admin SDK initialization."""
+import logging
 import os
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
+from google.cloud.firestore_v1 import Client
 from typing import Optional
 
-_firestore_client: Optional[firestore.Client] = None
+logger = logging.getLogger(__name__)
+
+_firestore_client: Optional[Client] = None
 
 
 def initialize_firebase():
@@ -13,9 +17,10 @@ def initialize_firebase():
     Called once at application startup.
     """
     # Get service account path from environment
+    # Check FIREBASE_SERVICE_ACCOUNT_PATH first, then GOOGLE_APPLICATION_CREDENTIALS
     service_account_path = os.getenv(
         "FIREBASE_SERVICE_ACCOUNT_PATH",
-        "./firebase-service-account.json"
+        os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "./firebase-service-account.json")
     )
 
     # Initialize Firebase app
@@ -26,10 +31,10 @@ def initialize_firebase():
     global _firestore_client
     _firestore_client = firestore.client()
 
-    print(f"✅ Firebase Admin SDK initialized with project: {cred.project_id}")
+    logger.info(f"Firebase Admin SDK initialized with project: {cred.project_id}")
 
 
-def get_firestore_client() -> firestore.Client:
+def get_firestore_client() -> Client:
     """Get initialized Firestore client.
 
     Returns:
