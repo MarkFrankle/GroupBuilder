@@ -1,4 +1,6 @@
+import io
 import pytest
+import pandas as pd
 
 
 class TestGetRoster:
@@ -72,3 +74,67 @@ class TestDeleteParticipant:
         roster = client.get("/api/roster/")
         bob = [p for p in roster.json()["participants"] if p["name"] == "Bob"][0]
         assert bob["partner_id"] is None
+
+
+class TestImportRoster:
+    def _make_excel(self, participants):
+        df = pd.DataFrame(participants)
+        buffer = io.BytesIO()
+        df.to_excel(buffer, index=False)
+        buffer.seek(0)
+        return buffer
+
+    def test_imports_excel_file(self, client):
+        excel = self._make_excel([
+            {"Name": "Alice", "Religion": "Christian", "Gender": "Female", "Partner": ""},
+            {"Name": "Bob", "Religion": "Jewish", "Gender": "Male", "Partner": ""},
+        ])
+        response = client.post(
+            "/api/roster/import",
+            files={"file": ("roster.xlsx", excel, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["participants"]) == 2
+
+    def test_imports_with_partners(self, client):
+        excel = self._make_excel([
+            {"Name": "Alice", "Religion": "Christian", "Gender": "Female", "Partner": "Bob"},
+            {"Name": "Bob", "Religion": "Jewish", "Gender": "Male", "Partner": "Alice"},
+        ])
+        response = client.post(
+            "/api/roster/import",
+            files={"file": ("roster.xlsx", excel, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        )
+        assert response.status_code == 200
+        participants = response.json()["participants"]
+        alice = [p for p in participants if p["name"] == "Alice"][0]
+        bob = [p for p in participants if p["name"] == "Bob"][0]
+        assert alice["partner_id"] == bob["id"]
+        assert bob["partner_id"] == alice["id"]
+
+    def test_rejects_missing_columns(self, client):
+        excel = self._make_excel([{"Name": "Alice", "Religion": "Christian"}])
+        response = client.post(
+            "/api/roster/import",
+            files={"file": ("roster.xlsx", excel, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        )
+        assert response.status_code == 400
+
+    def test_clears_existing_roster_on_import(self, client):
+        client.put("/api/roster/p1", json={
+            "name": "OldPerson", "religion": "Christian",
+            "gender": "Female", "partner_id": None,
+        })
+        excel = self._make_excel([
+            {"Name": "NewPerson", "Religion": "Jewish", "Gender": "Male", "Partner": ""},
+        ])
+        response = client.post(
+            "/api/roster/import",
+            files={"file": ("roster.xlsx", excel, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        )
+        assert response.status_code == 200
+        roster = client.get("/api/roster/")
+        names = [p["name"] for p in roster.json()["participants"]]
+        assert "NewPerson" in names
+        assert "OldPerson" not in names

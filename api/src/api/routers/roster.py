@@ -1,4 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+import io
+import uuid
+
+import pandas as pd
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from pydantic import BaseModel
 from typing import Optional
 from slowapi import Limiter
@@ -38,6 +42,75 @@ async def get_roster(
 ):
     participants = roster_service.get_roster(org_id)
     return {"participants": participants}
+
+
+REQUIRED_COLUMNS = {"Name", "Religion", "Gender", "Partner"}
+
+
+@router.post("/import")
+@limiter.limit("10/minute")
+async def import_roster(
+    request: Request,
+    file: UploadFile = File(...),
+    org_id: str = Depends(_get_org_id),
+    roster_service: RosterService = Depends(get_roster_service),
+):
+    if not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="File must be .xlsx or .xls")
+
+    contents = await file.read()
+    try:
+        df = pd.read_excel(io.BytesIO(contents))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Could not parse Excel file")
+
+    missing = REQUIRED_COLUMNS - set(df.columns)
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Missing columns: {', '.join(missing)}")
+
+    # Clear existing roster
+    existing = roster_service.get_roster(org_id)
+    for p in existing:
+        roster_service.delete_participant(org_id, p["id"])
+
+    # First pass: create without partners
+    name_to_id = {}
+    participants = []
+    for _, row in df.iterrows():
+        name = str(row["Name"]).strip()
+        if not name or name == "nan":
+            continue
+        pid = str(uuid.uuid4())
+        religion = str(row.get("Religion", "Other")).strip()
+        if religion == "nan" or religion not in ("Christian", "Jewish", "Muslim", "Other"):
+            religion = "Other"
+        gender = str(row.get("Gender", "Other")).strip()
+        if gender == "nan" or gender not in ("Male", "Female", "Other"):
+            gender = "Other"
+
+        roster_service.upsert_participant(org_id, pid, {
+            "name": name, "religion": religion,
+            "gender": gender, "partner_id": None,
+        })
+        name_to_id[name] = pid
+        participants.append({"id": pid, "name": name, "religion": religion,
+                             "gender": gender, "partner_id": None})
+
+    # Second pass: link partners
+    for _, row in df.iterrows():
+        name = str(row["Name"]).strip()
+        partner_name = str(row.get("Partner", "")).strip()
+        if not partner_name or partner_name == "nan" or partner_name == "":
+            continue
+        if name in name_to_id and partner_name in name_to_id:
+            pid = name_to_id[name]
+            partner_pid = name_to_id[partner_name]
+            p = [x for x in participants if x["id"] == pid][0]
+            p["partner_id"] = partner_pid
+            roster_service.upsert_participant(org_id, pid, {**p})
+
+    final = roster_service.get_roster(org_id)
+    return {"participants": final}
 
 
 @router.put("/{participant_id}")
