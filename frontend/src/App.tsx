@@ -7,6 +7,7 @@ import AuthVerifyPage from "./pages/AuthVerifyPage"
 import LandingPage from "./pages/LandingPage"
 import TableAssignmentsPage from "./pages/TableAssignmentsPage"
 import SeatingChartPage from "./pages/SeatingChartPage"
+import { RosterPage } from "./pages/RosterPage"
 import { AdminDashboard } from "./pages/admin/AdminDashboard"
 import InviteAcceptPage from "./pages/InviteAcceptPage"
 import OrganizationSelectorPage from "./pages/OrganizationSelectorPage"
@@ -83,6 +84,14 @@ const App: React.FC = () => {
               element={
                 <ProtectedRoute>
                   <LandingPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/roster"
+              element={
+                <ProtectedRoute>
+                  <RosterPage />
                 </ProtectedRoute>
               }
             />
