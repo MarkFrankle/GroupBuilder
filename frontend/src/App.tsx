@@ -1,5 +1,5 @@
 import React from "react"
-import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from "react-router-dom"
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation, Link } from "react-router-dom"
 import { AuthProvider, useAuth } from "./contexts/AuthContext"
 import { OrganizationProvider, useOrganization } from "./contexts/OrganizationContext"
 import LoginPage from "./pages/LoginPage"
@@ -60,11 +60,23 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function NavBar() {
+  const { user } = useAuth();
+  if (!user) return null;
+  return (
+    <nav className="border-b px-4 py-2 flex gap-4 text-sm">
+      <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
+      <Link to="/roster" className="text-muted-foreground hover:text-foreground transition-colors">Roster</Link>
+    </nav>
+  );
+}
+
 const App: React.FC = () => {
   return (
     <AuthProvider>
       <OrganizationProvider>
         <Router>
+          <NavBar />
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/auth/verify" element={<AuthVerifyPage />} />
