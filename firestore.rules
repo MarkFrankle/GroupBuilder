@@ -50,6 +50,12 @@ service cloud.firestore {
         allow create, update, delete: if isBBAdmin();
       }
       
+      // Roster subcollection
+      match /roster/{participantId} {
+        // Org members can read/write roster in their org
+        allow read, write: if isOrgMember(orgId);
+      }
+
       // Sessions subcollection
       match /sessions/{sessionId} {
         // Org members can read/write sessions in their org
