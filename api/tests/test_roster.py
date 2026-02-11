@@ -172,3 +172,25 @@ class TestImportRoster:
         names = [p["name"] for p in roster.json()["participants"]]
         assert "NewPerson" in names
         assert "OldPerson" not in names
+
+
+class TestFullFlow:
+    def test_create_roster_and_generate(self, client):
+        """Create participants via API, then generate assignments."""
+        for i in range(6):
+            response = client.put(f"/api/roster/p{i}", json={
+                "name": f"Person{i}",
+                "religion": ["Christian", "Jewish", "Muslim"][i % 3],
+                "gender": ["Male", "Female"][i % 2],
+                "partner_id": None,
+            })
+            assert response.status_code == 200
+
+        roster = client.get("/api/roster/")
+        assert len(roster.json()["participants"]) == 6
+
+        response = client.post("/api/roster/generate", json={
+            "num_tables": 2, "num_sessions": 2,
+        })
+        assert response.status_code == 200
+        assert "session_id" in response.json()
