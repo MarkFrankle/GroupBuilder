@@ -33,9 +33,17 @@ class MockFirestoreDocumentReference:
         self.parent = collection
         self._subcollections = {}
     
-    def set(self, data):
+    def set(self, data, merge=False):
         """Set document data."""
-        self._collection._documents[self.id] = data
+        if merge and self.id in self._collection._documents:
+            existing = self._collection._documents[self.id]
+            existing.update(data)
+        else:
+            self._collection._documents[self.id] = data
+
+    def delete(self):
+        """Delete document data."""
+        self._collection._documents.pop(self.id, None)
     
     def get(self):
         """Get document."""
@@ -258,9 +266,12 @@ def client():
             email_verified=True
         )
 
+    from api.routers.roster import _get_org_id
+
     # Override both auth dependencies
     app.dependency_overrides[require_session_access] = mock_auth
     app.dependency_overrides[get_current_user] = mock_auth
+    app.dependency_overrides[_get_org_id] = lambda: "test_org_id"
 
     # Set up test organization in mock Firestore
     _mock_firestore_client._collections.clear()  # Clear any existing data

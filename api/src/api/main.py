@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from api.routers import upload, assignments, admin, invites, admin_org_details, user
+from api.routers import upload, assignments, admin, invites, admin_org_details, user, roster
 from api.middleware import RequestIDMiddleware, RequestIDLogFilter
 from api.firebase_admin import initialize_firebase
 from fastapi import FastAPI, Request
@@ -59,6 +59,7 @@ app.include_router(admin.router)
 app.include_router(admin_org_details.router)
 app.include_router(invites.router)
 app.include_router(user.router, prefix="/api/user", tags=["user"])
+app.include_router(roster.router, prefix="/api/roster", tags=["roster"])
 
 
 @app.get("/health", tags=["health"])
