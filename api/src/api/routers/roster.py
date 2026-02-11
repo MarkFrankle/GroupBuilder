@@ -8,9 +8,12 @@ from typing import Optional
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from pydantic import Field
+
 from api.middleware.auth import get_current_user, AuthUser
 from api.services.roster_service import RosterService, get_roster_service
 from api.services.firestore_service import FirestoreService, get_firestore_service
+from api.services.session_storage import SessionStorage
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
@@ -111,6 +114,79 @@ async def import_roster(
 
     final = roster_service.get_roster(org_id)
     return {"participants": final}
+
+
+class GenerateRequest(BaseModel):
+    num_tables: int = Field(ge=1, le=10)
+    num_sessions: int = Field(ge=1, le=6)
+
+
+def _roster_to_participant_list(participants: list[dict]) -> list[dict]:
+    """Convert roster docs to the solver's expected participant dict format."""
+    id_to_name = {p["id"]: p["name"] for p in participants}
+
+    result = []
+    for i, p in enumerate(participants):
+        partner_name = None
+        if p.get("partner_id") and p["partner_id"] in id_to_name:
+            partner_name = id_to_name[p["partner_id"]]
+        result.append({
+            "id": i + 1,
+            "name": p["name"],
+            "religion": p["religion"],
+            "gender": p["gender"],
+            "partner": partner_name,
+            "couple_id": None,
+        })
+
+    # Assign couple IDs
+    couple_map = {}
+    next_couple_id = 1
+    for p in result:
+        if p["partner"]:
+            key = tuple(sorted([p["name"], p["partner"]]))
+            if key not in couple_map:
+                couple_map[key] = next_couple_id
+                next_couple_id += 1
+            p["couple_id"] = couple_map[key]
+
+    return result
+
+
+@router.post("/generate")
+@limiter.limit("10/minute")
+async def generate_from_roster(
+    request: Request,
+    data: GenerateRequest,
+    user: AuthUser = Depends(get_current_user),
+    org_id: str = Depends(_get_org_id),
+    roster_service: RosterService = Depends(get_roster_service),
+):
+    participants = roster_service.get_roster(org_id)
+    if not participants:
+        raise HTTPException(status_code=400, detail="Roster is empty")
+
+    if len(participants) < data.num_tables:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Need at least {data.num_tables} participants for {data.num_tables} tables"
+        )
+
+    participant_list = _roster_to_participant_list(participants)
+
+    session_id = str(uuid.uuid4())
+    storage = SessionStorage()
+    storage.save_session(
+        org_id=org_id,
+        session_id=session_id,
+        user_id=user.user_id,
+        participant_data=participant_list,
+        num_tables=data.num_tables,
+        num_sessions=data.num_sessions,
+        filename="roster",
+    )
+
+    return {"session_id": session_id, "message": "Session created from roster"}
 
 
 @router.put("/{participant_id}")

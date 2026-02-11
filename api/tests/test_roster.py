@@ -76,6 +76,40 @@ class TestDeleteParticipant:
         assert bob["partner_id"] is None
 
 
+class TestCreateSessionFromRoster:
+    def test_creates_session(self, client):
+        client.put("/api/roster/p1", json={
+            "name": "Alice", "religion": "Christian",
+            "gender": "Female", "partner_id": None,
+        })
+        client.put("/api/roster/p2", json={
+            "name": "Bob", "religion": "Jewish",
+            "gender": "Male", "partner_id": None,
+        })
+        response = client.post("/api/roster/generate", json={
+            "num_tables": 1, "num_sessions": 1,
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert "session_id" in data
+
+    def test_rejects_empty_roster(self, client):
+        response = client.post("/api/roster/generate", json={
+            "num_tables": 1, "num_sessions": 1,
+        })
+        assert response.status_code == 400
+
+    def test_rejects_too_few_participants(self, client):
+        client.put("/api/roster/p1", json={
+            "name": "Alice", "religion": "Christian",
+            "gender": "Female", "partner_id": None,
+        })
+        response = client.post("/api/roster/generate", json={
+            "num_tables": 3, "num_sessions": 1,
+        })
+        assert response.status_code == 400
+
+
 class TestImportRoster:
     def _make_excel(self, participants):
         df = pd.DataFrame(participants)
