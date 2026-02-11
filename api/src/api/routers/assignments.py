@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query, Path, Request, Body
+from fastapi import APIRouter, HTTPException, Query, Path, Request, Body, Depends
 from assignment_logic.api_handler import handle_generate_assignments
 from assignment_logic.group_builder import GroupBuilder
 from api.storage import (
@@ -6,6 +6,7 @@ from api.storage import (
     store_session, get_result_versions
 )
 from api.utils.seating_arrangement import arrange_circular_seating
+from api.middleware.auth import require_session_access, get_current_user, AuthUser
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from datetime import datetime
@@ -174,7 +175,8 @@ def _generate_assignments_internal(session_id: str, mark_regenerated: bool = Fal
 def get_assignments(
     request: Request,
     session_id: str = Query(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$"),
-    max_time_seconds: int = Query(120, ge=30, le=240, description="Maximum solver time in seconds (30-240)")
+    max_time_seconds: int = Query(120, ge=30, le=240, description="Maximum solver time in seconds (30-240)"),
+    user: AuthUser = Depends(get_current_user)
 ):
     """Generate assignments for a session."""
     if not session_exists(session_id):
@@ -432,8 +434,13 @@ async def regenerate_single_session(
 @router.get("/results/{session_id}")
 async def get_cached_results(
     session_id: str = Path(..., description="Session ID", min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$"),
-    version: Optional[str] = Query(None, description="Version ID (e.g., 'v1'). Defaults to latest.", max_length=10)
+    version: Optional[str] = Query(None, description="Version ID (e.g., 'v1'). Defaults to latest.", max_length=10),
+    user: AuthUser = Depends(require_session_access)
 ):
+    """Get assignment results for a session.
+
+    Now requires authentication and org membership.
+    """
     logger.info(f"Retrieving cached results for session: {session_id}, version: {version or 'latest'}")
 
     if not result_exists(session_id):

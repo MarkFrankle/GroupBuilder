@@ -604,3 +604,49 @@ class TestRegenerateSingleSession:
         assert stored_result["metadata"]["max_time_seconds"] == 60
         assert stored_result["metadata"]["regenerated"] == True
         assert stored_result["metadata"]["regenerated_session"] == 1
+
+
+class TestAuthProtection:
+    """Tests for authentication and authorization on protected endpoints."""
+
+    # Valid UUID format for path validation (doesn't need to exist)
+    VALID_SESSION_ID = "12345678-1234-1234-1234-123456789012"
+
+    def test_get_results_requires_auth(self, client_with_auth):
+        """Should return 401 if no auth token provided."""
+        response = client_with_auth.get(f"/api/assignments/results/{self.VALID_SESSION_ID}")
+        assert response.status_code == 401
+        assert "Authorization header missing" in response.json()["detail"]
+
+    def test_get_results_requires_session_access(self, client_with_auth):
+        """Should return 403 if user doesn't have access to session."""
+        from api.main import app
+        from api.middleware.auth import get_current_user, get_firestore_service, AuthUser
+
+        # Mock authenticated user
+        async def mock_user():
+            return AuthUser(user_id="user123", email="test@test.com", email_verified=True)
+
+        # Mock FirestoreService to deny access
+        class MockFirestoreService:
+            def check_user_can_access_session(self, user_id, session_id):
+                return False
+
+        app.dependency_overrides[get_current_user] = mock_user
+        app.dependency_overrides[get_firestore_service] = lambda: MockFirestoreService()
+
+        try:
+            response = client_with_auth.get(f"/api/assignments/results/{self.VALID_SESSION_ID}")
+            assert response.status_code == 403
+            assert "Access denied" in response.json()["detail"]
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_generate_requires_auth(self, client_with_auth):
+        """Should return 401 if no auth token for generate."""
+        response = client_with_auth.get(
+            "/api/assignments/",
+            params={"session_id": self.VALID_SESSION_ID}
+        )
+        assert response.status_code == 401
+        assert "Authorization header missing" in response.json()["detail"]
