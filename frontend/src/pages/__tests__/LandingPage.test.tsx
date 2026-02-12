@@ -1,13 +1,3 @@
-/**
- * Tests for LandingPage component.
- *
- * Tests key user flows:
- * - File upload
- * - Form validation
- * - Recent uploads
- * - Error handling
- */
-
 import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
@@ -15,7 +5,7 @@ import '@testing-library/jest-dom'
 import LandingPage from '../LandingPage'
 import * as recentUploadsModule from '@/utils/recentUploads'
 import { authenticatedFetch } from '@/utils/apiClient'
-import { fetchWithRetry } from '@/utils/fetchWithRetry'
+import { importRoster } from '@/api/roster'
 
 // Mock react-router-dom's useNavigate
 const mockNavigate = jest.fn()
@@ -24,14 +14,16 @@ jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
 }))
 
+// Mock roster API
+jest.mock('@/api/roster', () => ({
+  importRoster: jest.fn(),
+}))
+const mockImportRoster = importRoster as jest.MockedFunction<typeof importRoster>
+
 // Get the mocked functions (already mocked in setupTests.ts)
 const mockAuthenticatedFetch = authenticatedFetch as jest.MockedFunction<typeof authenticatedFetch>
-const mockFetchWithRetry = fetchWithRetry as jest.MockedFunction<typeof fetchWithRetry>
 
-// Mock fetch is no longer needed since fetchWithRetry is mocked
-global.fetch = jest.fn()
-
-// Mock ResizeObserver (needed by Radix UI Slider)
+// Mock ResizeObserver (needed by Radix UI)
 class ResizeObserverMock {
   observe = jest.fn()
   unobserve = jest.fn()
@@ -39,371 +31,130 @@ class ResizeObserverMock {
 }
 global.ResizeObserver = ResizeObserverMock as any
 
-// Helper to render component with router
 const renderWithRouter = (component: React.ReactElement) => {
   return render(<BrowserRouter>{component}</BrowserRouter>)
 }
 
-// Mock file
-const createMockFile = (name: string = 'test.xlsx', type: string = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') => {
-  return new File(['test content'], name, { type })
-}
-
-describe('LandingPage', () => {
+describe('Landing Page - Hub', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    ;(global.fetch as jest.Mock).mockClear()
-    mockAuthenticatedFetch.mockClear()
-    mockFetchWithRetry.mockClear()
     localStorage.clear()
-    // Mock getRecentUploadIds to return empty array by default
     jest.spyOn(recentUploadsModule, 'getRecentUploadIds').mockReturnValue([])
   })
 
-  describe('Rendering', () => {
-    it('renders the main title', () => {
-      renderWithRouter(<LandingPage />)
-      expect(screen.getByText('Group Builder')).toBeInTheDocument()
-    })
+  test('renders page title', () => {
+    renderWithRouter(<LandingPage />)
+    expect(screen.getByText('Group Builder')).toBeInTheDocument()
+  })
 
-    it('renders the "How it works" section', () => {
-      renderWithRouter(<LandingPage />)
-      expect(screen.getByText('How it works')).toBeInTheDocument()
-    })
+  test('renders tagline', () => {
+    renderWithRouter(<LandingPage />)
+    expect(screen.getByText(/Create balanced and diverse groups/)).toBeInTheDocument()
+  })
 
-    it('renders the file upload input', () => {
-      renderWithRouter(<LandingPage />)
-      expect(screen.getByLabelText(/Upload Participant Data/i)).toBeInTheDocument()
-    })
+  test('renders Manage Roster card', () => {
+    renderWithRouter(<LandingPage />)
+    expect(screen.getByText('Manage Roster')).toBeInTheDocument()
+    expect(screen.getByText('Add and edit participants')).toBeInTheDocument()
+  })
 
-    it('renders number of tables selector', () => {
-      renderWithRouter(<LandingPage />)
-      expect(screen.getByText('Number of Tables')).toBeInTheDocument()
-    })
+  test('renders Import from Excel card', () => {
+    renderWithRouter(<LandingPage />)
+    expect(screen.getByText('Import from Excel')).toBeInTheDocument()
+    expect(screen.getByText('Upload a roster file')).toBeInTheDocument()
+  })
 
-    it('renders number of sessions selector', () => {
-      renderWithRouter(<LandingPage />)
-      expect(screen.getByText('Number of Sessions')).toBeInTheDocument()
-    })
+  test('Manage Roster links to /roster', () => {
+    renderWithRouter(<LandingPage />)
+    const link = screen.getByText('Manage Roster').closest('a')
+    expect(link).toHaveAttribute('href', '/roster')
+  })
 
-    it('renders submit button', () => {
-      renderWithRouter(<LandingPage />)
-      expect(screen.getByRole('button', { name: /Generate Assignments/i })).toBeInTheDocument()
-    })
+  test('renders download template link', () => {
+    renderWithRouter(<LandingPage />)
+    expect(screen.getByText(/Download Template with Sample Data/i)).toBeInTheDocument()
+  })
 
-    it('renders template download link', () => {
-      renderWithRouter(<LandingPage />)
-      expect(screen.getByText(/Download Template with Sample Data/i)).toBeInTheDocument()
+  test('has hidden file input for import', () => {
+    renderWithRouter(<LandingPage />)
+    const fileInput = screen.getByTestId('file-input')
+    expect(fileInput).toHaveAttribute('type', 'file')
+    expect(fileInput).toHaveAttribute('accept', '.xlsx,.xls')
+    expect(fileInput).toHaveClass('hidden')
+  })
+
+  test('calls importRoster and navigates on file select', async () => {
+    mockImportRoster.mockResolvedValueOnce([])
+
+    renderWithRouter(<LandingPage />)
+
+    const fileInput = screen.getByTestId('file-input')
+    const file = new File(['test'], 'roster.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+
+    fireEvent.change(fileInput, { target: { files: [file] } })
+
+    await waitFor(() => {
+      expect(mockImportRoster).toHaveBeenCalledWith(file)
+      expect(mockNavigate).toHaveBeenCalledWith('/roster')
     })
   })
 
-  describe('Advanced Options', () => {
-    it('hides solver time options by default', () => {
-      renderWithRouter(<LandingPage />)
-      expect(screen.queryByText(/Solver Time/i)).not.toBeInTheDocument()
-    })
+  test('shows error on import failure', async () => {
+    mockImportRoster.mockRejectedValueOnce(new Error('Failed to import roster: 400'))
 
-    it('shows solver time options when Advanced Options clicked', async () => {
-      renderWithRouter(<LandingPage />)
+    renderWithRouter(<LandingPage />)
 
-      const advancedButton = screen.getByText('Advanced Options')
-      fireEvent.click(advancedButton)
+    const fileInput = screen.getByTestId('file-input')
+    const file = new File(['test'], 'roster.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
 
-      await waitFor(() => {
-        expect(screen.getByText(/Solver Time/i)).toBeInTheDocument()
-      })
-    })
+    fireEvent.change(fileInput, { target: { files: [file] } })
 
-    it('hides solver time options when Advanced Options clicked again', async () => {
-      renderWithRouter(<LandingPage />)
-
-      const advancedButton = screen.getByText('Advanced Options')
-
-      // Click to open
-      fireEvent.click(advancedButton)
-      await waitFor(() => {
-        expect(screen.getByText(/Solver Time/i)).toBeInTheDocument()
-      })
-
-      // Click to close
-      fireEvent.click(advancedButton)
-      await waitFor(() => {
-        expect(screen.queryByText(/Solver Time/i)).not.toBeInTheDocument()
-      })
+    await waitFor(() => {
+      expect(screen.getByText(/Failed to import roster/)).toBeInTheDocument()
     })
   })
 
-  describe('File Upload', () => {
-    it('displays selected file name', async () => {
-      renderWithRouter(<LandingPage />)
+  test('does not show recent uploads section when empty', () => {
+    renderWithRouter(<LandingPage />)
+    expect(screen.queryByText('Recent Uploads')).not.toBeInTheDocument()
+  })
 
-      const fileInput = screen.getByLabelText(/Upload Participant Data/i) as HTMLInputElement
-      const file = createMockFile('participants.xlsx')
+  test('shows recent uploads when available', async () => {
+    jest.spyOn(recentUploadsModule, 'getRecentUploadIds').mockReturnValue(['session-123'])
 
-      Object.defineProperty(fileInput, 'files', {
-        value: [file],
-        writable: false
+    mockAuthenticatedFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        session_id: 'session-123',
+        filename: 'test.xlsx',
+        num_participants: 10,
+        num_tables: 2,
+        num_sessions: 3,
+        created_at: new Date().toISOString(),
+        has_results: false
       })
+    } as Response)
 
-      fireEvent.change(fileInput)
+    renderWithRouter(<LandingPage />)
 
-      await waitFor(() => {
-        expect(fileInput.files?.[0].name).toBe('participants.xlsx')
-      })
-    })
-
-    it('accepts .xlsx files', () => {
-      renderWithRouter(<LandingPage />)
-
-      const fileInput = screen.getByLabelText(/Upload Participant Data/i)
-      expect(fileInput).toHaveAttribute('accept', '.xlsx, .xls')
+    await waitFor(() => {
+      expect(screen.getByText('Recent Uploads')).toBeInTheDocument()
     })
   })
 
-  describe('Form Submission', () => {
-    it('shows error when no file selected', async () => {
-      renderWithRouter(<LandingPage />)
+  test('removes expired sessions from recent uploads', async () => {
+    jest.spyOn(recentUploadsModule, 'getRecentUploadIds').mockReturnValue(['expired-session'])
+    const removeRecentUploadSpy = jest.spyOn(recentUploadsModule, 'removeRecentUpload')
 
-      const submitButton = screen.getByRole('button', { name: /Generate Assignments/i })
-      fireEvent.click(submitButton)
+    mockAuthenticatedFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404
+    } as Response)
 
-      await waitFor(() => {
-        expect(screen.getByText(/Please select a file/i)).toBeInTheDocument()
-      })
-    })
+    renderWithRouter(<LandingPage />)
 
-    it('submits form with valid file', async () => {
-      // Mock fetchWithRetry for upload and assignment generation
-      mockFetchWithRetry
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ session_id: 'session-123' })
-        } as Response)
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ assignments: [] })
-        } as Response)
-
-      renderWithRouter(<LandingPage />)
-
-      const fileInput = screen.getByLabelText(/Upload Participant Data/i) as HTMLInputElement
-      const file = createMockFile()
-
-      Object.defineProperty(fileInput, 'files', {
-        value: [file],
-        writable: false
-      })
-      fireEvent.change(fileInput)
-
-      const submitButton = screen.getByRole('button', { name: /Generate Assignments/i })
-      fireEvent.click(submitButton)
-
-      await waitFor(() => {
-        expect(mockFetchWithRetry).toHaveBeenCalledWith(
-          expect.stringContaining('/api/upload/'),
-          expect.any(Object)
-        )
-      })
-    })
-
-    it('shows loading state during submission', async () => {
-      mockFetchWithRetry.mockImplementation(() =>
-        new Promise(resolve => setTimeout(resolve, 1000))
-      )
-
-      renderWithRouter(<LandingPage />)
-
-      const fileInput = screen.getByLabelText(/Upload Participant Data/i) as HTMLInputElement
-      const file = createMockFile()
-
-      Object.defineProperty(fileInput, 'files', {
-        value: [file],
-        writable: false
-      })
-      fireEvent.change(fileInput)
-
-      const submitButton = screen.getByRole('button', { name: /Generate Assignments/i })
-      fireEvent.click(submitButton)
-
-      await waitFor(() => {
-        expect(screen.getByText(/Processing/i)).toBeInTheDocument()
-      })
-    })
-
-    it('disables button during submission', async () => {
-      mockFetchWithRetry.mockImplementation(() =>
-        new Promise(resolve => setTimeout(resolve, 1000))
-      )
-
-      renderWithRouter(<LandingPage />)
-
-      const fileInput = screen.getByLabelText(/Upload Participant Data/i) as HTMLInputElement
-      const file = createMockFile()
-
-      Object.defineProperty(fileInput, 'files', {
-        value: [file],
-        writable: false
-      })
-      fireEvent.change(fileInput)
-
-      const submitButton = screen.getByRole('button', { name: /Generate Assignments/i })
-      fireEvent.click(submitButton)
-
-      await waitFor(() => {
-        expect(submitButton).toBeDisabled()
-      })
-    })
-
-    it('navigates to results page on success', async () => {
-      const mockAssignments = [{ session: 1, tables: {} }]
-
-      mockFetchWithRetry
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ session_id: 'session-123' })
-        } as Response)
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => mockAssignments
-        } as Response)
-
-      renderWithRouter(<LandingPage />)
-
-      const fileInput = screen.getByLabelText(/Upload Participant Data/i) as HTMLInputElement
-      const file = createMockFile()
-
-      Object.defineProperty(fileInput, 'files', {
-        value: [file],
-        writable: false
-      })
-      fireEvent.change(fileInput)
-
-      const submitButton = screen.getByRole('button', { name: /Generate Assignments/i })
-      fireEvent.click(submitButton)
-
-      await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith(
-          '/table-assignments?session=session-123',
-          expect.objectContaining({
-            state: expect.objectContaining({
-              assignments: mockAssignments,
-              sessionId: 'session-123'
-            })
-          })
-        )
-      })
-    })
-
-    it('displays error message on upload failure', async () => {
-      // Mock fetchWithRetry to return 400 error (client error - won't retry)
-      mockFetchWithRetry.mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        json: async () => ({ detail: 'File upload failed' })
-      } as Response)
-
-      renderWithRouter(<LandingPage />)
-
-      const fileInput = screen.getByLabelText(/Upload Participant Data/i) as HTMLInputElement
-      const file = createMockFile()
-
-      Object.defineProperty(fileInput, 'files', {
-        value: [file],
-        writable: false
-      })
-      fireEvent.change(fileInput)
-
-      const submitButton = screen.getByRole('button', { name: /Generate Assignments/i })
-      fireEvent.click(submitButton)
-
-      await waitFor(() => {
-        expect(screen.getByText(/File upload failed/i)).toBeInTheDocument()
-      })
-    })
-  })
-
-  describe('Recent Uploads', () => {
-    it('does not show recent uploads section when empty', () => {
-      jest.spyOn(recentUploadsModule, 'getRecentUploadIds').mockReturnValue([])
-
-      renderWithRouter(<LandingPage />)
-
-      expect(screen.queryByText('Recent Uploads')).not.toBeInTheDocument()
-    })
-
-    it('shows recent uploads when available', async () => {
-      jest.spyOn(recentUploadsModule, 'getRecentUploadIds').mockReturnValue(['session-123'])
-
-      // Mock authenticatedFetch for metadata API call (PR #35 uses authenticated calls)
-      mockAuthenticatedFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          session_id: 'session-123',
-          filename: 'test.xlsx',
-          num_participants: 10,
-          num_tables: 2,
-          num_sessions: 3,
-          created_at: new Date().toISOString(),
-          has_results: false
-        })
-      } as Response)
-
-      renderWithRouter(<LandingPage />)
-
-      await waitFor(() => {
-        expect(screen.getByText('Recent Uploads')).toBeInTheDocument()
-      })
-    })
-
-    it('removes expired sessions from recent uploads', async () => {
-      jest.spyOn(recentUploadsModule, 'getRecentUploadIds').mockReturnValue(['expired-session'])
-      const removeRecentUploadSpy = jest.spyOn(recentUploadsModule, 'removeRecentUpload')
-
-      // Mock authenticatedFetch to return 404 for expired session (PR #35 uses authenticated calls)
-      mockAuthenticatedFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 404
-      } as Response)
-
-      renderWithRouter(<LandingPage />)
-
-      await waitFor(() => {
-        expect(removeRecentUploadSpy).toHaveBeenCalledWith('expired-session')
-      })
-    })
-  })
-
-  describe('Default Values', () => {
-    it('has default numTables of 1', () => {
-      renderWithRouter(<LandingPage />)
-
-      // The component uses a Select, so we check the SelectValue (which should show "1" by default)
-      const tablesButton = screen.getByRole('combobox', { name: /Number of Tables/i })
-      expect(tablesButton).toHaveTextContent('1')
-    })
-
-    it('has default numSessions of 1', () => {
-      renderWithRouter(<LandingPage />)
-
-      const sessionsButton = screen.getByRole('combobox', { name: /Number of Sessions/i })
-      expect(sessionsButton).toHaveTextContent('1')
-    })
-  })
-
-  describe('Accessibility', () => {
-    it('has proper labels for all inputs', () => {
-      renderWithRouter(<LandingPage />)
-
-      expect(screen.getByLabelText(/Upload Participant Data/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/Number of Tables/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/Number of Sessions/i)).toBeInTheDocument()
-    })
-
-    it('submit button is keyboard accessible', () => {
-      renderWithRouter(<LandingPage />)
-
-      const submitButton = screen.getByRole('button', { name: /Generate Assignments/i })
-      expect(submitButton).toBeInstanceOf(HTMLButtonElement)
+    await waitFor(() => {
+      expect(removeRecentUploadSpy).toHaveBeenCalledWith('expired-session')
     })
   })
 })

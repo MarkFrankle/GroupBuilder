@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Button } from "@/components/ui/button"
+import React, { useState, useRef, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle, Loader2, Clock, ChevronDown, ChevronRight } from 'lucide-react'
+import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -13,29 +11,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { AlertCircle, Loader2, Clock, Upload, Users } from 'lucide-react'
+import { importRoster } from '@/api/roster'
+import { getRecentUploadIds, removeRecentUpload, type RecentUpload } from '@/utils/recentUploads'
+import { authenticatedFetch } from '@/utils/apiClient'
+import { formatISOTimeAgo, formatUnixTimeAgo } from '@/utils/timeFormatting'
+import { SESSION_EXPIRY_MESSAGE } from '@/constants'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
-import { getRecentUploadIds, saveRecentUpload, removeRecentUpload, type RecentUpload } from '@/utils/recentUploads'
-import { fetchWithRetry } from '@/utils/fetchWithRetry'
-import { formatISOTimeAgo, formatUnixTimeAgo } from '@/utils/timeFormatting'
-import { API_BASE_URL } from '@/config/api'
-import { authenticatedFetch } from '@/utils/apiClient'
-import {
-  SESSION_EXPIRY_MESSAGE,
-  MAX_TABLES,
-  MAX_SESSIONS
-} from '@/constants'
+import { ChevronDown } from 'lucide-react'
 
-// Constant for new upload selection value
 const NEW_UPLOAD_VALUE = "new-upload"
 
 interface ResultVersion {
@@ -46,17 +35,12 @@ interface ResultVersion {
 }
 
 const LandingPage: React.FC = () => {
-  const [file, setFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [numTables, setNumTables] = useState<string>("1")
-  const [numSessions, setNumSessions] = useState<string>("1")
-  const [loading, setLoading] = useState<boolean>(false)
-  const [loadingMessage, setLoadingMessage] = useState<string>("")
+  const [importing, setImporting] = useState(false)
   const [recentUploads, setRecentUploads] = useState<RecentUpload[]>([])
   const [selectedRecentUpload, setSelectedRecentUpload] = useState<string>("")
   const [availableVersions, setAvailableVersions] = useState<ResultVersion[]>([])
-  const [advancedOpen, setAdvancedOpen] = useState<boolean>(false)
-  const [solverTime, setSolverTime] = useState<number>(120) // Default: 2 minutes
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
 
   // Load recent uploads on mount
@@ -72,7 +56,6 @@ const LandingPage: React.FC = () => {
             const metadata = await response.json()
             uploads.push(metadata)
           } else {
-            // Session expired, remove from localStorage
             removeRecentUpload(sessionId)
           }
         } catch (err) {
@@ -87,181 +70,51 @@ const LandingPage: React.FC = () => {
     loadRecentUploads()
   }, [])
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files) {
-      setFile(event.target.files[0])
-      setSelectedRecentUpload(NEW_UPLOAD_VALUE) // Clear recent upload selection when new file chosen
-    }
-  }
-
   const handleRecentUploadSelect = async (sessionId: string) => {
     setSelectedRecentUpload(sessionId)
 
     if (sessionId === NEW_UPLOAD_VALUE) {
-      // "Upload new file" selected, reset form
-      setFile(null)
       setAvailableVersions([])
       return
     }
 
-    // Find the selected upload and populate form
     const upload = recentUploads.find(u => u.session_id === sessionId)
-    if (upload) {
-      setNumTables(upload.num_tables.toString())
-      setNumSessions(upload.num_sessions.toString())
-      // Clear file input since we're using an existing session
-      setFile(null)
-
-      // Fetch available versions
-      if (upload.has_results) {
-        try {
-          const response = await authenticatedFetch(`/api/assignments/results/${sessionId}/versions`)
-          if (response.ok) {
-            const data = await response.json()
-            setAvailableVersions(data.versions || [])
-          }
-        } catch (err) {
-          console.error('Failed to fetch versions:', err)
-          setAvailableVersions([])
+    if (upload?.has_results) {
+      try {
+        const response = await authenticatedFetch(`/api/assignments/results/${sessionId}/versions`)
+        if (response.ok) {
+          const data = await response.json()
+          setAvailableVersions(data.versions || [])
         }
-      } else {
+      } catch (err) {
+        console.error('Failed to fetch versions:', err)
         setAvailableVersions([])
       }
+    } else {
+      setAvailableVersions([])
     }
   }
 
-  /**
-   * Validate form inputs before submission.
-   */
-  const validateForm = (): boolean => {
-    if (!file && (!selectedRecentUpload || selectedRecentUpload === NEW_UPLOAD_VALUE)) {
-      setError('Please select a file to upload or choose a recent upload.');
-      return false;
-    }
-    return true;
-  };
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
 
-  /**
-   * Clone an existing session with new parameters.
-   */
-  const cloneSession = async (sessionId: string): Promise<string> => {
-    setLoadingMessage('Updating configuration...');
-
-    const response = await fetchWithRetry(
-      `${API_BASE_URL}/api/assignments/sessions/${sessionId}/clone?num_tables=${numTables}&num_sessions=${numSessions}`,
-      { method: 'POST' }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Failed to update configuration');
-    }
-
-    const data = await response.json();
-    const newSessionId = data.session_id;
-    saveRecentUpload(newSessionId);
-    return newSessionId;
-  };
-
-  /**
-   * Upload a new file and create a session.
-   */
-  const uploadNewFile = async (): Promise<string> => {
-    setLoadingMessage('Uploading participant data...');
-
-    const formData = new FormData();
-    formData.append('file', file!);
-    formData.append('numTables', numTables);
-    formData.append('numSessions', numSessions);
-
-    const response = await fetchWithRetry(`${API_BASE_URL}/api/upload/`, {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'File upload failed');
-    }
-
-    const data = await response.json();
-    const sessionId = data.session_id;
-
-    if (!sessionId) {
-      throw new Error('No session ID received from server');
-    }
-
-    saveRecentUpload(sessionId);
-    return sessionId;
-  };
-
-  /**
-   * Get or create a session ID based on user selection.
-   */
-  const getSessionId = async (): Promise<string> => {
-    if (selectedRecentUpload !== NEW_UPLOAD_VALUE) {
-      // Using a recent upload - check if parameters changed
-      const selectedUpload = recentUploads.find(u => u.session_id === selectedRecentUpload);
-
-      if (selectedUpload &&
-          (selectedUpload.num_tables.toString() !== numTables ||
-           selectedUpload.num_sessions.toString() !== numSessions)) {
-        // Parameters changed - clone session with new params
-        return await cloneSession(selectedRecentUpload);
-      } else {
-        // Parameters unchanged - use existing session
-        return selectedRecentUpload;
-      }
-    } else {
-      // New file upload
-      return await uploadNewFile();
-    }
-  };
-
-  /**
-   * Generate assignments for a given session.
-   */
-  const generateAssignments = async (sessionId: string) => {
-    const estimatedMinutes = Math.ceil(solverTime / 60);
-    setLoadingMessage(`Generating optimal table assignments... This may take up to ${estimatedMinutes} minute${estimatedMinutes > 1 ? 's' : ''}.`);
-
-    const response = await fetchWithRetry(`${API_BASE_URL}/api/assignments/?session_id=${sessionId}&max_time_seconds=${solverTime}`, {
-      method: 'GET',
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Failed to generate assignments');
-    }
-
-    const assignments = await response.json();
-    navigate(`/table-assignments?session=${sessionId}`, { state: { assignments, sessionId } });
-  };
-
-  /**
-   * Handle form submission.
-   */
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    if (!validateForm()) {
-      return;
-    }
-
-    setError(null);
-    setLoading(true);
+    setError(null)
+    setImporting(true)
 
     try {
-      const sessionId = await getSessionId();
-      await generateAssignments(sessionId);
+      await importRoster(file)
+      navigate('/roster')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      setError(err instanceof Error ? err.message : 'Failed to import roster')
     } finally {
-      setLoading(false);
-      setLoadingMessage('');
+      setImporting(false)
+      // Reset file input so the same file can be re-selected
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
     }
-  };
-
+  }
 
   return (
     <div className="container mx-auto p-4">
@@ -272,220 +125,124 @@ const LandingPage: React.FC = () => {
             Create balanced and diverse groups for your seminar series
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
-            <div className="p-6 bg-secondary rounded-lg">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <h2 className="text-xl font-semibold mb-2">How it works</h2>
-                  <p className="text-secondary-foreground mb-3">
-                    Upload an Excel file with participant information, and our algorithm will generate
-                    balanced table assignments for each session. We consider factors like religion,
-                    gender, and partner status to create diverse groups.
-                  </p>
-                  <Button variant="link" asChild className="px-0 h-auto text-sm">
-                    <a href="/template.xlsx" download>
-                      Download Template with Sample Data
-                    </a>
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {recentUploads.length > 0 && (
-                <div className="space-y-2">
-                  <Label htmlFor="recent-uploads">
-                    <Clock className="inline h-4 w-4 mr-1" />
-                    Recent Uploads
-                  </Label>
-                  <Select value={selectedRecentUpload} onValueChange={handleRecentUploadSelect}>
-                    <SelectTrigger id="recent-uploads">
-                      <SelectValue placeholder="Select a previous upload" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NEW_UPLOAD_VALUE}>New upload</SelectItem>
-                      {recentUploads.map((upload) => {
-                        const timeAgo = formatISOTimeAgo(upload.created_at)
-                        return (
-                          <SelectItem key={upload.session_id} value={upload.session_id}>
-                            {upload.filename} ({upload.num_participants} participants, {upload.num_tables} tables, {upload.num_sessions} sessions) - {timeAgo}
-                          </SelectItem>
-                        )
-                      })}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground">
-                    Reuse a recent upload ({SESSION_EXPIRY_MESSAGE})
-                  </p>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="file-upload">Upload Participant Data</Label>
-                <Input
-                  id="file-upload"
+        <CardContent className="space-y-6">
+          {/* Two action cards */}
+          <div className="grid grid-cols-2 gap-4">
+            <Link to="/roster">
+              <Card className="hover:bg-accent cursor-pointer transition-colors h-full">
+                <CardContent className="pt-6 text-center">
+                  <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <h3 className="font-semibold">Manage Roster</h3>
+                  <p className="text-sm text-muted-foreground">Add and edit participants</p>
+                </CardContent>
+              </Card>
+            </Link>
+            <Card
+              className="hover:bg-accent cursor-pointer transition-colors h-full"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <CardContent className="pt-6 text-center">
+                {importing ? (
+                  <Loader2 className="h-8 w-8 mx-auto mb-2 text-muted-foreground animate-spin" />
+                ) : (
+                  <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                )}
+                <h3 className="font-semibold">Import from Excel</h3>
+                <p className="text-sm text-muted-foreground">Upload a roster file</p>
+                <input
+                  ref={fileInputRef}
                   type="file"
-                  accept=".xlsx, .xls"
-                  onChange={handleFileChange}
-                  disabled={selectedRecentUpload !== "" && selectedRecentUpload !== NEW_UPLOAD_VALUE}
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={handleImport}
+                  data-testid="file-input"
                 />
-                {selectedRecentUpload && selectedRecentUpload !== NEW_UPLOAD_VALUE && (
-                  <p className="text-sm text-muted-foreground">
-                    Using recent upload. Clear selection above to upload a new file.
-                  </p>
-                )}
-              </div>
-
-              <div className="flex space-x-4">
-                <div className="flex-1 space-y-2">
-                  <Label htmlFor="num-tables">Number of Tables</Label>
-                  <Select value={numTables} onValueChange={setNumTables}>
-                    <SelectTrigger id="num-tables">
-                      <SelectValue placeholder="Select number of tables" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[...Array(MAX_TABLES)].map((_, i) => (
-                        <SelectItem key={i} value={(i + 1).toString()}>
-                          {i + 1}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex-1 space-y-2">
-                  <Label htmlFor="num-sessions">Number of Sessions</Label>
-                  <Select value={numSessions} onValueChange={setNumSessions}>
-                    <SelectTrigger id="num-sessions">
-                      <SelectValue placeholder="Select number of sessions" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[...Array(MAX_SESSIONS)].map((_, i) => (
-                        <SelectItem key={i} value={(i + 1).toString()}>
-                          {i + 1}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
-                <CollapsibleTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="flex items-center gap-1 p-0 h-auto font-normal text-muted-foreground hover:text-foreground"
-                  >
-                    {advancedOpen ? (
-                      <ChevronDown className="h-4 w-4" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4" />
-                    )}
-                    <span className="text-sm">Advanced Options</span>
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-4 mt-2">
-                  <div className="space-y-3">
-                    <Label>Solver Time</Label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setSolverTime(60)}
-                        className={`flex flex-col h-auto py-3 ${solverTime === 60 ? 'border-2 border-black bg-gray-100' : ''}`}
-                      >
-                        <span className="font-semibold">Fast</span>
-                        <span className="text-xs opacity-80">1 min</span>
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setSolverTime(120)}
-                        className={`flex flex-col h-auto py-3 ${solverTime === 120 ? 'border-2 border-black bg-gray-100' : ''}`}
-                      >
-                        <span className="font-semibold">Default</span>
-                        <span className="text-xs opacity-80">2 min</span>
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setSolverTime(240)}
-                        className={`flex flex-col h-auto py-3 ${solverTime === 240 ? 'border-2 border-black bg-gray-100' : ''}`}
-                      >
-                        <span className="font-semibold">Slow</span>
-                        <span className="text-xs opacity-80">4 min</span>
-                      </Button>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      More time often yields better balanced groups
-                    </p>
-                  </div>
-
-                  <div className="border-t pt-4" />
-                </CollapsibleContent>
-              </Collapsible>
-
-              {loading && (
-                <Alert>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <AlertTitle>Processing</AlertTitle>
-                  <AlertDescription>{loadingMessage}</AlertDescription>
-                </Alert>
-              )}
-
-              {error && !loading && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Error</AlertTitle>
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              <div className="flex gap-4">
-                <Button type="submit" disabled={loading} variant="outline" className="flex-1">
-                  Generate Assignments
-                </Button>
-                {recentUploads.length > 0 && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={loading || !selectedRecentUpload || selectedRecentUpload === NEW_UPLOAD_VALUE || !recentUploads.find(u => u.session_id === selectedRecentUpload)?.has_results}
-                        className="flex-1"
-                      >
-                        View Previous Results
-                        <ChevronDown className="ml-2 h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-64 bg-white dark:bg-slate-950">
-                      {availableVersions.length > 0 ? (
-                        availableVersions.map((version) => (
-                          <DropdownMenuItem
-                            key={version.version_id}
-                            onClick={() => {
-                              navigate(`/table-assignments?session=${selectedRecentUpload}&version=${version.version_id}`)
-                            }}
-                          >
-                            <div className="flex flex-col">
-                              <span className="font-medium">{version.version_id}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {formatUnixTimeAgo(version.created_at)}
-                                {version.solve_time && ` • ${version.solve_time.toFixed(2)}s`}
-                              </span>
-                            </div>
-                          </DropdownMenuItem>
-                        ))
-                      ) : (
-                        <DropdownMenuItem disabled>No versions available</DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
-            </form>
+              </CardContent>
+            </Card>
           </div>
+
+          {/* Download template link */}
+          <div className="text-center">
+            <Button variant="link" asChild className="px-0 h-auto text-sm">
+              <a href="/template.xlsx" download>
+                Download Template with Sample Data
+              </a>
+            </Button>
+          </div>
+
+          {/* Error display */}
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* Recent uploads section */}
+          {recentUploads.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="recent-uploads">
+                <Clock className="inline h-4 w-4 mr-1" />
+                Recent Uploads
+              </Label>
+              <Select value={selectedRecentUpload} onValueChange={handleRecentUploadSelect}>
+                <SelectTrigger id="recent-uploads">
+                  <SelectValue placeholder="Select a previous upload" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NEW_UPLOAD_VALUE}>New upload</SelectItem>
+                  {recentUploads.map((upload) => {
+                    const timeAgo = formatISOTimeAgo(upload.created_at)
+                    return (
+                      <SelectItem key={upload.session_id} value={upload.session_id}>
+                        {upload.filename} ({upload.num_participants} participants) - {timeAgo}
+                      </SelectItem>
+                    )
+                  })}
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                Reuse a recent upload ({SESSION_EXPIRY_MESSAGE})
+              </p>
+              {selectedRecentUpload && selectedRecentUpload !== NEW_UPLOAD_VALUE && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      disabled={!recentUploads.find(u => u.session_id === selectedRecentUpload)?.has_results}
+                      className="w-full"
+                    >
+                      View Previous Results
+                      <ChevronDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64 bg-white dark:bg-slate-950">
+                    {availableVersions.length > 0 ? (
+                      availableVersions.map((version) => (
+                        <DropdownMenuItem
+                          key={version.version_id}
+                          onClick={() => {
+                            navigate(`/table-assignments?session=${selectedRecentUpload}&version=${version.version_id}`)
+                          }}
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-medium">{version.version_id}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {formatUnixTimeAgo(version.created_at)}
+                              {version.solve_time && ` • ${version.solve_time.toFixed(2)}s`}
+                            </span>
+                          </div>
+                        </DropdownMenuItem>
+                      ))
+                    ) : (
+                      <DropdownMenuItem disabled>No versions available</DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
