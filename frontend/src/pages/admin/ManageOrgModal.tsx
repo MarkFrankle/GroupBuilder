@@ -1,7 +1,7 @@
 /**
  * Modal for managing organization details, members, and invites
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -56,13 +56,7 @@ export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<{ userId: string; email: string } | null>(null);
 
-  useEffect(() => {
-    if (open && orgId) {
-      loadOrgDetails();
-    }
-  }, [open, orgId]);
-
-  const loadOrgDetails = async () => {
+  const loadOrgDetails = useCallback(async () => {
     if (!orgId) return;
 
     setLoading(true);
@@ -76,7 +70,13 @@ export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [orgId]);
+
+  useEffect(() => {
+    if (open && orgId) {
+      loadOrgDetails();
+    }
+  }, [open, orgId, loadOrgDetails]);
 
   const handleAddInvite = async (e: React.FormEvent) => {
     e.preventDefault();

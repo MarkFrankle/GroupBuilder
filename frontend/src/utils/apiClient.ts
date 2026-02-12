@@ -60,8 +60,28 @@ export async function apiRequest<T>(
       throw new AuthenticationError('Session expired. Please sign in again.');
     }
 
-    const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-    throw new Error(error.detail || `HTTP ${response.status}`);
+    // Try to parse error as JSON, fallback to text if it fails
+    let errorMessage = `HTTP ${response.status}`;
+
+    try {
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const error = await response.json();
+        errorMessage = error.detail || errorMessage;
+      } else {
+        // Non-JSON response (likely HTML error page)
+        const text = await response.text();
+        if (response.status === 403) {
+          errorMessage = 'Access denied. You may not have admin privileges.';
+        } else {
+          errorMessage = text.substring(0, 100) || errorMessage;
+        }
+      }
+    } catch (e) {
+      // Keep the default HTTP status message
+    }
+
+    throw new Error(errorMessage);
   }
 
   return response.json();

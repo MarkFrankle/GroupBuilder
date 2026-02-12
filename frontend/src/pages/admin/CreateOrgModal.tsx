@@ -27,7 +27,8 @@ export function CreateOrgModal({ open, onClose, onSuccess }: CreateOrgModalProps
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [inviteLinks, setInviteLinks] = useState<Array<{email: string, invite_link: string}>>([]);
+  const [inviteLinks, setInviteLinks] = useState<Array<{email: string, invite_link: string, email_sent: boolean, error?: string}>>([]);
+  const [partialFailure, setPartialFailure] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,7 +46,11 @@ export function CreateOrgModal({ open, onClose, onSuccess }: CreateOrgModalProps
         throw new Error('Please enter at least one email address');
       }
 
-      const response = await apiRequest<{org_id: string, invites: Array<{email: string, invite_link: string}>}>(
+      const response = await apiRequest<{
+        org_id: string;
+        invites: Array<{email: string; invite_link: string; email_sent: boolean; error?: string}>;
+        partial_failure: boolean;
+      }>(
         '/api/admin/organizations',
         {
           method: 'POST',
@@ -61,6 +66,7 @@ export function CreateOrgModal({ open, onClose, onSuccess }: CreateOrgModalProps
 
       setSuccess(true);
       setInviteLinks(response.invites);
+      setPartialFailure(response.partial_failure);
     } catch (err: any) {
       setError(err.message || 'Failed to create organization');
     } finally {
@@ -76,18 +82,26 @@ export function CreateOrgModal({ open, onClose, onSuccess }: CreateOrgModalProps
     setEmails('');
     setSuccess(false);
     setInviteLinks([]);
+    setPartialFailure(false);
     setError(null);
     onClose();
   };
 
   if (success) {
+    const sentCount = inviteLinks.filter(i => i.email_sent).length;
+    const failedCount = inviteLinks.filter(i => !i.email_sent).length;
+    
     return (
       <Dialog open={open} onOpenChange={handleClose}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>✓ Organization Created</DialogTitle>
+            <DialogTitle>
+              {partialFailure ? '⚠️ Organization Created with Warnings' : '✓ Organization Created'}
+            </DialogTitle>
             <DialogDescription>
-              Your organization has been created and invites have been sent.
+              {partialFailure 
+                ? 'Your organization has been created, but some invites could not be sent.'
+                : 'Your organization has been created and invites have been sent.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -96,15 +110,37 @@ export function CreateOrgModal({ open, onClose, onSuccess }: CreateOrgModalProps
               <strong>{name}</strong> has been created.
             </p>
 
+            {partialFailure && (
+              <div className="text-sm text-amber-700 bg-amber-50 p-3 rounded border border-amber-200">
+                {failedCount} of {inviteLinks.length} invitation emails failed to send. 
+                You can share the invite links manually below.
+              </div>
+            )}
+
             <div>
               <p className="font-medium mb-2">
-                Invitation emails sent to {inviteLinks.length} facilitators:
+                Facilitator invitations ({sentCount} sent, {failedCount} failed):
               </p>
-              <div className="space-y-1 text-sm">
+              <div className="space-y-2 text-sm">
                 {inviteLinks.map((invite, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <span className="text-green-600">✓</span>
-                    <span>{invite.email}</span>
+                  <div key={idx} className="flex items-start gap-2">
+                    <span className={invite.email_sent ? "text-green-600" : "text-red-600"}>
+                      {invite.email_sent ? '✓' : '✗'}
+                    </span>
+                    <div className="flex-1">
+                      <span>{invite.email}</span>
+                      {!invite.email_sent && (
+                        <div className="mt-1">
+                          <span className="text-red-600 text-xs">{invite.error || 'Email failed'}</span>
+                          <div className="mt-1">
+                            <span className="text-gray-500 text-xs">Manual link: </span>
+                            <code className="text-xs bg-gray-100 px-1 py-0.5 rounded break-all">
+                              {invite.invite_link}
+                            </code>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
