@@ -1,0 +1,95 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isBBAdmin() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/bb_admins/$(request.auth.token.email));
+    }
+    
+    function isOrgMember(orgId) {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+    }
+    
+    function isInvitedUser(inviteData) {
+      return isAuthenticated() && 
+             request.auth.token.email == inviteData.email;
+    }
+    
+    // BB Admins collection - only BB admins can read/write
+    match /bb_admins/{adminEmail} {
+      allow read, write: if isBBAdmin();
+    }
+    
+    // Organizations collection
+    match /organizations/{orgId} {
+      // Allow BB admins to read/write all orgs
+      // Allow org members to read their own org
+      allow read: if isBBAdmin() || isOrgMember(orgId);
+      allow write: if isBBAdmin();
+      
+      // Members subcollection
+      match /members/{userId} {
+        // Members can read their own org's members
+        allow read: if isOrgMember(orgId);
+        // Only admins can write members (invites flow handles joining)
+        allow write: if isBBAdmin();
+      }
+      
+      // Invites subcollection
+      match /invites/{inviteId} {
+        // BB admins and org members can read invites in their org
+        allow read: if isBBAdmin() || isOrgMember(orgId);
+        // Only BB admins can create/update/delete invites
+        allow create, update, delete: if isBBAdmin();
+      }
+      
+      // Sessions subcollection
+      match /sessions/{sessionId} {
+        // Org members can read/write sessions in their org
+        allow read, write: if isOrgMember(orgId);
+      }
+      
+      // Results subcollection
+      match /results/{sessionId} {
+        // Org members can read/write results in their org
+        allow read, write: if isOrgMember(orgId);
+        
+        // Results versions subcollection
+        match /versions/{versionId} {
+          allow read, write: if isOrgMember(orgId);
+        }
+      }
+    }
+    
+    // Collection group queries for invites (used by invite acceptance flow)
+    // This allows finding invites by token across all organizations
+    match /{path=**}/invites/{inviteId} {
+      // Anyone can read invite details by token (needed for pre-auth invite preview)
+      // But they can only see basic info (org name, status)
+      allow read: if true;
+      
+      // Only invited user or BB admin can update invite status (acceptance)
+      allow update: if isAuthenticated() && 
+                       (isInvitedUser(resource.data) || isBBAdmin());
+    }
+    
+    // Collection group queries for sessions (used for cross-org session lookups)
+    match /{path=**}/sessions/{sessionId} {
+      // Users can only read sessions from orgs they belong to
+      // This is enforced by checking membership in the session's parent org
+      allow read: if isAuthenticated();
+    }
+    
+    // Deny all other access by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

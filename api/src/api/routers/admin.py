@@ -1,25 +1,15 @@
 """Admin routes for organization management."""
-import logging
-import os
-import secrets
-from datetime import datetime, timedelta, timezone
-from typing import List, Dict, Any, Optional
-
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
-
+from typing import List
+from datetime import datetime, timezone, timedelta
 from ..middleware.auth import get_current_user, AuthUser
 from ..firebase_admin import get_firestore_client
+import secrets
+import os
 from ..services.email_service import get_email_service
 
-logger = logging.getLogger(__name__)
-
 router = APIRouter(prefix="/api/admin", tags=["admin"])
-
-# Simple in-memory rate limiting for org creation
-_rate_limit_store: Dict[str, List[datetime]] = {}
-RATE_LIMIT_WINDOW = timedelta(minutes=10)
-RATE_LIMIT_MAX_REQUESTS = 5
 
 
 class CreateOrgRequest(BaseModel):
@@ -28,65 +18,13 @@ class CreateOrgRequest(BaseModel):
     facilitator_emails: List[EmailStr]
 
 
-class InviteResult(BaseModel):
-    """Result of a single invite attempt."""
-    email: str
-    invite_link: str
-    email_sent: bool
-    error: Optional[str] = None
-
-
-class CreateOrgResponse(BaseModel):
-    """Response from organization creation."""
-    org_id: str
-    invites: List[InviteResult]
-    partial_failure: bool = False
-
-
 class OrganizationResponse(BaseModel):
     """Organization summary."""
     id: str
     name: str
-    created_at: datetime
+    created_at: float  # Unix timestamp
     member_count: int
-
-
-class PaginatedOrgsResponse(BaseModel):
-    """Paginated list of organizations."""
-    organizations: List[OrganizationResponse]
-    total: int
-    limit: int
-    offset: int
-
-
-def check_rate_limit(user_id: str) -> None:
-    """Check if user has exceeded rate limit for org creation.
-    
-    Raises:
-        HTTPException: 429 if rate limit exceeded
-    """
-    now = datetime.now(timezone.utc)
-    
-    # Clean up old entries
-    if user_id in _rate_limit_store:
-        _rate_limit_store[user_id] = [
-            ts for ts in _rate_limit_store[user_id]
-            if now - ts < RATE_LIMIT_WINDOW
-        ]
-    
-    # Check limit
-    requests = _rate_limit_store.get(user_id, [])
-    if len(requests) >= RATE_LIMIT_MAX_REQUESTS:
-        logger.warning(f"Rate limit exceeded for user {user_id}")
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Rate limit exceeded. Maximum {RATE_LIMIT_MAX_REQUESTS} organizations per {int(RATE_LIMIT_WINDOW.total_seconds() / 60)} minutes."
-        )
-    
-    # Record this request
-    if user_id not in _rate_limit_store:
-        _rate_limit_store[user_id] = []
-    _rate_limit_store[user_id].append(now)
+    active: bool = True
 
 
 async def require_bb_admin(user: AuthUser = Depends(get_current_user)) -> AuthUser:
@@ -110,7 +48,7 @@ async def require_bb_admin(user: AuthUser = Depends(get_current_user)) -> AuthUs
     return user
 
 
-@router.post("/organizations", response_model=CreateOrgResponse)
+@router.post("/organizations", response_model=dict)
 async def create_organization(
     request: CreateOrgRequest,
     user: AuthUser = Depends(require_bb_admin)
@@ -118,173 +56,132 @@ async def create_organization(
     """Create new organization and send invites.
 
     Returns:
-        Created org ID and invite status with partial failure info
+        Created org ID and invite status
     """
-    # Check rate limit
-    check_rate_limit(user.user_id)
-    
     db = get_firestore_client()
-    now = datetime.now(timezone.utc)
 
     # Create organization document
     org_ref = db.collection("organizations").document()
     org_ref.set({
         "name": request.name,
-        "created_at": now,
+        "created_at": datetime.now(timezone.utc),
         "created_by": user.user_id,
+        "active": True,
     })
-    
-    logger.info(f"Created organization {org_ref.id} by user {user.user_id}")
 
     # Create invite records
-    invites: List[InviteResult] = []
-    email_service = get_email_service()
-    has_failure = False
-    
+    invites = []
     for email in request.facilitator_emails:
         invite_token = secrets.token_urlsafe(32)
         invite_ref = org_ref.collection("invites").document()
         invite_ref.set({
             "email": email,
             "token": invite_token,
-            "created_at": now,
-            "expires_at": now + timedelta(days=7),
+            "created_at": datetime.now(timezone.utc),
+            "expires_at": datetime.now(timezone.utc) + timedelta(days=7),
             "status": "pending",
         })
 
-        invite_link = f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/invite/{invite_token}"
-        
         # Send invite email
-        try:
-            email_sent = email_service.send_facilitator_invite(
-                to_email=email,
-                org_name=request.name,
-                invite_token=invite_token,
-                inviter_email=user.email
-            )
-            
-            if not email_sent:
-                has_failure = True
-                logger.warning(f"Failed to send invite email to {email} for org {org_ref.id}")
-            
-            invites.append(InviteResult(
-                email=email,
-                invite_link=invite_link,
-                email_sent=email_sent,
-                error=None if email_sent else "Email delivery failed"
-            ))
-        except Exception as e:
-            has_failure = True
-            logger.error(f"Exception sending invite to {email}: {e}")
-            invites.append(InviteResult(
-                email=email,
-                invite_link=invite_link,
-                email_sent=False,
-                error="Failed to send email"
-            ))
+        email_service = get_email_service()
+        email_sent = email_service.send_facilitator_invite(
+            to_email=email,
+            org_name=request.name,
+            invite_token=invite_token,
+            inviter_email=user.email
+        )
 
-    return CreateOrgResponse(
-        org_id=org_ref.id,
-        invites=invites,
-        partial_failure=has_failure
-    )
+        invites.append({
+            "email": email,
+            "invite_link": f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/invite/{invite_token}",
+            "email_sent": email_sent
+        })
+
+    return {
+        "org_id": org_ref.id,
+        "invites": invites
+    }
 
 
-@router.get("/organizations", response_model=PaginatedOrgsResponse)
+@router.get("/organizations", response_model=List[OrganizationResponse])
 async def list_organizations(
-    user: AuthUser = Depends(require_bb_admin),
-    limit: int = Query(default=20, ge=1, le=100, description="Max orgs to return"),
-    offset: int = Query(default=0, ge=0, description="Number of orgs to skip")
+    show_inactive: bool = False,
+    user: AuthUser = Depends(require_bb_admin)
 ):
-    """List all organizations with pagination (admin only)."""
+    """List organizations (admin only).
+    
+    Args:
+        show_inactive: If True, include inactive organizations
+    """
     db = get_firestore_client()
 
-    # Get all orgs (Firestore doesn't support COUNT without reading docs)
-    all_org_docs = list(db.collection("organizations").stream())
-    total = len(all_org_docs)
-    
-    # Apply pagination
-    paginated_docs = all_org_docs[offset:offset + limit]
-
     orgs = []
-    for org_doc in paginated_docs:
+    org_docs = db.collection("organizations").stream()
+
+    for org_doc in org_docs:
         org_data = org_doc.to_dict()
+        
+        # Filter inactive orgs unless show_inactive is True
+        is_active = org_data.get("active", True)  # Default to True for legacy orgs
+        if not show_inactive and not is_active:
+            continue
 
         # Count members
         members = org_doc.reference.collection("members").stream()
         member_count = sum(1 for _ in members)
 
-        orgs.append(OrganizationResponse(
-            id=org_doc.id,
-            name=org_data["name"],
-            created_at=org_data["created_at"],
-            member_count=member_count,
-        ))
+        # Convert Firestore timestamp to Unix timestamp
+        created_at = org_data["created_at"]
+        created_at_unix = created_at.timestamp() if created_at else 0
 
-    return PaginatedOrgsResponse(
-        organizations=orgs,
-        total=total,
-        limit=limit,
-        offset=offset
-    )
+        orgs.append({
+            "id": org_doc.id,
+            "name": org_data["name"],
+            "created_at": created_at_unix,
+            "member_count": member_count,
+            "active": is_active,
+        })
 
-
-class InviteInfo(BaseModel):
-    """Information about a valid invite."""
-    org_id: str
-    org_name: str
-    email: str
-    expires_at: datetime
+    return orgs
 
 
-@router.get("/invites/{token}", response_model=InviteInfo)
-async def validate_invite(token: str):
-    """Validate an invite token and return invite details.
+@router.delete("/organizations/{org_id}")
+async def delete_organization(
+    org_id: str,
+    user: AuthUser = Depends(require_bb_admin)
+):
+    """Soft delete an organization by marking it as inactive.
     
-    This endpoint is public (no auth required) to allow invite validation
-    before the user signs in.
-    
+    Args:
+        org_id: Organization ID
+        user: Authenticated admin user
+        
+    Returns:
+        Success message
+        
     Raises:
-        HTTPException: 404 if invite not found or expired
+        HTTPException: 404 if organization not found
     """
     db = get_firestore_client()
-    now = datetime.now(timezone.utc)
     
-    # Search for invite across all organizations
-    # Note: In production, consider indexing tokens in a separate collection
-    orgs = db.collection("organizations").stream()
+    # Get organization
+    org_ref = db.collection("organizations").document(org_id)
+    org_doc = org_ref.get()
     
-    for org_doc in orgs:
-        invites = org_doc.reference.collection("invites").where("token", "==", token).stream()
-        
-        for invite_doc in invites:
-            invite_data = invite_doc.to_dict()
-            
-            # Check if invite is expired
-            expires_at = invite_data.get("expires_at")
-            if expires_at and expires_at.replace(tzinfo=timezone.utc) < now:
-                logger.info(f"Expired invite token used: {token[:8]}...")
-                raise HTTPException(
-                    status_code=status.HTTP_410_GONE,
-                    detail="This invitation has expired. Please request a new invite."
-                )
-            
-            # Check if already accepted
-            if invite_data.get("status") == "accepted":
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="This invitation has already been used."
-                )
-            
-            org_data = org_doc.to_dict()
-            return InviteInfo(
-                org_id=org_doc.id,
-                org_name=org_data["name"],
-                email=invite_data["email"],
-                expires_at=expires_at
-            )
+    if not org_doc.exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organization not found"
+        )
     
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail="Invalid or expired invitation link."
-    )
+    # Soft delete by marking as inactive
+    org_ref.update({
+        "active": False,
+        "deleted_at": datetime.now(timezone.utc),
+        "deleted_by": user.user_id
+    })
+    
+    return {
+        "success": True,
+        "message": "Organization deleted successfully"
+    }

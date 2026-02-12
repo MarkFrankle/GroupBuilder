@@ -230,10 +230,12 @@ class TestUploadEndpoint:
         assert response.status_code == 200
         session_id = response.json()["session_id"]
 
-        # Check that data was stored
-        stored_data = mock_storage.get(f"session:{session_id}")
+        # Check that data was stored in Firestore
+        from api.services.session_storage import SessionStorage
+        storage = SessionStorage()
+        stored_data = storage.get_session(session_id)
         assert stored_data is not None
-        assert "participant_dict" in stored_data
+        assert "participant_data" in stored_data
         assert "num_tables" in stored_data
         assert "num_sessions" in stored_data
         assert "filename" in stored_data
