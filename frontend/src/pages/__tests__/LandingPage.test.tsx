@@ -22,6 +22,15 @@ jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
 }))
 
+// Mock the authenticated fetch wrappers to bypass Firebase auth
+// These modules are imported by LandingPage via @/ alias
+jest.mock('@/utils/apiClient', () => ({
+  authenticatedFetch: (...args: any[]) => fetch(...args),
+}))
+jest.mock('@/utils/fetchWithRetry', () => ({
+  fetchWithRetry: (...args: any[]) => fetch(...args),
+}))
+
 // Mock fetch
 global.fetch = jest.fn()
 

@@ -9,6 +9,11 @@ Object.assign(navigator, {
   },
 })
 
+// Mock the authenticated fetch wrapper to bypass Firebase auth
+jest.mock('@/utils/apiClient', () => ({
+  authenticatedFetch: (...args: any[]) => fetch(...args),
+}))
+
 // Mock fetch globally
 global.fetch = jest.fn()
 
