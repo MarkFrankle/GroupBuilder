@@ -265,7 +265,7 @@ def test_facilitator_coverage():
         ], start=1)
     ]
     gb = GroupBuilder(participants, num_tables=4, num_sessions=2)
-    result = gb.generate_assignments()
+    result = gb.generate_assignments(max_time_seconds=10)
     assert result["status"] == "success"
     for session in result["assignments"]:
         for table_num, table_participants in session["tables"].items():
@@ -292,7 +292,7 @@ def test_facilitator_religion_diversity_per_table():
         participants.append({"id": i, "name": f"Person{i}", "religion": r, "gender": g, "partner": None, "couple_id": None, "is_facilitator": False})
 
     gb = GroupBuilder(participants, num_tables=4, num_sessions=3)
-    result = gb.generate_assignments()
+    result = gb.generate_assignments(max_time_seconds=10)
     assert result["status"] == "success"
     for session in result["assignments"]:
         for table_num, table_participants in session["tables"].items():
@@ -323,7 +323,7 @@ def test_facilitator_participant_repeat_penalty():
         participants.append({"id": i, "name": f"P{i}", "religion": r, "gender": g, "partner": None, "couple_id": None, "is_facilitator": False})
 
     gb = GroupBuilder(participants, num_tables=4, num_sessions=4)
-    result = gb.generate_assignments()
+    result = gb.generate_assignments(max_time_seconds=10)
     assert result["status"] == "success"
 
     # Track which facilitator each participant meets per session
