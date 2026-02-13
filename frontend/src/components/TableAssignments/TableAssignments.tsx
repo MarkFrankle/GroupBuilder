@@ -7,6 +7,7 @@ interface Participant {
   religion: string;
   gender: string;
   partner: string | null;
+  is_facilitator?: boolean;
 }
 
 interface Assignment {
@@ -126,12 +127,15 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
       }
     })
 
+    const facilitatorCount = realParticipants.filter(p => p.is_facilitator).length
+
     return {
       count: realParticipants.length,
       genderSplit: genderSplit || '0',
       religionCount: religions.size,
       hasCoupleViolation: coupleViolations.size > 0,
-      hasGenderImbalance
+      hasGenderImbalance,
+      facilitatorCount,
     }
   }
 
@@ -251,14 +255,17 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
                   <CardTitle className="text-lg flex items-center justify-between">
                     <span className={stats.hasCoupleViolation || isUnbalanced ? 'text-red-600' : ''}>Table {tableNumber}</span>
                     <span className="text-sm font-normal text-muted-foreground">
-                      <span className={isUnbalanced ? 'text-red-600' : ''}>{stats.count} {stats.count === 1 ? 'person' : 'people'}</span> • <span className={stats.hasGenderImbalance ? 'text-red-600' : ''}>{stats.genderSplit}</span> • {stats.religionCount} {stats.religionCount === 1 ? 'religion' : 'religions'}
+                      <span className={isUnbalanced ? 'text-red-600' : ''}>{stats.count} {stats.count === 1 ? 'person' : 'people'}</span> • <span className={stats.facilitatorCount === 0 ? 'text-red-600 font-semibold' : ''}>{stats.facilitatorCount} {stats.facilitatorCount === 1 ? 'facilitator' : 'facilitators'}</span> • <span className={stats.hasGenderImbalance ? 'text-red-600' : ''}>{stats.genderSplit}</span> • {stats.religionCount} {stats.religionCount === 1 ? 'religion' : 'religions'}
                       {stats.hasCoupleViolation && <span className="text-red-600"> • ⚠️ Couple</span>}
                     </span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {participants.map((participant, index) => {
+                    {(editMode
+                      ? participants
+                      : [...participants].sort((a, b) => (b?.is_facilitator ? 1 : 0) - (a?.is_facilitator ? 1 : 0))
+                    ).map((participant, index) => {
                       const isEmpty = participant === null || participant === undefined
                       const selected = isSelected(Number(tableNumber), index)
 
@@ -306,6 +313,11 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
                                 })()}
                               </div>
                               <div className="flex flex-wrap gap-1.5">
+                                {participant.is_facilitator && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                                    Facilitator
+                                  </span>
+                                )}
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getReligionColor(participant.religion)}`}>
                                   {participant.religion}
                                 </span>
