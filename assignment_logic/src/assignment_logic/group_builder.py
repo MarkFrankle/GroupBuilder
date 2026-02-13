@@ -31,6 +31,7 @@ class GroupBuilder:
         self.sessions = range(num_sessions)
         self.religions = set([participant["religion"] for participant in self.participants])
         self.genders = set([participant["gender"] for participant in self.participants])
+        self.facilitator_ids = [p["id"] for p in participants if p.get("is_facilitator", False)]
         self.locked_assignments = locked_assignments or {}
         self.historical_pairings = historical_pairings or set()  # Pairings from previous batches
         self.current_table_assignments = current_table_assignments or {}  # Current table assignments to forbid
@@ -263,6 +264,7 @@ class GroupBuilder:
         )
         # No table has more than one participant from a religion than any other table
         self._add_participant_attribute_distribution_constraint("gender", self.genders)
+        self._add_facilitator_constraints()
 
     def _add_participant_attribute_distribution_constraint(
         self, attribute_name, attribute_set
@@ -307,6 +309,46 @@ class GroupBuilder:
                     - min_participants_per_attribute[(s, attribute_value)]
                     <= 1
                 )
+
+    def _add_facilitator_constraints(self):
+        """Add facilitator-specific constraints: coverage and balance."""
+        if not self.facilitator_ids:
+            return
+
+        num_facilitators = len(self.facilitator_ids)
+        num_tables = len(self.tables)
+
+        # Coverage: every table has at least one facilitator per session
+        for s in self.sessions:
+            for t in self.tables:
+                self.model.Add(
+                    sum(self.participant_table_assignments[(f, s, t)] for f in self.facilitator_ids) >= 1
+                )
+
+        # Balance: facilitators spread evenly (no table has >1 more than any other)
+        min_per_table = num_facilitators // num_tables
+        max_per_table = min_per_table + (1 if num_facilitators % num_tables != 0 else 0)
+        for s in self.sessions:
+            for t in self.tables:
+                facilitator_count = sum(self.participant_table_assignments[(f, s, t)] for f in self.facilitator_ids)
+                self.model.Add(facilitator_count >= min_per_table)
+                self.model.Add(facilitator_count <= max_per_table)
+
+        # Religion diversity: no two facilitators at the same table share a religion
+        facilitator_religions = {}
+        for p in self.participants:
+            if p["id"] in self.facilitator_ids:
+                religion = p["religion"]
+                facilitator_religions.setdefault(religion, []).append(p["id"])
+
+        for s in self.sessions:
+            for t in self.tables:
+                for religion, fac_ids in facilitator_religions.items():
+                    if len(fac_ids) > 1:
+                        # At most 1 facilitator of this religion per table
+                        self.model.Add(
+                            sum(self.participant_table_assignments[(f, s, t)] for f in fac_ids) <= 1
+                        )
 
     def _add_objective_functions_to_model(self):
         # Separate couples as much as possible
@@ -443,6 +485,7 @@ class GroupBuilder:
                                     "religion": p["religion"],
                                     "gender": p["gender"],
                                     "partner": p.get("partner"),
+                                    "is_facilitator": p.get("is_facilitator", False),
                                 }
                             )
                 # Convert defaultdict to a regular dict for JSON compatibility

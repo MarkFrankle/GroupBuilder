@@ -103,6 +103,11 @@ export function RosterPage() {
 
   const handleGenerate = async () => {
     setError(null);
+    const facilitatorCount = participants.filter(p => p.is_facilitator).length;
+    if (facilitatorCount > 0 && facilitatorCount < parseInt(numTables)) {
+      setError(`Need at least ${numTables} facilitators for ${numTables} tables (have ${facilitatorCount})`);
+      return;
+    }
     setGenerating(true);
     setLoadingMessage('Creating session from roster...');
     try {

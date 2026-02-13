@@ -22,10 +22,11 @@ interface EmptyRowState {
   religion: Religion;
   gender: Gender;
   partner_id: string | null;
+  is_facilitator: boolean;
 }
 
 const EMPTY_ROW: EmptyRowState = {
-  name: '', religion: 'Other', gender: 'Other', partner_id: null,
+  name: '', religion: 'Other', gender: 'Other', partner_id: null, is_facilitator: false,
 };
 
 export function RosterGrid({ participants, onUpdate, onDelete, onAdd }: RosterGridProps) {
@@ -44,6 +45,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd }: RosterGr
         religion: participant.religion,
         gender: participant.gender,
         partner_id: participant.partner_id,
+        is_facilitator: participant.is_facilitator ?? false,
       });
     }
     setEditingNames(prev => {
@@ -64,6 +66,17 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd }: RosterGr
       religion: field === 'religion' ? value as Religion : participant.religion,
       gender: field === 'gender' ? value as Gender : participant.gender,
       partner_id: partnerValue,
+      is_facilitator: participant.is_facilitator ?? false,
+    });
+  };
+
+  const handleFacilitatorChange = (participant: RosterParticipant, checked: boolean) => {
+    onUpdate(participant.id, {
+      name: editingNames[participant.id] ?? participant.name,
+      religion: participant.religion,
+      gender: participant.gender,
+      partner_id: participant.partner_id,
+      is_facilitator: checked,
     });
   };
 
@@ -74,6 +87,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd }: RosterGr
         religion: emptyRow.religion,
         gender: emptyRow.gender,
         partner_id: emptyRow.partner_id,
+        is_facilitator: emptyRow.is_facilitator,
       });
       setEmptyRow({ ...EMPTY_ROW });
     }
@@ -99,6 +113,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd }: RosterGr
               <TableHead className="w-[150px]">Religion</TableHead>
               <TableHead className="w-[120px]">Gender</TableHead>
               <TableHead className="w-[200px]">Partner</TableHead>
+              <TableHead className="w-[90px]">Facilitator</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -150,6 +165,15 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd }: RosterGr
                       </SelectContent>
                     </Select>
                   </TableCell>
+                  <TableCell className="p-1 text-center">
+                    <input
+                      type="checkbox"
+                      checked={p.is_facilitator ?? false}
+                      onChange={e => handleFacilitatorChange(p, e.target.checked)}
+                      className="h-4 w-4 cursor-pointer"
+                      aria-label={`Mark ${p.name} as facilitator`}
+                    />
+                  </TableCell>
                   <TableCell className="p-1">
                     <Button
                       variant="ghost"
@@ -192,6 +216,16 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd }: RosterGr
               </TableCell>
               <TableCell className="p-1">
                 <span className="text-sm text-muted-foreground px-3">—</span>
+              </TableCell>
+              <TableCell className="p-1 text-center">
+                <input
+                  type="checkbox"
+                  checked={false}
+                  disabled
+                  className="h-4 w-4"
+                  aria-label="Facilitator (save name first)"
+                  onChange={() => {}}
+                />
               </TableCell>
               <TableCell className="p-1"></TableCell>
             </TableRow>

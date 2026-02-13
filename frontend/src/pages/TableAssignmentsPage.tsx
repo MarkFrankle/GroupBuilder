@@ -47,6 +47,7 @@ export interface Participant {
   religion: string;
   gender: string;
   partner: string | null;
+  is_facilitator?: boolean;
 }
 
 export interface Assignment {
