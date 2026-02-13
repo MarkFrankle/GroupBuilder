@@ -307,6 +307,14 @@ const TableAssignmentsPage: React.FC = () => {
     navigate('/')
   }
 
+  const handlePrintRoster = () => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId
+    navigate('/table-assignments/roster-print', {
+      state: { assignments, sessionId }
+    })
+  }
+
   const handlePrintSeating = async () => {
     try {
       const urlParams = new URLSearchParams(window.location.search);
@@ -918,6 +926,10 @@ const TableAssignmentsPage: React.FC = () => {
                   <DropdownMenuItem onClick={downloadCSV}>
                     <Download className="h-4 w-4 mr-2" />
                     Download CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handlePrintRoster} disabled={editMode}>
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print Roster
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleRegenerateClick} disabled={editMode || regenerating}>
                     <RotateCw className="h-4 w-4 mr-2" />
