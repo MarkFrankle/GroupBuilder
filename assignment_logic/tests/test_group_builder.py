@@ -273,5 +273,35 @@ def test_facilitator_coverage():
             assert len(facilitators) >= 1, f"Session {session['session']}, Table {table_num} has no facilitator"
 
 
+def test_facilitator_religion_diversity_per_table():
+    """No two facilitators at the same table share a religion."""
+    # 6 facilitators: 2 per religion. With 4 tables, some tables get 2 facilitators.
+    # Those 2 must be different religions.
+    participants = [
+        {"id": 1, "name": "F_Christian1", "religion": "Christian", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 2, "name": "F_Christian2", "religion": "Christian", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 3, "name": "F_Jewish1", "religion": "Jewish", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 4, "name": "F_Jewish2", "religion": "Jewish", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 5, "name": "F_Muslim1", "religion": "Muslim", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 6, "name": "F_Muslim2", "religion": "Muslim", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": True},
+    ]
+    # Add 14 regular participants for 20 total, 4 tables
+    for i in range(7, 21):
+        r = ["Christian", "Jewish", "Muslim"][(i - 7) % 3]
+        g = "Male" if i % 2 == 0 else "Female"
+        participants.append({"id": i, "name": f"Person{i}", "religion": r, "gender": g, "partner": None, "couple_id": None, "is_facilitator": False})
+
+    gb = GroupBuilder(participants, num_tables=4, num_sessions=3)
+    result = gb.generate_assignments()
+    assert result["status"] == "success"
+    for session in result["assignments"]:
+        for table_num, table_participants in session["tables"].items():
+            facilitators = [p for p in table_participants if p.get("is_facilitator")]
+            religions = [f["religion"] for f in facilitators]
+            assert len(religions) == len(set(religions)), (
+                f"Session {session['session']}, Table {table_num}: facilitators share religion: {religions}"
+            )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
