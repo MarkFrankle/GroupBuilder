@@ -204,6 +204,14 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
         if (selectedSlot.tableNum === tableNum && (isEmpty || selectedIsEmpty)) {
           return
         }
+
+        // Facilitator restriction: can only swap facilitator ↔ facilitator or facilitator → empty slot
+        const selectedIsFacilitator = selectedParticipant?.is_facilitator ?? false
+        const targetIsFacilitator = participant?.is_facilitator ?? false
+        if (!isEmpty && selectedIsFacilitator !== targetIsFacilitator) {
+          return
+        }
+
         onSwap(selectedSlot.tableNum, selectedSlot.index, tableNum, index)
         setSelectedSlot(null)
       }
@@ -277,7 +285,12 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
                       const sameTable = selectedSlot && selectedSlot.tableNum === Number(tableNumber)
                       const shouldExclude = sameTable && (isEmpty || selectedIsEmpty)
 
-                      const isTarget = editMode && selectedSlot && !selected && !shouldExclude
+                      // Facilitator type restriction: don't highlight invalid swap targets
+                      const selectedIsFacilitator = selectedParticipant?.is_facilitator ?? false
+                      const targetIsFacilitator = participant?.is_facilitator ?? false
+                      const isFacilitatorMismatch = !isEmpty && selectedIsFacilitator !== targetIsFacilitator
+
+                      const isTarget = editMode && selectedSlot && !selected && !shouldExclude && !isFacilitatorMismatch
                       const isAbsentTarget = editMode && selectedAbsentParticipant && isEmpty
 
                       return (
