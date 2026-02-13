@@ -21,8 +21,14 @@ class TestUploadEndpoint:
         """Test successful file upload with valid data."""
         response = client.post(
             "/api/upload/",
-            files={"file": ("test.xlsx", sample_excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-            data={"numTables": "2", "numSessions": "3"}
+            files={
+                "file": (
+                    "test.xlsx",
+                    sample_excel_file,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+            data={"numTables": "2", "numSessions": "3"},
         )
 
         assert response.status_code == 200
@@ -36,17 +42,25 @@ class TestUploadEndpoint:
     def test_file_too_large(self, client, mock_storage):
         """Test that files larger than 10MB are rejected."""
         # Create a file larger than 10MB
-        large_file = BytesIO(b'x' * (11 * 1024 * 1024))  # 11MB
+        large_file = BytesIO(b"x" * (11 * 1024 * 1024))  # 11MB
 
         response = client.post(
             "/api/upload/",
-            files={"file": ("large.xlsx", large_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-            data={"numTables": "2", "numSessions": "3"}
+            files={
+                "file": (
+                    "large.xlsx",
+                    large_file,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+            data={"numTables": "2", "numSessions": "3"},
         )
 
         assert response.status_code == 400
         assert "exceeds maximum allowed size" in response.json()["detail"]
-        assert "11.0MB" in response.json()["detail"] or "10MB" in response.json()["detail"]
+        assert (
+            "11.0MB" in response.json()["detail"] or "10MB" in response.json()["detail"]
+        )
 
     def test_invalid_file_format(self, client, mock_storage):
         """Test that non-Excel files are rejected."""
@@ -55,18 +69,26 @@ class TestUploadEndpoint:
         response = client.post(
             "/api/upload/",
             files={"file": ("test.txt", txt_file, "text/plain")},
-            data={"numTables": "2", "numSessions": "3"}
+            data={"numTables": "2", "numSessions": "3"},
         )
 
         assert response.status_code == 400
         assert "Invalid file format" in response.json()["detail"]
 
-    def test_missing_required_columns(self, client, mock_storage, sample_excel_file_missing_columns):
+    def test_missing_required_columns(
+        self, client, mock_storage, sample_excel_file_missing_columns
+    ):
         """Test that files with missing required columns are rejected."""
         response = client.post(
             "/api/upload/",
-            files={"file": ("test.xlsx", sample_excel_file_missing_columns, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-            data={"numTables": "2", "numSessions": "3"}
+            files={
+                "file": (
+                    "test.xlsx",
+                    sample_excel_file_missing_columns,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+            data={"numTables": "2", "numSessions": "3"},
         )
 
         assert response.status_code == 400
@@ -78,8 +100,14 @@ class TestUploadEndpoint:
         """Test that numTables < 1 is rejected."""
         response = client.post(
             "/api/upload/",
-            files={"file": ("test.xlsx", sample_excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-            data={"numTables": "0", "numSessions": "3"}
+            files={
+                "file": (
+                    "test.xlsx",
+                    sample_excel_file,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+            data={"numTables": "0", "numSessions": "3"},
         )
 
         assert response.status_code == 422  # FastAPI validation error
@@ -88,8 +116,14 @@ class TestUploadEndpoint:
         """Test that numTables > 10 is rejected."""
         response = client.post(
             "/api/upload/",
-            files={"file": ("test.xlsx", sample_excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-            data={"numTables": "11", "numSessions": "3"}
+            files={
+                "file": (
+                    "test.xlsx",
+                    sample_excel_file,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+            data={"numTables": "11", "numSessions": "3"},
         )
 
         assert response.status_code == 422  # FastAPI validation error
@@ -98,8 +132,14 @@ class TestUploadEndpoint:
         """Test that numSessions < 1 is rejected."""
         response = client.post(
             "/api/upload/",
-            files={"file": ("test.xlsx", sample_excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-            data={"numTables": "2", "numSessions": "0"}
+            files={
+                "file": (
+                    "test.xlsx",
+                    sample_excel_file,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+            data={"numTables": "2", "numSessions": "0"},
         )
 
         assert response.status_code == 422  # FastAPI validation error
@@ -108,30 +148,55 @@ class TestUploadEndpoint:
         """Test that numSessions > 6 is rejected."""
         response = client.post(
             "/api/upload/",
-            files={"file": ("test.xlsx", sample_excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-            data={"numTables": "2", "numSessions": "7"}
+            files={
+                "file": (
+                    "test.xlsx",
+                    sample_excel_file,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+            data={"numTables": "2", "numSessions": "7"},
         )
 
         assert response.status_code == 422  # FastAPI validation error
 
-    def test_not_enough_participants_for_tables(self, client, mock_storage, sample_excel_file):
+    def test_not_enough_participants_for_tables(
+        self, client, mock_storage, sample_excel_file
+    ):
         """Test that having fewer participants than tables is rejected."""
         # sample_excel_file has 4 participants
         response = client.post(
             "/api/upload/",
-            files={"file": ("test.xlsx", sample_excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-            data={"numTables": "5", "numSessions": "3"}  # 5 tables but only 4 participants
+            files={
+                "file": (
+                    "test.xlsx",
+                    sample_excel_file,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+            data={
+                "numTables": "5",
+                "numSessions": "3",
+            },  # 5 tables but only 4 participants
         )
 
         assert response.status_code == 400
         assert "Not enough participants" in response.json()["detail"]
 
-    def test_too_many_participants(self, client, mock_storage, sample_excel_file_too_many):
+    def test_too_many_participants(
+        self, client, mock_storage, sample_excel_file_too_many
+    ):
         """Test that files with > 200 participants are rejected."""
         response = client.post(
             "/api/upload/",
-            files={"file": ("test.xlsx", sample_excel_file_too_many, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-            data={"numTables": "5", "numSessions": "3"}
+            files={
+                "file": (
+                    "test.xlsx",
+                    sample_excel_file_too_many,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+            data={"numTables": "5", "numSessions": "3"},
         )
 
         assert response.status_code == 400
@@ -143,8 +208,14 @@ class TestUploadEndpoint:
         """Test that files with many participants (but under limit) work."""
         response = client.post(
             "/api/upload/",
-            files={"file": ("test.xlsx", sample_excel_file_large, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-            data={"numTables": "10", "numSessions": "6"}
+            files={
+                "file": (
+                    "test.xlsx",
+                    sample_excel_file_large,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+            data={"numTables": "10", "numSessions": "6"},
         )
 
         assert response.status_code == 200
@@ -156,8 +227,14 @@ class TestUploadEndpoint:
         # Min values
         response = client.post(
             "/api/upload/",
-            files={"file": ("test.xlsx", sample_excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-            data={"numTables": "1", "numSessions": "1"}
+            files={
+                "file": (
+                    "test.xlsx",
+                    sample_excel_file,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+            data={"numTables": "1", "numSessions": "1"},
         )
         assert response.status_code == 200
 
@@ -165,17 +242,25 @@ class TestUploadEndpoint:
         sample_excel_file.seek(0)  # Reset file pointer
         response = client.post(
             "/api/upload/",
-            files={"file": ("test.xlsx", sample_excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-            data={"numTables": "10", "numSessions": "6"}
+            files={
+                "file": (
+                    "test.xlsx",
+                    sample_excel_file,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+            data={"numTables": "10", "numSessions": "6"},
         )
         # This might fail due to not enough participants, but validation should pass
-        assert response.status_code in [200, 400]  # Either succeeds or fails on participant count
+        assert response.status_code in [
+            200,
+            400,
+        ]  # Either succeeds or fails on participant count
 
     def test_missing_file(self, client, mock_storage):
         """Test that request without a file is rejected."""
         response = client.post(
-            "/api/upload/",
-            data={"numTables": "2", "numSessions": "3"}
+            "/api/upload/", data={"numTables": "2", "numSessions": "3"}
         )
 
         assert response.status_code == 422  # FastAPI validation error
@@ -184,8 +269,14 @@ class TestUploadEndpoint:
         """Test that request without numTables is rejected."""
         response = client.post(
             "/api/upload/",
-            files={"file": ("test.xlsx", sample_excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-            data={"numSessions": "3"}
+            files={
+                "file": (
+                    "test.xlsx",
+                    sample_excel_file,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+            data={"numSessions": "3"},
         )
 
         assert response.status_code == 422  # FastAPI validation error
@@ -194,8 +285,14 @@ class TestUploadEndpoint:
         """Test that request without numSessions is rejected."""
         response = client.post(
             "/api/upload/",
-            files={"file": ("test.xlsx", sample_excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-            data={"numTables": "2"}
+            files={
+                "file": (
+                    "test.xlsx",
+                    sample_excel_file,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+            data={"numTables": "2"},
         )
 
         assert response.status_code == 422  # FastAPI validation error
@@ -206,8 +303,14 @@ class TestUploadEndpoint:
 
         response = client.post(
             "/api/upload/",
-            files={"file": ("test.xlsx", sample_excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-            data={"numTables": "2", "numSessions": "3"}
+            files={
+                "file": (
+                    "test.xlsx",
+                    sample_excel_file,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+            data={"numTables": "2", "numSessions": "3"},
         )
 
         assert response.status_code == 200
@@ -219,12 +322,59 @@ class TestUploadEndpoint:
         except ValueError:
             pytest.fail(f"session_id '{session_id}' is not a valid UUID")
 
+    def test_upload_with_facilitator_column(self, client, mock_storage):
+        """Test that Facilitator column is parsed and stored correctly."""
+        import io
+        import pandas as pd
+
+        df = pd.DataFrame(
+            {
+                "Name": ["Alice", "Bob", "Carol", "Dave"],
+                "Religion": ["Christian", "Jewish", "Muslim", "Christian"],
+                "Gender": ["Female", "Male", "Female", "Male"],
+                "Partner": ["", "", "", ""],
+                "Facilitator": ["Yes", "No", "Yes", ""],
+            }
+        )
+        buf = io.BytesIO()
+        df.to_excel(buf, index=False)
+        buf.seek(0)
+
+        response = client.post(
+            "/api/upload/",
+            files={
+                "file": (
+                    "test.xlsx",
+                    buf,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+            data={"numTables": "2", "numSessions": "1"},
+        )
+        assert response.status_code == 200
+        session_id = response.json()["session_id"]
+
+        from api.services.session_storage import SessionStorage
+
+        stored = SessionStorage().get_session(session_id)
+        assert stored is not None
+        facilitators = [
+            p for p in stored["participant_data"] if p.get("is_facilitator")
+        ]
+        assert len(facilitators) == 2
+
     def test_session_stored_correctly(self, client, mock_storage, sample_excel_file):
         """Test that session data is stored with correct structure."""
         response = client.post(
             "/api/upload/",
-            files={"file": ("test.xlsx", sample_excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-            data={"numTables": "2", "numSessions": "3"}
+            files={
+                "file": (
+                    "test.xlsx",
+                    sample_excel_file,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+            data={"numTables": "2", "numSessions": "3"},
         )
 
         assert response.status_code == 200
@@ -232,6 +382,7 @@ class TestUploadEndpoint:
 
         # Check that data was stored in Firestore
         from api.services.session_storage import SessionStorage
+
         storage = SessionStorage()
         stored_data = storage.get_session(session_id)
         assert stored_data is not None
