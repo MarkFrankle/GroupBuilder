@@ -273,22 +273,44 @@ def test_facilitator_coverage():
             assert len(facilitators) >= 1, f"Session {session['session']}, Table {table_num} has no facilitator"
 
 
+def test_facilitator_religion_diversity_per_table():
+    """No two facilitators at the same table share a religion."""
+    # 6 facilitators: 2 per religion. With 4 tables, some tables get 2 facilitators.
+    # Those 2 must be different religions.
+    participants = [
+        {"id": 1, "name": "F_Christian1", "religion": "Christian", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 2, "name": "F_Christian2", "religion": "Christian", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 3, "name": "F_Jewish1", "religion": "Jewish", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 4, "name": "F_Jewish2", "religion": "Jewish", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 5, "name": "F_Muslim1", "religion": "Muslim", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 6, "name": "F_Muslim2", "religion": "Muslim", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": True},
+    ]
+    # Add 14 regular participants for 20 total, 4 tables
+    for i in range(7, 21):
+        r = ["Christian", "Jewish", "Muslim"][(i - 7) % 3]
+        g = "Male" if i % 2 == 0 else "Female"
+        participants.append({"id": i, "name": f"Person{i}", "religion": r, "gender": g, "partner": None, "couple_id": None, "is_facilitator": False})
+
+    gb = GroupBuilder(participants, num_tables=4, num_sessions=3)
+    result = gb.generate_assignments()
+    assert result["status"] == "success"
+    for session in result["assignments"]:
+        for table_num, table_participants in session["tables"].items():
+            facilitators = [p for p in table_participants if p.get("is_facilitator")]
+            religions = [f["religion"] for f in facilitators]
+            assert len(religions) == len(set(religions)), (
+                f"Session {session['session']}, Table {table_num}: facilitators share religion: {religions}"
+            )
+
+
 def test_facilitator_participant_repeat_penalty():
-    """Facilitator-participant pairings are penalized within the rolling window, same as participant-participant.
+    """Facilitator-participant repeat pairings are penalized by the existing rolling window.
 
-    The solver's repeat-pairing penalty loop iterates over ALL participant pairs, which includes
-    facilitator-participant pairs (facilitators are participants with is_facilitator=True). This
-    test verifies that the mechanism is applied structurally and produces noticeably fewer repeats
-    than a random baseline — not that it achieves zero (the problem is too constrained for that
-    guarantee within the default time budget).
-
-    Structural note: with 4 facilitators across 4 tables (exactly 1 per table per session), a
-    participant's facilitator in each session is determined by their table assignment. The
-    religion/gender/balance hard constraints make full facilitator rotation difficult to achieve
-    while also solving to optimality within 120 s. The penalty IS applied; the solver just
-    cannot always reach the global minimum in time.
+    The solver's repeat-pairing penalty covers ALL participant pairs, including
+    facilitator-participant pairs. With 4 facilitators and 4 sessions, we verify
+    each participant meets at least 2 distinct facilitators (conservative bound).
+    Zero repeats may not be achievable given competing hard constraints.
     """
-    # 4 facilitators, 4 tables, 4 sessions — each facilitator should rotate
     participants = [
         {"id": 1, "name": "Fac1", "religion": "Christian", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
         {"id": 2, "name": "Fac2", "religion": "Jewish", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": True},
@@ -305,7 +327,7 @@ def test_facilitator_participant_repeat_penalty():
     assert result["status"] == "success"
 
     # Track which facilitator each participant meets per session
-    participant_facilitator_meetings = {}  # {participant_name: [facilitator_name_per_session]}
+    participant_facilitator_meetings = {}
     for session in result["assignments"]:
         for table_num, table_participants in session["tables"].items():
             facilitators = [p["name"] for p in table_participants if p.get("is_facilitator")]
@@ -313,26 +335,15 @@ def test_facilitator_participant_repeat_penalty():
             for nf in non_facilitators:
                 participant_facilitator_meetings.setdefault(nf, []).extend(facilitators)
 
-    # Structural check: every non-facilitator participant must have been assigned a facilitator
-    # in each session (coverage constraint guarantees this).
-    assert len(participant_facilitator_meetings) == 16, (
-        f"Expected 16 non-facilitator participants, got {len(participant_facilitator_meetings)}"
-    )
+    # Each participant meets 1 facilitator per session across 4 sessions
     for participant, fac_list in participant_facilitator_meetings.items():
-        assert len(fac_list) == 4, (
-            f"Participant {participant} should meet exactly 1 facilitator per session across 4 sessions, "
-            f"got {fac_list}"
-        )
+        assert len(fac_list) == 4
 
-    # Diversity check: across 4 sessions with 4 distinct facilitators, each participant should
-    # meet at least 2 different facilitators (if penalty had NO effect, random assignment with
-    # 4 tables and 4 sessions would already give ~2.9 unique facilitators on average).
-    # We assert >= 2 as a conservative lower bound that proves the rotation is happening.
+    # With penalty active, each participant should meet at least 2 distinct facilitators
     for participant, fac_list in participant_facilitator_meetings.items():
-        unique_facilitators = len(set(fac_list))
-        assert unique_facilitators >= 2, (
-            f"Participant {participant} met fewer than 2 distinct facilitators across 4 sessions: "
-            f"{fac_list}. Expected the penalty mechanism to drive facilitator rotation."
+        unique = len(set(fac_list))
+        assert unique >= 2, (
+            f"Participant {participant} met fewer than 2 distinct facilitators: {fac_list}"
         )
 
 

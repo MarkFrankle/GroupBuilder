@@ -334,6 +334,22 @@ class GroupBuilder:
                 self.model.Add(facilitator_count >= min_per_table)
                 self.model.Add(facilitator_count <= max_per_table)
 
+        # Religion diversity: no two facilitators at the same table share a religion
+        facilitator_religions = {}
+        for p in self.participants:
+            if p["id"] in self.facilitator_ids:
+                religion = p["religion"]
+                facilitator_religions.setdefault(religion, []).append(p["id"])
+
+        for s in self.sessions:
+            for t in self.tables:
+                for religion, fac_ids in facilitator_religions.items():
+                    if len(fac_ids) > 1:
+                        # At most 1 facilitator of this religion per table
+                        self.model.Add(
+                            sum(self.participant_table_assignments[(f, s, t)] for f in fac_ids) <= 1
+                        )
+
     def _add_objective_functions_to_model(self):
         # Separate couples as much as possible
         couples = defaultdict(list)
