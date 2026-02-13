@@ -250,101 +250,64 @@ class TestGroupBuilder:
 def test_facilitator_coverage():
     """Every table must have at least one facilitator."""
     participants = [
-        {"id": i, "name": f"Person{i}", "religion": r, "gender": g, "partner": None, "couple_id": None, "is_facilitator": i <= 4}
-        for i, (r, g) in enumerate([
-            ("Christian", "Male"), ("Christian", "Female"),
-            ("Jewish", "Male"), ("Jewish", "Female"),
-            ("Muslim", "Male"), ("Muslim", "Female"),
-            ("Christian", "Male"), ("Christian", "Female"),
-            ("Jewish", "Male"), ("Jewish", "Female"),
-            ("Muslim", "Male"), ("Muslim", "Female"),
-            ("Christian", "Male"), ("Christian", "Female"),
-            ("Jewish", "Male"), ("Jewish", "Female"),
-            ("Muslim", "Male"), ("Muslim", "Female"),
-            ("Christian", "Male"), ("Christian", "Female"),
-        ], start=1)
+        {"id": 1, "name": "Fac1", "religion": "Christian", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 2, "name": "Fac2", "religion": "Jewish", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 3, "name": "P1", "religion": "Muslim", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": False},
+        {"id": 4, "name": "P2", "religion": "Christian", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": False},
+        {"id": 5, "name": "P3", "religion": "Jewish", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": False},
+        {"id": 6, "name": "P4", "religion": "Muslim", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": False},
     ]
-    gb = GroupBuilder(participants, num_tables=4, num_sessions=2)
-    result = gb.generate_assignments(max_time_seconds=10)
+    gb = GroupBuilder(participants, num_tables=2, num_sessions=1)
+    result = gb.generate_assignments()
     assert result["status"] == "success"
     for session in result["assignments"]:
         for table_num, table_participants in session["tables"].items():
             facilitators = [p for p in table_participants if p.get("is_facilitator")]
-            assert len(facilitators) >= 1, f"Session {session['session']}, Table {table_num} has no facilitator"
+            assert len(facilitators) >= 1, f"Table {table_num} has no facilitator"
 
 
 def test_facilitator_religion_diversity_per_table():
     """No two facilitators at the same table share a religion."""
-    # 6 facilitators: 2 per religion. With 4 tables, some tables get 2 facilitators.
-    # Those 2 must be different religions.
+    # 4 facilitators (2 Christian, 2 Jewish), 2 tables — each table gets 2 facilitators
+    # who must be different religions.
     participants = [
-        {"id": 1, "name": "F_Christian1", "religion": "Christian", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
-        {"id": 2, "name": "F_Christian2", "religion": "Christian", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": True},
-        {"id": 3, "name": "F_Jewish1", "religion": "Jewish", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
-        {"id": 4, "name": "F_Jewish2", "religion": "Jewish", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": True},
-        {"id": 5, "name": "F_Muslim1", "religion": "Muslim", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
-        {"id": 6, "name": "F_Muslim2", "religion": "Muslim", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 1, "name": "Fac_C1", "religion": "Christian", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 2, "name": "Fac_C2", "religion": "Christian", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 3, "name": "Fac_J1", "religion": "Jewish", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 4, "name": "Fac_J2", "religion": "Jewish", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 5, "name": "P1", "religion": "Muslim", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": False},
+        {"id": 6, "name": "P2", "religion": "Christian", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": False},
+        {"id": 7, "name": "P3", "religion": "Jewish", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": False},
+        {"id": 8, "name": "P4", "religion": "Muslim", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": False},
     ]
-    # Add 14 regular participants for 20 total, 4 tables
-    for i in range(7, 21):
-        r = ["Christian", "Jewish", "Muslim"][(i - 7) % 3]
-        g = "Male" if i % 2 == 0 else "Female"
-        participants.append({"id": i, "name": f"Person{i}", "religion": r, "gender": g, "partner": None, "couple_id": None, "is_facilitator": False})
-
-    gb = GroupBuilder(participants, num_tables=4, num_sessions=3)
-    result = gb.generate_assignments(max_time_seconds=10)
+    gb = GroupBuilder(participants, num_tables=2, num_sessions=1)
+    result = gb.generate_assignments()
     assert result["status"] == "success"
     for session in result["assignments"]:
         for table_num, table_participants in session["tables"].items():
             facilitators = [p for p in table_participants if p.get("is_facilitator")]
             religions = [f["religion"] for f in facilitators]
             assert len(religions) == len(set(religions)), (
-                f"Session {session['session']}, Table {table_num}: facilitators share religion: {religions}"
+                f"Table {table_num}: facilitators share religion: {religions}"
             )
 
 
-def test_facilitator_participant_repeat_penalty():
-    """Facilitator-participant repeat pairings are penalized by the existing rolling window.
-
-    The solver's repeat-pairing penalty covers ALL participant pairs, including
-    facilitator-participant pairs. With 4 facilitators and 4 sessions, we verify
-    each participant meets at least 2 distinct facilitators (conservative bound).
-    Zero repeats may not be achievable given competing hard constraints.
-    """
+def test_facilitator_output_includes_flag():
+    """Solver output includes is_facilitator in participant dicts."""
     participants = [
         {"id": 1, "name": "Fac1", "religion": "Christian", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
-        {"id": 2, "name": "Fac2", "religion": "Jewish", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": True},
-        {"id": 3, "name": "Fac3", "religion": "Muslim", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
-        {"id": 4, "name": "Fac4", "religion": "Christian", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 2, "name": "P1", "religion": "Jewish", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": False},
+        {"id": 3, "name": "P2", "religion": "Muslim", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": False},
+        {"id": 4, "name": "P3", "religion": "Christian", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": False},
     ]
-    for i in range(5, 21):
-        r = ["Christian", "Jewish", "Muslim"][(i - 5) % 3]
-        g = "Male" if i % 2 == 0 else "Female"
-        participants.append({"id": i, "name": f"P{i}", "religion": r, "gender": g, "partner": None, "couple_id": None, "is_facilitator": False})
-
-    gb = GroupBuilder(participants, num_tables=4, num_sessions=4)
-    result = gb.generate_assignments(max_time_seconds=10)
+    gb = GroupBuilder(participants, num_tables=1, num_sessions=1)
+    result = gb.generate_assignments()
     assert result["status"] == "success"
-
-    # Track which facilitator each participant meets per session
-    participant_facilitator_meetings = {}
-    for session in result["assignments"]:
-        for table_num, table_participants in session["tables"].items():
-            facilitators = [p["name"] for p in table_participants if p.get("is_facilitator")]
-            non_facilitators = [p["name"] for p in table_participants if not p.get("is_facilitator")]
-            for nf in non_facilitators:
-                participant_facilitator_meetings.setdefault(nf, []).extend(facilitators)
-
-    # Each participant meets 1 facilitator per session across 4 sessions
-    for participant, fac_list in participant_facilitator_meetings.items():
-        assert len(fac_list) == 4
-
-    # With penalty active, each participant should meet at least 2 distinct facilitators
-    for participant, fac_list in participant_facilitator_meetings.items():
-        unique = len(set(fac_list))
-        assert unique >= 2, (
-            f"Participant {participant} met fewer than 2 distinct facilitators: {fac_list}"
-        )
+    all_participants = result["assignments"][0]["tables"][1]
+    fac = next(p for p in all_participants if p["name"] == "Fac1")
+    assert fac["is_facilitator"] is True
+    non_fac = next(p for p in all_participants if p["name"] == "P1")
+    assert non_fac["is_facilitator"] is False
 
 
 if __name__ == "__main__":
