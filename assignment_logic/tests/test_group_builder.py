@@ -247,5 +247,31 @@ class TestGroupBuilder:
         assert result["status"] == "success"
 
 
+def test_facilitator_coverage():
+    """Every table must have at least one facilitator."""
+    participants = [
+        {"id": i, "name": f"Person{i}", "religion": r, "gender": g, "partner": None, "couple_id": None, "is_facilitator": i <= 4}
+        for i, (r, g) in enumerate([
+            ("Christian", "Male"), ("Christian", "Female"),
+            ("Jewish", "Male"), ("Jewish", "Female"),
+            ("Muslim", "Male"), ("Muslim", "Female"),
+            ("Christian", "Male"), ("Christian", "Female"),
+            ("Jewish", "Male"), ("Jewish", "Female"),
+            ("Muslim", "Male"), ("Muslim", "Female"),
+            ("Christian", "Male"), ("Christian", "Female"),
+            ("Jewish", "Male"), ("Jewish", "Female"),
+            ("Muslim", "Male"), ("Muslim", "Female"),
+            ("Christian", "Male"), ("Christian", "Female"),
+        ], start=1)
+    ]
+    gb = GroupBuilder(participants, num_tables=4, num_sessions=2)
+    result = gb.generate_assignments()
+    assert result["status"] == "success"
+    for session in result["assignments"]:
+        for table_num, table_participants in session["tables"].items():
+            facilitators = [p for p in table_participants if p.get("is_facilitator")]
+            assert len(facilitators) >= 1, f"Session {session['session']}, Table {table_num} has no facilitator"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
