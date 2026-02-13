@@ -123,6 +123,7 @@ async def import_roster(
                 "religion": religion,
                 "gender": gender,
                 "partner_id": None,
+                "is_facilitator": is_facilitator,
             }
         )
 

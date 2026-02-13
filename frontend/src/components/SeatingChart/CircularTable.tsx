@@ -73,10 +73,10 @@ const CircularTable: React.FC<CircularTableProps> = ({ tableNumber, seats }) => 
         if (facilitators.length === 0) return null
         return (
           <div
-            className="mb-2 text-xs text-amber-700 font-medium text-center"
+            className="mb-2 text-xs text-gray-600 font-medium text-center"
             data-testid="facilitator-subtitle"
           >
-            {facilitators.map(f => shortenName(f.name)).join(' · ')}
+            Facilitators: {facilitators.map(f => shortenName(f.name)).join(' · ')}
           </div>
         )
       })()}
@@ -160,8 +160,8 @@ const CircularTable: React.FC<CircularTableProps> = ({ tableNumber, seats }) => 
                 height="32"
                 fill="white"
                 stroke="currentColor"
-                strokeWidth={seat.is_facilitator ? 2 : 1}
-                className={seat.is_facilitator ? "text-amber-500" : "text-gray-300"}
+                strokeWidth={seat.is_facilitator ? 2.5 : 1}
+                className={seat.is_facilitator ? "text-gray-800" : "text-gray-300"}
                 rx="4"
               />
 
@@ -171,7 +171,7 @@ const CircularTable: React.FC<CircularTableProps> = ({ tableNumber, seats }) => 
                 y={nameY}
                 textAnchor={textAnchor}
                 dominantBaseline="middle"
-                className={`text-sm font-bold fill-current ${seat.is_facilitator ? "text-amber-700" : "text-gray-900"}`}
+                className="text-sm font-bold fill-current text-gray-900"
                 style={{ whiteSpace: 'nowrap' }}
               >
                 {displayName}

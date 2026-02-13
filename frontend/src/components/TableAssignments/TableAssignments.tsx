@@ -90,15 +90,36 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
     Object.keys(assignment.tables).forEach(tableNum => {
       const key = Number(tableNum)
       const table = assignment.tables[key]
-      // Get only real participants, filtering out existing nulls/undefineds
       const realParticipants = table.filter((p): p is Participant => p !== null && p !== undefined)
+      const hasFacilitators = realParticipants.some(p => p.is_facilitator)
 
-      // Add exactly one empty slot to every table for placing absent participants
-      tables[key] = [...realParticipants, null]
+      // Keep original order, append empty slots at end
+      // Second null is the facilitator empty slot (only when facilitators exist)
+      if (hasFacilitators) {
+        tables[key] = [...realParticipants, null, null]
+      } else {
+        tables[key] = [...realParticipants, null]
+      }
     })
 
     return tables
   }, [assignment.tables, editMode])
+
+  // Track which empty slot index is for facilitators vs regulars per table
+  const facilitatorEmptySlotIndex = useMemo(() => {
+    if (!editMode) return {}
+    const map: { [tableNum: number]: number } = {}
+    Object.keys(tablesWithEmptySlots).forEach(tableNum => {
+      const key = Number(tableNum)
+      const arr = tablesWithEmptySlots[key]
+      const hasFacilitators = arr.some(p => p !== null && p !== undefined && p.is_facilitator)
+      if (hasFacilitators) {
+        // Last null is the facilitator empty slot
+        map[key] = arr.length - 1
+      }
+    })
+    return map
+  }, [tablesWithEmptySlots, editMode])
 
   const calculateTableStats = (participants: (Participant | null)[]) => {
     const realParticipants = participants.filter((p): p is Participant => p !== null)
@@ -205,11 +226,19 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
           return
         }
 
-        // Facilitator restriction: can only swap facilitator ↔ facilitator or facilitator → empty slot
+        // Facilitator restriction: facilitators swap with facilitators, regulars with regulars
         const selectedIsFacilitator = selectedParticipant?.is_facilitator ?? false
         const targetIsFacilitator = participant?.is_facilitator ?? false
         if (!isEmpty && selectedIsFacilitator !== targetIsFacilitator) {
           return
+        }
+
+        // Empty slot type restriction: facilitators only to facilitator empty slots, regulars to regular empty slots
+        if (isEmpty) {
+          const isFacilitatorEmptySlot = facilitatorEmptySlotIndex[tableNum] === index
+          if (selectedIsFacilitator !== isFacilitatorEmptySlot) {
+            return
+          }
         }
 
         onSwap(selectedSlot.tableNum, selectedSlot.index, tableNum, index)
@@ -249,7 +278,7 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
         {editMode && <span className="text-sm font-normal text-muted-foreground ml-3">(Edit Mode)</span>}
       </h2>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {Object.entries(editMode ? tablesWithEmptySlots : assignment.tables)
+        {Object.entries(tablesWithEmptySlots)
           .sort(([a], [b]) => Number(a) - Number(b))
           .map(([tableNumber, participants], tableIndex) => {
             const stats = calculateTableStats(participants)
@@ -269,34 +298,52 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    {(editMode
-                      ? participants
-                      : [...participants].sort((a, b) => (b?.is_facilitator ? 1 : 0) - (a?.is_facilitator ? 1 : 0))
-                    ).map((participant, index) => {
-                      const isEmpty = participant === null || participant === undefined
-                      const selected = isSelected(Number(tableNumber), index)
+                  {(() => {
+                    const allParticipants = participants
+                    const tNum = Number(tableNumber)
+                    const facEmptyIdx = facilitatorEmptySlotIndex[tNum]
+                    const indexed = allParticipants.map((p, i) => ({ participant: p, index: i }))
 
-                      // Check if selected slot is empty
+                    // Split into regular participants + their empty slot, and facilitators + their empty slot
+                    const regularParticipants = indexed.filter(({ participant, index }) => {
+                      if (participant === null || participant === undefined) {
+                        // In edit mode with facilitators, last null goes to facilitator section
+                        return index !== facEmptyIdx
+                      }
+                      return !participant.is_facilitator
+                    })
+                    const facilitatorEntries = indexed.filter(({ participant, index }) => {
+                      if (participant === null || participant === undefined) {
+                        return index === facEmptyIdx
+                      }
+                      return participant.is_facilitator
+                    })
+
+                    const renderSlot = ({ participant, index: slotIndex }: { participant: Participant | null, index: number }) => {
+                      const isEmpty = participant === null || participant === undefined
+                      const selected = isSelected(Number(tableNumber), slotIndex)
+
                       const selectedParticipant = selectedSlot ? tablesWithEmptySlots[selectedSlot.tableNum][selectedSlot.index] : null
                       const selectedIsEmpty = selectedParticipant === null || selectedParticipant === undefined
 
-                      // Don't highlight empty slots on same table as selected, or this slot if selected is empty on same table
                       const sameTable = selectedSlot && selectedSlot.tableNum === Number(tableNumber)
                       const shouldExclude = sameTable && (isEmpty || selectedIsEmpty)
 
-                      // Facilitator type restriction: don't highlight invalid swap targets
                       const selectedIsFacilitator = selectedParticipant?.is_facilitator ?? false
                       const targetIsFacilitator = participant?.is_facilitator ?? false
                       const isFacilitatorMismatch = !isEmpty && selectedIsFacilitator !== targetIsFacilitator
 
-                      const isTarget = editMode && selectedSlot && !selected && !shouldExclude && !isFacilitatorMismatch
+                      // Empty slot type mismatch: facilitator can only go to facilitator empty slot and vice versa
+                      const isEmptySlotMismatch = isEmpty && editMode && selectedSlot && !selectedIsEmpty &&
+                        (selectedIsFacilitator !== (facilitatorEmptySlotIndex[tNum] === slotIndex))
+
+                      const isTarget = editMode && selectedSlot && !selected && !shouldExclude && !isFacilitatorMismatch && !isEmptySlotMismatch
                       const isAbsentTarget = editMode && selectedAbsentParticipant && isEmpty
 
                       return (
                         <div
-                          key={index}
-                          onClick={() => handleSlotClick(Number(tableNumber), index)}
+                          key={slotIndex}
+                          onClick={() => handleSlotClick(Number(tableNumber), slotIndex)}
                           className={`
                             flex items-start gap-2 p-3 rounded-lg transition-all
                             ${isEmpty ? 'border-2 border-dashed border-gray-300 bg-gray-50 min-h-[60px]' : 'bg-gray-50'}
@@ -316,7 +363,7 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
                               <div className="flex items-center gap-2">
                                 <span className="font-medium">{participant.name}</span>
                                 {participant.partner && (() => {
-                                  const partnerAtSameTable = participants.some(p => p !== null && p.name === participant.partner)
+                                  const partnerAtSameTable = allParticipants.some(p => p !== null && p.name === participant.partner)
                                   return (
                                     <div className="flex items-center gap-1 text-xs text-red-600">
                                       <Heart className="h-3 w-3 fill-current" />
@@ -342,8 +389,24 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
                           )}
                         </div>
                       )
-                    })}
-                  </div>
+                    }
+
+                    return (
+                      <>
+                        <div className="space-y-3">
+                          {regularParticipants.map(renderSlot)}
+                        </div>
+                        {facilitatorEntries.length > 0 && (
+                          <div className="mt-4 pt-3 border-t border-gray-200">
+                            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Facilitators</h4>
+                            <div className="space-y-3">
+                              {facilitatorEntries.map(renderSlot)}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )
+                  })()}
                 </CardContent>
               </Card>
             )

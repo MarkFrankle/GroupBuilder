@@ -97,7 +97,7 @@ describe('CircularTable', () => {
     render(<CircularTable tableNumber={1} seats={seatsWithFacilitator} />)
     const subtitle = screen.getByTestId('facilitator-subtitle')
     expect(subtitle).toBeInTheDocument()
-    expect(subtitle).toHaveTextContent('Alice Johnson')
+    expect(subtitle).toHaveTextContent('Facilitators: Alice Johnson')
   })
 
   it('does not show facilitator subtitle when no facilitators', () => {
