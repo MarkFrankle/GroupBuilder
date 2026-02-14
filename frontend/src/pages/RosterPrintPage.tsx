@@ -9,38 +9,16 @@ interface LocationState {
   sessionId: string
 }
 
-interface RosterEntry {
-  name: string
-  table: number
-  is_facilitator: boolean
-}
-
 function getLastName(name: string): string {
   const parts = name.trim().split(/\s+/)
   return parts[parts.length - 1].toLowerCase()
 }
 
-function sortByLastName(a: RosterEntry, b: RosterEntry): number {
-  const lastA = getLastName(a.name)
-  const lastB = getLastName(b.name)
+function sortByLastName(a: string, b: string): number {
+  const lastA = getLastName(a)
+  const lastB = getLastName(b)
   if (lastA !== lastB) return lastA.localeCompare(lastB)
-  return a.name.localeCompare(b.name)
-}
-
-function buildRosterEntries(assignment: Assignment): RosterEntry[] {
-  const entries: RosterEntry[] = []
-  for (const [tableNum, participants] of Object.entries(assignment.tables)) {
-    for (const p of participants) {
-      if (p) {
-        entries.push({
-          name: p.name,
-          table: Number(tableNum),
-          is_facilitator: !!p.is_facilitator,
-        })
-      }
-    }
-  }
-  return entries
+  return a.toLowerCase().localeCompare(b.toLowerCase())
 }
 
 const RosterPrintPage: React.FC = () => {
@@ -89,62 +67,73 @@ const RosterPrintPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="container mx-auto p-8 max-w-4xl">
+      <div className="container mx-auto p-8 max-w-3xl">
         {assignments.map((assignment) => {
-          const allEntries = buildRosterEntries(assignment)
-          const participants = allEntries.filter(e => !e.is_facilitator).sort(sortByLastName)
-          const facilitators = allEntries.filter(e => e.is_facilitator).sort(sortByLastName)
           const absent = assignment.absentParticipants || []
-
           const title = isMultiSession
             ? `Session ${assignment.session} Roster`
             : 'Roster'
+          const tableNumbers = Object.keys(assignment.tables)
+            .map(Number)
+            .sort((a, b) => a - b)
 
           return (
-            <div key={assignment.session} className="mb-10">
-              <div className="flex justify-between items-baseline mb-4">
+            <div key={assignment.session} className="roster-section mb-10">
+              <div className="flex justify-between items-baseline mb-6">
                 <h2 className="text-xl font-bold">{title}</h2>
-                <span className="text-sm text-gray-500">{today}</span>
+                <span className="text-sm text-gray-500 print:text-black">{today}</span>
               </div>
 
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b-2 border-gray-300">
-                    <th className="text-left py-1 px-2">Name</th>
-                    <th className="text-left py-1 px-2">Table</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {participants.map((entry) => (
-                    <tr key={entry.name} className="border-b border-gray-200">
-                      <td className="py-1 px-2">{entry.name}</td>
-                      <td className="py-1 px-2">{entry.table}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                {facilitators.length > 0 && (
-                  <>
-                    <tbody>
-                      <tr>
-                        <td colSpan={2} className="pt-4 pb-1 px-2 font-semibold">
+              {tableNumbers.map((tableNum) => {
+                const people = (assignment.tables[tableNum] || []).filter(
+                  (p): p is Participant => p !== null
+                )
+                const facilitators = people
+                  .filter((p) => p.is_facilitator)
+                  .map((p) => p.name)
+                  .sort(sortByLastName)
+                const participants = people
+                  .filter((p) => !p.is_facilitator)
+                  .map((p) => p.name)
+                  .sort(sortByLastName)
+
+                return (
+                  <div key={tableNum} className="mb-6">
+                    <h3 className="text-lg font-bold mb-2 border-b-2 border-gray-300 pb-1">
+                      Table {tableNum}
+                    </h3>
+
+                    {facilitators.length > 0 && (
+                      <div className="mb-2">
+                        <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1 print:text-black">
                           Facilitators
-                        </td>
-                      </tr>
-                      {facilitators.map((entry) => (
-                        <tr key={entry.name} className="border-b border-gray-200">
-                          <td className="py-1 px-2">{entry.name}</td>
-                          <td className="py-1 px-2">{entry.table}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </>
-                )}
-              </table>
+                        </h4>
+                        <ul className="ml-4">
+                          {facilitators.map((name) => (
+                            <li key={name} className="py-0.5">{name}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div>
+                      <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1 print:text-black">
+                        Participants
+                      </h4>
+                      <ul className="ml-4">
+                        {participants.map((name) => (
+                          <li key={name} className="py-0.5">{name}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )
+              })}
 
               {absent.length > 0 && (
-                <p className="mt-4 text-sm text-gray-600">
+                <p className="mt-4 text-sm text-gray-600 print:text-black">
                   <span className="font-semibold">Absent:</span>{' '}
-                  {absent.map(p => p.name).join(', ')}
+                  {absent.map((p) => p.name).join(', ')}
                 </p>
               )}
             </div>

@@ -802,6 +802,16 @@ const TableAssignmentsPage: React.FC = () => {
             <CardTitle className="text-3xl font-bold">Table Assignments</CardTitle>
             <div className="flex items-center gap-2">
               <Button
+                onClick={handlePrintRoster}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                disabled={editMode}
+              >
+                <Printer className="h-4 w-4" />
+                Print Roster
+              </Button>
+              <Button
                 onClick={handleCopyLink}
                 variant="outline"
                 size="sm"
@@ -927,11 +937,7 @@ const TableAssignmentsPage: React.FC = () => {
                     <Download className="h-4 w-4 mr-2" />
                     Download CSV
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handlePrintRoster} disabled={editMode}>
-                    <Printer className="h-4 w-4 mr-2" />
-                    Print Roster
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleRegenerateClick} disabled={editMode || regenerating}>
+<DropdownMenuItem onClick={handleRegenerateClick} disabled={editMode || regenerating}>
                     <RotateCw className="h-4 w-4 mr-2" />
                     Regenerate All Sessions
                   </DropdownMenuItem>

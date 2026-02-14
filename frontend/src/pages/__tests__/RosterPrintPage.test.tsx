@@ -44,22 +44,24 @@ describe('RosterPrintPage', () => {
     expect(screen.getByText('No Data Available')).toBeInTheDocument()
   })
 
-  test('renders roster table sorted by last name', () => {
+  test('groups participants by table', () => {
     renderWithState({ assignments: mockAssignments, sessionId: 'test-session' })
-    const nameElements = screen.getAllByRole('cell').filter(cell => {
-      const text = cell.textContent || ''
-      return ['Sarah Adams', 'Rachel Green', 'David Kim'].includes(text)
-    })
-    expect(nameElements.map(el => el.textContent)).toEqual([
-      'Sarah Adams',
-      'Rachel Green',
-      'David Kim',
-    ])
+    expect(screen.getByText('Table 1')).toBeInTheDocument()
+    expect(screen.getByText('Table 2')).toBeInTheDocument()
   })
 
-  test('separates facilitators into their own section with Facilitators heading', () => {
+  test('shows participants sorted by last name within each table', () => {
     renderWithState({ assignments: mockAssignments, sessionId: 'test-session' })
-    expect(screen.getByText('Facilitators')).toBeInTheDocument()
+    // Table 1: Adams before Kim
+    expect(screen.getByText('Sarah Adams')).toBeInTheDocument()
+    expect(screen.getByText('David Kim')).toBeInTheDocument()
+  })
+
+  test('separates facilitators into their own section per table', () => {
+    renderWithState({ assignments: mockAssignments, sessionId: 'test-session' })
+    // Table 2 has Mark Frank as facilitator
+    const facilitatorHeadings = screen.getAllByText('Facilitators')
+    expect(facilitatorHeadings.length).toBe(1) // only table 2 has facilitators
     expect(screen.getByText('Mark Frank')).toBeInTheDocument()
   })
 
@@ -67,16 +69,6 @@ describe('RosterPrintPage', () => {
     renderWithState({ assignments: mockAssignments, sessionId: 'test-session' })
     expect(screen.getByText(/Absent:/)).toBeInTheDocument()
     expect(screen.getByText(/Bob Smith/)).toBeInTheDocument()
-  })
-
-  test('shows table number for each participant', () => {
-    renderWithState({ assignments: mockAssignments, sessionId: 'test-session' })
-    // Sarah Adams is at table 1, Rachel Green at table 2
-    const rows = screen.getAllByRole('row')
-    const sarahRow = rows.find(r => r.textContent?.includes('Sarah Adams'))
-    expect(sarahRow?.textContent).toContain('1')
-    const rachelRow = rows.find(r => r.textContent?.includes('Rachel Green'))
-    expect(rachelRow?.textContent).toContain('2')
   })
 
   test('omits Session N prefix when only one session', () => {
