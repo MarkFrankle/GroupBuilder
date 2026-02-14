@@ -12,6 +12,7 @@ import { AdminDashboard } from "./pages/admin/AdminDashboard"
 import InviteAcceptPage from "./pages/InviteAcceptPage"
 import OrganizationSelectorPage from "./pages/OrganizationSelectorPage"
 import RosterPrintPage from "./pages/RosterPrintPage"
+import HelpPage from "./pages/HelpPage"
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
@@ -68,6 +69,7 @@ function NavBar() {
     <nav className="no-print border-b px-4 py-2 flex gap-4 text-sm">
       <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
       <Link to="/roster" className="text-muted-foreground hover:text-foreground transition-colors">Roster</Link>
+      <Link to="/help" className="text-muted-foreground hover:text-foreground transition-colors">Help</Link>
     </nav>
   );
 }
@@ -82,6 +84,7 @@ const App: React.FC = () => {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/auth/verify" element={<AuthVerifyPage />} />
             <Route path="/invite/:token" element={<InviteAcceptPage />} />
+            <Route path="/help" element={<HelpPage />} />
 
             <Route
               path="/select-organization"
