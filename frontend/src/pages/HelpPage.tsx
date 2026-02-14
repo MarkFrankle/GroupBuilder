@@ -170,8 +170,8 @@ function HelpPage() {
           <p className="mb-4 text-slate-700 leading-relaxed">
             Each participant has a <strong>Religion</strong> dropdown (Christian, Jewish,
             Muslim, or Other) and a <strong>Gender</strong> dropdown (Male, Female, or
-            Other). These are used when balancing the tables — the solver tries to make
-            sure each table has a mix of religions and genders.
+            Other). These are used when balancing the tables — every table will
+            have an even mix of religions and genders.
           </p>
 
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Setting partners (couples):</p>
@@ -179,7 +179,7 @@ function HelpPage() {
             If two participants are a couple, use the <strong>Partner</strong> dropdown
             on either person's row to link them. You only need to do this on one person —
             the other person updates automatically. The solver will make sure partners are
-            always placed at <em>different</em> tables so they can each meet new people.
+            always placed at <em>different</em> tables, so they each meet new people.
           </p>
 
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Marking facilitators:</p>
@@ -382,25 +382,24 @@ function HelpPage() {
             <div className="pl-4 border-l-2 border-slate-200">
               <p className="font-medium text-slate-800">Couples Separated</p>
               <p className="text-slate-700 text-sm leading-relaxed">
-                A green checkmark means no partners were placed at the same table. This
-                is a hard constraint — the solver always tries to keep couples apart so
-                they each meet new people.
+                A green checkmark means no partners were placed at the same table.
+                Couples are always separated — this is guaranteed.
               </p>
             </div>
             <div className="pl-4 border-l-2 border-slate-200">
               <p className="font-medium text-slate-800">Religion Balanced</p>
               <p className="text-slate-700 text-sm leading-relaxed">
-                Shows how evenly different religions are spread across tables. You might
+                Shows how evenly different religions are spread across tables. You'll
                 see something like "±1" — that means no table has more than 1 extra
-                person of any religion compared to other tables. ±1 is excellent. ±2 is
-                still pretty good.
+                person of any religion compared to other tables. Religion balance is
+                always enforced.
               </p>
             </div>
             <div className="pl-4 border-l-2 border-slate-200">
               <p className="font-medium text-slate-800">Gender Balanced</p>
               <p className="text-slate-700 text-sm leading-relaxed">
-                Same idea as religion balance, but for gender distribution. The solver
-                tries to make sure each table has a similar mix.
+                Same idea as religion balance, but for gender distribution. Gender
+                balance is always enforced.
               </p>
             </div>
             <div className="pl-4 border-l-2 border-slate-200">
@@ -425,9 +424,8 @@ function HelpPage() {
               <p className="font-medium text-slate-800">Repeated Pairs</p>
               <p className="text-slate-700 text-sm leading-relaxed">
                 How many pairs of people end up at the same table more than once. Lower
-                is better — 0 repeated pairs would be perfect (everyone meets entirely
-                new tablemates each session), though that's not always possible depending
-                on the numbers.
+                is better. This will never be zero — with a fixed number of tables,
+                some repetition is mathematically unavoidable.
               </p>
             </div>
           </div>
@@ -469,8 +467,7 @@ function HelpPage() {
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Once you're happy with the assignments, you'll probably want to print them
-            out or share them with others. All three options are in the toolbar at the
-            top of the results page.
+            out or share them with others.
           </p>
 
           <h3 className="text-xl font-semibold mb-2">Print Roster</h3>
@@ -495,8 +492,8 @@ function HelpPage() {
             Click <strong>"Copy Link"</strong> to copy a shareable URL to your
             clipboard. You can paste this into an email, text message, or group chat.
             Anyone with the link can view that specific version of the assignments — they'll
-            need to be signed into Group Builder to see it. Links remain active for 30
-            days.
+            need to be signed into Group Builder to see it. Links stay active as long
+            as someone accesses them at least once every 30 days.
           </p>
 
           <ScreenshotPlaceholder label="Screenshot I: toolbar showing Print Roster, Copy Link, and (in detailed view) the Print Seating button" />
@@ -516,7 +513,6 @@ function HelpPage() {
           <p className="mb-4 text-slate-700 leading-relaxed">
             The generated assignments are a starting point. You can regenerate them
             entirely, redo a single session, or make fine-grained manual changes.
-            Nothing is permanent until you print — feel free to experiment.
           </p>
 
           {/* Regenerate All */}
@@ -558,7 +554,7 @@ function HelpPage() {
             Sometimes most sessions look great but one is off — maybe Session 3 has a
             couple at the same table, or the gender balance is uneven. In detailed view,
             navigate to the problem session and click <strong>"Regenerate Session."</strong>{" "}
-            This re-runs the solver for just that one session (it takes about 30 seconds)
+            This re-runs the solver for just that one session (it's nearly instant)
             while keeping all other sessions exactly as they are.
           </p>
 
@@ -647,8 +643,8 @@ function HelpPage() {
             <InfoCallout>
               <p className="font-bold mb-1">"The link I shared stopped working"</p>
               <p>
-                Shared links expire after 30 days. Generate your assignments again
-                and share a new link using the Copy Link button.
+                Shared links expire if no one accesses them for 30 days. Generate
+                your assignments again and share a new link using the Copy Link button.
               </p>
             </InfoCallout>
 
