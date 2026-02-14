@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Group Builder Help — Mobile Review</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #334155;
+    background: #fff;
+    line-height: 1.6;
+    padding: 16px;
+    max-width: 600px;
+    margin: 0 auto;
+    font-size: 16px;
+  }
+  h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; color: #0f172a; }
+  h2 { font-size: 1.3rem; font-weight: 700; margin: 32px 0 12px; color: #0f172a; padding-top: 16px; border-top: 1px solid #e2e8f0; }
+  h3 { font-size: 1.1rem; font-weight: 600; margin: 20px 0 8px; color: #1e293b; }
+  p { margin-bottom: 12px; }
+  .subtitle { color: #64748b; margin-bottom: 24px; }
+  .subtitle a { color: #2563eb; }
+
+  /* Table of contents */
+  .toc { background: #f8fafc; border-radius: 8px; padding: 16px; margin-bottom: 32px; }
+  .toc h2 { font-size: 1.1rem; margin: 0 0 10px; border: none; padding: 0; }
+  .toc ul { list-style: none; padding: 0; }
+  .toc li { margin-bottom: 6px; }
+  .toc a { color: #2563eb; text-decoration: underline; font-size: 0.95rem; }
+
+  ol, ul { padding-left: 20px; margin-bottom: 12px; }
+  li { margin-bottom: 8px; }
+
+  strong { color: #1e293b; }
+  em { font-style: italic; }
+
+  /* Callouts */
+  .callout { border-left: 4px solid; border-radius: 6px; padding: 12px 14px; margin: 14px 0; font-size: 0.93rem; }
+  .callout-title { font-weight: 700; margin-bottom: 4px; }
+  .tip { background: #eff6ff; border-color: #93c5fd; color: #1e3a5f; }
+  .tip::before { content: "💡 Tip: "; font-weight: 700; }
+  .warning { background: #fffbeb; border-color: #fcd34d; color: #78350f; }
+  .warning::before { content: "⚠️ "; }
+  .info { background: #f8fafc; border-color: #cbd5e1; color: #334155; }
+
+  /* Screenshot placeholders */
+  .screenshot { border: 2px dashed #cbd5e1; border-radius: 8px; background: #f8fafc; padding: 20px; text-align: center; color: #94a3b8; font-style: italic; margin: 14px 0; font-size: 0.9rem; }
+
+  /* Quality summary items */
+  .quality-item { border-left: 2px solid #e2e8f0; padding-left: 12px; margin-bottom: 14px; }
+  .quality-item .label { font-weight: 600; color: #1e293b; }
+  .quality-item .desc { font-size: 0.93rem; }
+
+  .red { color: #dc2626; font-weight: 500; }
+
+  .back-top { text-align: center; border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 32px; }
+  .back-top a { color: #2563eb; text-decoration: underline; font-size: 0.95rem; }
+
+  .field-label { font-weight: 500; margin-bottom: 2px; }
+</style>
+</head>
+<body>
+
+<h1>Group Builder Help</h1>
+<p class="subtitle">A step-by-step guide to creating balanced small groups for your seminar series. If you get stuck at any point, check the <a href="#troubleshooting">Troubleshooting</a> section at the bottom.</p>
+
+<nav class="toc">
+  <h2>Contents</h2>
+  <ul>
+    <li><a href="#getting-started">Getting Started</a></li>
+    <li><a href="#creating-your-roster">Creating Your Roster</a></li>
+    <li><a href="#generating-groups">Generating Groups</a></li>
+    <li><a href="#viewing-your-groups">Viewing Your Groups</a></li>
+    <li><a href="#printing-and-sharing">Printing &amp; Sharing</a></li>
+    <li><a href="#editing-sessions">Editing Sessions</a></li>
+    <li><a href="#troubleshooting">Troubleshooting</a></li>
+  </ul>
+</nav>
+
+<!-- ========== Section 1 ========== -->
+<section>
+  <h2 id="getting-started">Getting Started</h2>
+
+  <h3>What is Group Builder?</h3>
+  <p>Group Builder helps you create balanced small groups for a seminar series. If you have, say, 20 participants meeting over 5 weekly sessions, Group Builder will assign them to tables each week so that everyone gets to sit with as many different people as possible. It takes into account gender, religion, couples, and facilitator assignments to make sure each table is diverse and well-led.</p>
+
+  <h3>Signing in for the first time</h3>
+  <p>Your administrator will send you an invitation email. Here's what to expect:</p>
+  <ol>
+    <li>Open the invitation email and click the link inside. This takes you to Group Builder and shows you which organization you've been invited to.</li>
+    <li>You'll be asked to sign in. Enter your email address and click <strong>"Send me a login link."</strong></li>
+    <li>Check your email for the login link (it may take a minute). Click it to sign in. There's no password to remember — you'll sign in this way each time.</li>
+    <li>After signing in, you'll be taken back to accept the invitation. Click <strong>"Accept Invite"</strong> and you're in.</li>
+  </ol>
+
+  <div class="callout tip">Login links expire after 60 minutes. If you don't use one in time, just go back to the login page and request a new one.</div>
+
+  <h3>Finding your way around</h3>
+  <p>Once you're signed in, you'll see a navigation bar at the top of every page with three links:</p>
+  <ul>
+    <li><strong>Home</strong> — Your starting point. From here you can manage your roster, import from a spreadsheet, or view previous results.</li>
+    <li><strong>Roster</strong> — Where you add and edit your list of participants.</li>
+    <li><strong>Help</strong> — This page.</li>
+  </ul>
+
+  <div class="screenshot">Screenshot A: the nav bar with Home, Roster, and Help links</div>
+</section>
+
+<!-- ========== Section 2 ========== -->
+<section>
+  <h2 id="creating-your-roster">Creating Your Roster</h2>
+  <p>Before you can generate groups, you need to tell Group Builder who your participants are. There are two ways to do this.</p>
+
+  <h3>Using the Roster Manager</h3>
+  <p>Click <strong>Roster</strong> in the nav bar (or <strong>"Manage Roster"</strong> on the Home page) to open the roster manager. You'll see a spreadsheet-like table where you can add and edit participants one by one.</p>
+
+  <p class="field-label">Adding a participant:</p>
+  <p>There's always an empty row at the bottom of the list. Type a name into it, then press Tab or click somewhere else. The participant is saved automatically. A new empty row appears for the next person.</p>
+
+  <p class="field-label">Setting details:</p>
+  <p>Each participant has a <strong>Religion</strong> dropdown (Christian, Jewish, Muslim, or Other) and a <strong>Gender</strong> dropdown (Male, Female, or Other). These are used when balancing the tables — the solver tries to make sure each table has a mix of religions and genders.</p>
+
+  <p class="field-label">Setting partners (couples):</p>
+  <p>If two participants are a couple, use the <strong>Partner</strong> dropdown on either person's row to link them. You only need to do this on one person — the other person updates automatically. The solver will make sure partners are always placed at <em>different</em> tables so they can each meet new people.</p>
+
+  <p class="field-label">Marking facilitators:</p>
+  <p>If someone will be leading table discussions, check the <strong>Facilitator</strong> box on their row. The solver ensures at least one facilitator at every table. You can mark more facilitators than tables — if you have 6 facilitators for 4 tables, some tables will get two.</p>
+
+  <p class="field-label">Deleting a participant:</p>
+  <p>Hover over a participant's row and a trash icon will appear on the right. Click it to remove them.</p>
+
+  <div class="callout info"><strong>Auto-save:</strong> Your roster saves automatically as you type. You'll see a small "Saving..." indicator at the top that changes to "Saved" when everything is up to date.</div>
+
+  <div class="screenshot">Screenshot B: roster manager with several participants filled in, showing dropdown options</div>
+
+  <h3>Importing from Excel</h3>
+  <p>If you already have your participant list in a spreadsheet, you can import it instead of typing everyone in by hand.</p>
+  <ol>
+    <li>On the Home page, click <strong>"Download Template with Sample Data"</strong> to get an Excel file showing the expected format.</li>
+    <li>Open the template, replace the sample data with your participants, and save the file. Keep the column headers as they are.</li>
+    <li>Back on the Home page, click <strong>"Import from Excel"</strong> and select your file. Your participants will be loaded into the roster.</li>
+  </ol>
+  <p>After importing, you can always go to the Roster page to make corrections — fix a name, change a religion, add a partner pairing, and so on.</p>
+
+  <div class="screenshot">Screenshot C: Home page showing Manage Roster, Import from Excel, and Download Template</div>
+</section>
+
+<!-- ========== Section 3 ========== -->
+<section>
+  <h2 id="generating-groups">Generating Groups</h2>
+  <p>Once your roster is ready, it's time to create your groups. At the bottom of the Roster page, you'll see two dropdowns and a Generate button.</p>
+
+  <p class="field-label">Number of Tables</p>
+  <p>This is how many groups you want per session. If you have 20 participants and choose 4 tables, each table will have about 5 people.</p>
+
+  <p class="field-label">Number of Sessions</p>
+  <p>This is how many rounds of different groupings you need — typically one per week of your seminar. If your seminar runs for 5 weeks, choose 5 sessions. Each session will have a completely different arrangement so people meet new tablemates each week.</p>
+
+  <p>When you're ready, click <strong>Generate Assignments</strong>. The solver will spend about 2 minutes working out the best possible arrangement. You'll see a progress indicator while it works. When it's done, you'll be taken to the results page.</p>
+
+  <div class="screenshot">Screenshot D: the generate section at the bottom of the Roster page</div>
+
+  <div class="callout warning">
+    <p class="callout-title">If something goes wrong:</p>
+    <ul>
+      <li><strong>The Generate button is grayed out</strong> — You need more participants than tables. For example, if you chose 4 tables, you need at least 5 participants.</li>
+      <li><strong>"Need at least N facilitators for N tables"</strong> — You marked fewer facilitators than tables. Either go back and mark more people as facilitators, or reduce the number of tables.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ========== Section 4 ========== -->
+<section>
+  <h2 id="viewing-your-groups">Viewing Your Groups</h2>
+  <p>After generating assignments, you'll land on the results page. There are two ways to view your groups, and you can switch between them using the icons in the toolbar at the top.</p>
+
+  <h3>Compact View</h3>
+  <p>This is the default. It shows all sessions side by side in a grid, giving you a bird's-eye view of the entire seminar at once. Each person appears as a small colored chip with their name.</p>
+  <p>A few things you can do here:</p>
+  <ul>
+    <li><strong>Track someone across sessions:</strong> Click any person's name. Their chip will highlight in every session so you can trace their path through the seminar — who they sit with each week. Click again to deselect.</li>
+    <li><strong>See someone's details:</strong> Hover over any name to see a tooltip with their religion, gender, partner (if any), and whether they're a facilitator.</li>
+    <li><strong>Spot facilitators:</strong> Facilitators are shown with a bold ring around their name and listed separately above the regular participants at each table.</li>
+  </ul>
+
+  <div class="screenshot">Screenshot E: compact view with one person highlighted across all sessions</div>
+
+  <h3>Detailed View</h3>
+  <p>Click the list icon in the toolbar to switch to detailed view. This shows one session at a time, with a full card for each table. It's the view you'll use when you want to inspect a specific session closely, or when you want to make manual edits.</p>
+  <p>Each table card shows several pieces of information at a glance. Here's what to look for:</p>
+  <ol>
+    <li><strong>Table number and size</strong> — e.g. "Table 1 (5 participants)"</li>
+    <li><strong>Facilitator count</strong> — How many facilitators are at this table. If it turns <span class="red">red</span>, the table has no facilitator.</li>
+    <li><strong>Gender split</strong> — Shows the male/female breakdown. Turns <span class="red">red</span> if the split is significantly uneven.</li>
+    <li><strong>Religion breakdown</strong> — Color-coded badges showing how many of each religion are at the table.</li>
+    <li><strong>Partner warning</strong> — If partners end up at the same table (a constraint violation), you'll see a <span class="red">red heart icon</span> next to their names.</li>
+    <li><strong>Facilitator section</strong> — Facilitators are listed in bold in their own section at the top of the table card, so you can quickly see who's leading each table.</li>
+  </ol>
+  <p>To move between sessions, use the <strong>Previous</strong> and <strong>Next</strong> buttons, or pick a session from the dropdown.</p>
+
+  <div class="screenshot">Screenshot F: detailed view showing a table card with numbered annotations (1–6) pointing to each element described above</div>
+
+  <h3>Understanding the Quality Summary</h3>
+  <p>At the top of the results page, you'll always see a summary card that tells you how good the assignments are. This is the most important thing to check after generating groups. Here's what each line means:</p>
+
+  <div class="quality-item">
+    <p class="label">Couples Separated</p>
+    <p class="desc">A green checkmark means no partners were placed at the same table. This is a hard constraint — the solver always tries to keep couples apart so they each meet new people.</p>
+  </div>
+  <div class="quality-item">
+    <p class="label">Religion Balanced</p>
+    <p class="desc">Shows how evenly different religions are spread across tables. You might see something like "±1" — that means no table has more than 1 extra person of any religion compared to other tables. ±1 is excellent. ±2 is still pretty good.</p>
+  </div>
+  <div class="quality-item">
+    <p class="label">Gender Balanced</p>
+    <p class="desc">Same idea as religion balance, but for gender distribution. The solver tries to make sure each table has a similar mix.</p>
+  </div>
+  <div class="quality-item">
+    <p class="label">Facilitator Coverage</p>
+    <p class="desc">Confirms every table has at least one facilitator to lead the discussion. If you designated extra facilitators (e.g. 6 facilitators for 4 tables), some tables will have more than one — that's fine.</p>
+  </div>
+  <div class="quality-item">
+    <p class="label">Average Unique Tablemates</p>
+    <p class="desc">This tells you, on average, how many <em>different</em> people each participant sits with across all sessions. Higher is better. For example, if someone sits with 4 people per session over 5 sessions and never repeats, they'd have 20 unique tablemates — the maximum. In practice, some repetition is unavoidable, so this number will be lower.</p>
+  </div>
+  <div class="quality-item">
+    <p class="label">Repeated Pairs</p>
+    <p class="desc">How many pairs of people end up at the same table more than once. Lower is better — 0 repeated pairs would be perfect (everyone meets entirely new tablemates each session), though that's not always possible depending on the numbers.</p>
+  </div>
+
+  <p>Overall, the summary shows either a green <strong>"Looks Good"</strong> or a yellow <strong>"Has Issues."</strong></p>
+  <ul>
+    <li><strong>Green</strong> means all the hard constraints are satisfied (couples separated, facilitators at every table) and the balance metrics are within acceptable range.</li>
+    <li><strong>Yellow</strong> means something needs attention. Check which line has the issue — it might be that one table ended up with no facilitator, or two partners got placed together.</li>
+  </ul>
+
+  <div class="screenshot">Screenshot G: quality summary showing green "Looks Good" state</div>
+  <div class="screenshot">Screenshot H: quality summary showing yellow "Has Issues" state with a problem highlighted</div>
+
+  <div class="callout tip">If the quality isn't great, don't worry — you have options. You can <strong>Regenerate All</strong> with a slower speed setting (the solver spends more time searching for better arrangements), regenerate just one problematic session, or make manual edits. All of these are covered in the <a href="#editing-sessions" style="color:#1d4ed8">Editing Sessions</a> section below.</div>
+</section>
+
+<!-- ========== Section 5 ========== -->
+<section>
+  <h2 id="printing-and-sharing">Printing &amp; Sharing</h2>
+  <p>Once you're happy with the assignments, you'll probably want to print them out or share them with others. All three options are in the toolbar at the top of the results page.</p>
+
+  <h3>Print Roster</h3>
+  <p>Click <strong>"Print Roster"</strong> to open a print-formatted page with every session's table assignments listed out (who's at which table), plus circular seating charts showing where each person sits. From there, use your browser's Print function (Ctrl+P on Windows, Cmd+P on Mac) or click the Print button on the page. This is great for handing out at the seminar.</p>
+
+  <h3>Print Seating Charts</h3>
+  <p>If you only need seating charts for a single session (for example, to put one on each table), switch to detailed view, navigate to the session you want, and click <strong>"Print Seating."</strong> This shows just the circular seating charts for that session's tables.</p>
+
+  <h3>Copy Link</h3>
+  <p>Click <strong>"Copy Link"</strong> to copy a shareable URL to your clipboard. You can paste this into an email, text message, or group chat. Anyone with the link can view that specific version of the assignments — they'll need to be signed into Group Builder to see it. Links remain active for 30 days.</p>
+
+  <div class="screenshot">Screenshot I: toolbar showing Print Roster, Copy Link, and (in detailed view) the Print Seating button</div>
+
+  <div class="callout tip">Use Copy Link to share results with your co-facilitators for review before printing anything. That way you can gather feedback and make adjustments first.</div>
+</section>
+
+<!-- ========== Section 6 ========== -->
+<section>
+  <h2 id="editing-sessions">Editing Sessions</h2>
+  <p>The generated assignments are a starting point. You can regenerate them entirely, redo a single session, or make fine-grained manual changes. Nothing is permanent until you print — feel free to experiment.</p>
+
+  <h3>Starting Over: Regenerate All</h3>
+  <p>If you want a completely fresh set of assignments, click the <strong>&#x22EF; menu</strong> (three dots) in the toolbar and choose <strong>"Regenerate All Sessions."</strong></p>
+  <p>You'll be asked to pick a speed:</p>
+  <ul>
+    <li><strong>Fast</strong> (1 minute) — Good for a quick re-roll when you just want something different.</li>
+    <li><strong>Default</strong> (2 minutes) — The standard setting, same as the initial generation.</li>
+    <li><strong>Slow</strong> (4 minutes) — Gives the solver extra time to search for a better solution. Try this if you're not happy with the mixing quality.</li>
+  </ul>
+  <p>Your previous version is not lost. Every time you regenerate, the results are saved as a new version. You can switch between versions using the <strong>version dropdown</strong> in the toolbar — so if the new version is worse, you can always go back.</p>
+
+  <div class="screenshot">Screenshot J: the Regenerate All dialog showing the three speed options</div>
+
+  <h3>Fixing One Session: Regenerate Session</h3>
+  <p>Sometimes most sessions look great but one is off — maybe Session 3 has a couple at the same table, or the gender balance is uneven. In detailed view, navigate to the problem session and click <strong>"Regenerate Session."</strong> This re-runs the solver for just that one session (it takes about 30 seconds) while keeping all other sessions exactly as they are.</p>
+
+  <h3>Fine-Tuning: Edit Mode</h3>
+  <p>For precise control, you can manually move people between tables. In detailed view, navigate to the session you want to edit and click <strong>"Edit"</strong> in the toolbar.</p>
+
+  <p class="field-label">Swapping two people:</p>
+  <p>Click on the person you want to move — they'll get a blue highlight. Then click on the person you want to swap them with. The two switch places instantly. You'll see the quality summary and table indicators update in real time, so you can tell whether the swap improved things or made them worse.</p>
+
+  <div class="callout info"><strong>Note:</strong> Facilitators can only be swapped with other facilitators, and regular participants can only be swapped with other regular participants. This ensures every table keeps its facilitator coverage.</div>
+
+  <p class="field-label">Marking someone absent:</p>
+  <p>If someone can't make it to a particular session, click their name to select them, then click <strong>"Mark Absent."</strong> They'll be moved to an Absent section below the tables. If they can make it after all, click their name in the Absent section and then click any empty slot at a table to place them back.</p>
+
+  <p class="field-label">Undoing changes:</p>
+  <p>Made a swap you didn't like? Click <strong>Undo</strong> to step back. You can undo up to 10 changes. Each click undoes one action.</p>
+
+  <p class="field-label">Saving your edits:</p>
+  <p>When you're done, click <strong>"Done Editing."</strong> Your changes are saved in your browser automatically. The next time you visit this page, you'll see a note saying <strong>"Viewing edited version"</strong> to remind you that manual changes are in effect. Keep in mind that these edits are stored locally in your browser — if you switch to a different computer or clear your browsing data, they'll be gone. To make changes permanent for everyone, use Regenerate to create a new saved version.</p>
+
+  <div class="screenshot">Screenshot K: edit mode with a participant selected (blue highlight), showing the Undo and Mark Absent buttons</div>
+</section>
+
+<!-- ========== Section 7 ========== -->
+<section>
+  <h2 id="troubleshooting">Troubleshooting</h2>
+  <p>Here are solutions to the most common issues:</p>
+
+  <div class="callout info">
+    <p class="callout-title">"I got logged out" or "I need to sign in again"</p>
+    <p>This is normal — login links expire after 60 minutes for security. Go to the login page, enter your email, and you'll receive a fresh login link. Your data is safe; nothing is lost when you're logged out.</p>
+  </div>
+
+  <div class="callout info">
+    <p class="callout-title">"My session expired" or "I can't find my assignments"</p>
+    <p>If you uploaded a roster via Excel import, that upload session lasts for 1 hour. After that, go to the Home page and re-import your file, or rebuild your roster using the Roster Manager. If you previously generated assignments and saved them, check the "Recent Uploads" section on the Home page — you may be able to view previous results from there.</p>
+  </div>
+
+  <div class="callout info">
+    <p class="callout-title">"The link I shared stopped working"</p>
+    <p>Shared links expire after 30 days. Generate your assignments again and share a new link using the Copy Link button.</p>
+  </div>
+
+  <div class="callout info">
+    <p class="callout-title">"Need at least N facilitators for N tables"</p>
+    <p>You have fewer facilitators marked than the number of tables you chose. For example, if you set 4 tables, you need at least 4 facilitators. Go to the Roster page and check the Facilitator box on more people, or reduce the number of tables.</p>
+  </div>
+
+  <div class="callout info">
+    <p class="callout-title">"The Generate button is grayed out and I can't click it"</p>
+    <p>You need more participants than tables. If you chose 4 tables, you need at least 5 participants. Either add more people on the Roster page or reduce the number of tables.</p>
+  </div>
+
+  <div class="callout info">
+    <p class="callout-title">"My manual edits disappeared"</p>
+    <p>Manual edits (swaps, absent markings) are saved in your browser's local storage, not on the server. They'll disappear if you switch browsers, use a different computer, or clear your browsing data. If you want to preserve changes permanently, use the Regenerate function to create a new version that's saved on the server and visible to everyone.</p>
+  </div>
+</section>
+
+<div class="back-top">
+  <a href="#top">Back to top</a>
+</div>
+
+</body>
+</html>
