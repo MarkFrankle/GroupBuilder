@@ -115,4 +115,17 @@ code {
   html, body, #root {
     background: white !important;
   }
+
+  /* Roster print styles — page break between sessions, not after the last one */
+  .roster-section + .roster-section {
+    page-break-before: always;
+  }
+
+  .seating-section {
+    page-break-before: always;
+  }
+
+  .seating-session + .seating-session {
+    page-break-before: always;
+  }
 }

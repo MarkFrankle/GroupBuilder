@@ -11,6 +11,7 @@ import { RosterPage } from "./pages/RosterPage"
 import { AdminDashboard } from "./pages/admin/AdminDashboard"
 import InviteAcceptPage from "./pages/InviteAcceptPage"
 import OrganizationSelectorPage from "./pages/OrganizationSelectorPage"
+import RosterPrintPage from "./pages/RosterPrintPage"
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
@@ -64,7 +65,7 @@ function NavBar() {
   const { user } = useAuth();
   if (!user) return null;
   return (
-    <nav className="border-b px-4 py-2 flex gap-4 text-sm">
+    <nav className="no-print border-b px-4 py-2 flex gap-4 text-sm">
       <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
       <Link to="/roster" className="text-muted-foreground hover:text-foreground transition-colors">Roster</Link>
     </nav>
@@ -128,6 +129,14 @@ const App: React.FC = () => {
               element={
                 <ProtectedRoute>
                   <SeatingChartPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/table-assignments/roster-print"
+              element={
+                <ProtectedRoute>
+                  <RosterPrintPage />
                 </ProtectedRoute>
               }
             />

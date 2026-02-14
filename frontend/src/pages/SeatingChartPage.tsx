@@ -111,7 +111,7 @@ const SeatingChartPage: React.FC = () => {
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back
               </Button>
-              <Button onClick={handlePrint} variant="default" size="sm">
+              <Button onClick={handlePrint} variant="outline" size="sm">
                 <Printer className="h-4 w-4 mr-2" />
                 Print
               </Button>
