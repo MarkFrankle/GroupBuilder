@@ -112,19 +112,14 @@ function HelpPage() {
             </li>
             <li>
               Check your email for the login link (it may take a minute). Click it to
-              sign in. There's no password to remember — you'll sign in this way each
-              time.
+              sign in. There's no password to remember — this is a one-time setup.
             </li>
             <li>
               After signing in, you'll be taken back to accept the invitation. Click{" "}
-              <strong>"Accept Invite"</strong> and you're in.
+              <strong>"Accept Invite"</strong> and you're in. From now on, you'll stay
+              signed in — you shouldn't need to do this again.
             </li>
           </ol>
-
-          <TipCallout>
-            Login links expire after 60 minutes. If you don't use one in time, just
-            go back to the login page and request a new one.
-          </TipCallout>
 
           <h3 className="text-xl font-semibold mb-2">Finding your way around</h3>
           <p className="mb-2 text-slate-700 leading-relaxed">
@@ -164,14 +159,14 @@ function HelpPage() {
             a spreadsheet-like table where you can add and edit participants one by one.
           </p>
 
-          <p className="mb-1 text-slate-700 leading-relaxed font-medium">Adding a participant:</p>
+          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Adding a participant:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             There's always an empty row at the bottom of the list. Type a name into it,
             then press Tab or click somewhere else. The participant is saved automatically.
             A new empty row appears for the next person.
           </p>
 
-          <p className="mb-1 text-slate-700 leading-relaxed font-medium">Setting details:</p>
+          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Setting details:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Each participant has a <strong>Religion</strong> dropdown (Christian, Jewish,
             Muslim, or Other) and a <strong>Gender</strong> dropdown (Male, Female, or
@@ -179,7 +174,7 @@ function HelpPage() {
             sure each table has a mix of religions and genders.
           </p>
 
-          <p className="mb-1 text-slate-700 leading-relaxed font-medium">Setting partners (couples):</p>
+          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Setting partners (couples):</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             If two participants are a couple, use the <strong>Partner</strong> dropdown
             on either person's row to link them. You only need to do this on one person —
@@ -187,7 +182,7 @@ function HelpPage() {
             always placed at <em>different</em> tables so they can each meet new people.
           </p>
 
-          <p className="mb-1 text-slate-700 leading-relaxed font-medium">Marking facilitators:</p>
+          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Marking facilitators:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             If someone will be leading table discussions, check the{" "}
             <strong>Facilitator</strong> box on their row. The solver ensures at least one
@@ -195,7 +190,7 @@ function HelpPage() {
             you have 6 facilitators for 4 tables, some tables will get two.
           </p>
 
-          <p className="mb-1 text-slate-700 leading-relaxed font-medium">Deleting a participant:</p>
+          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Deleting a participant:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Hover over a participant's row and a trash icon will appear on the right.
             Click it to remove them.
@@ -245,7 +240,7 @@ function HelpPage() {
             of the Roster page, you'll see two dropdowns and a Generate button.
           </p>
 
-          <p className="mb-1 text-slate-700 leading-relaxed font-medium">
+          <p className="mb-1 text-slate-700 leading-relaxed font-bold">
             Number of Tables
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
@@ -253,7 +248,7 @@ function HelpPage() {
             and choose 4 tables, each table will have about 5 people.
           </p>
 
-          <p className="mb-1 text-slate-700 leading-relaxed font-medium">
+          <p className="mb-1 text-slate-700 leading-relaxed font-bold">
             Number of Sessions
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
@@ -296,8 +291,9 @@ function HelpPage() {
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
             After generating assignments, you'll land on the results page. There are
-            two ways to view your groups, and you can switch between them using the
-            icons in the toolbar at the top.
+            two ways to view your groups. You'll see two small icons below the quality
+            summary — a grid icon and a list icon. These switch between compact and
+            detailed view.
           </p>
 
           {/* Compact View */}
@@ -323,9 +319,10 @@ function HelpPage() {
               they're a facilitator.
             </li>
             <li>
-              <strong>Spot facilitators:</strong> Facilitators are shown with a bold
-              ring around their name and listed separately above the regular
-              participants at each table.
+              <strong>Spot facilitators:</strong> Facilitators have a gold ring
+              around their chip and bold text. Each table also lists its
+              facilitators by name just above the chips (e.g. "Facilitators: Omar
+              Hassan, Sarah Cohen").
             </li>
           </ul>
 
@@ -334,10 +331,10 @@ function HelpPage() {
           {/* Detailed View */}
           <h3 className="text-xl font-semibold mt-8 mb-2">Detailed View</h3>
           <p className="mb-2 text-slate-700 leading-relaxed">
-            Click the list icon in the toolbar to switch to detailed view. This shows
-            one session at a time, with a full card for each table. It's the view
-            you'll use when you want to inspect a specific session closely, or when
-            you want to make manual edits.
+            Click the list icon to switch to detailed view. This shows one session
+            at a time, with a full card for each table. It's the view you'll use
+            when you want to inspect a specific session closely, or when you want
+            to make manual edits.
           </p>
           <p className="mb-2 text-slate-700 leading-relaxed">
             Each table card shows several pieces of information at a glance. Here's
@@ -346,32 +343,24 @@ function HelpPage() {
           </p>
           <ol className="list-decimal pl-5 space-y-2 text-slate-700 leading-relaxed mb-4">
             <li>
-              <strong>Table number and size</strong> — e.g. "Table 1 (5 participants)"
+              <strong>Table header</strong> — Shows the table name on the left (e.g.
+              "Table 1") and a summary on the right: total people, facilitator count,
+              gender split (e.g. 5M/5F), and number of religions represented.
             </li>
             <li>
-              <strong>Facilitator count</strong> — How many facilitators are at this
-              table. If it turns <span className="text-red-600 font-medium">red</span>,
-              the table has no facilitator.
-            </li>
-            <li>
-              <strong>Gender split</strong> — Shows the male/female breakdown. Turns{" "}
-              <span className="text-red-600 font-medium">red</span> if the split is
-              significantly uneven.
-            </li>
-            <li>
-              <strong>Religion breakdown</strong> — Color-coded badges showing how many
-              of each religion are at the table.
+              <strong>Participant list</strong> — Each person gets their own row showing
+              their name in bold, color-coded religion and gender badges, and (if they
+              have a partner) a heart icon with their partner's name.
             </li>
             <li>
               <strong>Partner warning</strong> — If partners end up at the same table
-              (a constraint violation), you'll see a{" "}
-              <span className="text-red-600 font-medium">red heart icon</span> next
-              to their names.
+              (a constraint violation), the heart icon next to their names turns{" "}
+              <span className="text-red-600 font-medium">red</span>.
             </li>
             <li>
-              <strong>Facilitator section</strong> — Facilitators are listed in bold in
-              their own section at the top of the table card, so you can quickly see
-              who's leading each table.
+              <strong>Facilitator section</strong> — Facilitators are listed in their
+              own "FACILITATORS" section at the bottom of each table card, with a
+              green "Facilitator" badge alongside their religion and gender badges.
             </li>
           </ol>
           <p className="mb-4 text-slate-700 leading-relaxed">
@@ -379,7 +368,7 @@ function HelpPage() {
             <strong>Next</strong> buttons, or pick a session from the dropdown.
           </p>
 
-          <ScreenshotPlaceholder label="Screenshot F: detailed view showing a table card with numbered annotations (1-6) pointing to each element described above" />
+          <ScreenshotPlaceholder label="Screenshot F: detailed view showing a table card with numbered annotations (1-4) pointing to each element described above" />
 
           {/* Quality Summary */}
           <h3 className="text-xl font-semibold mt-8 mb-2">Understanding the Quality Summary</h3>
@@ -581,7 +570,7 @@ function HelpPage() {
             <strong>"Edit"</strong> in the toolbar.
           </p>
 
-          <p className="mb-1 text-slate-700 leading-relaxed font-medium">Swapping two people:</p>
+          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Swapping two people:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Click on the person you want to move — they'll get a blue highlight. Then
             click on the person you want to swap them with. The two switch places
@@ -596,7 +585,7 @@ function HelpPage() {
             ensures every table keeps its facilitator coverage.
           </InfoCallout>
 
-          <p className="mb-1 text-slate-700 leading-relaxed font-medium">Marking someone absent:</p>
+          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Marking someone absent:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             If someone can't make it to a particular session, click their name to select
             them, then click <strong>"Mark Absent."</strong> They'll be moved to an
@@ -605,13 +594,13 @@ function HelpPage() {
             them back.
           </p>
 
-          <p className="mb-1 text-slate-700 leading-relaxed font-medium">Undoing changes:</p>
+          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Undoing changes:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Made a swap you didn't like? Click <strong>Undo</strong> to step back. You
             can undo up to 10 changes. Each click undoes one action.
           </p>
 
-          <p className="mb-1 text-slate-700 leading-relaxed font-medium">Saving your edits:</p>
+          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Saving your edits:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             When you're done, click <strong>"Done Editing."</strong> Your changes are
             saved in your browser automatically. The next time you visit this page, you'll
