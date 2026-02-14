@@ -13,6 +13,7 @@
 - **Keep tests small and fast.** Unit tests should use minimal data (4-8 items, 1-2 tables, 1 session). Don't use production-scale data in unit tests. If the solver is involved, it should finish in under 5 seconds.
 - **Solver tests are not benchmarks.** Test constraint correctness with small problems, not solve quality with large ones. Solve quality testing belongs in CI regression checks, not the unit test suite.
 - **Reinstall `assignment_logic` after changing solver code.** It's a local Poetry path dependency of `api`. Editing source files does NOT update the installed package — run `cd api && poetry run pip install -e ../assignment_logic` after changes.
+- **Keep the Help page accurate.** When finishing feature work that changes UI behavior, labels, or constraints, review `frontend/src/pages/HelpPage.tsx` and update the documentation to match. Screenshots live in `frontend/public/images/help/` and may also need updating.
 
 ## Tool Preferences
 
