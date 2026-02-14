@@ -7,6 +7,12 @@ jest.mock('@/utils/apiClient', () => ({
   authenticatedFetch: (...args: any[]) => fetch(...args),
 }))
 
+jest.mock('@/components/SeatingChart/CircularTable', () => {
+  return function MockCircularTable({ tableNumber }: { tableNumber: number }) {
+    return <div data-testid={`circular-table-${tableNumber}`}>Table {tableNumber}</div>
+  }
+})
+
 const mockAssignments = [
   {
     session: 1,
@@ -75,6 +81,20 @@ describe('RosterPrintPage', () => {
     renderWithState({ assignments: mockAssignments, sessionId: 'test-session' })
     expect(screen.getByText('Roster')).toBeInTheDocument()
     expect(screen.queryByText(/Session 1 Roster/)).not.toBeInTheDocument()
+  })
+
+  test('fetches and renders seating charts', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        session: 1,
+        tables: [{ table_number: 1, seats: [{ position: 0, name: 'Sarah Adams', religion: 'None' }] }],
+      }),
+    })
+
+    renderWithState({ assignments: mockAssignments, sessionId: 'test-session' })
+    const chart = await screen.findByTestId('circular-table-1')
+    expect(chart).toBeInTheDocument()
   })
 
   test('shows Session N Roster prefix when multiple sessions', () => {

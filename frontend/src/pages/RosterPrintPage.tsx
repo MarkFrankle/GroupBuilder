@@ -1,8 +1,22 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Printer } from 'lucide-react'
 import { Assignment, Participant } from './TableAssignmentsPage'
+import CircularTable from '@/components/SeatingChart/CircularTable'
+import { API_BASE_URL } from '@/config/api'
+import { authenticatedFetch } from '@/utils/apiClient'
+
+interface SeatingTable {
+  table_number: number
+  seats: { position: number; name: string; religion: string; is_facilitator?: boolean }[]
+}
+
+interface SeatingData {
+  session: number
+  tables: SeatingTable[]
+  absent_participants?: { name: string; religion: string }[]
+}
 
 interface LocationState {
   assignments: Assignment[]
@@ -25,9 +39,41 @@ const RosterPrintPage: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const state = location.state as LocationState | null
+  const [seatingBySession, setSeatingBySession] = useState<Record<number, SeatingData>>({})
 
   const handleBack = () => navigate(-1)
   const handlePrint = () => window.print()
+
+  useEffect(() => {
+    if (!state?.assignments || !state?.sessionId) return
+
+    const fetchSeating = async () => {
+      const results: Record<number, SeatingData> = {}
+      await Promise.all(
+        state.assignments.map(async (assignment) => {
+          try {
+            const resp = await authenticatedFetch(
+              `${API_BASE_URL}/api/assignments/seating/${state.sessionId}?session=${assignment.session}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ assignments: [assignment] }),
+              }
+            )
+            if (resp.ok) {
+              const data = await resp.json()
+              results[assignment.session] = data
+            }
+          } catch {
+            // Fail silently — seating charts are supplementary
+          }
+        })
+      )
+      setSeatingBySession(results)
+    }
+
+    fetchSeating()
+  }, [state])
 
   if (!state || !state.assignments) {
     return (
@@ -139,6 +185,35 @@ const RosterPrintPage: React.FC = () => {
             </div>
           )
         })}
+
+        {Object.keys(seatingBySession).length > 0 && (
+          <div className="seating-section">
+            {assignments.map((assignment) => {
+              const seating = seatingBySession[assignment.session]
+              if (!seating) return null
+              const seatingTitle = isMultiSession
+                ? `Session ${assignment.session} Seating Chart`
+                : 'Seating Chart'
+              const tableCount = seating.tables.length
+              const gridCols = tableCount >= 6 ? 'grid-cols-3' : 'grid-cols-2'
+
+              return (
+                <div key={`seating-${assignment.session}`} className="mb-10">
+                  <h2 className="text-xl font-bold mb-6">{seatingTitle}</h2>
+                  <div className={`grid ${gridCols} gap-4`}>
+                    {seating.tables.map((table) => (
+                      <CircularTable
+                        key={table.table_number}
+                        tableNumber={table.table_number}
+                        seats={table.seats}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )
