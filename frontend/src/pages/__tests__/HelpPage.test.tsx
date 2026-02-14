@@ -44,10 +44,10 @@ describe('HelpPage', () => {
     }
   });
 
-  test('renders screenshot placeholders', () => {
+  test('renders screenshots with captions', () => {
     renderPage();
-    expect(screen.getByText(/Screenshot A/)).toBeInTheDocument();
-    expect(screen.getByText(/Screenshot K/)).toBeInTheDocument();
+    expect(screen.getByAltText(/roster manager/i)).toBeInTheDocument();
+    expect(screen.getByAltText(/edit mode/i)).toBeInTheDocument();
   });
 
   test('renders callout boxes', () => {

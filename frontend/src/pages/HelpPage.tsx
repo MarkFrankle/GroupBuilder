@@ -5,11 +5,18 @@ import {
   ArrowUp,
 } from "lucide-react";
 
-function ScreenshotPlaceholder({ label }: { label: string }) {
+function Screenshot({ src, alt, caption }: { src: string; alt: string; caption: string }) {
   return (
-    <div className="border-2 border-dashed border-slate-300 rounded-lg bg-slate-50 p-8 text-center text-slate-500 italic my-4">
-      {label}
-    </div>
+    <figure className="my-6 bg-slate-50 rounded-lg p-4 border border-slate-200">
+      <img
+        src={src}
+        alt={alt}
+        className="rounded border border-slate-200 shadow-sm mx-auto max-w-2xl w-full"
+      />
+      <figcaption className="text-sm text-slate-500 text-center mt-3 italic">
+        {caption}
+      </figcaption>
+    </figure>
   );
 }
 
@@ -139,7 +146,6 @@ function HelpPage() {
             </li>
           </ul>
 
-          <ScreenshotPlaceholder label="Screenshot A: the nav bar with Home, Roster, and Help links" />
         </section>
 
         {/* ===================== Section 2: Creating Your Roster ===================== */}
@@ -201,7 +207,11 @@ function HelpPage() {
             indicator at the top that changes to "Saved" when everything is up to date.
           </InfoCallout>
 
-          <ScreenshotPlaceholder label="Screenshot B: roster manager with several participants filled in, showing dropdown options" />
+          <Screenshot
+            src="/images/help/roster-management.png"
+            alt="The roster manager showing several participants with their religion, gender, partner, and facilitator settings"
+            caption="The roster manager with participants, their details, partner links, and facilitator checkboxes"
+          />
 
           <h3 className="text-xl font-semibold mt-8 mb-2">Importing from Excel</h3>
           <p className="mb-2 text-slate-700 leading-relaxed">
@@ -227,7 +237,11 @@ function HelpPage() {
             fix a name, change a religion, add a partner pairing, and so on.
           </p>
 
-          <ScreenshotPlaceholder label="Screenshot C: Home page showing Manage Roster, Import from Excel, and Download Template" />
+          <Screenshot
+            src="/images/help/home-page-ui.png"
+            alt="The Home page with Manage Roster and Import from Excel options, plus a Download Template link"
+            caption="The Home page — your starting point for managing participants and importing data"
+          />
         </section>
 
         {/* ===================== Section 3: Generating Groups ===================== */}
@@ -264,8 +278,6 @@ function HelpPage() {
             see a progress indicator while it works. When it's done, you'll be taken to
             the results page.
           </p>
-
-          <ScreenshotPlaceholder label="Screenshot D: the generate section at the bottom of the Roster page" />
 
           <WarningCallout>
             <p className="font-semibold mb-2">If something goes wrong:</p>
@@ -326,7 +338,11 @@ function HelpPage() {
             </li>
           </ul>
 
-          <ScreenshotPlaceholder label="Screenshot E: compact view with one person highlighted across all sessions" />
+          <Screenshot
+            src="/images/help/compact-view.png"
+            alt="Compact view showing all sessions side by side, with David Cohen highlighted across every session"
+            caption="Compact view — click any name to track them across sessions (here, David Cohen is highlighted)"
+          />
 
           {/* Detailed View */}
           <h3 className="text-xl font-semibold mt-8 mb-2">Detailed View</h3>
@@ -337,38 +353,41 @@ function HelpPage() {
             to make manual edits.
           </p>
           <p className="mb-2 text-slate-700 leading-relaxed">
-            Each table card shows several pieces of information at a glance. Here's
-            what to look for (these correspond to the numbered items in the screenshot
-            below):
+            Each table card shows several pieces of information at a glance:
           </p>
-          <ol className="list-decimal pl-5 space-y-2 text-slate-700 leading-relaxed mb-4">
+          <ul className="list-disc pl-5 space-y-2 text-slate-700 leading-relaxed mb-4">
             <li>
               <strong>Table header</strong> — Shows the table name on the left (e.g.
               "Table 1") and a summary on the right: total people, facilitator count,
-              gender split (e.g. 5M/5F), and number of religions represented.
+              gender split (e.g. 3F/3M), and number of religions represented.
             </li>
             <li>
-              <strong>Participant list</strong> — Each person gets their own row showing
+              <strong>Participant rows</strong> — Each person gets their own row showing
               their name in bold, color-coded religion and gender badges, and (if they
               have a partner) a heart icon with their partner's name.
             </li>
             <li>
               <strong>Partner warning</strong> — If partners end up at the same table
-              (a constraint violation), the heart icon next to their names turns{" "}
-              <span className="text-red-600 font-medium">red</span>.
+              (a constraint violation), the table header shows a{" "}
+              <span className="text-red-600 font-medium">red warning triangle</span> and
+              the heart icons next to their names turn red.
             </li>
             <li>
               <strong>Facilitator section</strong> — Facilitators are listed in their
               own "FACILITATORS" section at the bottom of each table card, with a
               green "Facilitator" badge alongside their religion and gender badges.
             </li>
-          </ol>
+          </ul>
           <p className="mb-4 text-slate-700 leading-relaxed">
             To move between sessions, use the <strong>Previous</strong> and{" "}
             <strong>Next</strong> buttons, or pick a session from the dropdown.
           </p>
 
-          <ScreenshotPlaceholder label="Screenshot F: detailed view showing a table card with numbered annotations (1-4) pointing to each element described above" />
+          <Screenshot
+            src="/images/help/detail-view-with-issue.png"
+            alt="Detailed view of a single table card showing participant rows, religion and gender badges, partner hearts, a couple warning, and the facilitator section"
+            caption="Detailed view — a table card showing participant details, partner links, a couple warning (red triangle), and the facilitator section at the bottom"
+          />
 
           {/* Quality Summary */}
           <h3 className="text-xl font-semibold mt-8 mb-2">Understanding the Quality Summary</h3>
@@ -447,8 +466,16 @@ function HelpPage() {
             </li>
           </ul>
 
-          <ScreenshotPlaceholder label="Screenshot G: quality summary showing green 'Looks Good' state" />
-          <ScreenshotPlaceholder label="Screenshot H: quality summary showing yellow 'Has Issues' state with a problem highlighted" />
+          <Screenshot
+            src="/images/help/validation-summary-looks-good.png"
+            alt="Validation summary showing all green checkmarks: couples separated, religion balanced, gender balanced, all tables have facilitators, with Looks Good overall status"
+            caption="The quality summary when everything looks good — all constraints satisfied"
+          />
+          <Screenshot
+            src="/images/help/validation-summary-issues.png"
+            alt="Validation summary showing a couple violation warning, with yellow Has Issues overall status"
+            caption="The quality summary when there's a problem — here, one couple ended up at the same table"
+          />
 
           <TipCallout>
             If the quality isn't great, don't worry — you have options. You can{" "}
@@ -496,13 +523,11 @@ function HelpPage() {
             as someone accesses them at least once every 30 days.
           </p>
 
-          <ScreenshotPlaceholder label="Screenshot I: toolbar showing Print Roster, Copy Link, and (in detailed view) the Print Seating button" />
-
-          <TipCallout>
-            Use Copy Link to share results with your co-facilitators for review before
-            printing anything. That way you can gather feedback and make adjustments
-            first.
-          </TipCallout>
+          <Screenshot
+            src="/images/help/print-roster-copy-link-print-seating.png"
+            alt="The results page toolbar showing Print Roster, Copy Link, and version picker at the top, with Edit, Regenerate Session, and Print Seating controls below"
+            caption="The results page controls — Print Roster and Copy Link in the top toolbar, with session-specific actions (Edit, Regenerate Session, Print Seating) below"
+          />
         </section>
 
         {/* ===================== Section 6: Editing Sessions ===================== */}
@@ -545,8 +570,6 @@ function HelpPage() {
             <strong>version dropdown</strong> in the toolbar — so if the new version is
             worse, you can always go back.
           </p>
-
-          <ScreenshotPlaceholder label="Screenshot J: the Regenerate All dialog showing the three speed options" />
 
           {/* Regenerate One Session */}
           <h3 className="text-xl font-semibold mt-8 mb-2">Fixing One Session: Regenerate Session</h3>
@@ -607,7 +630,11 @@ function HelpPage() {
             to create a new saved version.
           </p>
 
-          <ScreenshotPlaceholder label="Screenshot K: edit mode with a participant selected (blue highlight), showing the Undo and Mark Absent buttons" />
+          <Screenshot
+            src="/images/help/edit-mode.png"
+            alt="Edit mode showing a selected participant with green highlight, an absent participant section, empty slots at tables, and the Undo and Mark Absent buttons in the toolbar"
+            caption="Edit mode — Raj Patel is marked absent, Carlos Rodriguez is selected (green border), and empty slots show where absent participants can be placed back"
+          />
         </section>
 
         {/* ===================== Section 7: Troubleshooting ===================== */}
