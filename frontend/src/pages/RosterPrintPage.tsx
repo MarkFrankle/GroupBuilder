@@ -198,7 +198,7 @@ const RosterPrintPage: React.FC = () => {
               const gridCols = tableCount >= 6 ? 'grid-cols-3' : 'grid-cols-2'
 
               return (
-                <div key={`seating-${assignment.session}`} className="mb-10">
+                <div key={`seating-${assignment.session}`} className="seating-session mb-10">
                   <h2 className="text-xl font-bold mb-6">{seatingTitle}</h2>
                   <div className={`grid ${gridCols} gap-4`}>
                     {seating.tables.map((table) => (

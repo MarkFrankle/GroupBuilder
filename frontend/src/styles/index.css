@@ -124,4 +124,8 @@ code {
   .seating-section {
     page-break-before: always;
   }
+
+  .seating-session + .seating-session {
+    page-break-before: always;
+  }
 }
