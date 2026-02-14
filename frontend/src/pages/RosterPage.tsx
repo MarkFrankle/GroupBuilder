@@ -27,8 +27,8 @@ export function RosterPage() {
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const [error, setError] = useState<string | null>(null);
-  const [numTables, setNumTables] = useState('1');
-  const [numSessions, setNumSessions] = useState('1');
+  const [numTables, setNumTables] = useState('4');
+  const [numSessions, setNumSessions] = useState('5');
   const [generating, setGenerating] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
 
