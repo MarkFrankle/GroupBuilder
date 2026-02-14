@@ -115,4 +115,17 @@ code {
   html, body, #root {
     background: white !important;
   }
+
+  /* Roster print styles */
+  .roster-section {
+    page-break-after: always;
+  }
+
+  .roster-section:last-of-type {
+    page-break-after: auto;
+  }
+
+  .seating-section {
+    page-break-before: always;
+  }
 }
