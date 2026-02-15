@@ -77,7 +77,7 @@ const CompactAssignments: React.FC<CompactAssignmentsProps> = ({ assignments }) 
                     <div className="flex flex-wrap gap-1">
                       {participants.filter((p): p is Participant => p !== null).map((participant, idx) => {
                         const isHighlighted = participant.name === highlightedPerson
-                        const religionStyle = getReligionStyle(participant.religion, participant.name)
+                        const religionStyle = getReligionStyle(participant.religion, participant.name, false)
 
                         return (
                           <button
@@ -107,7 +107,7 @@ const CompactAssignments: React.FC<CompactAssignmentsProps> = ({ assignments }) 
                   <div className="flex flex-wrap gap-1">
                     {assignment.absentParticipants.map((participant, idx) => {
                       const isHighlighted = participant.name === highlightedPerson
-                      const religionStyle = getReligionStyle(participant.religion, participant.name)
+                      const religionStyle = getReligionStyle(participant.religion, participant.name, false)
 
                       return (
                         <button
