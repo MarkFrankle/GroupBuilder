@@ -247,5 +247,68 @@ class TestGroupBuilder:
         assert result["status"] == "success"
 
 
+def test_facilitator_coverage():
+    """Every table must have at least one facilitator."""
+    participants = [
+        {"id": 1, "name": "Fac1", "religion": "Christian", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 2, "name": "Fac2", "religion": "Jewish", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 3, "name": "P1", "religion": "Muslim", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": False},
+        {"id": 4, "name": "P2", "religion": "Christian", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": False},
+        {"id": 5, "name": "P3", "religion": "Jewish", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": False},
+        {"id": 6, "name": "P4", "religion": "Muslim", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": False},
+    ]
+    gb = GroupBuilder(participants, num_tables=2, num_sessions=1)
+    result = gb.generate_assignments()
+    assert result["status"] == "success"
+    for session in result["assignments"]:
+        for table_num, table_participants in session["tables"].items():
+            facilitators = [p for p in table_participants if p.get("is_facilitator")]
+            assert len(facilitators) >= 1, f"Table {table_num} has no facilitator"
+
+
+def test_facilitator_religion_diversity_per_table():
+    """No two facilitators at the same table share a religion."""
+    # 4 facilitators (2 Christian, 2 Jewish), 2 tables — each table gets 2 facilitators
+    # who must be different religions.
+    participants = [
+        {"id": 1, "name": "Fac_C1", "religion": "Christian", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 2, "name": "Fac_C2", "religion": "Christian", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 3, "name": "Fac_J1", "religion": "Jewish", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 4, "name": "Fac_J2", "religion": "Jewish", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 5, "name": "P1", "religion": "Muslim", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": False},
+        {"id": 6, "name": "P2", "religion": "Christian", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": False},
+        {"id": 7, "name": "P3", "religion": "Jewish", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": False},
+        {"id": 8, "name": "P4", "religion": "Muslim", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": False},
+    ]
+    gb = GroupBuilder(participants, num_tables=2, num_sessions=1)
+    result = gb.generate_assignments()
+    assert result["status"] == "success"
+    for session in result["assignments"]:
+        for table_num, table_participants in session["tables"].items():
+            facilitators = [p for p in table_participants if p.get("is_facilitator")]
+            religions = [f["religion"] for f in facilitators]
+            assert len(religions) == len(set(religions)), (
+                f"Table {table_num}: facilitators share religion: {religions}"
+            )
+
+
+def test_facilitator_output_includes_flag():
+    """Solver output includes is_facilitator in participant dicts."""
+    participants = [
+        {"id": 1, "name": "Fac1", "religion": "Christian", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
+        {"id": 2, "name": "P1", "religion": "Jewish", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": False},
+        {"id": 3, "name": "P2", "religion": "Muslim", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": False},
+        {"id": 4, "name": "P3", "religion": "Christian", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": False},
+    ]
+    gb = GroupBuilder(participants, num_tables=1, num_sessions=1)
+    result = gb.generate_assignments()
+    assert result["status"] == "success"
+    all_participants = result["assignments"][0]["tables"][1]
+    fac = next(p for p in all_participants if p["name"] == "Fac1")
+    assert fac["is_facilitator"] is True
+    non_fac = next(p for p in all_participants if p["name"] == "P1")
+    assert non_fac["is_facilitator"] is False
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

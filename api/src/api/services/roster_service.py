@@ -11,6 +11,7 @@ class RosterService:
     def __init__(self, db=None):
         if db is None:
             from api.firebase_admin import get_firestore_client
+
             db = get_firestore_client()
         self.db = db
 
@@ -33,11 +34,15 @@ class RosterService:
 
         religion = data.get("religion", "")
         if religion not in VALID_RELIGIONS:
-            raise ValueError(f"Invalid religion: {religion}. Must be one of {VALID_RELIGIONS}")
+            raise ValueError(
+                f"Invalid religion: {religion}. Must be one of {VALID_RELIGIONS}"
+            )
 
         gender = data.get("gender", "")
         if gender not in VALID_GENDERS:
-            raise ValueError(f"Invalid gender: {gender}. Must be one of {VALID_GENDERS}")
+            raise ValueError(
+                f"Invalid gender: {gender}. Must be one of {VALID_GENDERS}"
+            )
 
         now = datetime.now(timezone.utc)
         doc_data = {
@@ -45,6 +50,7 @@ class RosterService:
             "religion": religion,
             "gender": gender,
             "partner_id": data.get("partner_id"),
+            "is_facilitator": bool(data.get("is_facilitator", False)),
             "updated_at": now,
         }
 

@@ -4,6 +4,7 @@ export interface Seat {
   position: number
   name: string
   religion: string
+  is_facilitator?: boolean
 }
 
 export interface CircularTableProps {
@@ -62,9 +63,23 @@ const CircularTable: React.FC<CircularTableProps> = ({ tableNumber, seats }) => 
       data-testid="circular-table"
     >
       {/* Table number label */}
-      <div className="mb-4 px-4 py-2 bg-gray-800 text-white text-xl font-bold rounded-full">
+      <div className="mb-2 px-4 py-2 bg-gray-800 text-white text-xl font-bold rounded-full">
         Table {tableNumber}
       </div>
+
+      {/* Facilitator subtitle */}
+      {(() => {
+        const facilitators = seats.filter(s => s.is_facilitator)
+        if (facilitators.length === 0) return null
+        return (
+          <div
+            className="mb-2 text-xs text-gray-600 font-medium text-center"
+            data-testid="facilitator-subtitle"
+          >
+            Facilitators: {facilitators.map(f => shortenName(f.name)).join(' · ')}
+          </div>
+        )
+      })()}
 
       <svg
         width={svgSize}
@@ -145,11 +160,11 @@ const CircularTable: React.FC<CircularTableProps> = ({ tableNumber, seats }) => 
                 height="32"
                 fill="white"
                 stroke="currentColor"
-                strokeWidth="1"
-                className="text-gray-300"
+                strokeWidth={seat.is_facilitator ? 2.5 : 1}
+                className={seat.is_facilitator ? "text-gray-800" : "text-gray-300"}
                 rx="4"
               />
-              
+
               {/* Name text */}
               <text
                 x={nameX}

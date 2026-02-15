@@ -6,6 +6,7 @@ interface Participant {
   religion: string;
   gender: string;
   partner: string | null;
+  is_facilitator?: boolean;
 }
 
 interface Assignment {
@@ -78,6 +79,12 @@ const CompactAssignments: React.FC<CompactAssignmentsProps> = ({ assignments }) 
                 .map(([tableNum, participants]) => (
                   <div key={tableNum} className="space-y-1">
                     <div className="text-xs font-semibold text-gray-600">Table {tableNum}</div>
+                    {(() => {
+                      const facilitators = participants.filter((p): p is Participant => p !== null && !!p.is_facilitator)
+                      return facilitators.length > 0 ? (
+                        <div className="text-xs text-gray-500">Facilitators: {facilitators.map(f => f.name).join(', ')}</div>
+                      ) : null
+                    })()}
                     <div className="flex flex-wrap gap-1">
                       {participants.filter((p): p is Participant => p !== null).map((participant, idx) => {
                         const isHighlighted = participant.name === highlightedPerson
@@ -88,12 +95,13 @@ const CompactAssignments: React.FC<CompactAssignmentsProps> = ({ assignments }) 
                             key={idx}
                             onClick={() => handlePersonClick(participant.name)}
                             className={`
-                              px-2 py-1 rounded text-xs font-medium transition-all
+                              px-2 py-1 rounded text-xs transition-all
                               ${colorClass}
+                              ${participant.is_facilitator ? 'font-semibold ring-1 ring-amber-400' : 'font-medium'}
                               ${isHighlighted ? 'ring-2 ring-blue-500 ring-offset-1' : ''}
                               cursor-pointer
                             `}
-                            title={`${participant.name}\n${participant.religion}, ${participant.gender}${participant.partner ? `\nPartner: ${participant.partner}` : ''}`}
+                            title={`${participant.name}\n${participant.religion}, ${participant.gender}${participant.partner ? `\nPartner: ${participant.partner}` : ''}${participant.is_facilitator ? '\n(Facilitator)' : ''}`}
                           >
                             {participant.name}
                           </button>

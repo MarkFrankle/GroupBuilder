@@ -24,6 +24,7 @@ class ParticipantData(BaseModel):
     religion: str
     gender: str
     partner_id: Optional[str] = None
+    is_facilitator: bool = False
 
 
 async def _get_org_id(
@@ -69,7 +70,9 @@ async def import_roster(
 
     missing = REQUIRED_COLUMNS - set(df.columns)
     if missing:
-        raise HTTPException(status_code=400, detail=f"Missing columns: {', '.join(missing)}")
+        raise HTTPException(
+            status_code=400, detail=f"Missing columns: {', '.join(missing)}"
+        )
 
     # Clear existing roster
     existing = roster_service.get_roster(org_id)
@@ -85,19 +88,44 @@ async def import_roster(
             continue
         pid = str(uuid.uuid4())
         religion = str(row.get("Religion", "Other")).strip()
-        if religion == "nan" or religion not in ("Christian", "Jewish", "Muslim", "Other"):
+        if religion == "nan" or religion not in (
+            "Christian",
+            "Jewish",
+            "Muslim",
+            "Other",
+        ):
             religion = "Other"
         gender = str(row.get("Gender", "Other")).strip()
         if gender == "nan" or gender not in ("Male", "Female", "Other"):
             gender = "Other"
 
-        roster_service.upsert_participant(org_id, pid, {
-            "name": name, "religion": religion,
-            "gender": gender, "partner_id": None,
-        })
+        is_facilitator = False
+        if "Facilitator" in df.columns:
+            fac_val = str(row.get("Facilitator", "")).strip().lower()
+            is_facilitator = fac_val in ("yes", "y", "true", "1")
+
+        roster_service.upsert_participant(
+            org_id,
+            pid,
+            {
+                "name": name,
+                "religion": religion,
+                "gender": gender,
+                "partner_id": None,
+                "is_facilitator": is_facilitator,
+            },
+        )
         name_to_id[name] = pid
-        participants.append({"id": pid, "name": name, "religion": religion,
-                             "gender": gender, "partner_id": None})
+        participants.append(
+            {
+                "id": pid,
+                "name": name,
+                "religion": religion,
+                "gender": gender,
+                "partner_id": None,
+                "is_facilitator": is_facilitator,
+            }
+        )
 
     # Second pass: link partners
     for _, row in df.iterrows():
@@ -130,14 +158,17 @@ def _roster_to_participant_list(participants: list[dict]) -> list[dict]:
         partner_name = None
         if p.get("partner_id") and p["partner_id"] in id_to_name:
             partner_name = id_to_name[p["partner_id"]]
-        result.append({
-            "id": i + 1,
-            "name": p["name"],
-            "religion": p["religion"],
-            "gender": p["gender"],
-            "partner": partner_name,
-            "couple_id": None,
-        })
+        result.append(
+            {
+                "id": i + 1,
+                "name": p["name"],
+                "religion": p["religion"],
+                "gender": p["gender"],
+                "partner": partner_name,
+                "couple_id": None,
+                "is_facilitator": p.get("is_facilitator", False),
+            }
+        )
 
     # Assign couple IDs
     couple_map = {}
@@ -169,10 +200,19 @@ async def generate_from_roster(
     if len(participants) < data.num_tables:
         raise HTTPException(
             status_code=400,
-            detail=f"Need at least {data.num_tables} participants for {data.num_tables} tables"
+            detail=f"Need at least {data.num_tables} participants for {data.num_tables} tables",
         )
 
     participant_list = _roster_to_participant_list(participants)
+
+    facilitator_count = sum(
+        1 for p in participant_list if p.get("is_facilitator", False)
+    )
+    if facilitator_count > 0 and facilitator_count < data.num_tables:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Need at least {data.num_tables} facilitators for {data.num_tables} tables (have {facilitator_count})",
+        )
 
     session_id = str(uuid.uuid4())
     storage = SessionStorage()
@@ -199,7 +239,9 @@ async def upsert_participant(
     roster_service: RosterService = Depends(get_roster_service),
 ):
     try:
-        result = roster_service.upsert_participant(org_id, participant_id, data.model_dump())
+        result = roster_service.upsert_participant(
+            org_id, participant_id, data.model_dump()
+        )
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -217,8 +259,8 @@ async def delete_participant(
     if participant and participant.get("partner_id"):
         partner = roster_service.get_participant(org_id, participant["partner_id"])
         if partner and partner.get("partner_id") == participant_id:
-            roster_service.upsert_participant(org_id, participant["partner_id"], {
-                **partner, "partner_id": None
-            })
+            roster_service.upsert_participant(
+                org_id, participant["partner_id"], {**partner, "partner_id": None}
+            )
     roster_service.delete_participant(org_id, participant_id)
     return {"status": "deleted"}

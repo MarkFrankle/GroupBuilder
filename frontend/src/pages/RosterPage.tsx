@@ -27,8 +27,8 @@ export function RosterPage() {
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const [error, setError] = useState<string | null>(null);
-  const [numTables, setNumTables] = useState('1');
-  const [numSessions, setNumSessions] = useState('1');
+  const [numTables, setNumTables] = useState('4');
+  const [numSessions, setNumSessions] = useState('5');
   const [generating, setGenerating] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
 
@@ -103,6 +103,11 @@ export function RosterPage() {
 
   const handleGenerate = async () => {
     setError(null);
+    const facilitatorCount = participants.filter(p => p.is_facilitator).length;
+    if (facilitatorCount > 0 && facilitatorCount < parseInt(numTables)) {
+      setError(`Need at least ${numTables} facilitators for ${numTables} tables (have ${facilitatorCount})`);
+      return;
+    }
     setGenerating(true);
     setLoadingMessage('Creating session from roster...');
     try {

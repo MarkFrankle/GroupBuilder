@@ -7,6 +7,7 @@ interface Participant {
   religion: string;
   gender: string;
   partner: string | null;
+  is_facilitator?: boolean;
 }
 
 interface Assignment {
@@ -27,6 +28,8 @@ interface ValidationResult {
   repeatPairings: number;
   avgNewPeopleMet: number;
   totalParticipants: number;
+  tablesWithoutFacilitator: number;
+  hasFacilitators: boolean;
 }
 
 const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
@@ -39,6 +42,8 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
         repeatPairings: 0,
         avgNewPeopleMet: 0,
         totalParticipants: 0,
+        tablesWithoutFacilitator: 0,
+        hasFacilitators: false,
       }
     }
 
@@ -176,6 +181,18 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
       ? Math.round((totalUniquePeopleMet / totalParticipants) * 10) / 10
       : 0
 
+    // Check facilitator coverage
+    const hasFacilitators = allParticipants.some(p => p.is_facilitator)
+    let tablesWithoutFacilitator = 0
+    if (hasFacilitators) {
+      assignments.forEach(assignment => {
+        Object.values(assignment.tables).forEach(participants => {
+          const hasF = participants.some(p => p !== null && p !== undefined && p.is_facilitator)
+          if (!hasF) tablesWithoutFacilitator++
+        })
+      })
+    }
+
     return {
       coupleViolations,
       maxReligionDeviation,
@@ -183,13 +200,16 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
       repeatPairings,
       avgNewPeopleMet,
       totalParticipants,
+      tablesWithoutFacilitator,
+      hasFacilitators,
     }
   }
 
   const stats = calculateStats()
   const allConstraintsSatisfied = stats.coupleViolations === 0 &&
                                    stats.maxReligionDeviation <= 1 &&
-                                   stats.maxGenderDeviation <= 1
+                                   stats.maxGenderDeviation <= 1 &&
+                                   stats.tablesWithoutFacilitator === 0
 
   return (
     <Card className="mb-6">
@@ -239,6 +259,20 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
                   Gender balanced (±{stats.maxGenderDeviation})
                 </span>
               </div>
+              {stats.hasFacilitators && (
+                <div className="flex items-center gap-2">
+                  {stats.tablesWithoutFacilitator === 0 ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 text-red-600" />
+                  )}
+                  <span className="text-sm">
+                    {stats.tablesWithoutFacilitator === 0
+                      ? 'All tables have facilitators'
+                      : `${stats.tablesWithoutFacilitator} table(s) without facilitator`}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

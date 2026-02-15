@@ -85,7 +85,23 @@ describe('CircularTable', () => {
 
   it('applies correct test-id for component identification', () => {
     render(<CircularTable tableNumber={1} seats={mockSeats} />)
-    
+
     expect(screen.getByTestId('circular-table')).toBeInTheDocument()
+  })
+
+  it('shows facilitator subtitle when facilitators present', () => {
+    const seatsWithFacilitator = [
+      { position: 0, name: 'Alice Johnson', religion: 'Christian', is_facilitator: true },
+      { position: 1, name: 'Bob Smith', religion: 'Jewish', is_facilitator: false },
+    ]
+    render(<CircularTable tableNumber={1} seats={seatsWithFacilitator} />)
+    const subtitle = screen.getByTestId('facilitator-subtitle')
+    expect(subtitle).toBeInTheDocument()
+    expect(subtitle).toHaveTextContent('Facilitators: Alice Johnson')
+  })
+
+  it('does not show facilitator subtitle when no facilitators', () => {
+    render(<CircularTable tableNumber={1} seats={mockSeats} />)
+    expect(screen.queryByTestId('facilitator-subtitle')).not.toBeInTheDocument()
   })
 })
