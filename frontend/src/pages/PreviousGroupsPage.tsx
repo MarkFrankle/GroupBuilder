@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Card, CardContent } from "@/components/ui/card"
 import { Loader2, FolderOpen } from 'lucide-react'
 import { authenticatedFetch } from '@/utils/apiClient'
-import { formatUnixTimeAgo } from '@/utils/timeFormatting'
+
 import { useOrganization } from '@/contexts/OrganizationContext'
 
 interface SessionSummary {
