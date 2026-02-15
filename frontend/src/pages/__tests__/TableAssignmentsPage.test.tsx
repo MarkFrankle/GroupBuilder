@@ -229,11 +229,11 @@ describe('TableAssignmentsPage unified control bar', () => {
     // Session dropdown, Edit, Regenerate, Prev/Next should all be visible
     await waitFor(() => {
       expect(screen.getByRole('combobox', { name: /select session/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /regenerate session/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /prev/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /next/i })).toBeInTheDocument()
     })
+    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /regenerate session/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /prev/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /next/i })).toBeInTheDocument()
   })
 
   it('hides session controls in compact view', async () => {
@@ -246,8 +246,8 @@ describe('TableAssignmentsPage unified control bar', () => {
     // Should be in compact view by default
     await waitFor(() => {
       expect(screen.queryByRole('combobox', { name: /select session/i })).not.toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument()
     })
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument()
   })
 
   it('shows Print Seating button in detailed view when not in edit mode', async () => {
@@ -262,11 +262,8 @@ describe('TableAssignmentsPage unified control bar', () => {
     fireEvent.click(detailedButton)
 
     // Print Seating button should appear
-    await waitFor(() => {
-      const printButton = screen.getByRole('button', { name: /print seating/i })
-      expect(printButton).toBeInTheDocument()
-      expect(printButton).toBeEnabled()
-    })
+    const printButton = await screen.findByRole('button', { name: /print seating/i })
+    expect(printButton).toBeEnabled()
   })
 
   it('disables Print Seating button in edit mode', async () => {
@@ -286,8 +283,7 @@ describe('TableAssignmentsPage unified control bar', () => {
 
     // Print Seating button should be disabled
     await waitFor(() => {
-      const printButton = screen.getByRole('button', { name: /print seating/i })
-      expect(printButton).toBeDisabled()
+      expect(screen.getByRole('button', { name: /print seating/i })).toBeDisabled()
     })
   })
 

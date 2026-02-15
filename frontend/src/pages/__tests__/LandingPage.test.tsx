@@ -66,7 +66,7 @@ describe('Landing Page - Hub', () => {
 
   test('Manage Roster links to /roster', () => {
     renderWithRouter(<LandingPage />)
-    const link = screen.getByText('Manage Roster').closest('a')
+    const link = screen.getByRole('link', { name: /Manage Roster/i })
     expect(link).toHaveAttribute('href', '/roster')
   })
 
@@ -95,6 +95,8 @@ describe('Landing Page - Hub', () => {
 
     await waitFor(() => {
       expect(mockImportRoster).toHaveBeenCalledWith(file)
+    })
+    await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/roster')
     })
   })

@@ -313,7 +313,10 @@ function HelpPage() {
           <p className="mb-2 text-slate-700 leading-relaxed">
             This is the default. It shows all sessions side by side in a grid, giving
             you a bird's-eye view of the entire seminar at once. Each person appears
-            as a small colored chip with their name.
+            as a small colored chip with their name. Chips are color-coded by
+            religion — blue for Jewish, red for Christian, green for Muslim, and
+            yellow for Other — so you can see the religious mix at each table at a
+            glance. A legend at the top shows which color maps to which religion.
           </p>
           <p className="mb-2 text-slate-700 leading-relaxed">
             A few things you can do here:

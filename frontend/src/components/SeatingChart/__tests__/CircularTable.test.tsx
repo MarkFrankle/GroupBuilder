@@ -11,13 +11,13 @@ describe('CircularTable', () => {
 
   it('renders table number', () => {
     render(<CircularTable tableNumber={1} seats={mockSeats} />)
-    
+
     expect(screen.getByText('Table 1')).toBeInTheDocument()
   })
 
   it('renders all participant names', () => {
     render(<CircularTable tableNumber={1} seats={mockSeats} />)
-    
+
     expect(screen.getByText('Alice Johnson')).toBeInTheDocument()
     expect(screen.getByText('Bob Smith')).toBeInTheDocument()
     expect(screen.getByText('Charlie Brown')).toBeInTheDocument()
@@ -25,10 +25,13 @@ describe('CircularTable', () => {
   })
 
   it('renders SVG circle', () => {
-    const { container } = render(<CircularTable tableNumber={1} seats={mockSeats} />)
-    
-    const circle = container.querySelector('circle')
-    expect(circle).toBeInTheDocument()
+    render(<CircularTable tableNumber={1} seats={mockSeats} />)
+
+    // SVG elements aren't well-supported by Testing Library queries;
+    // use the component's test ID to verify the SVG rendered
+    const table = screen.getByTestId('circular-table')
+    // eslint-disable-next-line testing-library/no-node-access
+    expect(table.querySelector('circle')).toBeInTheDocument()
   })
 
   it('shortens long names', () => {
@@ -36,9 +39,9 @@ describe('CircularTable', () => {
       { position: 0, name: 'Elizabeth Montgomery-Wellington', religion: 'Christian' },
       { position: 1, name: 'Short Name', religion: 'Jewish' },
     ]
-    
+
     render(<CircularTable tableNumber={2} seats={longNameSeats} />)
-    
+
     // Long name should be shortened to "FirstName L."
     expect(screen.getByText('Elizabeth M.')).toBeInTheDocument()
     // Short name should remain unchanged
@@ -49,21 +52,23 @@ describe('CircularTable', () => {
     const singleSeat = [
       { position: 0, name: 'Solo Participant', religion: 'Buddhist' },
     ]
-    
+
     render(<CircularTable tableNumber={3} seats={singleSeat} />)
-    
+
     expect(screen.getByText('Solo Participant')).toBeInTheDocument()
     expect(screen.getByText('Table 3')).toBeInTheDocument()
   })
 
   it('positions names around circle using polar coordinates', () => {
-    const { container } = render(<CircularTable tableNumber={1} seats={mockSeats} />)
-    
-    const textElements = container.querySelectorAll('text')
-    
+    render(<CircularTable tableNumber={1} seats={mockSeats} />)
+
+    const table = screen.getByTestId('circular-table')
+    // eslint-disable-next-line testing-library/no-node-access
+    const textElements = table.querySelectorAll('text')
+
     // Should have as many text elements as seats
     expect(textElements.length).toBe(mockSeats.length)
-    
+
     // Each text element should have x and y coordinates
     textElements.forEach(text => {
       expect(text.getAttribute('x')).toBeTruthy()
@@ -72,10 +77,12 @@ describe('CircularTable', () => {
   })
 
   it('uses appropriate text anchoring', () => {
-    const { container } = render(<CircularTable tableNumber={1} seats={mockSeats} />)
-    
-    const textElements = container.querySelectorAll('text')
-    
+    render(<CircularTable tableNumber={1} seats={mockSeats} />)
+
+    const table = screen.getByTestId('circular-table')
+    // eslint-disable-next-line testing-library/no-node-access
+    const textElements = table.querySelectorAll('text')
+
     // Check that text elements have textAnchor attribute
     textElements.forEach(text => {
       const anchor = text.getAttribute('text-anchor')

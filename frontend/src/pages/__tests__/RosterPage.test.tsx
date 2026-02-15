@@ -1,11 +1,11 @@
-jest.mock('uuid', () => ({
-  v4: () => 'mock-uuid-1234',
-}));
-
 import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { RosterPage } from '../RosterPage';
 import { authenticatedFetch } from '@/utils/apiClient';
+
+jest.mock('uuid', () => ({
+  v4: () => 'mock-uuid-1234',
+}));
 
 jest.mock('@/utils/apiClient');
 const mockFetch = authenticatedFetch as jest.MockedFunction<typeof authenticatedFetch>;
