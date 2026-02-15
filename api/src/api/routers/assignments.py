@@ -572,6 +572,17 @@ async def get_result_version_list(
     return {"versions": versions}
 
 
+@router.get("/sessions")
+async def list_sessions(
+    org_id: str = Query(..., description="Organization ID"),
+    user: AuthUser = Depends(get_current_user),
+):
+    """List all sessions for an organization, sorted by most recent."""
+    session_storage = get_session_storage()
+    logger.info(f"Listing sessions for org: {org_id}")
+    return session_storage.get_sessions_for_org(org_id)
+
+
 @router.get("/sessions/{session_id}/metadata")
 async def get_session_metadata(
     session_id: str = Path(
