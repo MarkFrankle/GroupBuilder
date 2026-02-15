@@ -76,11 +76,15 @@ const PreviousGroupsPage: React.FC = () => {
                   <FolderOpen className="h-5 w-5 text-muted-foreground shrink-0" />
                   <div>
                     <div className="font-medium">
-                      {session.num_tables} tables, {session.num_sessions} session{session.num_sessions !== 1 ? 's' : ''}
+                      {session.created_at
+                        ? new Date(session.created_at * 1000).toLocaleString(undefined, {
+                            month: 'short', day: 'numeric', year: 'numeric',
+                            hour: 'numeric', minute: '2-digit'
+                          })
+                        : 'Unknown date'}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {session.num_participants} participants
-                      {session.created_at && <> &middot; {formatUnixTimeAgo(session.created_at)}</>}
+                      {session.num_participants} participants &middot; {session.num_tables} tables &middot; {session.num_sessions} session{session.num_sessions !== 1 ? 's' : ''}
                     </div>
                   </div>
                 </div>
