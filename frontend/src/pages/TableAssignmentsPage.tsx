@@ -72,6 +72,7 @@ const TableAssignmentsPage: React.FC = () => {
   const [undoStack, setUndoStack] = useState<Assignment[][]>([])
   const [selectedAbsentParticipant, setSelectedAbsentParticipant] = useState<Participant | null>(null)
   const [selectedParticipantSlot, setSelectedParticipantSlot] = useState<{tableNum: number, participantIndex: number} | null>(null)
+  const [clearSelectionKey, setClearSelectionKey] = useState(0)
   const [availableVersions, setAvailableVersions] = useState<ResultVersion[]>([])
   const [currentVersion, setCurrentVersion] = useState<string>('latest')
   const [showRegenerateDialog, setShowRegenerateDialog] = useState<boolean>(false)
@@ -692,6 +693,7 @@ const TableAssignmentsPage: React.FC = () => {
 
     // Clear selection after marking absent
     setSelectedParticipantSlot(null)
+    setClearSelectionKey(prev => prev + 1)
 
     // Edit made (hasUnsavedEdits tracking removed)
   }
@@ -734,6 +736,8 @@ const TableAssignmentsPage: React.FC = () => {
 
     setAssignments(undoStack[undoStack.length - 1])
     setUndoStack(prev => prev.slice(0, -1))
+    setSelectedAbsentParticipant(null)
+    setSelectedParticipantSlot(null)
   }
 
   const toggleEditMode = () => {
@@ -1088,7 +1092,7 @@ const TableAssignmentsPage: React.FC = () => {
                       >
                         <div className="font-medium">{participant.name}</div>
                         <div className="text-xs text-gray-600">
-                          {participant.religion} • {participant.gender}
+                          {participant.is_facilitator && 'Facilitator • '}{participant.religion} • {participant.gender}
                         </div>
                       </div>
                     ))}
@@ -1114,6 +1118,7 @@ const TableAssignmentsPage: React.FC = () => {
                     const sessionIndex = assignments.findIndex(a => a.session === currentSession)
                     handlePlaceAbsentParticipant(sessionIndex, tableNum, seatIndex)
                   }}
+                  clearSelectionKey={clearSelectionKey}
                   onSelectionChange={(tableNum, participantIndex) => {
                     if (tableNum !== null && participantIndex !== null) {
                       setSelectedParticipantSlot({ tableNum, participantIndex })
