@@ -36,7 +36,8 @@ def initialize_firebase():
     global _firestore_client
     _firestore_client = firestore.client()
 
-    logger.info(f"Firebase Admin SDK initialized with project: {cred.project_id}")
+    app = firebase_admin.get_app()
+    logger.info(f"Firebase Admin SDK initialized with project: {app.project_id}")
 
 
 def get_firestore_client() -> Client:
