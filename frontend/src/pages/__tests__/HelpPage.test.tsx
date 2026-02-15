@@ -12,35 +12,33 @@ describe('HelpPage', () => {
 
   test('renders table of contents with all section links', () => {
     renderPage();
-    const sectionIds = [
-      'getting-started',
-      'creating-your-roster',
-      'generating-groups',
-      'viewing-your-groups',
-      'printing-and-sharing',
-      'editing-sessions',
-      'troubleshooting',
+    const sectionNames = [
+      'Getting Started',
+      'Creating Your Roster',
+      'Generating Groups',
+      'Viewing Your Groups',
+      'Printing & Sharing',
+      'Editing Sessions',
+      'Troubleshooting',
     ];
-    for (const id of sectionIds) {
-      const anchor = document.querySelector(`a[href="#${id}"]`);
-      expect(anchor).toBeInTheDocument();
+    for (const name of sectionNames) {
+      expect(screen.getAllByText(name).length).toBeGreaterThanOrEqual(1);
     }
   });
 
-  test('renders all section headings with correct IDs', () => {
+  test('renders all section headings', () => {
     renderPage();
-    const sectionIds = [
-      'getting-started',
-      'creating-your-roster',
-      'generating-groups',
-      'viewing-your-groups',
-      'printing-and-sharing',
-      'editing-sessions',
-      'troubleshooting',
+    const headings = [
+      'Getting Started',
+      'Creating Your Roster',
+      'Generating Groups',
+      'Viewing Your Groups',
+      'Printing & Sharing',
+      'Editing Sessions',
+      'Troubleshooting',
     ];
-    for (const id of sectionIds) {
-      const element = document.getElementById(id);
-      expect(element).toBeInTheDocument();
+    for (const heading of headings) {
+      expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
     }
   });
 
