@@ -101,8 +101,6 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
       const key = Number(tableNum)
       const table = assignment.tables[key]
       const realParticipants = table.filter((p): p is Participant => p !== null && p !== undefined)
-      const hasFacilitators = realParticipants.some(p => p.is_facilitator)
-
       // Keep original order, append empty slots at end
       // Always add two nulls in edit mode: one for regulars, one for facilitators
       // Every table needs a facilitator section so absent facilitators can be placed
