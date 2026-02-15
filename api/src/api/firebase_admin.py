@@ -20,7 +20,7 @@ def initialize_firebase():
     # Check FIREBASE_SERVICE_ACCOUNT_PATH first, then GOOGLE_APPLICATION_CREDENTIALS
     service_account_path = os.getenv(
         "FIREBASE_SERVICE_ACCOUNT_PATH",
-        os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "./firebase-service-account.json")
+        os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "./firebase-service-account.json"),
     )
 
     # Initialize Firebase app
@@ -44,7 +44,9 @@ def get_firestore_client() -> Client:
         RuntimeError: If Firebase not initialized
     """
     if _firestore_client is None:
-        raise RuntimeError("Firebase not initialized. Call initialize_firebase() first.")
+        raise RuntimeError(
+            "Firebase not initialized. Call initialize_firebase() first."
+        )
     return _firestore_client
 
 

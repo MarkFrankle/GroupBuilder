@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 # Try to import storage libraries, but gracefully fall back if not available
 try:
     from upstash_redis import Redis as UpstashRedis
+
     UPSTASH_AVAILABLE = True
 except ImportError:
     UPSTASH_AVAILABLE = False
@@ -21,6 +22,7 @@ except ImportError:
 
 try:
     import redis
+
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
@@ -127,7 +129,7 @@ class RedisBackend(StorageBackend):
             max_connections=max_connections,
             socket_connect_timeout=timeout,
             socket_keepalive=True,
-            decode_responses=True
+            decode_responses=True,
         )
 
         # Create client with connection pool
@@ -168,7 +170,9 @@ class RedisBackend(StorageBackend):
         return self.client.exists(key) > 0
 
     def keys(self, pattern: str = "*") -> list[str]:
-        return [k.decode() if isinstance(k, bytes) else k for k in self.client.keys(pattern)]
+        return [
+            k.decode() if isinstance(k, bytes) else k for k in self.client.keys(pattern)
+        ]
 
     def expire(self, key: str, ttl_seconds: int) -> bool:
         """Refresh TTL on an existing key."""
@@ -180,7 +184,7 @@ class RedisBackend(StorageBackend):
 
     def close(self) -> None:
         """Close all connections in the pool."""
-        if hasattr(self, 'pool'):
+        if hasattr(self, "pool"):
             self.pool.disconnect()
             logger.info("Redis connection pool closed")
 
@@ -196,7 +200,8 @@ class InMemoryBackend(StorageBackend):
         """Remove expired keys"""
         current_time = datetime.now()
         expired_keys = [
-            key for key, (_, expiry) in self.data.items()
+            key
+            for key, (_, expiry) in self.data.items()
             if expiry and current_time > expiry
         ]
         for key in expired_keys:
@@ -232,6 +237,7 @@ class InMemoryBackend(StorageBackend):
             return list(self.data.keys())
         # Simple pattern matching (only supports "*" wildcard)
         import fnmatch
+
         return [key for key in self.data.keys() if fnmatch.fnmatch(key, pattern)]
 
     def expire(self, key: str, ttl_seconds: int) -> bool:
@@ -262,7 +268,9 @@ def create_storage_backend() -> StorageBackend:
 
     Set REQUIRE_PERSISTENT_STORAGE=true in production to fail hard if external storage unavailable.
     """
-    require_persistent = os.getenv("REQUIRE_PERSISTENT_STORAGE", "false").lower() == "true"
+    require_persistent = (
+        os.getenv("REQUIRE_PERSISTENT_STORAGE", "false").lower() == "true"
+    )
 
     # First try Upstash REST (best for serverless environments)
     upstash_url = os.getenv("UPSTASH_REDIS_REST_URL", "").strip()
@@ -281,10 +289,14 @@ def create_storage_backend() -> StorageBackend:
             logger.warning("Falling back to in-memory storage")
             return InMemoryBackend()
     elif upstash_url and upstash_token and not UPSTASH_AVAILABLE:
-        error_msg = "UPSTASH_REDIS_REST_URL set, but upstash-redis library not installed"
+        error_msg = (
+            "UPSTASH_REDIS_REST_URL set, but upstash-redis library not installed"
+        )
         logger.warning(error_msg)
         if require_persistent:
-            raise RuntimeError(f"{error_msg}. Cannot start with in-memory storage in production.")
+            raise RuntimeError(
+                f"{error_msg}. Cannot start with in-memory storage in production."
+            )
         logger.warning("Falling back to in-memory storage")
         return InMemoryBackend()
 
@@ -306,7 +318,9 @@ def create_storage_backend() -> StorageBackend:
         error_msg = "REDIS_URL set, but redis library not installed"
         logger.warning(error_msg)
         if require_persistent:
-            raise RuntimeError(f"{error_msg}. Cannot start with in-memory storage in production.")
+            raise RuntimeError(
+                f"{error_msg}. Cannot start with in-memory storage in production."
+            )
         logger.warning("Falling back to in-memory storage")
         return InMemoryBackend()
 
@@ -333,8 +347,12 @@ RESULT_LATEST_SUFFIX = ":latest"
 
 # TTL constants (configurable via environment variables)
 SESSION_TTL = int(os.getenv("SESSION_TTL_SECONDS", "3600"))  # 1 hour default
-RESULT_TTL = int(os.getenv("RESULT_TTL_SECONDS", str(30 * 24 * 3600)))  # 30 days default
-MAX_RESULT_VERSIONS = int(os.getenv("MAX_RESULT_VERSIONS", "5"))  # Keep last 5 versions default
+RESULT_TTL = int(
+    os.getenv("RESULT_TTL_SECONDS", str(30 * 24 * 3600))
+)  # 30 days default
+MAX_RESULT_VERSIONS = int(
+    os.getenv("MAX_RESULT_VERSIONS", "5")
+)  # Keep last 5 versions default
 
 
 def store_session(session_id: str, data: dict) -> None:
@@ -390,11 +408,7 @@ def store_result(session_id: str, data: dict, version_id: Optional[str] = None) 
         version_id = f"v{version_num}"
 
     # Add metadata to result
-    result_with_metadata = {
-        **data,
-        "version_id": version_id,
-        "created_at": time.time()
-    }
+    result_with_metadata = {**data, "version_id": version_id, "created_at": time.time()}
 
     # Store the versioned result
     version_key = f"{RESULT_PREFIX}{session_id}:{version_id}"
@@ -406,7 +420,7 @@ def store_result(session_id: str, data: dict, version_id: Optional[str] = None) 
         "created_at": result_with_metadata["created_at"],
         "solve_time": data.get("metadata", {}).get("solve_time"),
         "solution_quality": data.get("metadata", {}).get("solution_quality"),
-        "max_time_seconds": data.get("metadata", {}).get("max_time_seconds")
+        "max_time_seconds": data.get("metadata", {}).get("max_time_seconds"),
     }
 
     # Append new version

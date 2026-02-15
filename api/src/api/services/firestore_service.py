@@ -28,28 +28,21 @@ class FirestoreService:
 
         for org_doc in org_docs:
             org_data = org_doc.to_dict()
-            
+
             # Skip inactive organizations
             if not org_data.get("active", True):
                 continue
-            
+
             # Check if user is a member of this org
             member_ref = org_doc.reference.collection("members").document(user_id)
             member_doc = member_ref.get()
 
             if member_doc.exists:
-                orgs.append({
-                    "id": org_doc.id,
-                    **org_data
-                })
+                orgs.append({"id": org_doc.id, **org_data})
 
         return orgs
 
-    def check_user_can_access_session(
-        self,
-        user_id: str,
-        session_id: str
-    ) -> bool:
+    def check_user_can_access_session(self, user_id: str, session_id: str) -> bool:
         """Check if user has access to a session.
 
         Args:
@@ -107,7 +100,7 @@ _firestore_service: Optional[FirestoreService] = None
 
 def get_firestore_service() -> FirestoreService:
     """FastAPI dependency for FirestoreService.
-    
+
     Returns a singleton instance to avoid creating new connections per request.
     """
     global _firestore_service

@@ -283,12 +283,16 @@ class TestStorageBackendSelection:
         assert "REQUIRE_PERSISTENT_STORAGE is enabled" in str(exc_info.value)
         assert "no external storage configured" in str(exc_info.value)
 
-    @patch.dict(os.environ, {
-        "REQUIRE_PERSISTENT_STORAGE": "true",
-        "UPSTASH_REDIS_REST_URL": "http://fake-url",
-        "UPSTASH_REDIS_REST_TOKEN": "fake-token"
-    }, clear=True)
-    @patch('api.storage.UPSTASH_AVAILABLE', False)
+    @patch.dict(
+        os.environ,
+        {
+            "REQUIRE_PERSISTENT_STORAGE": "true",
+            "UPSTASH_REDIS_REST_URL": "http://fake-url",
+            "UPSTASH_REDIS_REST_TOKEN": "fake-token",
+        },
+        clear=True,
+    )
+    @patch("api.storage.UPSTASH_AVAILABLE", False)
     def test_require_persistent_fails_with_missing_library(self):
         """Test that REQUIRE_PERSISTENT_STORAGE=true fails when library not installed."""
         with pytest.raises(RuntimeError) as exc_info:

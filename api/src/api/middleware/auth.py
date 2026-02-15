@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 class AuthUser(BaseModel):
     """Authenticated user information."""
+
     user_id: str
     email: str
     email_verified: bool
@@ -19,16 +20,14 @@ class AuthUser(BaseModel):
 
 def get_firestore_service() -> FirestoreService:
     """Dependency provider for FirestoreService.
-    
+
     Returns:
         FirestoreService instance
     """
     return FirestoreService()
 
 
-async def get_current_user(
-    authorization: Optional[str] = Header(None)
-) -> AuthUser:
+async def get_current_user(authorization: Optional[str] = Header(None)) -> AuthUser:
     """Extract and verify Firebase token from Authorization header.
 
     Args:
@@ -44,7 +43,7 @@ async def get_current_user(
     if not authorization:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header missing"
+            detail="Authorization header missing",
         )
 
     # Parse Bearer token
@@ -52,7 +51,7 @@ async def get_current_user(
     if len(parts) != 2 or parts[0].lower() != "bearer":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format"
+            detail="Invalid authorization header format",
         )
 
     token = parts[1]
@@ -63,31 +62,28 @@ async def get_current_user(
         return AuthUser(
             user_id=decoded_token["uid"],
             email=decoded_token.get("email", ""),
-            email_verified=decoded_token.get("email_verified", False)
+            email_verified=decoded_token.get("email_verified", False),
         )
     except firebase_auth.InvalidIdTokenError:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid Firebase token"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Firebase token"
         )
     except firebase_auth.ExpiredIdTokenError:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Firebase token expired"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Firebase token expired"
         )
     except Exception as e:
         # Log the actual error internally but don't expose details to client
         logger.error(f"Token verification failed: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token verification failed"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token verification failed"
         )
 
 
 async def require_session_access(
     session_id: str = Path(..., description="Session ID from URL"),
     user: AuthUser = Depends(get_current_user),
-    firestore_service: FirestoreService = Depends(get_firestore_service)
+    firestore_service: FirestoreService = Depends(get_firestore_service),
 ) -> AuthUser:
     """Require that the current user has access to the specified session.
 
@@ -103,14 +99,13 @@ async def require_session_access(
         HTTPException: 403 if user doesn't have access to session
     """
     has_access = firestore_service.check_user_can_access_session(
-        user_id=user.user_id,
-        session_id=session_id
+        user_id=user.user_id, session_id=session_id
     )
 
     if not has_access:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Access denied to session {session_id}"
+            detail=f"Access denied to session {session_id}",
         )
 
     return user

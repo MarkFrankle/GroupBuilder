@@ -14,10 +14,7 @@ logger = logging.getLogger(__name__)
 TEMPLATE_DIR = Path(__file__).parent.parent / "templates"
 
 # Initialize Jinja2 environment for templates
-_jinja_env = Environment(
-    loader=FileSystemLoader(str(TEMPLATE_DIR)),
-    autoescape=True
-)
+_jinja_env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)), autoescape=True)
 
 
 class EmailService:
@@ -34,11 +31,7 @@ class EmailService:
             logger.warning("SENDGRID_API_KEY not set - emails will be skipped")
 
     def _send_email(
-        self,
-        to_email: str,
-        subject: str,
-        html_content: str,
-        plain_content: str
+        self, to_email: str, subject: str, html_content: str, plain_content: str
     ) -> bool:
         """Send an email via SendGrid.
 
@@ -61,7 +54,7 @@ class EmailService:
                 to_emails=To(to_email),
                 subject=subject,
                 html_content=Content("text/html", html_content),
-                plain_text_content=Content("text/plain", plain_content)
+                plain_text_content=Content("text/plain", plain_content),
             )
 
             client = SendGridAPIClient(self.api_key)
@@ -71,7 +64,9 @@ class EmailService:
                 logger.info(f"Email sent successfully to {to_email}")
                 return True
             else:
-                logger.error(f"Email delivery failed to {to_email}: HTTP {response.status_code}")
+                logger.error(
+                    f"Email delivery failed to {to_email}: HTTP {response.status_code}"
+                )
                 return False
 
         except Exception as e:
@@ -96,7 +91,7 @@ class EmailService:
         to_email: str,
         org_name: str,
         invite_token: str,
-        inviter_email: Optional[str] = None
+        inviter_email: Optional[str] = None,
     ) -> bool:
         """Send facilitator invite email.
 
@@ -115,20 +110,19 @@ class EmailService:
             "facilitator_invite_email.html",
             org_name=org_name,
             invite_link=invite_link,
-            inviter_email=inviter_email
+            inviter_email=inviter_email,
         )
 
         plain_content = self._render_template(
             "facilitator_invite_email.txt",
             org_name=org_name,
             invite_link=invite_link,
-            inviter_email=inviter_email
+            inviter_email=inviter_email,
         )
 
         subject = f"You're invited to facilitate {org_name} on GroupBuilder"
 
         return self._send_email(to_email, subject, html_content, plain_content)
-
 
 
 # Singleton instance for convenience

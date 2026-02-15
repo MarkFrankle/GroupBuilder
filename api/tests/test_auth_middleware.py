@@ -6,7 +6,7 @@ from api.middleware.auth import (
     get_current_user,
     require_session_access,
     get_firestore_service,
-    AuthUser
+    AuthUser,
 )
 
 
@@ -34,10 +34,7 @@ def test_missing_authorization_header(test_app):
 def test_invalid_authorization_format(test_app):
     """Should return 401 if Authorization header not 'Bearer <token>'."""
     client = TestClient(test_app)
-    response = client.get(
-        "/protected",
-        headers={"Authorization": "InvalidFormat"}
-    )
+    response = client.get("/protected", headers={"Authorization": "InvalidFormat"})
 
     assert response.status_code == 401
     assert response.json() == {"detail": "Invalid authorization header format"}
@@ -50,17 +47,14 @@ def test_require_session_access_forbidden():
 
     @app.get("/session/{session_id}")
     async def session_route(
-        session_id: str,
-        user: AuthUser = Depends(require_session_access)
+        session_id: str, user: AuthUser = Depends(require_session_access)
     ):
         return {"message": "Access granted"}
 
     # Mock get_current_user to return a user
     async def mock_get_current_user():
         return AuthUser(
-            user_id="user123",
-            email="test@example.com",
-            email_verified=True
+            user_id="user123", email="test@example.com", email_verified=True
         )
 
     # Mock FirestoreService to return False for access check
@@ -87,17 +81,14 @@ def test_require_session_access_granted():
 
     @app.get("/session/{session_id}")
     async def session_route(
-        session_id: str,
-        user: AuthUser = Depends(require_session_access)
+        session_id: str, user: AuthUser = Depends(require_session_access)
     ):
         return {"message": "Access granted", "user_id": user.user_id}
 
     # Mock get_current_user to return a user
     async def mock_get_current_user():
         return AuthUser(
-            user_id="user123",
-            email="test@example.com",
-            email_verified=True
+            user_id="user123", email="test@example.com", email_verified=True
         )
 
     # Mock FirestoreService to return True for access check

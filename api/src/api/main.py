@@ -1,7 +1,16 @@
 from dotenv import load_dotenv
+
 load_dotenv()
 
-from api.routers import upload, assignments, admin, invites, admin_org_details, user, roster
+from api.routers import (
+    upload,
+    assignments,
+    admin,
+    invites,
+    admin_org_details,
+    user,
+    roster,
+)
 from api.middleware import RequestIDMiddleware, RequestIDLogFilter
 from api.firebase_admin import initialize_firebase
 from fastapi import FastAPI, Request
@@ -15,7 +24,7 @@ import os
 # Configure logging with request ID support
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - [%(request_id)s] - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - [%(request_id)s] - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -39,8 +48,7 @@ app.add_middleware(RequestIDMiddleware)
 
 # Get allowed origins from environment or use defaults
 allowed_origins = os.getenv(
-    "CORS_ORIGINS",
-    "http://localhost:3000,https://group-builder.netlify.app"
+    "CORS_ORIGINS", "http://localhost:3000,https://group-builder.netlify.app"
 ).split(",")
 
 app.add_middleware(
@@ -78,13 +86,11 @@ async def health_check():
         storage.set(test_key, {"timestamp": "test"}, ttl_seconds=10)
         storage.delete(test_key)
 
-        return {
-            "status": "healthy",
-            "storage": "connected"
-        }
+        return {"status": "healthy", "storage": "connected"}
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
         from fastapi import HTTPException
+
         raise HTTPException(status_code=503, detail=f"Storage unavailable: {str(e)}")
 
 
@@ -102,12 +108,14 @@ async def startup_event():
 async def shutdown_event():
     """Clean up resources on shutdown."""
     from api.storage import storage
-    if hasattr(storage, 'close'):
+
+    if hasattr(storage, "close"):
         logger.info("Closing storage connections...")
         storage.close()
 
 
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
