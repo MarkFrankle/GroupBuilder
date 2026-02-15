@@ -51,7 +51,6 @@ jobs:
 
     - name: Check code formatting (black)
       run: poetry run black --check src tests
-      continue-on-error: true
 
   frontend-tests:
     name: Frontend Tests
@@ -83,7 +82,6 @@ jobs:
 
     - name: Lint
       run: npm run lint
-      continue-on-error: true
 
   assignment-logic-tests:
     name: Assignment Logic Tests

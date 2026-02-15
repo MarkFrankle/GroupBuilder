@@ -21,15 +21,39 @@ def sample_session_data():
     """Sample session data for testing."""
     return {
         "participant_dict": [
-            {"id": 1, "name": "Alice", "religion": "Christian", "gender": "Female", "couple_id": None},
-            {"id": 2, "name": "Bob", "religion": "Jewish", "gender": "Male", "couple_id": None},
-            {"id": 3, "name": "Charlie", "religion": "Muslim", "gender": "Male", "couple_id": None},
-            {"id": 4, "name": "Diana", "religion": "Christian", "gender": "Female", "couple_id": None},
+            {
+                "id": 1,
+                "name": "Alice",
+                "religion": "Christian",
+                "gender": "Female",
+                "couple_id": None,
+            },
+            {
+                "id": 2,
+                "name": "Bob",
+                "religion": "Jewish",
+                "gender": "Male",
+                "couple_id": None,
+            },
+            {
+                "id": 3,
+                "name": "Charlie",
+                "religion": "Muslim",
+                "gender": "Male",
+                "couple_id": None,
+            },
+            {
+                "id": 4,
+                "name": "Diana",
+                "religion": "Christian",
+                "gender": "Female",
+                "couple_id": None,
+            },
         ],
         "num_tables": 2,
         "num_sessions": 2,
         "filename": "test.xlsx",
-        "created_at": datetime.now().isoformat()
+        "created_at": datetime.now().isoformat(),
     }
 
 
@@ -48,37 +72,85 @@ def sample_assignments_result():
                 "session": 1,
                 "tables": {
                     "1": [
-                        {"name": "Alice", "religion": "Christian", "gender": "Female", "partner": None},
-                        {"name": "Bob", "religion": "Jewish", "gender": "Male", "partner": None}
+                        {
+                            "name": "Alice",
+                            "religion": "Christian",
+                            "gender": "Female",
+                            "partner": None,
+                        },
+                        {
+                            "name": "Bob",
+                            "religion": "Jewish",
+                            "gender": "Male",
+                            "partner": None,
+                        },
                     ],
                     "2": [
-                        {"name": "Charlie", "religion": "Muslim", "gender": "Male", "partner": None},
-                        {"name": "Diana", "religion": "Christian", "gender": "Female", "partner": None}
-                    ]
-                }
+                        {
+                            "name": "Charlie",
+                            "religion": "Muslim",
+                            "gender": "Male",
+                            "partner": None,
+                        },
+                        {
+                            "name": "Diana",
+                            "religion": "Christian",
+                            "gender": "Female",
+                            "partner": None,
+                        },
+                    ],
+                },
             },
             {
                 "session": 2,
                 "tables": {
                     "1": [
-                        {"name": "Charlie", "religion": "Muslim", "gender": "Male", "partner": None},
-                        {"name": "Bob", "religion": "Jewish", "gender": "Male", "partner": None}
+                        {
+                            "name": "Charlie",
+                            "religion": "Muslim",
+                            "gender": "Male",
+                            "partner": None,
+                        },
+                        {
+                            "name": "Bob",
+                            "religion": "Jewish",
+                            "gender": "Male",
+                            "partner": None,
+                        },
                     ],
                     "2": [
-                        {"name": "Alice", "religion": "Christian", "gender": "Female", "partner": None},
-                        {"name": "Diana", "religion": "Christian", "gender": "Female", "partner": None}
-                    ]
-                }
-            }
-        ]
+                        {
+                            "name": "Alice",
+                            "religion": "Christian",
+                            "gender": "Female",
+                            "partner": None,
+                        },
+                        {
+                            "name": "Diana",
+                            "religion": "Christian",
+                            "gender": "Female",
+                            "partner": None,
+                        },
+                    ],
+                },
+            },
+        ],
     }
 
 
 class TestGetAssignments:
     """Test suite for GET /api/assignments/ endpoint."""
 
-    @patch('api.routers.assignments.handle_generate_assignments')
-    def test_generate_assignments_success(self, mock_generate, client, mock_storage, sample_session_data, sample_assignments_result, add_session_to_firestore):
+    @patch("api.routers.assignments.handle_generate_assignments")
+    def test_generate_assignments_success(
+        self,
+        mock_generate,
+        client,
+        mock_storage,
+        sample_session_data,
+        sample_assignments_result,
+        add_session_to_firestore,
+    ):
         """Test successful assignment generation."""
         session_id = str(uuid.uuid4())
         add_session_to_firestore(session_id, sample_session_data)
@@ -115,16 +187,25 @@ class TestGetAssignments:
 
         for invalid_id in invalid_ids:
             response = client.get(f"/api/assignments/?session_id={invalid_id}")
-            assert response.status_code == 422, f"Invalid ID '{invalid_id}' should return 422"
+            assert (
+                response.status_code == 422
+            ), f"Invalid ID '{invalid_id}' should return 422"
 
-    @patch('api.routers.assignments.handle_generate_assignments')
-    def test_generate_assignments_solver_failure(self, mock_generate, client, mock_storage, sample_session_data, add_session_to_firestore):
+    @patch("api.routers.assignments.handle_generate_assignments")
+    def test_generate_assignments_solver_failure(
+        self,
+        mock_generate,
+        client,
+        mock_storage,
+        sample_session_data,
+        add_session_to_firestore,
+    ):
         """Test handling of solver failures."""
         session_id = str(uuid.uuid4())
         add_session_to_firestore(session_id, sample_session_data)
         mock_generate.return_value = {
             "status": "failure",
-            "error": "No feasible solution found"
+            "error": "No feasible solution found",
         }
 
         response = client.get(f"/api/assignments/?session_id={session_id}")
@@ -132,11 +213,20 @@ class TestGetAssignments:
         assert response.status_code == 400
         assert "No feasible solution" in response.json()["detail"]
 
+
 class TestRegenerateAssignments:
     """Test suite for POST /api/assignments/regenerate/{session_id} endpoint."""
 
-    @patch('api.routers.assignments.handle_generate_assignments')
-    def test_regenerate_success(self, mock_generate, client, mock_storage, sample_session_data, sample_assignments_result, add_session_to_firestore):
+    @patch("api.routers.assignments.handle_generate_assignments")
+    def test_regenerate_success(
+        self,
+        mock_generate,
+        client,
+        mock_storage,
+        sample_session_data,
+        sample_assignments_result,
+        add_session_to_firestore,
+    ):
         """Test successful regeneration."""
         session_id = str(uuid.uuid4())
         add_session_to_firestore(session_id, sample_session_data)
@@ -168,11 +258,21 @@ class TestRegenerateAssignments:
 class TestGetCachedResults:
     """Test suite for GET /api/assignments/results/{session_id} endpoint."""
 
-    def test_get_results_success(self, client, mock_storage, sample_assignments_result, add_results_to_firestore, add_session_to_firestore, sample_session_data):
+    def test_get_results_success(
+        self,
+        client,
+        mock_storage,
+        sample_assignments_result,
+        add_results_to_firestore,
+        add_session_to_firestore,
+        sample_session_data,
+    ):
         """Test retrieving cached results."""
         session_id = str(uuid.uuid4())
         add_session_to_firestore(session_id, sample_session_data)
-        add_results_to_firestore(session_id, "v1", sample_assignments_result["assignments"])
+        add_results_to_firestore(
+            session_id, "v1", sample_assignments_result["assignments"]
+        )
 
         response = client.get(f"/api/assignments/results/{session_id}")
 
@@ -180,11 +280,21 @@ class TestGetCachedResults:
         data = response.json()
         assert len(data) == 2  # 2 sessions
 
-    def test_get_results_specific_version(self, client, mock_storage, sample_assignments_result, add_results_to_firestore, add_session_to_firestore, sample_session_data):
+    def test_get_results_specific_version(
+        self,
+        client,
+        mock_storage,
+        sample_assignments_result,
+        add_results_to_firestore,
+        add_session_to_firestore,
+        sample_session_data,
+    ):
         """Test retrieving specific version."""
         session_id = str(uuid.uuid4())
         add_session_to_firestore(session_id, sample_session_data)
-        add_results_to_firestore(session_id, "v2", sample_assignments_result["assignments"])
+        add_results_to_firestore(
+            session_id, "v2", sample_assignments_result["assignments"]
+        )
 
         response = client.get(f"/api/assignments/results/{session_id}?version=v2")
 
@@ -215,12 +325,30 @@ class TestGetCachedResults:
 class TestGetResultVersions:
     """Test suite for GET /api/assignments/results/{session_id}/versions endpoint."""
 
-    def test_get_versions_success(self, client, mock_storage, add_session_to_firestore, add_results_to_firestore, sample_session_data, sample_assignments_result):
+    def test_get_versions_success(
+        self,
+        client,
+        mock_storage,
+        add_session_to_firestore,
+        add_results_to_firestore,
+        sample_session_data,
+        sample_assignments_result,
+    ):
         """Test retrieving version list."""
         session_id = str(uuid.uuid4())
         add_session_to_firestore(session_id, sample_session_data)
-        add_results_to_firestore(session_id, "v1", sample_assignments_result["assignments"], {"solve_time": 1.5})
-        add_results_to_firestore(session_id, "v2", sample_assignments_result["assignments"], {"solve_time": 2.0})
+        add_results_to_firestore(
+            session_id,
+            "v1",
+            sample_assignments_result["assignments"],
+            {"solve_time": 1.5},
+        )
+        add_results_to_firestore(
+            session_id,
+            "v2",
+            sample_assignments_result["assignments"],
+            {"solve_time": 2.0},
+        )
 
         response = client.get(f"/api/assignments/results/{session_id}/versions")
 
@@ -241,7 +369,9 @@ class TestGetResultVersions:
 class TestGetSessionMetadata:
     """Test suite for GET /api/assignments/sessions/{session_id}/metadata endpoint."""
 
-    def test_get_metadata_success(self, client, mock_storage, sample_session_data, add_session_to_firestore):
+    def test_get_metadata_success(
+        self, client, mock_storage, sample_session_data, add_session_to_firestore
+    ):
         """Test retrieving session metadata."""
         session_id = str(uuid.uuid4())
         add_session_to_firestore(session_id, sample_session_data)
@@ -269,7 +399,9 @@ class TestGetSessionMetadata:
 class TestCloneSession:
     """Test suite for POST /api/assignments/sessions/{session_id}/clone endpoint."""
 
-    def test_clone_session_success(self, client, mock_storage, sample_session_data, add_session_to_firestore):
+    def test_clone_session_success(
+        self, client, mock_storage, sample_session_data, add_session_to_firestore
+    ):
         """Test successful session cloning."""
         original_session_id = str(uuid.uuid4())
         add_session_to_firestore(original_session_id, sample_session_data)
@@ -285,12 +417,15 @@ class TestCloneSession:
 
         # Verify new session was created in Firestore
         from api.services.session_storage import SessionStorage
+
         storage = SessionStorage()
         new_session_id = data["session_id"]
         new_session = storage.get_session(new_session_id)
         assert new_session["num_tables"] == 3
         assert new_session["num_sessions"] == 4
-        assert new_session["participant_data"] == sample_session_data["participant_dict"]
+        assert (
+            new_session["participant_data"] == sample_session_data["participant_dict"]
+        )
 
     def test_clone_session_not_found(self, client, mock_storage):
         """Test cloning nonexistent session."""
@@ -302,7 +437,9 @@ class TestCloneSession:
 
         assert response.status_code == 404
 
-    def test_clone_invalid_num_tables(self, client, mock_storage, sample_session_data, add_session_to_firestore):
+    def test_clone_invalid_num_tables(
+        self, client, mock_storage, sample_session_data, add_session_to_firestore
+    ):
         """Test cloning with invalid num_tables."""
         session_id = str(uuid.uuid4())
         add_session_to_firestore(session_id, sample_session_data)
@@ -319,7 +456,9 @@ class TestCloneSession:
         )
         assert response.status_code == 422
 
-    def test_clone_invalid_num_sessions(self, client, mock_storage, sample_session_data, add_session_to_firestore):
+    def test_clone_invalid_num_sessions(
+        self, client, mock_storage, sample_session_data, add_session_to_firestore
+    ):
         """Test cloning with invalid num_sessions."""
         session_id = str(uuid.uuid4())
         add_session_to_firestore(session_id, sample_session_data)
@@ -336,7 +475,9 @@ class TestCloneSession:
         )
         assert response.status_code == 422
 
-    def test_clone_not_enough_participants(self, client, mock_storage, sample_session_data, add_session_to_firestore):
+    def test_clone_not_enough_participants(
+        self, client, mock_storage, sample_session_data, add_session_to_firestore
+    ):
         """Test cloning with more tables than participants."""
         session_id = str(uuid.uuid4())
         add_session_to_firestore(session_id, sample_session_data)
@@ -352,16 +493,29 @@ class TestCloneSession:
 class TestRegenerateSingleSession:
     """Test suite for POST /api/assignments/regenerate/{session_id}/session/{session_number} endpoint."""
 
-    @patch('api.routers.assignments.GroupBuilder')
-    def test_regenerate_single_session_success(self, mock_builder_class, client, mock_storage, sample_session_data, sample_assignments_result, add_session_to_firestore, add_results_to_firestore):
+    @patch("api.routers.assignments.GroupBuilder")
+    def test_regenerate_single_session_success(
+        self,
+        mock_builder_class,
+        client,
+        mock_storage,
+        sample_session_data,
+        sample_assignments_result,
+        add_session_to_firestore,
+        add_results_to_firestore,
+    ):
         """Test successful single-session regeneration."""
         session_id = str(uuid.uuid4())
         version_id = "v_test123"
 
         # Setup: store session and existing results with proper versioning
         add_session_to_firestore(session_id, sample_session_data)
-        add_results_to_firestore(session_id, version_id, sample_assignments_result["assignments"], 
-                                 {"solution_quality": "optimal", "solve_time": 1.5, "max_time_seconds": 120})
+        add_results_to_firestore(
+            session_id,
+            version_id,
+            sample_assignments_result["assignments"],
+            {"solution_quality": "optimal", "solve_time": 1.5, "max_time_seconds": 120},
+        )
 
         # Mock the solver to return new assignments for session 1
         mock_builder = MagicMock()
@@ -371,25 +525,47 @@ class TestRegenerateSingleSession:
             "solution_quality": "optimal",
             "solve_time": 2.0,
             "total_deviation": 5,
-            "assignments": [{
-                "session": 1,
-                "tables": {
-                    "1": [
-                        {"name": "Charlie", "religion": "Muslim", "gender": "Male", "partner": None},
-                        {"name": "Diana", "religion": "Christian", "gender": "Female", "partner": None}
-                    ],
-                    "2": [
-                        {"name": "Alice", "religion": "Christian", "gender": "Female", "partner": None},
-                        {"name": "Bob", "religion": "Jewish", "gender": "Male", "partner": None}
-                    ]
+            "assignments": [
+                {
+                    "session": 1,
+                    "tables": {
+                        "1": [
+                            {
+                                "name": "Charlie",
+                                "religion": "Muslim",
+                                "gender": "Male",
+                                "partner": None,
+                            },
+                            {
+                                "name": "Diana",
+                                "religion": "Christian",
+                                "gender": "Female",
+                                "partner": None,
+                            },
+                        ],
+                        "2": [
+                            {
+                                "name": "Alice",
+                                "religion": "Christian",
+                                "gender": "Female",
+                                "partner": None,
+                            },
+                            {
+                                "name": "Bob",
+                                "religion": "Jewish",
+                                "gender": "Male",
+                                "partner": None,
+                            },
+                        ],
+                    },
                 }
-            }]
+            ],
         }
 
         # Regenerate session 1
         response = client.post(
             f"/api/assignments/regenerate/{session_id}/session/1?max_time_seconds=60",
-            json=[]  # No absent participants
+            json=[],  # No absent participants
         )
 
         assert response.status_code == 200
@@ -416,14 +592,28 @@ class TestRegenerateSingleSession:
         assert call_kwargs["num_sessions"] == 1
         assert call_kwargs["current_table_assignments"] is not None
 
-    @patch('api.routers.assignments.GroupBuilder')
-    def test_regenerate_single_session_with_absent_participants(self, mock_builder_class, client, mock_storage, sample_session_data, sample_assignments_result, add_session_to_firestore, add_results_to_firestore):
+    @patch("api.routers.assignments.GroupBuilder")
+    def test_regenerate_single_session_with_absent_participants(
+        self,
+        mock_builder_class,
+        client,
+        mock_storage,
+        sample_session_data,
+        sample_assignments_result,
+        add_session_to_firestore,
+        add_results_to_firestore,
+    ):
         """Test single-session regeneration with absent participants."""
         session_id = str(uuid.uuid4())
         version_id = "v_test456"
 
         add_session_to_firestore(session_id, sample_session_data)
-        add_results_to_firestore(session_id, version_id, sample_assignments_result["assignments"], {"solution_quality": "optimal"})
+        add_results_to_firestore(
+            session_id,
+            version_id,
+            sample_assignments_result["assignments"],
+            {"solution_quality": "optimal"},
+        )
 
         mock_builder = MagicMock()
         mock_builder_class.return_value = mock_builder
@@ -432,24 +622,45 @@ class TestRegenerateSingleSession:
             "solution_quality": "optimal",
             "solve_time": 1.0,
             "total_deviation": 0,
-            "assignments": [{
-                "session": 1,
-                "tables": {
-                    "1": [{"name": "Charlie", "religion": "Muslim", "gender": "Male", "partner": None}],
-                    "2": [{"name": "Diana", "religion": "Christian", "gender": "Female", "partner": None}]
+            "assignments": [
+                {
+                    "session": 1,
+                    "tables": {
+                        "1": [
+                            {
+                                "name": "Charlie",
+                                "religion": "Muslim",
+                                "gender": "Male",
+                                "partner": None,
+                            }
+                        ],
+                        "2": [
+                            {
+                                "name": "Diana",
+                                "religion": "Christian",
+                                "gender": "Female",
+                                "partner": None,
+                            }
+                        ],
+                    },
                 }
-            }]
+            ],
         }
 
         # Mark Alice and Bob as absent
         absent_participants = [
-            {"name": "Alice", "religion": "Christian", "gender": "Female", "partner": None},
-            {"name": "Bob", "religion": "Jewish", "gender": "Male", "partner": None}
+            {
+                "name": "Alice",
+                "religion": "Christian",
+                "gender": "Female",
+                "partner": None,
+            },
+            {"name": "Bob", "religion": "Jewish", "gender": "Male", "partner": None},
         ]
 
         response = client.post(
             f"/api/assignments/regenerate/{session_id}/session/1",
-            json=absent_participants
+            json=absent_participants,
         )
 
         assert response.status_code == 200
@@ -464,29 +675,50 @@ class TestRegenerateSingleSession:
         call_kwargs = mock_builder_class.call_args[1]
         assert len(call_kwargs["participants"]) == 2  # Only Charlie and Diana
 
-    @patch('api.routers.assignments.GroupBuilder')
-    def test_regenerate_single_session_fallback_when_impossible(self, mock_builder_class, client, mock_storage, sample_session_data, sample_assignments_result, add_session_to_firestore, add_results_to_firestore):
+    @patch("api.routers.assignments.GroupBuilder")
+    def test_regenerate_single_session_fallback_when_impossible(
+        self,
+        mock_builder_class,
+        client,
+        mock_storage,
+        sample_session_data,
+        sample_assignments_result,
+        add_session_to_firestore,
+        add_results_to_firestore,
+    ):
         """Test that fallback occurs when hard constraint makes problem infeasible."""
         session_id = str(uuid.uuid4())
         version_id = "v_test789"
 
         add_session_to_firestore(session_id, sample_session_data)
-        add_results_to_firestore(session_id, version_id, sample_assignments_result["assignments"], {"solution_quality": "optimal"})
+        add_results_to_firestore(
+            session_id,
+            version_id,
+            sample_assignments_result["assignments"],
+            {"solution_quality": "optimal"},
+        )
 
         # First call (hard constraint) fails, second call (soft constraint) succeeds
         mock_builder_hard = MagicMock()
         mock_builder_soft = MagicMock()
         mock_builder_class.side_effect = [mock_builder_hard, mock_builder_soft]
 
-        mock_builder_hard.generate_assignments.return_value = {"status": "failure", "error": "Infeasible"}
+        mock_builder_hard.generate_assignments.return_value = {
+            "status": "failure",
+            "error": "Infeasible",
+        }
         mock_builder_soft.generate_assignments.return_value = {
             "status": "success",
             "solution_quality": "optimal",
             "solve_time": 1.0,
-            "assignments": sample_assignments_result["assignments"][:1]  # Return session 1
+            "assignments": sample_assignments_result["assignments"][
+                :1
+            ],  # Return session 1
         }
 
-        response = client.post(f"/api/assignments/regenerate/{session_id}/session/1", json=[])
+        response = client.post(
+            f"/api/assignments/regenerate/{session_id}/session/1", json=[]
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -501,12 +733,21 @@ class TestRegenerateSingleSession:
         """Test regeneration of expired session."""
         fake_session_id = str(uuid.uuid4())
 
-        response = client.post(f"/api/assignments/regenerate/{fake_session_id}/session/1", json=[])
+        response = client.post(
+            f"/api/assignments/regenerate/{fake_session_id}/session/1", json=[]
+        )
 
         assert response.status_code == 404
         assert "Session not found" in response.json()["detail"]
 
-    def test_regenerate_single_session_invalid_session_number(self, client, mock_storage, sample_session_data, sample_assignments_result, add_session_to_firestore):
+    def test_regenerate_single_session_invalid_session_number(
+        self,
+        client,
+        mock_storage,
+        sample_session_data,
+        sample_assignments_result,
+        add_session_to_firestore,
+    ):
         """Test regeneration with invalid session number."""
         session_id = str(uuid.uuid4())
         version_id = "v_testABC"
@@ -516,16 +757,25 @@ class TestRegenerateSingleSession:
         mock_storage.data[f"result:{session_id}:{version_id}"] = {
             "assignments": sample_assignments_result["assignments"],
             "metadata": {},
-            "created_at": datetime.now().isoformat()
+            "created_at": datetime.now().isoformat(),
         }
 
         # Try to regenerate session 5 when only 2 sessions exist
-        response = client.post(f"/api/assignments/regenerate/{session_id}/session/5", json=[])
+        response = client.post(
+            f"/api/assignments/regenerate/{session_id}/session/5", json=[]
+        )
 
         assert response.status_code == 400
         assert "Invalid session number" in response.json()["detail"]
 
-    def test_regenerate_single_session_max_time_validation(self, client, mock_storage, sample_session_data, sample_assignments_result, add_session_to_firestore):
+    def test_regenerate_single_session_max_time_validation(
+        self,
+        client,
+        mock_storage,
+        sample_session_data,
+        sample_assignments_result,
+        add_session_to_firestore,
+    ):
         """Test that max_time_seconds is validated (30-240 range)."""
         session_id = str(uuid.uuid4())
         version_id = "v_testDEF"
@@ -535,29 +785,44 @@ class TestRegenerateSingleSession:
         mock_storage.data[f"result:{session_id}:{version_id}"] = {
             "assignments": sample_assignments_result["assignments"],
             "metadata": {},
-            "created_at": datetime.now().isoformat()
+            "created_at": datetime.now().isoformat(),
         }
 
         # Too low
-        response = client.post(f"/api/assignments/regenerate/{session_id}/session/1?max_time_seconds=10", json=[])
+        response = client.post(
+            f"/api/assignments/regenerate/{session_id}/session/1?max_time_seconds=10",
+            json=[],
+        )
         assert response.status_code == 422  # Validation error
 
         # Too high
-        response = client.post(f"/api/assignments/regenerate/{session_id}/session/1?max_time_seconds=300", json=[])
+        response = client.post(
+            f"/api/assignments/regenerate/{session_id}/session/1?max_time_seconds=300",
+            json=[],
+        )
         assert response.status_code == 422
 
-    @patch('api.routers.assignments.GroupBuilder')
-    def test_regenerate_single_session_metadata_persistence(self, mock_builder_class, client, mock_storage, sample_session_data, sample_assignments_result, add_session_to_firestore, add_results_to_firestore):
+    @patch("api.routers.assignments.GroupBuilder")
+    def test_regenerate_single_session_metadata_persistence(
+        self,
+        mock_builder_class,
+        client,
+        mock_storage,
+        sample_session_data,
+        sample_assignments_result,
+        add_session_to_firestore,
+        add_results_to_firestore,
+    ):
         """Test that max_time_seconds and regenerated metadata are persisted correctly."""
         session_id = str(uuid.uuid4())
         version_id = "v_testGHI"
 
         add_session_to_firestore(session_id, sample_session_data)
         add_results_to_firestore(
-            session_id, 
-            version_id, 
+            session_id,
+            version_id,
             sample_assignments_result["assignments"],
-            metadata={"max_time_seconds": 120}
+            metadata={"max_time_seconds": 120},
         )
 
         mock_builder = MagicMock()
@@ -567,22 +832,26 @@ class TestRegenerateSingleSession:
             "solution_quality": "optimal",
             "solve_time": 1.5,
             "total_deviation": 3,
-            "assignments": sample_assignments_result["assignments"][:1]
+            "assignments": sample_assignments_result["assignments"][:1],
         }
 
-        response = client.post(f"/api/assignments/regenerate/{session_id}/session/1?max_time_seconds=60", json=[])
+        response = client.post(
+            f"/api/assignments/regenerate/{session_id}/session/1?max_time_seconds=60",
+            json=[],
+        )
 
         assert response.status_code == 200
 
         # Verify metadata was stored with correct max_time_seconds
         from api.services.session_storage import SessionStorage
+
         storage = SessionStorage()
-        
+
         # Get latest result version
         versions = storage.get_result_versions(session_id)
         assert len(versions) >= 2  # Original + regenerated
         latest_version = versions[0]  # Sorted newest first
-        
+
         # Get the stored result
         stored_result = storage.get_results(session_id, latest_version["version_id"])
         assert stored_result["metadata"]["max_time_seconds"] == 60
@@ -598,18 +867,26 @@ class TestAuthProtection:
 
     def test_get_results_requires_auth(self, client_with_auth):
         """Should return 401 if no auth token provided."""
-        response = client_with_auth.get(f"/api/assignments/results/{self.VALID_SESSION_ID}")
+        response = client_with_auth.get(
+            f"/api/assignments/results/{self.VALID_SESSION_ID}"
+        )
         assert response.status_code == 401
         assert "Authorization header missing" in response.json()["detail"]
 
     def test_get_results_requires_session_access(self, client_with_auth):
         """Should return 403 if user doesn't have access to session."""
         from api.main import app
-        from api.middleware.auth import get_current_user, get_firestore_service, AuthUser
+        from api.middleware.auth import (
+            get_current_user,
+            get_firestore_service,
+            AuthUser,
+        )
 
         # Mock authenticated user
         async def mock_user():
-            return AuthUser(user_id="user123", email="test@test.com", email_verified=True)
+            return AuthUser(
+                user_id="user123", email="test@test.com", email_verified=True
+            )
 
         # Mock FirestoreService to deny access
         class MockFirestoreService:
@@ -620,7 +897,9 @@ class TestAuthProtection:
         app.dependency_overrides[get_firestore_service] = lambda: MockFirestoreService()
 
         try:
-            response = client_with_auth.get(f"/api/assignments/results/{self.VALID_SESSION_ID}")
+            response = client_with_auth.get(
+                f"/api/assignments/results/{self.VALID_SESSION_ID}"
+            )
             assert response.status_code == 403
             assert "Access denied" in response.json()["detail"]
         finally:
@@ -629,8 +908,7 @@ class TestAuthProtection:
     def test_generate_requires_auth(self, client_with_auth):
         """Should return 401 if no auth token for generate."""
         response = client_with_auth.get(
-            "/api/assignments/",
-            params={"session_id": self.VALID_SESSION_ID}
+            "/api/assignments/", params={"session_id": self.VALID_SESSION_ID}
         )
         assert response.status_code == 401
         assert "Authorization header missing" in response.json()["detail"]

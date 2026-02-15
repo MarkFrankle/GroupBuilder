@@ -1,7 +1,10 @@
 from collections import defaultdict
 from typing import List, Dict, Any
 
-def arrange_circular_seating(participants: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+
+def arrange_circular_seating(
+    participants: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
     """
     Arrange participants around a circular table, distributing religions evenly.
 
@@ -17,7 +20,7 @@ def arrange_circular_seating(participants: List[Dict[str, Any]]) -> List[Dict[st
     # Group by religion
     religion_groups = defaultdict(list)
     for p in participants:
-        religion_groups[p['religion']].append(p)
+        religion_groups[p["religion"]].append(p)
 
     # Sort by group size (largest first) for better distribution
     sorted_groups = sorted(religion_groups.values(), key=len, reverse=True)
@@ -31,6 +34,6 @@ def arrange_circular_seating(participants: List[Dict[str, Any]]) -> List[Dict[st
 
     # Assign position indices
     for i, participant in enumerate(result):
-        participant['position'] = i
+        participant["position"] = i
 
     return result

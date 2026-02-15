@@ -16,7 +16,9 @@ class TestUploadRateLimiting:
     """Test suite for upload endpoint rate limiting."""
 
     @pytest.mark.skip(reason="Rate limiting disabled in test environment")
-    def test_upload_rate_limit_not_exceeded(self, client_with_rate_limiting, mock_storage, sample_excel_file):
+    def test_upload_rate_limit_not_exceeded(
+        self, client_with_rate_limiting, mock_storage, sample_excel_file
+    ):
         """Test that requests within rate limit succeed."""
         client = client_with_rate_limiting
         # Make 5 requests (well under the 10/minute limit)
@@ -24,20 +26,31 @@ class TestUploadRateLimiting:
             sample_excel_file.seek(0)  # Reset file pointer
             response = client.post(
                 "/api/upload/",
-                files={"file": ("test.xlsx", sample_excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-                data={"numTables": "2", "numSessions": "3"}
+                files={
+                    "file": (
+                        "test.xlsx",
+                        sample_excel_file,
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    )
+                },
+                data={"numTables": "2", "numSessions": "3"},
             )
             assert response.status_code == 200, f"Request {i+1} should succeed"
 
         # Explicitly clear rate limiter after test to prevent state bleeding
         from api.main import app
-        if hasattr(app.state.limiter, '_storage'):
+
+        if hasattr(app.state.limiter, "_storage"):
             app.state.limiter._storage.storage.clear()
 
-    @pytest.mark.skip(reason="Flaky due to test ordering - rate limiter state from previous tests. "
-                              "Passes reliably when run in isolation. Other rate limiting tests "
-                              "verify the functionality works correctly.")
-    def test_upload_rate_limit_exceeded(self, client_with_rate_limiting, mock_storage, sample_excel_file):
+    @pytest.mark.skip(
+        reason="Flaky due to test ordering - rate limiter state from previous tests. "
+        "Passes reliably when run in isolation. Other rate limiting tests "
+        "verify the functionality works correctly."
+    )
+    def test_upload_rate_limit_exceeded(
+        self, client_with_rate_limiting, mock_storage, sample_excel_file
+    ):
         """Test that exceeding rate limit returns 429.
 
         Note: This test is skipped in CI due to flakiness from test ordering.
@@ -53,8 +66,14 @@ class TestUploadRateLimiting:
             sample_excel_file.seek(0)  # Reset file pointer
             response = client.post(
                 "/api/upload/",
-                files={"file": ("test.xlsx", sample_excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-                data={"numTables": "2", "numSessions": "3"}
+                files={
+                    "file": (
+                        "test.xlsx",
+                        sample_excel_file,
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    )
+                },
+                data={"numTables": "2", "numSessions": "3"},
             )
 
             if response.status_code == 200:
@@ -72,8 +91,14 @@ class TestAssignmentsRateLimiting:
     """Test suite for assignments endpoint rate limiting."""
 
     @pytest.mark.skip(reason="Rate limiting disabled in test environment")
-    @patch('api.routers.assignments.handle_generate_assignments')
-    def test_get_assignments_rate_limit_not_exceeded(self, mock_generate, client_with_rate_limiting, mock_storage, sample_session_data):
+    @patch("api.routers.assignments.handle_generate_assignments")
+    def test_get_assignments_rate_limit_not_exceeded(
+        self,
+        mock_generate,
+        client_with_rate_limiting,
+        mock_storage,
+        sample_session_data,
+    ):
         """Test that requests within rate limit succeed."""
         client = client_with_rate_limiting
         session_id = str(uuid.uuid4())
@@ -84,7 +109,7 @@ class TestAssignmentsRateLimiting:
             "solution_quality": "optimal",
             "total_deviation": 0,
             "solve_time": 1.5,
-            "assignments": [{"session": 1, "tables": {}}]
+            "assignments": [{"session": 1, "tables": {}}],
         }
 
         # Make 3 requests (under the 5/minute limit)
@@ -93,8 +118,14 @@ class TestAssignmentsRateLimiting:
             assert response.status_code == 200, f"Request {i+1} should succeed"
 
     @pytest.mark.skip(reason="Rate limiting disabled in test environment")
-    @patch('api.routers.assignments.handle_generate_assignments')
-    def test_get_assignments_rate_limit_exceeded(self, mock_generate, client_with_rate_limiting, mock_storage, sample_session_data):
+    @patch("api.routers.assignments.handle_generate_assignments")
+    def test_get_assignments_rate_limit_exceeded(
+        self,
+        mock_generate,
+        client_with_rate_limiting,
+        mock_storage,
+        sample_session_data,
+    ):
         """Test that exceeding rate limit returns 429."""
         client = client_with_rate_limiting
         session_id = str(uuid.uuid4())
@@ -105,7 +136,7 @@ class TestAssignmentsRateLimiting:
             "solution_quality": "optimal",
             "total_deviation": 0,
             "solve_time": 1.5,
-            "assignments": [{"session": 1, "tables": {}}]
+            "assignments": [{"session": 1, "tables": {}}],
         }
 
         # Make 6 requests (exceeds 5/minute limit)
@@ -130,8 +161,14 @@ class TestRegenerateRateLimiting:
     """Test suite for regenerate endpoint rate limiting."""
 
     @pytest.mark.skip(reason="Rate limiting disabled in test environment")
-    @patch('api.routers.assignments.handle_generate_assignments')
-    def test_regenerate_rate_limit_not_exceeded(self, mock_generate, client_with_rate_limiting, mock_storage, sample_session_data):
+    @patch("api.routers.assignments.handle_generate_assignments")
+    def test_regenerate_rate_limit_not_exceeded(
+        self,
+        mock_generate,
+        client_with_rate_limiting,
+        mock_storage,
+        sample_session_data,
+    ):
         """Test that requests within rate limit succeed."""
         client = client_with_rate_limiting
         session_id = str(uuid.uuid4())
@@ -142,7 +179,7 @@ class TestRegenerateRateLimiting:
             "solution_quality": "optimal",
             "total_deviation": 0,
             "solve_time": 1.5,
-            "assignments": [{"session": 1, "tables": {}}]
+            "assignments": [{"session": 1, "tables": {}}],
         }
 
         # Make 3 requests (under the 5/minute limit)
@@ -151,8 +188,14 @@ class TestRegenerateRateLimiting:
             assert response.status_code == 200, f"Request {i+1} should succeed"
 
     @pytest.mark.skip(reason="Rate limiting disabled in test environment")
-    @patch('api.routers.assignments.handle_generate_assignments')
-    def test_regenerate_rate_limit_exceeded(self, mock_generate, client_with_rate_limiting, mock_storage, sample_session_data):
+    @patch("api.routers.assignments.handle_generate_assignments")
+    def test_regenerate_rate_limit_exceeded(
+        self,
+        mock_generate,
+        client_with_rate_limiting,
+        mock_storage,
+        sample_session_data,
+    ):
         """Test that exceeding rate limit returns 429."""
         client = client_with_rate_limiting
         session_id = str(uuid.uuid4())
@@ -163,7 +206,7 @@ class TestRegenerateRateLimiting:
             "solution_quality": "optimal",
             "total_deviation": 0,
             "solve_time": 1.5,
-            "assignments": [{"session": 1, "tables": {}}]
+            "assignments": [{"session": 1, "tables": {}}],
         }
 
         # Make 6 requests (exceeds 5/minute limit)
@@ -188,15 +231,40 @@ class TestRegenerateRateLimiting:
 def sample_session_data():
     """Sample session data for testing."""
     from datetime import datetime
+
     return {
         "participant_dict": [
-            {"id": 1, "name": "Alice", "religion": "Christian", "gender": "Female", "couple_id": None},
-            {"id": 2, "name": "Bob", "religion": "Jewish", "gender": "Male", "couple_id": None},
-            {"id": 3, "name": "Charlie", "religion": "Muslim", "gender": "Male", "couple_id": None},
-            {"id": 4, "name": "Diana", "religion": "Christian", "gender": "Female", "couple_id": None},
+            {
+                "id": 1,
+                "name": "Alice",
+                "religion": "Christian",
+                "gender": "Female",
+                "couple_id": None,
+            },
+            {
+                "id": 2,
+                "name": "Bob",
+                "religion": "Jewish",
+                "gender": "Male",
+                "couple_id": None,
+            },
+            {
+                "id": 3,
+                "name": "Charlie",
+                "religion": "Muslim",
+                "gender": "Male",
+                "couple_id": None,
+            },
+            {
+                "id": 4,
+                "name": "Diana",
+                "religion": "Christian",
+                "gender": "Female",
+                "couple_id": None,
+            },
         ],
         "num_tables": 2,
         "num_sessions": 2,
         "filename": "test.xlsx",
-        "created_at": datetime.now().isoformat()
+        "created_at": datetime.now().isoformat(),
     }

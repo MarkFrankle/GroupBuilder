@@ -2,6 +2,7 @@
  * API client with automatic Firebase token injection
  */
 import { getCurrentUserToken } from '../services/firebase';
+import { API_BASE_URL } from '../config/api';
 
 /**
  * Error thrown when authentication fails and user needs to re-login
@@ -38,7 +39,10 @@ export async function authenticatedFetch(
   const headers = new Headers(options.headers);
   headers.set('Authorization', `Bearer ${token}`);
 
-  return fetch(url, {
+  // Prepend API_BASE_URL to relative paths so they hit the backend, not the SPA host
+  const resolvedUrl = url.startsWith('/') ? `${API_BASE_URL}${url}` : url;
+
+  return fetch(resolvedUrl, {
     ...options,
     headers,
   });

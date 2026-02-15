@@ -59,18 +59,13 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
             response.headers["X-Request-ID"] = request_id
 
             # Log response
-            logger.info(
-                f"[{request_id}] Response: {response.status_code}"
-            )
+            logger.info(f"[{request_id}] Response: {response.status_code}")
 
             return response
 
         except Exception as e:
             # Log errors with request ID
-            logger.error(
-                f"[{request_id}] Request failed: {str(e)}",
-                exc_info=True
-            )
+            logger.error(f"[{request_id}] Request failed: {str(e)}", exc_info=True)
             raise
 
 
