@@ -976,7 +976,7 @@ const TableAssignmentsPage: React.FC = () => {
                 </Select>
 
                 <Button
-                  variant={editMode ? 'default' : 'outline'}
+                  variant="outline"
                   onClick={toggleEditMode}
                   size="sm"
                 >
