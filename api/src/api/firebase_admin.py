@@ -20,12 +20,17 @@ def initialize_firebase():
     # Check FIREBASE_SERVICE_ACCOUNT_PATH first, then GOOGLE_APPLICATION_CREDENTIALS
     service_account_path = os.getenv(
         "FIREBASE_SERVICE_ACCOUNT_PATH",
-        os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "./firebase-service-account.json"),
+        os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
     )
 
     # Initialize Firebase app
-    cred = credentials.Certificate(service_account_path)
-    firebase_admin.initialize_app(cred)
+    if service_account_path and os.path.exists(service_account_path):
+        # Use explicit service account file (local dev)
+        cred = credentials.Certificate(service_account_path)
+        firebase_admin.initialize_app(cred)
+    else:
+        # Use Application Default Credentials (Cloud Run, GCE, etc.)
+        firebase_admin.initialize_app()
 
     # Initialize Firestore client
     global _firestore_client
