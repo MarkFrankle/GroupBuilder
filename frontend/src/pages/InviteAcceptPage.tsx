@@ -6,6 +6,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useOrganization } from '../contexts/OrganizationContext';
 import { apiRequest } from '../utils/apiClient';
+import { API_BASE_URL } from '../config/api';
 
 interface InviteDetails {
   org_id: string;
@@ -37,7 +38,7 @@ export function InviteAcceptPage() {
       }
 
       try {
-        const response = await fetch(`/api/invites/${token}`);
+        const response = await fetch(`${API_BASE_URL}/api/invites/${token}`);
         
         if (!response.ok) {
           if (response.status === 404) {
