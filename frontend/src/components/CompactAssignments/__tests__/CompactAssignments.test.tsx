@@ -78,7 +78,7 @@ describe('CompactAssignments', () => {
     // All Alice instances should have highlight ring
     aliceButtons.forEach(button => {
       expect(button).toHaveClass('ring-2')
-      expect(button).toHaveClass('ring-blue-500')
+      expect(button).toHaveClass('ring-gray-800')
     })
   })
 
@@ -258,12 +258,34 @@ describe('CompactAssignments', () => {
     expect(aliceButton).toHaveClass('cursor-pointer')
   })
 
-  it('applies hover styles to person buttons', () => {
+  it('applies religion-chip class for hover styles', () => {
     render(<CompactAssignments assignments={sampleAssignments} />)
 
     const aliceButton = screen.getAllByRole('button', { name: 'Alice Johnson' })[0]
 
-    // Should have a hover class (specific to the color)
-    expect(aliceButton.className).toMatch(/hover:/)
+    expect(aliceButton).toHaveClass('religion-chip')
+  })
+
+  it('applies religion-based inline styles to participant buttons', () => {
+    render(<CompactAssignments assignments={sampleAssignments} />)
+
+    const aliceButton = screen.getAllByRole('button', { name: 'Alice Johnson' })[0]
+    // Alice is Christian — should have an inline background color set
+    expect(aliceButton.style.backgroundColor).toBeTruthy()
+    expect(aliceButton.style.color).toBeTruthy()
+
+    const bobButton = screen.getAllByRole('button', { name: 'Bob Smith' })[0]
+    // Bob is Jewish — should have a different background color than Alice (Christian)
+    expect(bobButton.style.backgroundColor).toBeTruthy()
+    expect(bobButton.style.backgroundColor).not.toBe(aliceButton.style.backgroundColor)
+  })
+
+  it('displays color legend with all religions', () => {
+    render(<CompactAssignments assignments={sampleAssignments} />)
+
+    expect(screen.getByText('Jewish')).toBeInTheDocument()
+    expect(screen.getByText('Christian')).toBeInTheDocument()
+    expect(screen.getByText('Muslim')).toBeInTheDocument()
+    expect(screen.getByText('Other')).toBeInTheDocument()
   })
 })

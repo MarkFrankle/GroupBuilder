@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Heart } from 'lucide-react'
+import { getReligionStyle } from '@/constants/colors'
 
 interface Participant {
   name: string;
@@ -174,19 +175,8 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
     return colors[gender] || 'bg-gray-100 text-gray-800'
   }
 
-  const getReligionColor = (religion: string): string => {
-    const colors: { [key: string]: string } = {
-      'Christian': 'bg-green-100 text-green-800',
-      'Muslim': 'bg-teal-100 text-teal-800',
-      'Jewish': 'bg-indigo-100 text-indigo-800',
-      'Hindu': 'bg-orange-100 text-orange-800',
-      'Buddhist': 'bg-yellow-100 text-yellow-800',
-      'Sikh': 'bg-amber-100 text-amber-800',
-      'Secular': 'bg-slate-100 text-slate-800',
-      'Other': 'bg-gray-100 text-gray-800',
-      'None': 'bg-slate-100 text-slate-800',
-    }
-    return colors[religion] || 'bg-gray-100 text-gray-800'
+  const getReligionBadgeStyle = (religion: string) => {
+    return getReligionStyle(religion, '', false)
   }
 
   const handleSlotClick = (tableNum: number, index: number) => {
@@ -378,7 +368,10 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
                                     Facilitator
                                   </span>
                                 )}
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getReligionColor(participant.religion)}`}>
+                                <span
+                                  className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                                  style={getReligionBadgeStyle(participant.religion)}
+                                >
                                   {participant.religion}
                                 </span>
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getGenderColor(participant.gender)}`}>

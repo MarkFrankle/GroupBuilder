@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Card, CardContent } from "@/components/ui/card"
+import { getReligionStyle, BBT_COLORS } from '@/constants/colors'
 
 interface Participant {
   name: string;
@@ -21,36 +22,22 @@ interface CompactAssignmentsProps {
   assignments: Assignment[];
 }
 
+const ColorLegend: React.FC = () => (
+  <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-3">
+    {Object.entries(BBT_COLORS).map(([religion, colors]) => (
+      <div key={religion} className="flex items-center gap-1.5">
+        <span
+          className="inline-block w-3 h-3 rounded-full"
+          style={{ backgroundColor: colors.base }}
+        />
+        <span>{religion}</span>
+      </div>
+    ))}
+  </div>
+)
+
 const CompactAssignments: React.FC<CompactAssignmentsProps> = ({ assignments }) => {
   const [highlightedPerson, setHighlightedPerson] = useState<string | null>(null)
-
-  // Generate consistent color for each participant based on their name
-  const getPersonColor = (name: string): string => {
-    // djb2 hash function - better distribution than simple character sum
-    let hash = 5381
-    for (let i = 0; i < name.length; i++) {
-      hash = ((hash << 5) + hash) + name.charCodeAt(i) // hash * 33 + char
-    }
-
-    // Use predefined color palette for better visibility
-    const colors = [
-      'bg-blue-100 hover:bg-blue-200',
-      'bg-green-100 hover:bg-green-200',
-      'bg-yellow-100 hover:bg-yellow-200',
-      'bg-purple-100 hover:bg-purple-200',
-      'bg-pink-100 hover:bg-pink-200',
-      'bg-indigo-100 hover:bg-indigo-200',
-      'bg-red-100 hover:bg-red-200',
-      'bg-orange-100 hover:bg-orange-200',
-      'bg-teal-100 hover:bg-teal-200',
-      'bg-cyan-100 hover:bg-cyan-200',
-      'bg-lime-100 hover:bg-lime-200',
-      'bg-amber-100 hover:bg-amber-200',
-    ]
-
-    const index = Math.abs(hash) % colors.length
-    return colors[index]
-  }
 
   const handlePersonClick = (name: string) => {
     setHighlightedPerson(highlightedPerson === name ? null : name)
@@ -58,6 +45,8 @@ const CompactAssignments: React.FC<CompactAssignmentsProps> = ({ assignments }) 
 
   return (
     <div className="space-y-4">
+      <ColorLegend />
+
       {highlightedPerson && (
         <div
           className="bg-blue-50 border border-blue-200 rounded p-3 text-sm"
@@ -88,19 +77,19 @@ const CompactAssignments: React.FC<CompactAssignmentsProps> = ({ assignments }) 
                     <div className="flex flex-wrap gap-1">
                       {participants.filter((p): p is Participant => p !== null).map((participant, idx) => {
                         const isHighlighted = participant.name === highlightedPerson
-                        const colorClass = getPersonColor(participant.name)
+                        const religionStyle = getReligionStyle(participant.religion, participant.name)
 
                         return (
                           <button
                             key={idx}
                             onClick={() => handlePersonClick(participant.name)}
                             className={`
-                              px-2 py-1 rounded text-xs transition-all
-                              ${colorClass}
+                              px-2 py-1 rounded text-xs transition-all religion-chip
                               ${participant.is_facilitator ? 'font-semibold ring-1 ring-amber-400' : 'font-medium'}
-                              ${isHighlighted ? 'ring-2 ring-blue-500 ring-offset-1' : ''}
+                              ${isHighlighted ? 'ring-2 ring-gray-800 ring-offset-1' : ''}
                               cursor-pointer
                             `}
+                            style={religionStyle}
                             title={`${participant.name}\n${participant.religion}, ${participant.gender}${participant.partner ? `\nPartner: ${participant.partner}` : ''}${participant.is_facilitator ? '\n(Facilitator)' : ''}`}
                           >
                             {participant.name}
@@ -118,18 +107,18 @@ const CompactAssignments: React.FC<CompactAssignmentsProps> = ({ assignments }) 
                   <div className="flex flex-wrap gap-1">
                     {assignment.absentParticipants.map((participant, idx) => {
                       const isHighlighted = participant.name === highlightedPerson
-                      const colorClass = getPersonColor(participant.name)
+                      const religionStyle = getReligionStyle(participant.religion, participant.name)
 
                       return (
                         <button
                           key={idx}
                           onClick={() => handlePersonClick(participant.name)}
                           className={`
-                            px-2 py-1 rounded text-xs font-medium transition-all opacity-60
-                            ${colorClass}
-                            ${isHighlighted ? 'ring-2 ring-blue-500 ring-offset-1' : ''}
+                            px-2 py-1 rounded text-xs font-medium transition-all opacity-60 religion-chip
+                            ${isHighlighted ? 'ring-2 ring-gray-800 ring-offset-1' : ''}
                             cursor-pointer
                           `}
+                          style={religionStyle}
                           title={`${participant.name}\n${participant.religion}, ${participant.gender}${participant.partner ? `\nPartner: ${participant.partner}` : ''}\n(Absent)`}
                         >
                           {participant.name}

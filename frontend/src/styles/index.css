@@ -16,6 +16,11 @@ code {
     monospace;
 }
 
+/* Hover darkening for religion-colored participant chips */
+.religion-chip:hover {
+  filter: brightness(0.92);
+}
+
 /* Print-specific styles for seating charts */
 @media print {
   /* Hide UI controls when printing */
