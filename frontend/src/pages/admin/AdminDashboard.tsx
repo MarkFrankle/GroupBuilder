@@ -13,7 +13,7 @@ import { useAuth } from '../../contexts/AuthContext';
 interface Organization {
   id: string;
   name: string;
-  created_at: string;
+  created_at: number;
   member_count: number;
   active?: boolean;
 }
@@ -77,8 +77,10 @@ export function AdminDashboard() {
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+  const formatDate = (timestamp: string | number) => {
+    const date = typeof timestamp === 'number'
+      ? new Date(timestamp * 1000)
+      : new Date(timestamp);
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',

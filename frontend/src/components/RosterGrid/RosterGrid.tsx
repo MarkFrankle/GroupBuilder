@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -80,7 +80,9 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd }: RosterGr
     });
   };
 
-  const handleEmptyRowBlur = useCallback(() => {
+  const emptyRowRef = useRef<HTMLTableRowElement>(null);
+
+  const commitEmptyRow = useCallback(() => {
     if (emptyRow.name.trim()) {
       onAdd({
         name: emptyRow.name.trim(),
@@ -92,6 +94,18 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd }: RosterGr
       setEmptyRow({ ...EMPTY_ROW });
     }
   }, [emptyRow, onAdd]);
+
+  const handleEmptyRowBlur = useCallback(() => {
+    // Delay check so focus has time to settle (Radix Select portals the dropdown)
+    setTimeout(() => {
+      const active = document.activeElement;
+      // If focus moved to something inside the row, don't commit yet
+      if (emptyRowRef.current?.contains(active)) return;
+      // Also check for open Radix popper content (portaled outside the row)
+      if (active?.closest('[data-radix-popper-content-wrapper]')) return;
+      commitEmptyRow();
+    }, 0);
+  }, [commitEmptyRow]);
 
   const duplicateNames = new Set<string>();
   const nameCounts: Record<string, number> = {};
@@ -189,13 +203,12 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd }: RosterGr
               );
             })}
             {/* Perpetual empty row */}
-            <TableRow>
+            <TableRow ref={emptyRowRef} onBlur={handleEmptyRowBlur}>
               <TableCell className="p-1">
                 <Input
                   placeholder="Name"
                   value={emptyRow.name}
                   onChange={e => setEmptyRow(prev => ({ ...prev, name: e.target.value }))}
-                  onBlur={handleEmptyRowBlur}
                 />
               </TableCell>
               <TableCell className="p-1">

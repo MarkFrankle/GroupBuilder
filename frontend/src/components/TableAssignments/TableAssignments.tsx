@@ -27,6 +27,7 @@ interface TableAssignmentsProps {
   onMarkAbsent?: (tableNum: number, participantIndex: number) => void;
   onPlaceAbsent?: (tableNum: number, seatIndex: number) => void;
   onSelectionChange?: (tableNum: number | null, participantIndex: number | null) => void;
+  clearSelectionKey?: number;
 }
 
 const TableAssignments: React.FC<TableAssignmentsProps> = ({
@@ -36,7 +37,8 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
   selectedAbsentParticipant = null,
   onMarkAbsent,
   onPlaceAbsent,
-  onSelectionChange
+  onSelectionChange,
+  clearSelectionKey = 0,
 }) => {
   const [selectedSlot, setSelectedSlot] = useState<{tableNum: number, index: number} | null>(null)
 
@@ -57,6 +59,13 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
       setSelectedSlot(null)
     }
   }, [editMode, selectedAbsentParticipant])
+
+  // Clear selection when parent signals (e.g. after mark absent)
+  React.useEffect(() => {
+    if (clearSelectionKey > 0) {
+      setSelectedSlot(null)
+    }
+  }, [clearSelectionKey])
 
   // Clear selection if the selected participant was removed or is null
   React.useEffect(() => {
@@ -92,15 +101,10 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
       const key = Number(tableNum)
       const table = assignment.tables[key]
       const realParticipants = table.filter((p): p is Participant => p !== null && p !== undefined)
-      const hasFacilitators = realParticipants.some(p => p.is_facilitator)
-
       // Keep original order, append empty slots at end
-      // Second null is the facilitator empty slot (only when facilitators exist)
-      if (hasFacilitators) {
-        tables[key] = [...realParticipants, null, null]
-      } else {
-        tables[key] = [...realParticipants, null]
-      }
+      // Always add two nulls in edit mode: one for regulars, one for facilitators
+      // Every table needs a facilitator section so absent facilitators can be placed
+      tables[key] = [...realParticipants, null, null]
     })
 
     return tables
@@ -113,11 +117,8 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
     Object.keys(tablesWithEmptySlots).forEach(tableNum => {
       const key = Number(tableNum)
       const arr = tablesWithEmptySlots[key]
-      const hasFacilitators = arr.some(p => p !== null && p !== undefined && p.is_facilitator)
-      if (hasFacilitators) {
-        // Last null is the facilitator empty slot
-        map[key] = arr.length - 1
-      }
+      // Last null is always the facilitator empty slot
+      map[key] = arr.length - 1
     })
     return map
   }, [tablesWithEmptySlots, editMode])
@@ -187,6 +188,12 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
 
     // If an absent participant is selected and user clicks an empty seat, place them there
     if (selectedAbsentParticipant && isEmpty && onPlaceAbsent) {
+      // Enforce facilitator/regular slot matching
+      const isFacilitatorEmptySlot = facilitatorEmptySlotIndex[tableNum] === index
+      const absentIsFacilitator = selectedAbsentParticipant.is_facilitator ?? false
+      if (absentIsFacilitator !== isFacilitatorEmptySlot) {
+        return
+      }
       onPlaceAbsent(tableNum, index)
       return
     }
@@ -328,7 +335,8 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
                         (selectedIsFacilitator !== (facilitatorEmptySlotIndex[tNum] === slotIndex))
 
                       const isTarget = editMode && selectedSlot && !selected && !shouldExclude && !isFacilitatorMismatch && !isEmptySlotMismatch
-                      const isAbsentTarget = editMode && selectedAbsentParticipant && isEmpty
+                      const isAbsentTarget = editMode && selectedAbsentParticipant && isEmpty &&
+                        (selectedAbsentParticipant.is_facilitator ?? false) === (facilitatorEmptySlotIndex[tNum] === slotIndex)
 
                       return (
                         <div

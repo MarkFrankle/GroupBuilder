@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RosterGrid } from '../RosterGrid';
 import { RosterParticipant } from '@/types/roster';
@@ -68,7 +68,10 @@ describe('RosterGrid', () => {
     const emptyNameInputs = screen.getAllByPlaceholderText('Name');
     const emptyRow = emptyNameInputs[2];
     await userEvent.type(emptyRow, 'Charlie');
-    fireEvent.blur(emptyRow);
+    // Click outside the row to trigger blur → deferred commit
+    await userEvent.click(document.body);
+    // Flush the deferred setTimeout(0) handler
+    await act(async () => { await new Promise(r => setTimeout(r, 10)); });
     expect(defaultProps.onAdd).toHaveBeenCalledWith(expect.objectContaining({
       name: 'Charlie',
     }));
