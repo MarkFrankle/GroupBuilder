@@ -142,6 +142,10 @@ function HelpPage() {
               <strong>Roster</strong> — Where you add and edit your list of participants.
             </li>
             <li>
+              <strong>Groups</strong> — Browse all previously created group assignments,
+              sorted by most recent.
+            </li>
+            <li>
               <strong>Help</strong> — This page.
             </li>
           </ul>
@@ -665,8 +669,8 @@ function HelpPage() {
                 If you uploaded a roster via Excel import, that upload session lasts for
                 1 hour. After that, go to the Home page and re-import your file, or
                 rebuild your roster using the Roster Manager. If you previously generated
-                assignments and saved them, check the "Recent Uploads" section on the
-                Home page — you may be able to view previous results from there.
+                assignments and saved them, click <strong>Groups</strong> in the nav bar
+                to browse all your past group assignments.
               </p>
             </InfoCallout>
 

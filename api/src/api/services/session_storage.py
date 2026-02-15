@@ -200,6 +200,49 @@ class SessionStorage:
         """
         return self.get_results(session_id) is not None
 
+    def get_sessions_for_org(self, org_id: str) -> List[Dict[str, Any]]:
+        """Get all sessions for an organization with version counts.
+
+        Args:
+            org_id: Organization ID
+
+        Returns:
+            List of session metadata, sorted by creation time (newest first)
+        """
+        sessions_ref = (
+            self.db.collection("organizations").document(org_id).collection("sessions")
+        )
+
+        sessions = []
+        for doc in sessions_ref.order_by("created_at", direction="DESCENDING").stream():
+            data = doc.to_dict()
+            created_at = data.get("created_at")
+            created_at_unix = created_at.timestamp() if created_at else None
+
+            # Count versions for this session
+            versions_ref = (
+                self.db.collection("organizations")
+                .document(org_id)
+                .collection("results")
+                .document(doc.id)
+                .collection("versions")
+            )
+            num_versions = sum(1 for _ in versions_ref.stream())
+
+            sessions.append(
+                {
+                    "session_id": doc.id,
+                    "filename": data.get("filename", "Unknown"),
+                    "num_participants": len(data.get("participant_data", [])),
+                    "num_tables": data.get("num_tables"),
+                    "num_sessions": data.get("num_sessions"),
+                    "created_at": created_at_unix,
+                    "num_versions": num_versions,
+                }
+            )
+
+        return sessions
+
     def get_result_versions(self, session_id: str) -> List[Dict[str, Any]]:
         """Get list of all result versions for a session.
 

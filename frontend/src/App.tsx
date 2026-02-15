@@ -13,6 +13,7 @@ import InviteAcceptPage from "./pages/InviteAcceptPage"
 import OrganizationSelectorPage from "./pages/OrganizationSelectorPage"
 import RosterPrintPage from "./pages/RosterPrintPage"
 import HelpPage from "./pages/HelpPage"
+import PreviousGroupsPage from "./pages/PreviousGroupsPage"
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
@@ -69,6 +70,7 @@ function NavBar() {
     <nav className="no-print border-b px-4 py-2 flex gap-4 text-sm">
       <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
       <Link to="/roster" className="text-muted-foreground hover:text-foreground transition-colors">Roster</Link>
+      <Link to="/groups" className="text-muted-foreground hover:text-foreground transition-colors">Groups</Link>
       <Link to="/help" className="text-muted-foreground hover:text-foreground transition-colors">Help</Link>
     </nav>
   );
@@ -108,6 +110,14 @@ const App: React.FC = () => {
               element={
                 <ProtectedRoute>
                   <RosterPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/groups"
+              element={
+                <ProtectedRoute>
+                  <PreviousGroupsPage />
                 </ProtectedRoute>
               }
             />

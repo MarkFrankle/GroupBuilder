@@ -5,6 +5,7 @@
 - Don't commit to `main`. Feature branches only.
 - When you learn something non-obvious (a gotcha, a pattern, a rake you stepped on), update the relevant `agent_docs/` file. If no file fits, update this file.
 - When finishing feature work that changes UI, review `frontend/src/pages/HelpPage.tsx` and update docs to match.
+- Before committing frontend changes, run `npm run lint` in `frontend/`.
 
 ## Development Rules
 
