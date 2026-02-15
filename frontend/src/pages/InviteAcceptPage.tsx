@@ -1,8 +1,10 @@
 /**
  * Page for accepting organization invites
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
+import { auth } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useOrganization } from '../contexts/OrganizationContext';
 import { apiRequest } from '../utils/apiClient';
@@ -24,9 +26,11 @@ export function InviteAcceptPage() {
 
   const [inviteDetails, setInviteDetails] = useState<InviteDetails | null>(null);
   const [loading, setLoading] = useState(true);
+  const [signingIn, setSigningIn] = useState(false);
   const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const magicLinkAttempted = useRef(false);
 
   // Fetch invite details on mount
   useEffect(() => {
@@ -63,6 +67,29 @@ export function InviteAcceptPage() {
     fetchInviteDetails();
   }, [token]);
 
+  // Auto-complete Firebase magic link sign-in if the URL contains sign-in params
+  useEffect(() => {
+    if (magicLinkAttempted.current || !inviteDetails || user) return;
+
+    const fullUrl = window.location.href;
+    if (!isSignInWithEmailLink(auth, fullUrl)) return;
+
+    magicLinkAttempted.current = true;
+    setSigningIn(true);
+
+    signInWithEmailLink(auth, inviteDetails.invited_email, fullUrl)
+      .then(() => {
+        // Strip Firebase query params from URL so refresh doesn't re-trigger
+        navigate(`/invite/${token}`, { replace: true });
+      })
+      .catch((err) => {
+        setError(`Sign-in failed: ${err.message}`);
+      })
+      .finally(() => {
+        setSigningIn(false);
+      });
+  }, [inviteDetails, user, token, navigate]);
+
   const handleAcceptInvite = async () => {
     if (!token || !user) return;
 
@@ -95,11 +122,13 @@ export function InviteAcceptPage() {
   };
 
   // Loading state
-  if (loading || authLoading) {
+  if (loading || authLoading || signingIn) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="max-w-md w-full p-8 bg-white rounded-lg shadow">
-          <p className="text-center text-gray-600">Loading invite...</p>
+          <p className="text-center text-gray-600">
+            {signingIn ? 'Signing you in...' : 'Loading invite...'}
+          </p>
         </div>
       </div>
     );
