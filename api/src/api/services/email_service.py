@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
+from firebase_admin import auth as firebase_auth
 from jinja2 import Environment, FileSystemLoader
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, Content
@@ -104,7 +105,23 @@ class EmailService:
         Returns:
             True if sent successfully
         """
-        invite_link = f"{self.frontend_url}/invite/{invite_token}"
+        # Generate a Firebase magic sign-in link that redirects to the invite page.
+        # When the facilitator clicks this link, they're authenticated automatically.
+        continue_url = f"{self.frontend_url}/invite/{invite_token}"
+        try:
+            action_code_settings = firebase_auth.ActionCodeSettings(
+                url=continue_url,
+                handle_code_in_app=True,
+            )
+            invite_link = firebase_auth.generate_sign_in_with_email_link(
+                to_email, action_code_settings
+            )
+        except Exception as e:
+            logger.warning(
+                f"Failed to generate magic sign-in link for {to_email}, "
+                f"falling back to plain invite link: {e}"
+            )
+            invite_link = continue_url
 
         html_content = self._render_template(
             "facilitator_invite_email.html",
