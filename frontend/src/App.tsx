@@ -13,6 +13,7 @@ import InviteAcceptPage from "./pages/InviteAcceptPage"
 import OrganizationSelectorPage from "./pages/OrganizationSelectorPage"
 import RosterPrintPage from "./pages/RosterPrintPage"
 import HelpPage from "./pages/HelpPage"
+import LegalPage from "./pages/LegalPage"
 import PreviousGroupsPage from "./pages/PreviousGroupsPage"
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -87,6 +88,7 @@ const App: React.FC = () => {
             <Route path="/auth/verify" element={<AuthVerifyPage />} />
             <Route path="/invite/:token" element={<InviteAcceptPage />} />
             <Route path="/help" element={<HelpPage />} />
+            <Route path="/legal" element={<LegalPage />} />
 
             <Route
               path="/select-organization"

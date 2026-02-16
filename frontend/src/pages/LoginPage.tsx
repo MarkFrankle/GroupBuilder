@@ -2,6 +2,7 @@
  * Login page with magic link email input
  */
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { sendMagicLink } from '../services/firebase';
 
 // Email validation regex
@@ -123,7 +124,8 @@ export function LoginPage() {
         </form>
 
         <p className="text-xs text-center text-gray-500 mt-4">
-          By signing in, you agree to our terms of service and privacy policy.
+          By signing in, you agree to our{' '}
+          <Link to="/legal" className="underline hover:text-gray-700">terms of service and privacy policy</Link>.
         </p>
       </div>
     </div>
