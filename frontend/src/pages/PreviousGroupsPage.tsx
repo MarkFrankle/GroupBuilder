@@ -1,46 +1,17 @@
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent } from "@/components/ui/card"
 import { Loader2, FolderOpen } from 'lucide-react'
-import { authenticatedFetch } from '@/utils/apiClient'
+import { useSessionsList } from '@/hooks/queries'
 
 import { useOrganization } from '@/contexts/OrganizationContext'
 
-interface SessionSummary {
-  session_id: string
-  filename: string
-  num_participants: number
-  num_tables: number
-  num_sessions: number
-  created_at: number | null
-  num_versions: number
-}
-
 const PreviousGroupsPage: React.FC = () => {
-  const [sessions, setSessions] = useState<SessionSummary[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const { currentOrg } = useOrganization()
   const navigate = useNavigate()
+  const { data: sessions = [], isLoading, error } = useSessionsList(currentOrg?.id ?? null)
 
-  useEffect(() => {
-    const fetchSessions = async () => {
-      if (!currentOrg) return
-      try {
-        const response = await authenticatedFetch(`/api/assignments/sessions?org_id=${currentOrg.id}`)
-        if (!response.ok) throw new Error('Failed to load sessions')
-        const data = await response.json()
-        setSessions(data)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load sessions')
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchSessions()
-  }, [currentOrg])
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -51,7 +22,7 @@ const PreviousGroupsPage: React.FC = () => {
   if (error) {
     return (
       <div className="max-w-2xl mx-auto p-6 text-center text-red-600">
-        {error}
+        {error?.message}
       </div>
     )
   }
