@@ -5,8 +5,9 @@
 - Don't commit to `main`. Feature branches only.
 - When you learn something non-obvious (a gotcha, a pattern, a rake you stepped on), update the relevant `agent_docs/` file. If no file fits, update this file.
 - When finishing feature work that changes UI, review `frontend/src/pages/HelpPage.tsx` and update docs to match.
-- Before committing frontend changes, run `npm run lint` in `frontend/`.
+- Before committing frontend changes, run `npm run lint` and `npx tsc --noEmit` in `frontend/`. ESLint and Jest don't catch TypeScript type errors — only `tsc` does.
 - When a user mentions a feature idea or wish, add it to `BACKLOG.md`. Don't plan or implement backlog items unless explicitly asked.
+- **Use superpowers skills for planning.** Don't write ad-hoc plans — use the writing-plans skill and save to `docs/plans/`. The user prefers the deliberative back-and-forth of the skill workflow over "here's a plan, shall I start?"
 
 ## Development Rules
 
@@ -24,6 +25,7 @@
 npm start                                          # Dev server (localhost:3000, proxies /api to :8000)
 npm run build                                      # Production build
 npm run lint                                       # ESLint (zero warnings allowed)
+npx tsc --noEmit                                   # TypeScript type-check (lint doesn't catch type errors)
 CI=true npm test -- --watchAll=false                # All tests (CI mode)
 ```
 
