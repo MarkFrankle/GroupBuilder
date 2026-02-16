@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { produce } from 'immer'
 import TableAssignments from "../components/TableAssignments/TableAssignments"
 import CompactAssignments from "../components/CompactAssignments/CompactAssignments"
@@ -7,7 +8,6 @@ import ValidationStats from "../components/ValidationStats/ValidationStats"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DEFAULT_SOLVER_TIMEOUT_SECONDS } from '@/constants'
-import { dummyData } from "../data/dummyData"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Loader2, LayoutGrid, List, Edit, Undo2, MoreVertical, RotateCw, Check, Link, AlertCircle, Printer } from 'lucide-react'
 import {
@@ -31,16 +31,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { API_BASE_URL } from '@/config/api'
 import { authenticatedFetch } from '@/utils/apiClient'
-
-interface ResultVersion {
-  version_id: string
-  created_at: number
-  solve_time?: number
-  solution_quality?: string
-  max_time_seconds?: number
-}
+import { useResultVersions, useAssignmentResults } from '@/hooks/queries'
 
 export interface Participant {
   name: string;
@@ -59,8 +51,18 @@ export interface Assignment {
 }
 
 const TableAssignmentsPage: React.FC = () => {
+  const urlParams = new URLSearchParams(window.location.search)
+  const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId || null
+  const versionParam = urlParams.get('version') || undefined
+
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+
+  const { data: versionsData } = useResultVersions(sessionId)
+  const [currentVersion, setCurrentVersion] = useState<string>(versionParam ?? 'latest')
+  const { data: fetchedAssignments, isLoading: loading, error: fetchError } = useAssignmentResults(sessionId, currentVersion !== 'latest' ? currentVersion : undefined)
+
   const [assignments, setAssignments] = useState<Assignment[]>([])
-  const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [currentSession, setCurrentSession] = useState<number>(1)
   const [viewMode, setViewMode] = useState<'detailed' | 'compact'>(() => {
@@ -73,8 +75,6 @@ const TableAssignmentsPage: React.FC = () => {
   const [selectedAbsentParticipant, setSelectedAbsentParticipant] = useState<Participant | null>(null)
   const [selectedParticipantSlot, setSelectedParticipantSlot] = useState<{tableNum: number, participantIndex: number} | null>(null)
   const [clearSelectionKey, setClearSelectionKey] = useState(0)
-  const [availableVersions, setAvailableVersions] = useState<ResultVersion[]>([])
-  const [currentVersion, setCurrentVersion] = useState<string>('latest')
   const [showRegenerateDialog, setShowRegenerateDialog] = useState<boolean>(false)
   const [regenerating, setRegenerating] = useState<boolean>(false)
   const [regenerateSuccess, setRegenerateSuccess] = useState<boolean>(false)
@@ -84,9 +84,14 @@ const TableAssignmentsPage: React.FC = () => {
   const [copySuccess, setCopySuccess] = useState<boolean>(false)
   const [copyError, setCopyError] = useState<boolean>(false)
 
-  const navigate = useNavigate()
+  const availableVersions = versionsData ?? []
 
-  const useRealData = true;
+  // Sync fetched assignments to local state (needed for edit mode)
+  useEffect(() => {
+    if (fetchedAssignments) {
+      setAssignments(fetchedAssignments)
+    }
+  }, [fetchedAssignments])
 
 
   // Cleanup on unmount
@@ -134,67 +139,10 @@ const TableAssignmentsPage: React.FC = () => {
     })
   }
 
-  useEffect(() => {
-    const fetchAssignments = async () => {
-      try {
-        if (process.env.NODE_ENV === 'development' && !useRealData) {
-          setAssignments(dummyData)
-        } else {
-          // Try to get session ID from: 1) URL query param, 2) navigation state
-          const urlParams = new URLSearchParams(window.location.search);
-          const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId;
-          const versionParam = urlParams.get('version');
-
-          if (!sessionId) {
-            // No session ID available, user might have refreshed the page
-            throw new Error('Session expired. Please upload a file again.')
-          }
-
-          // Set current version from URL param if available
-          if (versionParam) {
-            setCurrentVersion(versionParam)
-          }
-
-          // Fetch available versions
-          try {
-            const versionsResponse = await authenticatedFetch(`/api/assignments/results/${sessionId}/versions`)
-            if (versionsResponse.ok) {
-              const versionsData = await versionsResponse.json()
-              setAvailableVersions(versionsData.versions || [])
-            }
-          } catch (err) {
-            console.error('Failed to fetch versions:', err)
-          }
-
-          // Fetch assignments for the specified version
-          const versionQuery = versionParam ? `?version=${versionParam}` : ''
-          const response = await authenticatedFetch(`/api/assignments/results/${sessionId}${versionQuery}`)
-          if (!response.ok) {
-            const errorData = await response.json()
-            throw new Error(errorData.detail || 'Failed to fetch assignments')
-          }
-          const data = await response.json()
-
-          setAssignments(data)
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchAssignments()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
 
   const handleCopyLink = async () => {
     try {
-      // Get session ID from URL or navigation state
-      const urlParams = new URLSearchParams(window.location.search);
-      const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId;
-      
       if (!sessionId) {
         console.error('No session ID available to copy')
         setCopyError(true)
@@ -232,8 +180,6 @@ const TableAssignmentsPage: React.FC = () => {
   }
 
   const handlePrintRoster = () => {
-    const urlParams = new URLSearchParams(window.location.search)
-    const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId
     navigate('/table-assignments/roster-print', {
       state: { assignments, sessionId }
     })
@@ -241,9 +187,6 @@ const TableAssignmentsPage: React.FC = () => {
 
   const handlePrintSeating = async () => {
     try {
-      const urlParams = new URLSearchParams(window.location.search);
-      const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId;
-
       if (!sessionId) {
         throw new Error('Session ID not found. Please upload a file again.')
       }
@@ -255,8 +198,8 @@ const TableAssignmentsPage: React.FC = () => {
       }
 
       // POST to backend seating API endpoint
-      const response = await fetch(
-        `${API_BASE_URL}/api/assignments/seating/${sessionId}?session=${currentSession}`,
+      const response = await authenticatedFetch(
+        `/api/assignments/seating/${sessionId}?session=${currentSession}`,
         {
           method: 'POST',
           headers: {
@@ -282,42 +225,15 @@ const TableAssignmentsPage: React.FC = () => {
     }
   }
 
-  const handleVersionChange = async (versionId: string) => {
-    setLoading(true)
-    setError(null)
-    // Clear undo history when switching versions
+  const handleVersionChange = (versionId: string) => {
     setUndoStack([])
-    try {
-      const urlParams = new URLSearchParams(window.location.search);
-      const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId;
+    setCurrentVersion(versionId)
 
-      if (!sessionId) {
-        throw new Error('Session ID not found. Please upload a file again.')
-      }
-
-      const versionQuery = versionId !== 'latest' ? `?version=${versionId}` : ''
-      const response = await authenticatedFetch(`/api/assignments/results/${sessionId}${versionQuery}`)
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Failed to fetch version')
-      }
-
-      const data = await response.json()
-      setCurrentVersion(versionId)
-
-      setAssignments(data)
-
-      // Update URL without reload
-      const newUrl = versionId !== 'latest'
-        ? `${window.location.pathname}?session=${sessionId}&version=${versionId}`
-        : `${window.location.pathname}?session=${sessionId}`
-      window.history.replaceState({}, '', newUrl)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load version')
-    } finally {
-      setLoading(false)
-    }
+    // Update URL without reload
+    const newUrl = versionId !== 'latest'
+      ? `${window.location.pathname}?session=${sessionId}&version=${versionId}`
+      : `${window.location.pathname}?session=${sessionId}`
+    window.history.replaceState({}, '', newUrl)
   }
 
   const handleRegenerateConfirm = async () => {
@@ -337,9 +253,6 @@ const TableAssignmentsPage: React.FC = () => {
     setAbortController(controller)
 
     try {
-      const urlParams = new URLSearchParams(window.location.search);
-      const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId;
-
       if (!sessionId) {
         throw new Error('Session ID not found. Please upload a file again.')
       }
@@ -360,16 +273,9 @@ const TableAssignmentsPage: React.FC = () => {
       setNewVersionId(result.version_id)
       setRegenerateSuccess(true)
 
-      // Refetch versions list to include the new version
-      try {
-        const versionsResponse = await authenticatedFetch(`/api/assignments/results/${sessionId}/versions`)
-        if (versionsResponse.ok) {
-          const versionsData = await versionsResponse.json()
-          setAvailableVersions(versionsData.versions || [])
-        }
-      } catch (err) {
-        console.error('Failed to refresh versions:', err)
-      }
+      // Invalidate queries so versions list refreshes
+      queryClient.invalidateQueries({ queryKey: ['versions', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['results', sessionId] })
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         // Regeneration was cancelled
@@ -400,9 +306,6 @@ const TableAssignmentsPage: React.FC = () => {
     setError(null)
 
     try {
-      const urlParams = new URLSearchParams(window.location.search);
-      const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId;
-
       if (!sessionId) {
         throw new Error('Session ID not found. Please upload a file again.')
       }
@@ -430,8 +333,8 @@ const TableAssignmentsPage: React.FC = () => {
         queryParams.append('version_id', currentVersion)
       }
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/assignments/regenerate/${sessionId}/session/${sessionNumber}?${queryParams}`,
+      const response = await authenticatedFetch(
+        `/api/assignments/regenerate/${sessionId}/session/${sessionNumber}?${queryParams}`,
         {
           method: 'POST',
           headers: {
@@ -606,9 +509,6 @@ const TableAssignmentsPage: React.FC = () => {
       // Save edits as a new version if actual changes were made
       if (undoStack.length > 0) {
         try {
-          const urlParams = new URLSearchParams(window.location.search)
-          const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId
-
           const response = await authenticatedFetch(`/api/assignments/results/${sessionId}/save`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -627,12 +527,8 @@ const TableAssignmentsPage: React.FC = () => {
           // Update version state to reflect the new version
           setCurrentVersion(result.version_id)
 
-          // Refresh the version list
-          const versionsResponse = await authenticatedFetch(`/api/assignments/results/${sessionId}/versions`)
-          if (versionsResponse.ok) {
-            const versionsData = await versionsResponse.json()
-            setAvailableVersions(versionsData.versions || [])
-          }
+          // Invalidate versions query to refresh the list
+          queryClient.invalidateQueries({ queryKey: ['versions', sessionId] })
 
           // Update URL to reflect new version
           const newUrl = `${window.location.pathname}?session=${sessionId}&version=${result.version_id}`
@@ -650,6 +546,8 @@ const TableAssignmentsPage: React.FC = () => {
     setEditMode(!editMode)
   }
 
+  const displayError = !sessionId ? 'Session expired. Please upload a file again.' : fetchError?.message || error
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -658,12 +556,12 @@ const TableAssignmentsPage: React.FC = () => {
     )
   }
 
-  if (error) {
+  if (displayError && !assignments.length) {
     return (
       <div className="container mx-auto p-4 max-w-2xl mt-8">
         <Alert variant="destructive">
           <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>{displayError}</AlertDescription>
         </Alert>
         <div className="flex justify-center mt-6">
           <Button onClick={() => navigate('/')} variant="outline">
