@@ -1,5 +1,7 @@
 import React from "react"
 import { BrowserRouter as Router, Route, Routes, Navigate, useLocation, Link } from "react-router-dom"
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { AuthProvider, useAuth } from "./contexts/AuthContext"
 import { OrganizationProvider, useOrganization } from "./contexts/OrganizationContext"
 import LoginPage from "./pages/LoginPage"
@@ -77,86 +79,100 @@ function NavBar() {
   );
 }
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 2 * 60 * 1000,  // 2 min — data under 2 min old served from cache
+      gcTime: 5 * 60 * 1000,     // 5 min — unused cache entries garbage collected
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+})
+
 const App: React.FC = () => {
   return (
     <AuthProvider>
       <OrganizationProvider>
-        <Router>
-          <NavBar />
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/auth/verify" element={<AuthVerifyPage />} />
-            <Route path="/invite/:token" element={<InviteAcceptPage />} />
-            <Route path="/help" element={<HelpPage />} />
-            <Route path="/legal" element={<LegalPage />} />
+        <QueryClientProvider client={queryClient}>
+          <Router>
+            <NavBar />
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/auth/verify" element={<AuthVerifyPage />} />
+              <Route path="/invite/:token" element={<InviteAcceptPage />} />
+              <Route path="/help" element={<HelpPage />} />
+              <Route path="/legal" element={<LegalPage />} />
 
-            <Route
-              path="/select-organization"
-              element={
-                <ProtectedRoute>
-                  <OrganizationSelectorPage />
-                </ProtectedRoute>
-              }
-            />
+              <Route
+                path="/select-organization"
+                element={
+                  <ProtectedRoute>
+                    <OrganizationSelectorPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <LandingPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/roster"
-              element={
-                <ProtectedRoute>
-                  <RosterPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/groups"
-              element={
-                <ProtectedRoute>
-                  <PreviousGroupsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute>
-                  <AdminDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/table-assignments"
-              element={
-                <ProtectedRoute>
-                  <TableAssignmentsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/table-assignments/seating"
-              element={
-                <ProtectedRoute>
-                  <SeatingChartPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/table-assignments/roster-print"
-              element={
-                <ProtectedRoute>
-                  <RosterPrintPage />
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
-        </Router>
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <LandingPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/roster"
+                element={
+                  <ProtectedRoute>
+                    <RosterPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/groups"
+                element={
+                  <ProtectedRoute>
+                    <PreviousGroupsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/table-assignments"
+                element={
+                  <ProtectedRoute>
+                    <TableAssignmentsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/table-assignments/seating"
+                element={
+                  <ProtectedRoute>
+                    <SeatingChartPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/table-assignments/roster-print"
+                element={
+                  <ProtectedRoute>
+                    <RosterPrintPage />
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </Router>
+          <ReactQueryDevtools initialIsOpen={false} />
+        </QueryClientProvider>
       </OrganizationProvider>
     </AuthProvider>
   )
