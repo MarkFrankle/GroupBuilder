@@ -1,7 +1,7 @@
 /**
  * Admin dashboard for organization management
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { CreateOrgModal } from './CreateOrgModal';
@@ -9,19 +9,12 @@ import { ManageOrgModal } from './ManageOrgModal';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { apiRequest } from '../../utils/apiClient';
 import { useAuth } from '../../contexts/AuthContext';
-
-interface Organization {
-  id: string;
-  name: string;
-  created_at: number;
-  member_count: number;
-  active?: boolean;
-}
+import { useAdminOrganizations } from '@/hooks/queries';
+import { useQueryClient } from '@tanstack/react-query';
 
 export function AdminDashboard() {
   const { user, signOut } = useAuth();
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [managingOrgId, setManagingOrgId] = useState<string | null>(null);
@@ -29,28 +22,13 @@ export function AdminDashboard() {
   const [deletingOrgId, setDeletingOrgId] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
 
-  const loadOrganizations = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const { data: rawOrganizations = [], isLoading: loading, error: fetchError } = useAdminOrganizations(showInactive);
 
-    try {
-      const orgs = await apiRequest<Organization[]>(`/api/admin/organizations?show_inactive=${showInactive}`);
-      // Sort by created date (newest first)
-      orgs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setOrganizations(orgs);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load organizations');
-    } finally {
-      setLoading(false);
-    }
-  }, [showInactive]);
-
-  useEffect(() => {
-    loadOrganizations();
-  }, [loadOrganizations]);
+  // Sort by created date (newest first)
+  const organizations = [...rawOrganizations].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const handleCreateSuccess = () => {
-    loadOrganizations();
+    queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
   };
 
   const handleDelete = (orgId: string, orgName: string) => {
@@ -68,7 +46,7 @@ export function AdminDashboard() {
         method: 'DELETE',
       });
 
-      await loadOrganizations(); // Reload list
+      await queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
     } catch (err: any) {
       setError(err.message || 'Failed to delete organization');
     } finally {
@@ -124,9 +102,9 @@ export function AdminDashboard() {
           </label>
         </div>
 
-        {error && (
+        {(fetchError || error) && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-            {error}
+            {fetchError?.message || error}
           </div>
         )}
 
