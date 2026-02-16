@@ -6,10 +6,22 @@ import { useSessionsList } from '@/hooks/queries'
 
 import { useOrganization } from '@/contexts/OrganizationContext'
 
+interface SessionSummary {
+  session_id: string
+  filename: string
+  num_participants: number
+  num_tables: number
+  num_sessions: number
+  created_at: number | null
+  num_versions: number
+}
+
 const PreviousGroupsPage: React.FC = () => {
   const { currentOrg } = useOrganization()
   const navigate = useNavigate()
-  const { data: sessions = [], isLoading, error } = useSessionsList(currentOrg?.id ?? null)
+  const { data: sessions = [], isLoading, error } = useSessionsList(currentOrg?.id ?? null) as {
+    data: SessionSummary[] | undefined; isLoading: boolean; error: Error | null
+  }
 
   if (isLoading) {
     return (

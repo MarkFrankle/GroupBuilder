@@ -34,6 +34,14 @@ import {
 import { authenticatedFetch } from '@/utils/apiClient'
 import { useResultVersions, useAssignmentResults } from '@/hooks/queries'
 
+interface ResultVersion {
+  version_id: string
+  created_at: number
+  solve_time?: number
+  solution_quality?: string
+  max_time_seconds?: number
+}
+
 export interface Participant {
   name: string;
   religion: string;
@@ -84,7 +92,7 @@ const TableAssignmentsPage: React.FC = () => {
   const [copySuccess, setCopySuccess] = useState<boolean>(false)
   const [copyError, setCopyError] = useState<boolean>(false)
 
-  const availableVersions = versionsData ?? []
+  const availableVersions: ResultVersion[] = versionsData ?? []
 
   // Sync fetched assignments to local state (needed for edit mode)
   useEffect(() => {
