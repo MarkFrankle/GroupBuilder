@@ -124,14 +124,23 @@ const TableAssignmentsPage: React.FC = () => {
     }
   }
 
-  // Abort regeneration on unmount
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
+      setShowRegenerateDialog(false)
+      document.body.style.removeProperty('pointer-events')
       if (abortController) {
         abortController.abort()
       }
     }
   }, [abortController])
+
+  // Clean up body pointer-events whenever dialog closes
+  useEffect(() => {
+    if (!showRegenerateDialog) {
+      document.body.style.removeProperty('pointer-events')
+    }
+  }, [showRegenerateDialog])
 
   // Persist view mode to localStorage
   useEffect(() => {
@@ -363,7 +372,13 @@ const TableAssignmentsPage: React.FC = () => {
     }
   }
 
-  const handleRegenerateAll = async () => {
+  const handleRegenerateConfirm = async () => {
+    setShowRegenerateDialog(false)
+    document.body.style.removeProperty('pointer-events')
+
+    // Wait for dialog to fully unmount before starting regeneration
+    await new Promise(resolve => setTimeout(resolve, 100))
+
     setRegenerating(true)
     setRegenerateSuccess(false)
     setNewVersionId(null)
@@ -1009,28 +1024,30 @@ const TableAssignmentsPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={showRegenerateDialog} onOpenChange={setShowRegenerateDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Regenerate All Sessions</DialogTitle>
-            <DialogDescription>
-              This will create a completely new set of assignments. It takes up to 2
-              minutes — you can continue browsing while it runs.
-            </DialogDescription>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Your current version will be saved and you can switch back anytime.
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRegenerateDialog(false)}>
-              Cancel
-            </Button>
-            <Button variant="outline" onClick={() => { setShowRegenerateDialog(false); handleRegenerateAll(); }}>
-              Regenerate All
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {showRegenerateDialog && (
+        <Dialog open={true} onOpenChange={setShowRegenerateDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Regenerate All Sessions</DialogTitle>
+              <DialogDescription>
+                This will create a completely new set of assignments. It takes up to 2
+                minutes — you can continue browsing while it runs.
+              </DialogDescription>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              Your current version will be saved and you can switch back anytime.
+            </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowRegenerateDialog(false)}>
+                Cancel
+              </Button>
+              <Button variant="outline" onClick={handleRegenerateConfirm}>
+                Regenerate All
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }
