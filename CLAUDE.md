@@ -54,6 +54,7 @@ Three independent packages (no monorepo tooling):
 | `agent_docs/deployment.md` | deploying, debugging prod, Cloud Run, Netlify, env vars |
 | `agent_docs/architecture.md` | adding routes, changing auth, data model, stack questions |
 | `agent_docs/testing.md` | writing or debugging tests, CI failures |
+| `agent_docs/frontend_design.md` | adding or modifying UI components, buttons, dialogs |
 
 ## Tool Preferences
 
