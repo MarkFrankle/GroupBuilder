@@ -1,7 +1,7 @@
 /**
  * Modal for managing organization details, members, and invites
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -12,33 +12,8 @@ import {
 import { Button } from '../../components/ui/button';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { apiRequest } from '../../utils/apiClient';
-
-interface Member {
-  user_id: string;
-  email: string;
-  role: string;
-  joined_at: number;  // Unix timestamp
-}
-
-interface Invite {
-  id: string;
-  email: string;
-  status: string;
-  created_at: number;  // Unix timestamp
-  expires_at: number;  // Unix timestamp
-  accepted_at?: number;  // Unix timestamp
-  accepted_by_user_id?: string;
-  removed_at?: number;  // Unix timestamp
-}
-
-interface OrgDetails {
-  id: string;
-  name: string;
-  created_at: number;  // Unix timestamp
-  created_by: string;
-  members: Member[];
-  invites: Invite[];
-}
+import { useOrgDetails } from '@/hooks/queries';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ManageOrgModalProps {
   open: boolean;
@@ -47,8 +22,7 @@ interface ManageOrgModalProps {
 }
 
 export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
-  const [orgDetails, setOrgDetails] = useState<OrgDetails | null>(null);
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [newInviteEmail, setNewInviteEmail] = useState('');
   const [sendingInvite, setSendingInvite] = useState(false);
@@ -56,27 +30,7 @@ export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<{ userId: string; email: string } | null>(null);
 
-  const loadOrgDetails = useCallback(async () => {
-    if (!orgId) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const details = await apiRequest<OrgDetails>(`/api/admin/organizations/${orgId}`);
-      setOrgDetails(details);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load organization details');
-    } finally {
-      setLoading(false);
-    }
-  }, [orgId]);
-
-  useEffect(() => {
-    if (open && orgId) {
-      loadOrgDetails();
-    }
-  }, [open, orgId, loadOrgDetails]);
+  const { data: orgDetails = null, isLoading: loading, error: fetchError } = useOrgDetails(orgId, open);
 
   const handleAddInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,7 +51,7 @@ export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
       });
 
       setNewInviteEmail('');
-      await loadOrgDetails(); // Reload to show new invite
+      await queryClient.invalidateQueries({ queryKey: ['admin-org-details', orgId] }); // Reload to show new invite
     } catch (err: any) {
       setError(err.message || 'Failed to send invite');
     } finally {
@@ -116,7 +70,7 @@ export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
         method: 'DELETE',
       });
 
-      await loadOrgDetails(); // Reload to update invite status
+      await queryClient.invalidateQueries({ queryKey: ['admin-org-details', orgId] }); // Reload to update invite status
     } catch (err: any) {
       setError(err.message || 'Failed to revoke invite');
     } finally {
@@ -141,7 +95,7 @@ export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
         method: 'DELETE',
       });
 
-      await loadOrgDetails(); // Reload to update members list
+      await queryClient.invalidateQueries({ queryKey: ['admin-org-details', orgId] }); // Reload to update members list
     } catch (err: any) {
       setError(err.message || 'Failed to remove member');
     } finally {
@@ -184,7 +138,6 @@ export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
   };
 
   const handleClose = () => {
-    setOrgDetails(null);
     setError(null);
     setNewInviteEmail('');
     onClose();
@@ -202,9 +155,9 @@ export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
           </DialogDescription>
         </DialogHeader>
 
-        {error && (
+        {(fetchError || error) && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            {error}
+            {fetchError?.message || error}
           </div>
         )}
 

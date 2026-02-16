@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,7 @@ import { AlertCircle, Loader2, Clock, Upload, Users } from 'lucide-react'
 import { importRoster } from '@/api/roster'
 import { getRecentUploadIds, removeRecentUpload, type RecentUpload } from '@/utils/recentUploads'
 import { authenticatedFetch } from '@/utils/apiClient'
+import { useQueries } from '@tanstack/react-query'
 import { formatISOTimeAgo, formatUnixTimeAgo } from '@/utils/timeFormatting'
 import { SESSION_EXPIRY_MESSAGE } from '@/constants'
 import {
@@ -37,38 +38,30 @@ interface ResultVersion {
 const LandingPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
-  const [recentUploads, setRecentUploads] = useState<RecentUpload[]>([])
   const [selectedRecentUpload, setSelectedRecentUpload] = useState<string>("")
   const [availableVersions, setAvailableVersions] = useState<ResultVersion[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
 
-  // Load recent uploads on mount
-  useEffect(() => {
-    const loadRecentUploads = async () => {
-      const sessionIds = getRecentUploadIds()
-      const uploads: RecentUpload[] = []
+  const sessionIds = getRecentUploadIds()
 
-      for (const sessionId of sessionIds) {
-        try {
-          const response = await authenticatedFetch(`/api/assignments/sessions/${sessionId}/metadata`)
-          if (response.ok) {
-            const metadata = await response.json()
-            uploads.push(metadata)
-          } else {
-            removeRecentUpload(sessionId)
-          }
-        } catch (err) {
-          console.error(`Failed to load metadata for session ${sessionId}:`, err)
+  const metadataQueries = useQueries({
+    queries: sessionIds.map(sessionId => ({
+      queryKey: ['session-metadata', sessionId],
+      queryFn: async () => {
+        const response = await authenticatedFetch(`/api/assignments/sessions/${sessionId}/metadata`)
+        if (!response.ok) {
           removeRecentUpload(sessionId)
+          throw new Error('Not found')
         }
-      }
+        return response.json()
+      },
+    })),
+  })
 
-      setRecentUploads(uploads)
-    }
-
-    loadRecentUploads()
-  }, [])
+  const recentUploads = metadataQueries
+    .filter(q => q.isSuccess && q.data)
+    .map(q => q.data as RecentUpload)
 
   const handleRecentUploadSelect = async (sessionId: string) => {
     setSelectedRecentUpload(sessionId)

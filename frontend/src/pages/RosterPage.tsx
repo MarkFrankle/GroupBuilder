@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -11,9 +12,10 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RosterGrid } from '@/components/RosterGrid/RosterGrid';
 import { RosterParticipant } from '@/types/roster';
 import {
-  getRoster, upsertParticipant, deleteParticipant as apiDeleteParticipant,
+  upsertParticipant, deleteParticipant as apiDeleteParticipant,
   generateFromRoster,
 } from '@/api/roster';
+import { useRoster } from '@/hooks/queries';
 import { fetchWithRetry } from '@/utils/fetchWithRetry';
 import { API_BASE_URL } from '@/config/api';
 import { MAX_TABLES, MAX_SESSIONS } from '@/constants';
@@ -23,8 +25,9 @@ type SaveStatus = 'saved' | 'saving' | 'error';
 
 export function RosterPage() {
   const navigate = useNavigate();
+  const { data: rosterData, isLoading: loading, error: fetchError } = useRoster();
+  const queryClient = useQueryClient();
   const [participants, setParticipants] = useState<RosterParticipant[]>([]);
-  const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const [error, setError] = useState<string | null>(null);
   const [numTables, setNumTables] = useState('4');
@@ -33,11 +36,10 @@ export function RosterPage() {
   const [loadingMessage, setLoadingMessage] = useState('');
 
   useEffect(() => {
-    getRoster()
-      .then(data => setParticipants(data))
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
+    if (rosterData) {
+      setParticipants(rosterData);
+    }
+  }, [rosterData]);
 
   const handleUpdate = useCallback(async (id: string, data: Omit<RosterParticipant, 'id'>) => {
     setSaveStatus('saving');
@@ -71,22 +73,24 @@ export function RosterPage() {
         }
       }
 
+      queryClient.invalidateQueries({ queryKey: ['roster'] });
       setSaveStatus('saved');
     } catch {
       setSaveStatus('error');
     }
-  }, [participants]);
+  }, [participants, queryClient]);
 
   const handleDelete = useCallback(async (id: string) => {
     setSaveStatus('saving');
     setParticipants(prev => prev.filter(p => p.id !== id));
     try {
       await apiDeleteParticipant(id);
+      queryClient.invalidateQueries({ queryKey: ['roster'] });
       setSaveStatus('saved');
     } catch {
       setSaveStatus('error');
     }
-  }, []);
+  }, [queryClient]);
 
   const handleAdd = useCallback(async (data: Omit<RosterParticipant, 'id'>) => {
     const newId = uuidv4();
@@ -95,11 +99,12 @@ export function RosterPage() {
     setParticipants(prev => [...prev, newParticipant]);
     try {
       await upsertParticipant(newId, data);
+      queryClient.invalidateQueries({ queryKey: ['roster'] });
       setSaveStatus('saved');
     } catch {
       setSaveStatus('error');
     }
-  }, []);
+  }, [queryClient]);
 
   const handleGenerate = async () => {
     setError(null);
@@ -193,11 +198,11 @@ export function RosterPage() {
             </div>
           </div>
 
-          {error && (
+          {(error || fetchError) && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>{error || (fetchError as Error)?.message}</AlertDescription>
             </Alert>
           )}
 

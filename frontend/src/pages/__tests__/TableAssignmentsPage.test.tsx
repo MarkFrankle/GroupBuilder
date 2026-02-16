@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import TableAssignmentsPage from '../TableAssignmentsPage'
 import { authenticatedFetch } from '@/utils/apiClient'
+import { createQueryWrapper } from '@/test-utils/queryWrapper'
 
 // Mock clipboard API
 Object.assign(navigator, {
@@ -12,9 +13,6 @@ Object.assign(navigator, {
 
 // Get the mocked authenticatedFetch (already mocked in setupTests.ts)
 const mockAuthenticatedFetch = authenticatedFetch as jest.MockedFunction<typeof authenticatedFetch>
-
-// Keep global.fetch mock for non-authenticated calls (e.g., seating chart POST)
-global.fetch = jest.fn()
 
 const mockAssignmentsData = [
   {
@@ -64,9 +62,12 @@ describe('TableAssignmentsPage copy link functionality', () => {
   })
 
   it('displays copy link button', async () => {
+    const QueryWrapper = createQueryWrapper()
     render(
       <BrowserRouter>
-        <TableAssignmentsPage />
+        <QueryWrapper>
+          <TableAssignmentsPage />
+        </QueryWrapper>
       </BrowserRouter>
     )
 
@@ -77,9 +78,12 @@ describe('TableAssignmentsPage copy link functionality', () => {
   })
 
   it('copies current URL to clipboard when clicked', async () => {
+    const QueryWrapper = createQueryWrapper()
     render(
       <BrowserRouter>
-        <TableAssignmentsPage />
+        <QueryWrapper>
+          <TableAssignmentsPage />
+        </QueryWrapper>
       </BrowserRouter>
     )
 
@@ -95,9 +99,12 @@ describe('TableAssignmentsPage copy link functionality', () => {
   })
 
   it('shows success feedback after copying', async () => {
+    const QueryWrapper = createQueryWrapper()
     render(
       <BrowserRouter>
-        <TableAssignmentsPage />
+        <QueryWrapper>
+          <TableAssignmentsPage />
+        </QueryWrapper>
       </BrowserRouter>
     )
 
@@ -150,9 +157,12 @@ describe('TableAssignmentsPage session dropdown', () => {
   })
 
   it('session dropdown allows quick navigation', async () => {
+    const QueryWrapper = createQueryWrapper()
     render(
       <BrowserRouter>
-        <TableAssignmentsPage />
+        <QueryWrapper>
+          <TableAssignmentsPage />
+        </QueryWrapper>
       </BrowserRouter>
     )
 
@@ -216,9 +226,12 @@ describe('TableAssignmentsPage unified control bar', () => {
   })
 
   it('shows session controls with action buttons in unified bar in detailed view', async () => {
+    const QueryWrapper = createQueryWrapper()
     render(
       <BrowserRouter>
-        <TableAssignmentsPage />
+        <QueryWrapper>
+          <TableAssignmentsPage />
+        </QueryWrapper>
       </BrowserRouter>
     )
 
@@ -237,9 +250,12 @@ describe('TableAssignmentsPage unified control bar', () => {
   })
 
   it('hides session controls in compact view', async () => {
+    const QueryWrapper = createQueryWrapper()
     render(
       <BrowserRouter>
-        <TableAssignmentsPage />
+        <QueryWrapper>
+          <TableAssignmentsPage />
+        </QueryWrapper>
       </BrowserRouter>
     )
 
@@ -251,9 +267,12 @@ describe('TableAssignmentsPage unified control bar', () => {
   })
 
   it('shows Print Seating button in detailed view when not in edit mode', async () => {
+    const QueryWrapper = createQueryWrapper()
     render(
       <BrowserRouter>
-        <TableAssignmentsPage />
+        <QueryWrapper>
+          <TableAssignmentsPage />
+        </QueryWrapper>
       </BrowserRouter>
     )
 
@@ -267,9 +286,12 @@ describe('TableAssignmentsPage unified control bar', () => {
   })
 
   it('disables Print Seating button in edit mode', async () => {
+    const QueryWrapper = createQueryWrapper()
     render(
       <BrowserRouter>
-        <TableAssignmentsPage />
+        <QueryWrapper>
+          <TableAssignmentsPage />
+        </QueryWrapper>
       </BrowserRouter>
     )
 
@@ -288,9 +310,12 @@ describe('TableAssignmentsPage unified control bar', () => {
   })
 
   it('hides Print Seating button in compact view', async () => {
+    const QueryWrapper = createQueryWrapper()
     render(
       <BrowserRouter>
-        <TableAssignmentsPage />
+        <QueryWrapper>
+          <TableAssignmentsPage />
+        </QueryWrapper>
       </BrowserRouter>
     )
 

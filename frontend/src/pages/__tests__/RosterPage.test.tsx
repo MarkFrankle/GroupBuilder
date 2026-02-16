@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { RosterPage } from '../RosterPage';
 import { authenticatedFetch } from '@/utils/apiClient';
+import { createQueryWrapper } from '@/test-utils/queryWrapper';
 
 jest.mock('uuid', () => ({
   v4: () => 'mock-uuid-1234',
@@ -10,7 +11,16 @@ jest.mock('uuid', () => ({
 jest.mock('@/utils/apiClient');
 const mockFetch = authenticatedFetch as jest.MockedFunction<typeof authenticatedFetch>;
 
-const renderPage = () => render(<BrowserRouter><RosterPage /></BrowserRouter>);
+const renderPage = () => {
+  const QueryWrapper = createQueryWrapper();
+  return render(
+    <BrowserRouter>
+      <QueryWrapper>
+        <RosterPage />
+      </QueryWrapper>
+    </BrowserRouter>
+  );
+};
 
 describe('RosterPage', () => {
   beforeEach(() => {
