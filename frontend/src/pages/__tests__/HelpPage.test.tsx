@@ -51,7 +51,7 @@ describe('HelpPage', () => {
   test('renders callout boxes', () => {
     renderPage();
     // Tip callout in quality section
-    expect(screen.getByText(/slower speed setting/)).toBeInTheDocument();
+    expect(screen.getAllByText(/completely fresh set of assignments/).length).toBeGreaterThan(0);
     // Warning callout in generating section
     expect(screen.getAllByText(/Need at least N facilitators/).length).toBeGreaterThan(0);
   });

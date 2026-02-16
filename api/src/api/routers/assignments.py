@@ -572,6 +572,56 @@ async def get_result_version_list(
     return {"versions": versions}
 
 
+@router.post("/results/{session_id}/save")
+async def save_edited_assignments(
+    request: Request,
+    session_id: str = Path(
+        ...,
+        description="Session ID",
+        min_length=36,
+        max_length=36,
+        pattern="^[a-f0-9-]{36}$",
+    ),
+    body: Dict[str, Any] = Body(...),
+):
+    """Save manually edited assignments as a new version."""
+    session_storage = get_session_storage()
+    assignments = body.get("assignments")
+    based_on_version = body.get("based_on_version")
+
+    if not assignments:
+        raise HTTPException(status_code=400, detail="assignments is required")
+
+    try:
+        existing_versions = session_storage.get_result_versions(session_id)
+        version_num = len(existing_versions) + 1
+        version_id = f"v{version_num}"
+
+        metadata = {
+            "source": "manual_edit",
+            "based_on": based_on_version,
+        }
+
+        session_storage.save_results(
+            session_id=session_id,
+            version_id=version_id,
+            assignments=assignments,
+            metadata=metadata,
+        )
+
+        logger.info(
+            f"Saved manual edits as version {version_id} for session {session_id}"
+        )
+
+        return {"version_id": version_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to save edited assignments: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to save edited assignments")
+
+
 @router.get("/sessions")
 async def list_sessions(
     org_id: str = Query(..., description="Organization ID"),
