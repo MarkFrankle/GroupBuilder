@@ -1009,7 +1009,10 @@ const TableAssignmentsPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={showRegenerateDialog} onOpenChange={setShowRegenerateDialog}>
+      <Dialog open={showRegenerateDialog} onOpenChange={(open) => {
+        setShowRegenerateDialog(open);
+        if (!open) document.body.style.removeProperty('pointer-events');
+      }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Regenerate All Sessions</DialogTitle>
@@ -1025,7 +1028,12 @@ const TableAssignmentsPage: React.FC = () => {
             <Button variant="outline" onClick={() => setShowRegenerateDialog(false)}>
               Cancel
             </Button>
-            <Button variant="outline" onClick={() => { setShowRegenerateDialog(false); handleRegenerateAll(); }}>
+            <Button variant="outline" onClick={() => {
+              setShowRegenerateDialog(false);
+              // Radix Dialog sets pointer-events: none on body and sometimes doesn't clean up
+              document.body.style.removeProperty('pointer-events');
+              handleRegenerateAll();
+            }}>
               Regenerate All
             </Button>
           </DialogFooter>
