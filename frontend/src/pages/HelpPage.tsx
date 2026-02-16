@@ -114,7 +114,7 @@ function HelpPage() {
               automatically and takes you to Group Builder.
             </li>
             <li>
-              You'll see which organization you've been invited to. Click{" "}
+              You'll see which program you've been invited to. Click{" "}
               <strong>"Accept Invite"</strong> and you're in. From now on, you'll stay
               signed in — you shouldn't need to do this again.
             </li>
@@ -123,7 +123,7 @@ function HelpPage() {
           <h3 className="text-xl font-semibold mb-2">Finding your way around</h3>
           <p className="mb-2 text-slate-700 leading-relaxed">
             Once you're signed in, you'll see a navigation bar at the top of every page
-            with three links:
+            with four links:
           </p>
           <ul className="list-disc pl-5 space-y-2 text-slate-700 leading-relaxed mb-4">
             <li>
@@ -149,6 +149,12 @@ function HelpPage() {
           <h2 id="creating-your-roster" className="text-2xl font-bold mb-4 scroll-mt-8">
             Creating Your Roster
           </h2>
+          <Screenshot
+            src="/images/help/home-page-ui.png"
+            alt="The Home page with Manage Roster and Import from Excel options, plus a Download Template link"
+            caption="The Home page — your starting point for managing participants and importing data"
+          />
+
           <p className="mb-4 text-slate-700 leading-relaxed">
             Before you can generate groups, you need to tell Group Builder who your
             participants are. There are two ways to do this.
@@ -233,11 +239,6 @@ function HelpPage() {
             fix a name, change a religion, add a partner pairing, and so on.
           </p>
 
-          <Screenshot
-            src="/images/help/home-page-ui.png"
-            alt="The Home page with Manage Roster and Import from Excel options, plus a Download Template link"
-            caption="The Home page — your starting point for managing participants and importing data"
-          />
         </section>
 
         {/* ===================== Section 3: Generating Groups ===================== */}
@@ -478,10 +479,9 @@ function HelpPage() {
 
           <TipCallout>
             If the quality isn't great, don't worry — you have options. You can{" "}
-            <strong>Regenerate All</strong> with a slower speed setting (the solver
-            spends more time searching for better arrangements), regenerate just one
-            problematic session, or make manual edits. All of these are covered in
-            the <a href="#editing-sessions" className="text-blue-700 underline">Editing Sessions</a>{" "}
+            <strong>Regenerate All</strong> to get a completely fresh set of assignments,
+            regenerate just one problematic session, or make manual edits. All of these
+            are covered in the <a href="#editing-sessions" className="text-blue-700 underline">Editing Sessions</a>{" "}
             section below.
           </TipCallout>
         </section>
@@ -542,9 +542,9 @@ function HelpPage() {
           {/* Regenerate All */}
           <h3 className="text-xl font-semibold mb-2">Starting Over: Regenerate All</h3>
           <p className="mb-2 text-slate-700 leading-relaxed">
-            If you want a completely fresh set of assignments, click{" "}
-            <strong>"Regenerate All"</strong> in the toolbar. Regeneration takes
-            up to 2 minutes — you can continue browsing while it runs.
+            If you want a completely fresh set of assignments, click the{" "}
+            <strong>⋮ menu</strong> and select <strong>"Regenerate All Sessions."</strong>{" "}
+            Regeneration takes up to 2 minutes — you can continue browsing while it runs.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Your previous version is not lost. Every time you regenerate, the results
@@ -560,7 +560,8 @@ function HelpPage() {
             couple at the same table, or the gender balance is uneven. In detailed view,
             navigate to the problem session and click <strong>"Regenerate Session."</strong>{" "}
             This re-runs the solver for just that one session (it's nearly instant)
-            while keeping all other sessions exactly as they are.
+            while keeping all other sessions exactly as they are. Any participants
+            you've marked as absent will stay absent in the regenerated session.
           </p>
 
           {/* Edit Mode */}
@@ -672,16 +673,6 @@ function HelpPage() {
               </p>
             </InfoCallout>
 
-            <InfoCallout>
-              <p className="font-bold mb-1">"My manual edits disappeared"</p>
-              <p>
-                Manual edits (swaps, absent markings) are saved in your browser's local
-                storage, not on the server. They'll disappear if you switch browsers,
-                use a different computer, or clear your browsing data. If you want to
-                preserve changes permanently, use the Regenerate function to create a
-                new version that's saved on the server and visible to everyone.
-              </p>
-            </InfoCallout>
           </div>
         </section>
 
