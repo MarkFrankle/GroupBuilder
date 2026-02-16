@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import '@testing-library/jest-dom'
 import LandingPage from '../LandingPage'
+import { createQueryWrapper } from '@/test-utils/queryWrapper'
 import * as recentUploadsModule from '@/utils/recentUploads'
 import { authenticatedFetch } from '@/utils/apiClient'
 import { importRoster } from '@/api/roster'
@@ -32,7 +33,14 @@ class ResizeObserverMock {
 global.ResizeObserver = ResizeObserverMock as any
 
 const renderWithRouter = (component: React.ReactElement) => {
-  return render(<BrowserRouter>{component}</BrowserRouter>)
+  const QueryWrapper = createQueryWrapper()
+  return render(
+    <BrowserRouter>
+      <QueryWrapper>
+        {component}
+      </QueryWrapper>
+    </BrowserRouter>
+  )
 }
 
 describe('Landing Page - Hub', () => {
