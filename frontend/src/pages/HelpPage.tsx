@@ -542,27 +542,10 @@ function HelpPage() {
           {/* Regenerate All */}
           <h3 className="text-xl font-semibold mb-2">Starting Over: Regenerate All</h3>
           <p className="mb-2 text-slate-700 leading-relaxed">
-            If you want a completely fresh set of assignments, click the{" "}
-            <strong>&#x22EF; menu</strong> (three dots) in the toolbar and choose{" "}
-            <strong>"Regenerate All Sessions."</strong>
+            If you want a completely fresh set of assignments, click{" "}
+            <strong>"Regenerate All"</strong> in the toolbar. Regeneration takes
+            up to 2 minutes — you can continue browsing while it runs.
           </p>
-          <p className="mb-2 text-slate-700 leading-relaxed">
-            You'll be asked to pick a speed:
-          </p>
-          <ul className="list-disc pl-5 space-y-1.5 text-slate-700 leading-relaxed mb-4">
-            <li>
-              <strong>Fast</strong> (1 minute) — Good for a quick re-roll when you just
-              want something different.
-            </li>
-            <li>
-              <strong>Default</strong> (2 minutes) — The standard setting, same as the
-              initial generation.
-            </li>
-            <li>
-              <strong>Slow</strong> (4 minutes) — Gives the solver extra time to search
-              for a better solution. Try this if you're not happy with the mixing quality.
-            </li>
-          </ul>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Your previous version is not lost. Every time you regenerate, the results
             are saved as a new version. You can switch between versions using the{" "}

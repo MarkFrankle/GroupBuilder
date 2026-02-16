@@ -6,10 +6,10 @@ import CompactAssignments from "../components/CompactAssignments/CompactAssignme
 import ValidationStats from "../components/ValidationStats/ValidationStats"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
+import { DEFAULT_SOLVER_TIMEOUT_SECONDS } from '@/constants'
 import { dummyData } from "../data/dummyData"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, LayoutGrid, List, Edit, Undo2, MoreVertical, Download, RotateCw, X, Check, Link, AlertCircle, Printer } from 'lucide-react'
+import { Loader2, LayoutGrid, List, Edit, Undo2, MoreVertical, RotateCw, Check, Link, AlertCircle, Printer } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -76,9 +76,6 @@ const TableAssignmentsPage: React.FC = () => {
   const [availableVersions, setAvailableVersions] = useState<ResultVersion[]>([])
   const [currentVersion, setCurrentVersion] = useState<string>('latest')
   const [showRegenerateDialog, setShowRegenerateDialog] = useState<boolean>(false)
-  const [regenerateSolverTime, setRegenerateSolverTime] = useState<number>(120)
-  const [currentMaxTime, setCurrentMaxTime] = useState<number>(120)
-  const [currentSolveTime, setCurrentSolveTime] = useState<number>(0)
   const [regenerating, setRegenerating] = useState<boolean>(false)
   const [regenerateSuccess, setRegenerateSuccess] = useState<boolean>(false)
   const [newVersionId, setNewVersionId] = useState<string | null>(null)
@@ -127,23 +124,14 @@ const TableAssignmentsPage: React.FC = () => {
     }
   }
 
-  // Ensure dialog cleanup when component unmounts
+  // Abort regeneration on unmount
   useEffect(() => {
     return () => {
-      setShowRegenerateDialog(false)
-      document.body.style.removeProperty('pointer-events')
       if (abortController) {
         abortController.abort()
       }
     }
   }, [abortController])
-
-  // Clean up body pointer-events whenever dialog closes
-  useEffect(() => {
-    if (!showRegenerateDialog) {
-      document.body.style.removeProperty('pointer-events')
-    }
-  }, [showRegenerateDialog])
 
   // Persist view mode to localStorage
   useEffect(() => {
@@ -202,31 +190,6 @@ const TableAssignmentsPage: React.FC = () => {
             if (versionsResponse.ok) {
               const versionsData = await versionsResponse.json()
               setAvailableVersions(versionsData.versions || [])
-
-              // Set current version's metadata for regenerate dialog
-              let currentVersionData: ResultVersion | undefined
-
-              if (loadingVersion === 'latest') {
-                // Find the actual latest version by timestamp
-                currentVersionData = versionsData.versions?.reduce((latest: ResultVersion | undefined, v: ResultVersion) => {
-                  if (!latest || v.created_at > latest.created_at) return v
-                  return latest
-                }, undefined)
-              } else {
-                // Find by version ID
-                currentVersionData = versionsData.versions?.find((v: ResultVersion) =>
-                  v.version_id === loadingVersion
-                )
-              }
-
-              if (currentVersionData) {
-                console.log('[Version Metadata] Loading version:', loadingVersion, 'Found metadata:', currentVersionData)
-                setCurrentMaxTime(currentVersionData.max_time_seconds || 120)
-                setCurrentSolveTime(currentVersionData.solve_time || 0)
-                setRegenerateSolverTime(currentVersionData.max_time_seconds || 120)
-              } else {
-                console.warn('[Version Metadata] No metadata found for version:', loadingVersion)
-              }
             }
           } catch (err) {
             console.error('Failed to fetch versions:', err)
@@ -302,10 +265,6 @@ const TableAssignmentsPage: React.FC = () => {
         setCopyError(false)
       }, 2000)
     }
-  }
-
-  const handleClearAssignments = () => {
-    navigate('/')
   }
 
   const handlePrintRoster = () => {
@@ -392,31 +351,6 @@ const TableAssignmentsPage: React.FC = () => {
         setAssignments(data)
       }
 
-      // Update version metadata for regenerate dialog
-      let currentVersionData: ResultVersion | undefined
-
-      if (versionId === 'latest') {
-        // Find the actual latest version by timestamp
-        currentVersionData = availableVersions.reduce((latest: ResultVersion | undefined, v: ResultVersion) => {
-          if (!latest || v.created_at > latest.created_at) return v
-          return latest
-        }, undefined)
-      } else {
-        // Find by version ID
-        currentVersionData = availableVersions.find((v: ResultVersion) =>
-          v.version_id === versionId
-        )
-      }
-
-      if (currentVersionData) {
-        console.log('[Version Metadata] Switching to version:', versionId, 'Found metadata:', currentVersionData)
-        setCurrentMaxTime(currentVersionData.max_time_seconds || 120)
-        setCurrentSolveTime(currentVersionData.solve_time || 0)
-        setRegenerateSolverTime(currentVersionData.max_time_seconds || 120)
-      } else {
-        console.warn('[Version Metadata] No metadata found for version:', versionId)
-      }
-
       // Update URL without reload
       const newUrl = versionId !== 'latest'
         ? `${window.location.pathname}?session=${sessionId}&version=${versionId}`
@@ -429,20 +363,7 @@ const TableAssignmentsPage: React.FC = () => {
     }
   }
 
-  const handleRegenerateClick = () => {
-    setShowRegenerateDialog(true)
-  }
-
-  const handleRegenerateConfirm = async () => {
-    // Close dialog first and wait for state update
-    setShowRegenerateDialog(false)
-
-    // Force cleanup of body pointer-events that Radix Dialog sets
-    document.body.style.removeProperty('pointer-events')
-
-    // Use setTimeout to ensure dialog is fully closed before starting regeneration
-    await new Promise(resolve => setTimeout(resolve, 100))
-
+  const handleRegenerateAll = async () => {
     setRegenerating(true)
     setRegenerateSuccess(false)
     setNewVersionId(null)
@@ -460,8 +381,8 @@ const TableAssignmentsPage: React.FC = () => {
         throw new Error('Session ID not found. Please upload a file again.')
       }
 
-      console.log('[Regenerate] Requesting regeneration with max_time_seconds:', regenerateSolverTime)
-      const response = await authenticatedFetch(`/api/assignments/regenerate/${sessionId}?max_time_seconds=${regenerateSolverTime}`, {
+      console.log('[Regenerate] Requesting regeneration with max_time_seconds:', DEFAULT_SOLVER_TIMEOUT_SECONDS)
+      const response = await authenticatedFetch(`/api/assignments/regenerate/${sessionId}?max_time_seconds=${DEFAULT_SOLVER_TIMEOUT_SECONDS}`, {
         method: 'POST',
         signal: controller.signal,
       })
@@ -594,41 +515,6 @@ const TableAssignmentsPage: React.FC = () => {
 
     // Load the new version
     await handleVersionChange(newVersionId)
-  }
-
-  const downloadCSV = () => {
-    let csvContent = ""
-
-    // Generate CSV for each session
-    assignments.forEach((assignment) => {
-      csvContent += `Session ${assignment.session}\n`
-      csvContent += "Table,Name,Religion,Gender,Partner\n"
-
-      // Iterate through each table in the session
-      Object.entries(assignment.tables).forEach(([tableNum, participants]) => {
-        participants.forEach(participant => {
-          if (participant !== null) {
-            const partner = participant.partner || ""
-            csvContent += `${tableNum},"${participant.name}","${participant.religion}","${participant.gender}","${partner}"\n`
-          }
-        })
-      })
-
-      csvContent += "\n" // Blank line between sessions
-    })
-
-    // Create blob and download
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-
-    link.setAttribute('href', url)
-    link.setAttribute('download', `table-assignments-${new Date().toISOString().split('T')[0]}.csv`)
-    link.style.visibility = 'hidden'
-
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
   }
 
   const handlePreviousSession = () => {
@@ -874,7 +760,7 @@ const TableAssignmentsPage: React.FC = () => {
                   <div>
                     <AlertTitle>Regenerating Assignments</AlertTitle>
                     <AlertDescription>
-                      Creating new assignments for a maximum of {Math.floor(regenerateSolverTime / 60)} min {regenerateSolverTime % 60}s.
+                      Creating new assignments (up to 2 minutes).
                       You can continue browsing while we work.
                     </AlertDescription>
                   </div>
@@ -929,29 +815,19 @@ const TableAssignmentsPage: React.FC = () => {
               </Button>
             </div>
 
-            <div className="flex gap-2 items-center">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-white dark:bg-slate-950">
-                  <DropdownMenuItem onClick={downloadCSV}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Download CSV
-                  </DropdownMenuItem>
-<DropdownMenuItem onClick={handleRegenerateClick} disabled={editMode || regenerating}>
-                    <RotateCw className="h-4 w-4 mr-2" />
-                    Regenerate All Sessions
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleClearAssignments}>
-                    <X className="h-4 w-4 mr-2" />
-                    Clear
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" disabled={editMode || regenerating}>
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-white dark:bg-slate-950">
+                <DropdownMenuItem onClick={() => setShowRegenerateDialog(true)}>
+                  <RotateCw className="h-4 w-4 mr-2" />
+                  Regenerate All Sessions
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Unified session control bar (only in detailed view) */}
@@ -1133,70 +1009,28 @@ const TableAssignmentsPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Regenerate Dialog */}
-      {showRegenerateDialog && (
-        <Dialog open={true} onOpenChange={setShowRegenerateDialog}>
-          <DialogContent className="sm:max-w-md">
+      <Dialog open={showRegenerateDialog} onOpenChange={setShowRegenerateDialog}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Regenerate All Sessions</DialogTitle>
             <DialogDescription>
-              Configure solver time to balance speed vs. quality
+              This will create a completely new set of assignments. It takes up to 2
+              minutes — you can continue browsing while it runs.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-3">
-              <Label>Solver Time</Label>
-              <div className="grid grid-cols-3 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setRegenerateSolverTime(60)}
-                  className={`flex flex-col h-auto py-3 ${regenerateSolverTime === 60 ? 'border-2 border-black bg-gray-100' : ''}`}
-                >
-                  <span className="font-semibold">Fast</span>
-                  <span className="text-xs opacity-80">1 min</span>
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setRegenerateSolverTime(120)}
-                  className={`flex flex-col h-auto py-3 ${regenerateSolverTime === 120 ? 'border-2 border-black bg-gray-100' : ''}`}
-                >
-                  <span className="font-semibold">Default</span>
-                  <span className="text-xs opacity-80">2 min</span>
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setRegenerateSolverTime(240)}
-                  className={`flex flex-col h-auto py-3 ${regenerateSolverTime === 240 ? 'border-2 border-black bg-gray-100' : ''}`}
-                >
-                  <span className="font-semibold">Slow</span>
-                  <span className="text-xs opacity-80">4 min</span>
-                </Button>
-              </div>
-            </div>
-            <div className="rounded-lg bg-muted p-3 text-sm">
-              <p className="text-muted-foreground">
-                ℹ️ Current results used <strong>{currentMaxTime < 60 ? `${currentMaxTime}s` : `${Math.round(currentMaxTime / 60)}m`}</strong> and
-                completed in <strong>{currentSolveTime < 1 ? `${(currentSolveTime * 1000).toFixed(0)}ms` : `${currentSolveTime.toFixed(1)}s`}</strong>.
-                <span className="block mt-1">
-                  More time often yields better balanced groups.
-                </span>
-              </p>
-            </div>
-          </div>
+          <p className="text-sm text-muted-foreground">
+            Your current version will be saved and you can switch back anytime.
+          </p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowRegenerateDialog(false)}>
               Cancel
             </Button>
-            <Button variant="outline" onClick={handleRegenerateConfirm}>
+            <Button variant="outline" onClick={() => { setShowRegenerateDialog(false); handleRegenerateAll(); }}>
               Regenerate All
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      )}
     </div>
   )
 }

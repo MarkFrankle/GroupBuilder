@@ -22,7 +22,6 @@ export const MAX_RECENT_UPLOADS = 10
 
 // Solver configuration
 export const DEFAULT_SOLVER_TIMEOUT_SECONDS = 120  // 2 minutes
-export const ESTIMATED_SOLVE_TIME_MINUTES = 2
 
 // UI Text
 export const SESSION_EXPIRY_MESSAGE = 'available for 1 hour'
