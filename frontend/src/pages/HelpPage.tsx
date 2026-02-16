@@ -110,19 +110,11 @@ function HelpPage() {
           </p>
           <ol className="list-decimal pl-5 space-y-2 text-slate-700 leading-relaxed mb-4">
             <li>
-              Open the invitation email and click the link inside. This takes you to
-              Group Builder and shows you which organization you've been invited to.
+              Open the invitation email and click the link inside. This signs you in
+              automatically and takes you to Group Builder.
             </li>
             <li>
-              You'll be asked to sign in. Enter your email address and click{" "}
-              <strong>"Send me a login link."</strong>
-            </li>
-            <li>
-              Check your email for the login link (it may take a minute). Click it to
-              sign in. There's no password to remember — this is a one-time setup.
-            </li>
-            <li>
-              After signing in, you'll be taken back to accept the invitation. Click{" "}
+              You'll see which organization you've been invited to. Click{" "}
               <strong>"Accept Invite"</strong> and you're in. From now on, you'll stay
               signed in — you shouldn't need to do this again.
             </li>
