@@ -604,12 +604,8 @@ function HelpPage() {
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Saving your edits:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             When you're done, click <strong>"Done Editing."</strong> Your changes are
-            saved in your browser automatically. The next time you visit this page, you'll
-            see a note saying <strong>"Viewing edited version"</strong> to remind you that
-            manual changes are in effect. Keep in mind that these edits are stored locally
-            in your browser — if you switch to a different computer or clear your browsing
-            data, they'll be gone. To make changes permanent for everyone, use Regenerate
-            to create a new saved version.
+            saved as a new version automatically. You can switch back to any previous
+            version using the version picker at the top of the page.
           </p>
 
           <Screenshot

@@ -88,41 +88,6 @@ const TableAssignmentsPage: React.FC = () => {
 
   const useRealData = true;
 
-  // Helper functions for persisting edits to localStorage
-  const getEditsKey = (versionId?: string) => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId;
-    const version = versionId || currentVersion
-    return `edits_${sessionId}_${version}`
-  }
-
-  const saveEditsToStorage = (assignments: Assignment[], versionId?: string) => {
-    try {
-      localStorage.setItem(getEditsKey(versionId), JSON.stringify(assignments))
-      // Edits cleared (hasUnsavedEdits tracking removed)
-    } catch (err) {
-      console.error('Failed to save edits to localStorage:', err)
-    }
-  }
-
-  const loadEditsFromStorage = (versionId?: string): Assignment[] | null => {
-    try {
-      const saved = localStorage.getItem(getEditsKey(versionId))
-      return saved ? JSON.parse(saved) : null
-    } catch (err) {
-      console.error('Failed to load edits from localStorage:', err)
-      return null
-    }
-  }
-
-  const clearEditsFromStorage = (versionId?: string) => {
-    try {
-      localStorage.removeItem(getEditsKey(versionId))
-      // Edits cleared (hasUnsavedEdits tracking removed)
-    } catch (err) {
-      console.error('Failed to clear edits from localStorage:', err)
-    }
-  }
 
   // Cleanup on unmount
   useEffect(() => {
@@ -185,9 +150,6 @@ const TableAssignmentsPage: React.FC = () => {
             throw new Error('Session expired. Please upload a file again.')
           }
 
-          // Determine which version we're loading
-          const loadingVersion = versionParam || 'latest'
-
           // Set current version from URL param if available
           if (versionParam) {
             setCurrentVersion(versionParam)
@@ -213,14 +175,7 @@ const TableAssignmentsPage: React.FC = () => {
           }
           const data = await response.json()
 
-          // Check for saved edits in localStorage for this specific version
-          const savedEdits = loadEditsFromStorage(loadingVersion)
-          if (savedEdits) {
-            setAssignments(savedEdits)
-            // Edits cleared (hasUnsavedEdits tracking removed) // Edits are saved, just not to backend
-          } else {
-            setAssignments(data)
-          }
+          setAssignments(data)
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An unknown error occurred')
@@ -351,14 +306,7 @@ const TableAssignmentsPage: React.FC = () => {
       const data = await response.json()
       setCurrentVersion(versionId)
 
-      // Check for saved edits in localStorage for this specific version
-      const savedEdits = loadEditsFromStorage(versionId)
-      if (savedEdits) {
-        setAssignments(savedEdits)
-        // Edits cleared (hasUnsavedEdits tracking removed) // Edits are saved in localStorage
-      } else {
-        setAssignments(data)
-      }
+      setAssignments(data)
 
       // Update URL without reload
       const newUrl = versionId !== 'latest'
@@ -503,9 +451,6 @@ const TableAssignmentsPage: React.FC = () => {
       // Update assignments in-place (no new version)
       setAssignments(result.assignments)
 
-      // Clear any saved edits for this version since we just regenerated
-      clearEditsFromStorage()
-
       console.log('[Regenerate Session] Successfully regenerated session', sessionNumber,
         'in', result.solve_time?.toFixed(2), 's')
 
@@ -641,7 +586,7 @@ const TableAssignmentsPage: React.FC = () => {
     setSelectedParticipantSlot(null)
   }
 
-  const toggleEditMode = () => {
+  const toggleEditMode = async () => {
     if (!editMode) {
       setViewMode('detailed')
     } else {
@@ -658,12 +603,44 @@ const TableAssignmentsPage: React.FC = () => {
 
       setAssignments(cleanedAssignments)
 
-      // Only save edits if actual changes were made (undo stack not empty)
+      // Save edits as a new version if actual changes were made
       if (undoStack.length > 0) {
-        saveEditsToStorage(cleanedAssignments)
-      } else {
-        // No edits were made, clear any existing saved edits
-        clearEditsFromStorage()
+        try {
+          const urlParams = new URLSearchParams(window.location.search)
+          const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId
+
+          const response = await authenticatedFetch(`/api/assignments/results/${sessionId}/save`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              assignments: cleanedAssignments,
+              based_on_version: currentVersion,
+            }),
+          })
+
+          if (!response.ok) {
+            throw new Error('Failed to save edits')
+          }
+
+          const result = await response.json()
+
+          // Update version state to reflect the new version
+          setCurrentVersion(result.version_id)
+
+          // Refresh the version list
+          const versionsResponse = await authenticatedFetch(`/api/assignments/results/${sessionId}/versions`)
+          if (versionsResponse.ok) {
+            const versionsData = await versionsResponse.json()
+            setAvailableVersions(versionsData.versions || [])
+          }
+
+          // Update URL to reflect new version
+          const newUrl = `${window.location.pathname}?session=${sessionId}&version=${result.version_id}`
+          window.history.replaceState({}, '', newUrl)
+        } catch (err) {
+          console.error('Failed to save edits as new version:', err)
+          setError('Failed to save your edits. Please try again.')
+        }
       }
 
       // Clear selections when exiting edit mode
@@ -961,13 +938,6 @@ const TableAssignmentsPage: React.FC = () => {
             <CompactAssignments assignments={assignments} />
           ) : (
             <>
-              {/* Show indicator when viewing edited version */}
-              {loadEditsFromStorage() !== null && (
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-                  <span className="font-semibold">✓ Viewing edited version</span>
-                </div>
-              )}
-
               {/* Absent Participants Box */}
               {currentAssignment && currentAssignment.absentParticipants && currentAssignment.absentParticipants.length > 0 && (
                 <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
