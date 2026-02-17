@@ -62,7 +62,7 @@ Add a link to it from `AdminDashboard.tsx` — either in the header nav or as a 
 
 ## Content Outline
 
-The page should have seven sections. Each is described in enough detail below that a developer can write it without needing to re-examine the source code.
+The page should have eight sections. Each is described in enough detail below that a developer can write it without needing to re-examine the source code.
 
 ---
 
@@ -171,7 +171,33 @@ This is the most important section for reducing admin support burden. Describe t
 
 ---
 
-### 6. Common Admin Tasks (Quick Reference)
+### 6. Logins, Sharing, and Who Can See What
+
+**Purpose:** Directly address admin anxiety about multiple people being logged in at once, and set clear expectations about the data isolation model.
+
+**What to cover:**
+
+**Each facilitator needs their own login.**
+GroupBuilder uses email-based magic links — there are no passwords to share. This means each person who needs access must have their own email address in the system, and must log in via their own email. Sharing login credentials is not possible with this auth model; it's not a restriction, it's just how magic links work. If two people need access, invite both of them.
+
+**Multiple facilitators can be logged in simultaneously — this is fine.**
+There is no concept of "one person at a time." If two facilitators from the same organization both have the app open, both are looking at the same shared data: the same roster, the same generated groups, the same assignment history. Either of them can make changes. This is intentional — it supports co-facilitation and delegation.
+
+**Facilitators only see their own organization's data.**
+Access is scoped strictly to the organizations a facilitator has been invited to and accepted. A facilitator in "Spring 2026 Cohort" cannot see anything in "Fall 2025 Cohort" unless they were separately invited to that org. Admins can see all organizations in the admin panel, but only via the admin UI — the admin panel doesn't give roster or group access, only org management access.
+
+**The expected ownership model.**
+The typical setup is one facilitator per organization who "owns" the tool — they build the roster, run the solver, and manage the results. Additional facilitators can be invited (e.g., a co-facilitator or backup) and will have full equal access to the same org. There is no read-only role; all invited facilitators can edit.
+
+**Tip callout:** If you're inviting a co-facilitator purely so they can view assignments (not edit), there's no lightweight way to do that right now. Anyone you invite gets full edit access. The workaround is to share a link to the results page using the Copy Link button in the app — no login required to view a shared link.
+
+**Info callout:** Login links expire after 60 minutes. Facilitators who get logged out just need to go to the login page and enter their email to get a fresh link. Nothing is lost — their data lives in the database, not in their browser session.
+
+**No screenshot needed for this section** — it's entirely explanatory prose.
+
+---
+
+### 7. Common Admin Tasks (Quick Reference)
 
 A tight reference table or bulleted list of the most frequent tasks:
 
@@ -187,7 +213,7 @@ A tight reference table or bulleted list of the most frequent tasks:
 
 ---
 
-### 7. Troubleshooting
+### 8. Troubleshooting
 
 Individual `InfoCallout` blocks, matching the style of `HelpPage.tsx`:
 
@@ -200,6 +226,8 @@ Individual `InfoCallout` blocks, matching the style of `HelpPage.tsx`:
 - **"A facilitator clicked the link but got a 'wrong email' warning"** — They were already signed into GroupBuilder with a different email. They need to click "Sign In with Different Email" on the invite page and sign in using the email the invite was sent to.
 
 - **"I can't find an organization I created"** — Check "Show deleted organizations" on the dashboard. If it appears there, it was soft-deleted. Data is intact; UI recovery isn't currently supported.
+
+- **"Two facilitators edited the roster at the same time and something looks wrong"** — The app has no real-time conflict detection. If two people are editing the roster simultaneously, the last write wins. If something looks off, check the roster and correct it manually. For anything consequential (running the solver, making manual edits to assignments), coordinate so only one person is doing it at a time.
 
 - **"I need admin access"** — Admin access requires adding your email to the `bb_admins` collection in Firestore. Contact your system administrator.
 
