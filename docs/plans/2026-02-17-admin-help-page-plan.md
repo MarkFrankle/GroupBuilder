@@ -161,7 +161,7 @@ This is the most important section for reducing admin support burden. Describe t
 
 4. **First time in the app** — They land on the Home page for the organization they just joined. If they were invited to multiple organizations, they'll see an organization selector first. From here, they use the app as described in the facilitator help page.
 
-5. **Future logins** — The magic link in the invite email only works once. For subsequent logins, they go to the login page directly and enter their email to receive a fresh login link (valid for 60 minutes).
+5. **Staying logged in** — Firebase persists the session in the browser, so after accepting the invite, facilitators are typically logged in indefinitely on that device. The invite email link only works once. If they ever need to log in again (new browser, cleared cookies), they go to the login page, enter their email, and receive a fresh magic link. That link expires after 60 minutes if unused.
 
 **Tip callout:** Tell new facilitators to bookmark the app after their first login — they won't need the invite email again.
 
@@ -191,7 +191,7 @@ The typical setup is one facilitator per organization who "owns" the tool — th
 
 **Tip callout:** If you're inviting a co-facilitator purely so they can view assignments (not edit), there's no lightweight way to do that right now. Anyone you invite gets full edit access. The workaround is to share a link to the results page using the Copy Link button in the app — no login required to view a shared link.
 
-**Info callout:** Login links expire after 60 minutes. Facilitators who get logged out just need to go to the login page and enter their email to get a fresh link. Nothing is lost — their data lives in the database, not in their browser session.
+**Info callout:** Firebase stores the session in the browser's localStorage, so facilitators stay logged in across page refreshes and browser restarts — they should rarely need to log in again after the first time. The session ends if they explicitly sign out, clear their browser data, or switch to a new browser/device. If they do need to log in again, they go to the login page, enter their email, and receive a fresh magic link; that link expires after 60 minutes if unused, but clicking it re-establishes a persistent session just like before.
 
 **No screenshot needed for this section** — it's entirely explanatory prose.
 
