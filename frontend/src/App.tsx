@@ -11,6 +11,7 @@ import TableAssignmentsPage from "./pages/TableAssignmentsPage"
 import SeatingChartPage from "./pages/SeatingChartPage"
 import { RosterPage } from "./pages/RosterPage"
 import { AdminDashboard } from "./pages/admin/AdminDashboard"
+import AdminHelpPage from "./pages/admin/AdminHelpPage"
 import InviteAcceptPage from "./pages/InviteAcceptPage"
 import OrganizationSelectorPage from "./pages/OrganizationSelectorPage"
 import RosterPrintPage from "./pages/RosterPrintPage"
@@ -34,7 +35,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   // Allow admin page access without org membership
-  if (organizations.length === 0 && location.pathname !== '/admin') {
+  if (organizations.length === 0 && !location.pathname.startsWith('/admin')) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
         <h2>No Organization Access</h2>
@@ -43,8 +44,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
   
-  // Admin page doesn't require org selection
-  if (location.pathname === '/admin') {
+  // Admin pages don't require org selection
+  if (location.pathname.startsWith('/admin')) {
     return <>{children}</>;
   }
 
@@ -142,6 +143,14 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/help"
+                element={
+                  <ProtectedRoute>
+                    <AdminHelpPage />
                   </ProtectedRoute>
                 }
               />
