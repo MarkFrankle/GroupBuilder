@@ -93,12 +93,6 @@ export function AdminHelpPage() {
             lets you manage organizations — it does not give you access to the roster
             or group assignment tools that facilitators use.
           </InfoCallout>
-
-          <Screenshot
-            src="/images/admin-help/admin-dashboard.png"
-            alt="The admin dashboard showing the Organizations list with a + Create Organization button"
-            caption="The admin dashboard — your starting point for managing organizations"
-          />
         </section>
 
         {/* ===================== Section 2: Creating an Organization ===================== */}
@@ -250,9 +244,11 @@ export function AdminHelpPage() {
 
           <ol className="list-decimal pl-5 space-y-4 text-slate-700 leading-relaxed mb-6">
             <li>
-              <strong>The invitation email</strong> arrives from GroupBuilder. It contains
-              a "Sign in to GroupBuilder" link that is personalized to the invited email
-              address. The link signs them in automatically — no password required.
+              <strong>The invitation email</strong> arrives from GroupBuilder with the
+              subject "You're invited to facilitate [org name] on GroupBuilder." It
+              shows who sent the invite (your email address will appear as "Invited by"),
+              and contains an "Accept Invitation" button. Clicking it signs them in
+              automatically — no password required.
             </li>
             <li>
               <strong>Clicking the link</strong> takes them to the invite acceptance page.
