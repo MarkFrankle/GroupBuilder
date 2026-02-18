@@ -2,6 +2,7 @@
  * Admin dashboard for organization management
  */
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { CreateOrgModal } from './CreateOrgModal';
@@ -74,6 +75,9 @@ export function AdminDashboard() {
           <h1 className="text-2xl font-bold">GroupBuilder Admin</h1>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-600">{user?.email}</span>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/admin/help">Admin Help</Link>
+            </Button>
             <Button variant="outline" size="sm" onClick={signOut}>
               Logout
             </Button>
