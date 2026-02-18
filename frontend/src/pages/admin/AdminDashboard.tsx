@@ -76,13 +76,12 @@ export function AdminDashboard() {
           <h1 className="text-2xl font-bold">GroupBuilder Admin</h1>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-600">{user?.email}</span>
-            <Link
-              to="/admin/help"
-              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors"
-            >
-              <BookOpen className="h-4 w-4" />
-              Admin Help
-            </Link>
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/admin/help" className="flex items-center gap-1.5">
+                <BookOpen className="h-4 w-4" />
+                Admin Help
+              </Link>
+            </Button>
             <Button variant="outline" size="sm" onClick={signOut}>
               Logout
             </Button>
