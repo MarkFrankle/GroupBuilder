@@ -136,15 +136,15 @@ export function AdminHelpPage() {
           </WarningCallout>
 
           <Screenshot
-            src="/images/admin-help/create-org-modal.png"
+            src="/images/help-admin/create-organization-modal.png"
             alt="The Create Organization form showing the Series Name field and the multi-line Facilitator Emails textarea"
             caption="The Create Organization form — enter a specific series name and one email per line"
           />
 
           <Screenshot
-            src="/images/admin-help/create-org-success.png"
-            alt="Post-creation confirmation showing sent checkmarks and a failed invite with a manual link"
-            caption="After creation — each email shows as sent or failed, with a manual link for any failures"
+            src="/images/help-admin/organization-created-confirmation.png"
+            alt="Post-creation confirmation showing the org name and two sent invites with green checkmarks"
+            caption="After creation — each invited email shows a green checkmark when successfully sent"
           />
         </section>
 
@@ -197,7 +197,7 @@ export function AdminHelpPage() {
           </InfoCallout>
 
           <Screenshot
-            src="/images/admin-help/manage-org-modal.png"
+            src="/images/help-admin/manage-organization-modal.png"
             alt="The Manage modal showing the Members section with a Remove button, the Invites section with mixed statuses, and the Add New Invite form"
             caption="The Manage panel — Members, Invites (with status history), and the Add New Invite form"
           />
@@ -226,7 +226,7 @@ export function AdminHelpPage() {
           </WarningCallout>
 
           <Screenshot
-            src="/images/admin-help/delete-org-dialog.png"
+            src="/images/help-admin/delete-organization-modal.png"
             alt="The delete confirmation dialog asking to confirm deleting an organization"
             caption="The delete confirmation dialog — check the name carefully before confirming"
           />
@@ -254,7 +254,7 @@ export function AdminHelpPage() {
                 button.
               </p>
               <Screenshot
-                src="/images/admin-help/invite-email.png"
+                src="/images/help-admin/facilitator-invite-email.png"
                 alt="The invitation email showing the org name, Invited by field, and Accept Invitation button"
                 caption="The invitation email — facilitators see who invited them and can click Accept Invitation"
               />
@@ -274,7 +274,7 @@ export function AdminHelpPage() {
                 automatically taken into the app.
               </p>
               <Screenshot
-                src="/images/admin-help/invite-accept-page.png"
+                src="/images/help-admin/accept-facilitator-invite-page.png"
                 alt="The invite acceptance page showing the organization name, invited email, and a green Accept Invite button"
                 caption="The acceptance page — org name, their email, and the green Accept Invite button"
               />
