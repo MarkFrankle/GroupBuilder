@@ -242,58 +242,73 @@ export function AdminHelpPage() {
             to tell them and how to troubleshoot if something goes wrong.
           </p>
 
-          <ol className="list-decimal pl-5 space-y-4 text-slate-700 leading-relaxed mb-6">
-            <li>
-              <strong>The invitation email</strong> arrives from GroupBuilder with the
-              subject "You're invited to facilitate [org name] on GroupBuilder." It
-              shows who sent the invite (your email address will appear as "Invited by"),
-              and contains an "Accept Invitation" button. Clicking it signs them in
-              automatically — no password required.
-            </li>
-            <li>
-              <strong>Clicking the link</strong> takes them to the invite acceptance page.
-              The system signs them in with a magic link in the background. Once signed
-              in, they see a "You're Invited!" screen showing the organization name and
-              the email they were invited as.
-            </li>
-            <li>
-              <strong>Accept Invite</strong> — They click the green button. After a brief
-              loading state, they see "Invite Accepted!" and are automatically redirected
-              to the main app.
-            </li>
-            <li>
-              <strong>First time in the app</strong> — They land on the Home page for the
-              organization they just joined. If they were invited to multiple organizations,
-              they'll see an organization selector first.
-            </li>
-            <li>
-              <strong>Staying logged in</strong> — The app remembers them in their browser,
-              so after accepting the invite, facilitators are typically logged in
-              indefinitely on that device. The invite email link only works once. If they
-              ever need to log in again (new browser, cleared cookies), they go to the
-              login page, enter their email, and receive a fresh magic link that expires
-              after 60 minutes if unused.
-            </li>
-          </ol>
+          <div className="space-y-8 text-slate-700">
 
-          <TipCallout>
-            Tell new facilitators to bookmark the app after their first login — they
-            won't need the invite email again.
-          </TipCallout>
+            {/* Step 1 */}
+            <div>
+              <p className="leading-relaxed mb-2">
+                <span className="font-semibold">1. The invitation email</span> arrives
+                from GroupBuilder with the subject "You're invited to facilitate [org
+                name] on GroupBuilder." It shows who sent the invite — your email
+                address appears as "Invited by" — and contains an "Accept Invitation"
+                button.
+              </p>
+              <Screenshot
+                src="/images/admin-help/invite-email.png"
+                alt="The invitation email showing the org name, Invited by field, and Accept Invitation button"
+                caption="The invitation email — facilitators see who invited them and can click Accept Invitation"
+              />
+            </div>
 
-          <InfoCallout>
-            <p className="font-semibold mb-1">Email mismatch warning</p>
-            If a facilitator clicks the link but is already signed in to GroupBuilder
-            with a <em>different</em> email, they'll see a warning and the Accept button
-            will be disabled. They need to click "Sign In with Different Email" and use
-            the address the invite was sent to.
-          </InfoCallout>
+            {/* Steps 2–3 */}
+            <div>
+              <p className="leading-relaxed mb-2">
+                <span className="font-semibold">2. Clicking the button</span> takes them
+                to the invite acceptance page. They'll see a "You're Invited!" screen
+                showing the organization name and the email address the invite was sent
+                to, confirming they're in the right place.
+              </p>
+              <p className="leading-relaxed mb-2">
+                <span className="font-semibold">3. They click "Accept Invite."</span>{" "}
+                After a brief loading state, they see "Invite Accepted!" and are
+                automatically taken into the app.
+              </p>
+              <Screenshot
+                src="/images/admin-help/invite-accept-page.png"
+                alt="The invite acceptance page showing the organization name, invited email, and a green Accept Invite button"
+                caption="The acceptance page — org name, their email, and the green Accept Invite button"
+              />
+              <InfoCallout>
+                <p className="font-semibold mb-1">Email mismatch warning</p>
+                If a facilitator clicks the link but is already signed into GroupBuilder
+                with a <em>different</em> email, they'll see a warning and the Accept
+                button will be disabled. They need to click "Sign In with Different
+                Email" and use the address the invite was sent to.
+              </InfoCallout>
+            </div>
 
-          <Screenshot
-            src="/images/admin-help/invite-accept-page.png"
-            alt="The invite acceptance page showing the organization name, invited email, and a green Accept Invite button"
-            caption="What the facilitator sees — the invite acceptance page, ready to click Accept"
-          />
+            {/* Steps 4–5 */}
+            <div>
+              <p className="leading-relaxed mb-2">
+                <span className="font-semibold">4. First time in the app</span> — they
+                land on the Home page for the organization they just joined. If they
+                were invited to multiple organizations, they'll see a selector first.
+              </p>
+              <p className="leading-relaxed mb-2">
+                <span className="font-semibold">5. Staying logged in</span> — the app
+                keeps them logged in in their browser, so they won't need to sign in
+                again on that device. The invite link only works once. If they ever do
+                need to log in again (new browser, cleared cookies), they go to the
+                login page, enter their email, and receive a fresh sign-in link that
+                expires after 60 minutes if unused.
+              </p>
+              <TipCallout>
+                Tell new facilitators to bookmark the app after their first login —
+                they won't need the invite email again.
+              </TipCallout>
+            </div>
+
+          </div>
         </section>
 
         {/* ===================== Section 6: Logins, Sharing, and Who Can See What ===================== */}
@@ -346,12 +361,12 @@ export function AdminHelpPage() {
           </TipCallout>
 
           <InfoCallout>
-            Firebase stores the session in the browser, so facilitators stay logged in
-            across page refreshes and browser restarts — they should rarely need to log
-            in again after the first time. The session ends if they explicitly sign out,
-            clear their browser data, or switch to a new browser or device. If they do
-            need to log in again, they go to the login page, enter their email, and
-            receive a fresh magic link; that link expires after 60 minutes if unused,
+            The app keeps facilitators logged in in their browser, so they should rarely
+            need to sign in again after the first time. The session ends if they
+            explicitly sign out, clear their browser data, or switch to a new browser
+            or device. If they do need to log in again, they go to the login page,
+            enter their email, and receive a fresh sign-in link; that link expires after
+            60 minutes if unused,
             but clicking it re-establishes a persistent session just like before.
           </InfoCallout>
         </section>
