@@ -78,9 +78,8 @@ export function AdminHelpPage() {
             of facilitators.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            Admin access is granted by adding your email address to the system. This is
-            done out-of-band — there is no self-service signup. If you need to grant
-            admin access to someone else, contact whoever manages the backend system.
+            Admin access is managed by Mark on a per-case basis. If you need someone
+            added or removed, just ask him.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             To reach the admin panel, navigate to{" "}
@@ -457,10 +456,7 @@ export function AdminHelpPage() {
 
             <InfoCallout>
               <p className="font-bold mb-1">I need to grant admin access to someone</p>
-              <p>
-                Admin access requires adding the person's email to the <code>bb_admins</code>{" "}
-                collection in Firestore. Contact your system administrator.
-              </p>
+              <p>Ask Mark.</p>
             </InfoCallout>
           </div>
         </section>
