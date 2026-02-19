@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import RosterPrintPage from '../RosterPrintPage'
 
 jest.mock('@/utils/apiClient', () => ({
-  authenticatedFetch: (...args: any[]) => fetch(...args),
+  authenticatedFetch: (...args: Parameters<typeof fetch>) => fetch(...args),
 }))
 
 jest.mock('@/components/SeatingChart/CircularTable', () => {
