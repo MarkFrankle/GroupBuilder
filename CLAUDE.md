@@ -67,7 +67,7 @@ GroupBuilder exists to make thoughtful group mixing effortless. Two things must 
 **Before adding or changing anything, ask:**
 1. Does it serve the mission?
 2. Is there a third use case demanding it? (YAGNI — resist configurability "just in case")
-3. Does it maintain solver correctness?
+3. Does it maintain solver correctness? (The solver is stable, established code — don't regress it, but don't over-index on it either)
 4. Will it confuse a non-technical event coordinator?
 5. Can we test it?
 
@@ -82,6 +82,3 @@ If any answer is no, defer or reject.
 - Features that require documentation to discover
 - Error messages that don't tell the user how to fix the problem
 
-## Tool Preferences
-
-The claude-memory plugin is there to use.
