@@ -21,7 +21,7 @@ def _serialize_for_firestore(data: Any) -> Any:
 
 
 class SessionStorage:
-    """Store sessions in Firestore organized by organization."""
+    """Store sessions in Firestore organized by program."""
 
     def __init__(self):
         self.db = get_firestore_client()
@@ -36,10 +36,10 @@ class SessionStorage:
         num_tables: int,
         num_sessions: int,
     ) -> None:
-        """Save session to organization's sessions collection.
+        """Save session to program's sessions collection.
 
         Args:
-            org_id: Organization ID
+            org_id: Program ID
             session_id: Session UUID
             user_id: User who created session
             participant_data: Participant dictionary
@@ -67,7 +67,7 @@ class SessionStorage:
         )
 
     def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
-        """Get session data by ID (searches across all orgs).
+        """Get session data by ID (searches across all programs).
 
         Args:
             session_id: Session UUID
@@ -118,7 +118,7 @@ class SessionStorage:
             version_id: Version identifier
             assignments: Assignment data
             metadata: Result metadata (solve time, etc.)
-            org_id: Organization ID (optional - will be looked up from session if not provided)
+            org_id: Program ID (optional - will be looked up from session if not provided)
         """
         # Look up org_id from session if not provided
         if org_id is None:
@@ -156,7 +156,7 @@ class SessionStorage:
         Returns:
             Results data or None if not found
         """
-        # Find session's org first
+        # Find session's program first
         sessions_ref = self.db.collection_group("sessions")
         query = sessions_ref.where("session_id", "==", session_id).limit(1)
         session_docs = list(query.stream())
@@ -200,17 +200,19 @@ class SessionStorage:
         """
         return self.get_results(session_id) is not None
 
-    def get_sessions_for_org(self, org_id: str) -> List[Dict[str, Any]]:
-        """Get all sessions for an organization with version counts.
+    def get_sessions_for_program(self, program_id: str) -> List[Dict[str, Any]]:
+        """Get all sessions for a program with version counts.
 
         Args:
-            org_id: Organization ID
+            program_id: Program ID
 
         Returns:
             List of session metadata, sorted by creation time (newest first)
         """
         sessions_ref = (
-            self.db.collection("organizations").document(org_id).collection("sessions")
+            self.db.collection("organizations")
+            .document(program_id)
+            .collection("sessions")
         )
 
         sessions = []
@@ -222,7 +224,7 @@ class SessionStorage:
             # Count versions for this session
             versions_ref = (
                 self.db.collection("organizations")
-                .document(org_id)
+                .document(program_id)
                 .collection("results")
                 .document(doc.id)
                 .collection("versions")
@@ -252,7 +254,7 @@ class SessionStorage:
         Returns:
             List of version metadata, sorted by creation time (newest first)
         """
-        # Find session's org first
+        # Find session's program first
         session_data = self.get_session(session_id)
         if not session_data:
             return []

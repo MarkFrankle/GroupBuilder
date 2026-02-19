@@ -1,12 +1,12 @@
 /**
- * Page for accepting organization invites
+ * Page for accepting program invites
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { useOrganization } from '../contexts/OrganizationContext';
+import { useProgram } from '../contexts/ProgramContext';
 import { apiRequest } from '../utils/apiClient';
 import { API_BASE_URL } from '../config/api';
 
@@ -22,7 +22,7 @@ export function InviteAcceptPage() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { refreshOrganizations } = useOrganization();
+  const { refreshPrograms } = useProgram();
 
   const [inviteDetails, setInviteDetails] = useState<InviteDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,7 +43,7 @@ export function InviteAcceptPage() {
 
       try {
         const response = await fetch(`${API_BASE_URL}/api/invites/${token}`);
-        
+
         if (!response.ok) {
           if (response.status === 404) {
             throw new Error('Invite not found');
@@ -107,8 +107,8 @@ export function InviteAcceptPage() {
 
       setSuccess(true);
 
-      // Refresh organizations to get the newly joined org
-      await refreshOrganizations();
+      // Refresh programs to get the newly joined program
+      await refreshPrograms();
 
       // Redirect to home after 2 seconds
       setTimeout(() => {
@@ -244,7 +244,7 @@ export function InviteAcceptPage() {
           {emailMismatch && (
             <div className="p-4 bg-red-50 rounded-md mb-6 border border-red-500">
               <p className="text-sm text-red-800 text-center">
-                ⚠️ This invite is for {inviteDetails.invited_email}, but you're signed in as {user.email}. 
+                ⚠️ This invite is for {inviteDetails.invited_email}, but you're signed in as {user.email}.
                 Please sign in with the correct email address.
               </p>
             </div>

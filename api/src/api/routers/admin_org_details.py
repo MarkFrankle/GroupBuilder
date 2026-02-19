@@ -1,4 +1,4 @@
-"""Additional admin endpoints for organization details."""
+"""Additional admin endpoints for program details."""
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from typing import List, Optional
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
 class MemberInfo(BaseModel):
-    """Organization member details."""
+    """Program member details."""
 
     user_id: str
     email: str
@@ -35,8 +35,8 @@ class InviteInfo(BaseModel):
     removed_at: Optional[float] = None  # Unix timestamp
 
 
-class OrgDetailsResponse(BaseModel):
-    """Detailed organization information."""
+class ProgramDetailsResponse(BaseModel):
+    """Detailed program information."""
 
     id: str
     name: str
@@ -46,38 +46,38 @@ class OrgDetailsResponse(BaseModel):
     invites: List[InviteInfo]
 
 
-@router.get("/organizations/{org_id}", response_model=OrgDetailsResponse)
-async def get_organization_details(
-    org_id: str, user: AuthUser = Depends(require_bb_admin)
+@router.get("/programs/{program_id}", response_model=ProgramDetailsResponse)
+async def get_program_details(
+    program_id: str, user: AuthUser = Depends(require_bb_admin)
 ):
-    """Get detailed organization info including members and invites.
+    """Get detailed program info including members and invites.
 
     Args:
-        org_id: Organization ID
+        program_id: Program ID
         user: Authenticated admin user
 
     Returns:
-        Detailed organization information
+        Detailed program information
 
     Raises:
-        HTTPException: 404 if organization not found
+        HTTPException: 404 if program not found
     """
     db = get_firestore_client()
 
-    # Get organization
-    org_ref = db.collection("organizations").document(org_id)
-    org_doc = org_ref.get()
+    # Get program
+    program_ref = db.collection("organizations").document(program_id)
+    program_doc = program_ref.get()
 
-    if not org_doc.exists:
+    if not program_doc.exists:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Program not found"
         )
 
-    org_data = org_doc.to_dict()
+    program_data = program_doc.to_dict()
 
     # Get members
     members = []
-    member_docs = org_ref.collection("members").stream()
+    member_docs = program_ref.collection("members").stream()
     for member_doc in member_docs:
         member_data = member_doc.to_dict()
         joined_at = member_data.get("joined_at")
@@ -98,7 +98,7 @@ async def get_organization_details(
 
     # Get invites
     invites = []
-    invite_docs = org_ref.collection("invites").stream()
+    invite_docs = program_ref.collection("invites").stream()
     for invite_doc in invite_docs:
         invite_data = invite_doc.to_dict()
 
@@ -139,34 +139,38 @@ async def get_organization_details(
     # Sort invites by created_at (newest first)
     invites.sort(key=lambda x: x["created_at"], reverse=True)
 
-    # Convert org created_at timestamp
-    org_created_at = org_data["created_at"]
-    org_created_at_unix = org_created_at.timestamp() if org_created_at else 0
+    # Convert program created_at timestamp
+    program_created_at = program_data["created_at"]
+    program_created_at_unix = (
+        program_created_at.timestamp() if program_created_at else 0
+    )
 
     return {
-        "id": org_id,
-        "name": org_data["name"],
-        "created_at": org_created_at_unix,
-        "created_by": org_data.get("created_by", ""),
+        "id": program_id,
+        "name": program_data["name"],
+        "created_at": program_created_at_unix,
+        "created_by": program_data.get("created_by", ""),
         "members": members,
         "invites": invites,
     }
 
 
 class AddInvitesRequest(BaseModel):
-    """Request to add invites to an existing organization."""
+    """Request to add invites to an existing program."""
 
     facilitator_emails: List[str]
 
 
-@router.post("/organizations/{org_id}/invites")
-async def add_organization_invites(
-    org_id: str, request: AddInvitesRequest, user: AuthUser = Depends(require_bb_admin)
+@router.post("/programs/{program_id}/invites")
+async def add_program_invites(
+    program_id: str,
+    request: AddInvitesRequest,
+    user: AuthUser = Depends(require_bb_admin),
 ):
-    """Add new invites to an existing organization.
+    """Add new invites to an existing program.
 
     Args:
-        org_id: Organization ID
+        program_id: Program ID
         request: List of facilitator emails to invite
         user: Authenticated admin user
 
@@ -174,26 +178,26 @@ async def add_organization_invites(
         List of created invites with links
 
     Raises:
-        HTTPException: 404 if organization not found
+        HTTPException: 404 if program not found
     """
     db = get_firestore_client()
 
-    # Get organization
-    org_ref = db.collection("organizations").document(org_id)
-    org_doc = org_ref.get()
+    # Get program
+    program_ref = db.collection("organizations").document(program_id)
+    program_doc = program_ref.get()
 
-    if not org_doc.exists:
+    if not program_doc.exists:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Program not found"
         )
 
-    org_data = org_doc.to_dict()
+    program_data = program_doc.to_dict()
 
     # Create invite records
     invites = []
     for email in request.facilitator_emails:
         invite_token = secrets.token_urlsafe(32)
-        invite_ref = org_ref.collection("invites").document()
+        invite_ref = program_ref.collection("invites").document()
         invite_ref.set(
             {
                 "email": email.strip().lower(),
@@ -208,7 +212,7 @@ async def add_organization_invites(
         email_service = get_email_service()
         email_sent = email_service.send_facilitator_invite(
             to_email=email,
-            org_name=org_data["name"],
+            org_name=program_data["name"],
             invite_token=invite_token,
             inviter_email=user.email,
         )
@@ -222,17 +226,17 @@ async def add_organization_invites(
             }
         )
 
-    return {"org_id": org_id, "invites": invites}
+    return {"program_id": program_id, "invites": invites}
 
 
-@router.delete("/organizations/{org_id}/invites/{invite_id}")
+@router.delete("/programs/{program_id}/invites/{invite_id}")
 async def revoke_invite(
-    org_id: str, invite_id: str, user: AuthUser = Depends(require_bb_admin)
+    program_id: str, invite_id: str, user: AuthUser = Depends(require_bb_admin)
 ):
     """Revoke a pending invite.
 
     Args:
-        org_id: Organization ID
+        program_id: Program ID
         invite_id: Invite document ID
         user: Authenticated admin user
 
@@ -247,7 +251,7 @@ async def revoke_invite(
     # Get invite
     invite_ref = (
         db.collection("organizations")
-        .document(org_id)
+        .document(program_id)
         .collection("invites")
         .document(invite_id)
     )
@@ -279,14 +283,14 @@ async def revoke_invite(
     return {"success": True, "message": "Invite revoked successfully"}
 
 
-@router.delete("/organizations/{org_id}/members/{user_id}")
+@router.delete("/programs/{program_id}/members/{user_id}")
 async def remove_member(
-    org_id: str, user_id: str, user: AuthUser = Depends(require_bb_admin)
+    program_id: str, user_id: str, user: AuthUser = Depends(require_bb_admin)
 ):
-    """Remove a member from an organization.
+    """Remove a member from a program.
 
     Args:
-        org_id: Organization ID
+        program_id: Program ID
         user_id: User ID to remove
         user: Authenticated admin user
 
@@ -301,7 +305,7 @@ async def remove_member(
     # Get member
     member_ref = (
         db.collection("organizations")
-        .document(org_id)
+        .document(program_id)
         .collection("members")
         .document(user_id)
     )
@@ -320,9 +324,9 @@ async def remove_member(
 
     # Update corresponding invite status to "removed" if it exists
     if member_email:
-        org_ref = db.collection("organizations").document(org_id)
+        program_ref = db.collection("organizations").document(program_id)
         invites_query = (
-            org_ref.collection("invites")
+            program_ref.collection("invites")
             .where("email", "==", member_email.lower())
             .where("status", "==", "accepted")
             .limit(1)

@@ -15,11 +15,15 @@ class RosterService:
             db = get_firestore_client()
         self.db = db
 
-    def _roster_collection(self, org_id: str):
-        return self.db.collection("organizations").document(org_id).collection("roster")
+    def _roster_collection(self, program_id: str):
+        return (
+            self.db.collection("organizations")
+            .document(program_id)
+            .collection("roster")
+        )
 
-    def get_roster(self, org_id: str) -> list[dict]:
-        docs = self._roster_collection(org_id).stream()
+    def get_roster(self, program_id: str) -> list[dict]:
+        docs = self._roster_collection(program_id).stream()
         participants = []
         for doc in docs:
             data = doc.to_dict()
@@ -27,7 +31,9 @@ class RosterService:
             participants.append(data)
         return participants
 
-    def upsert_participant(self, org_id: str, participant_id: str, data: dict) -> dict:
+    def upsert_participant(
+        self, program_id: str, participant_id: str, data: dict
+    ) -> dict:
         name = data.get("name", "").strip()
         if not name:
             raise ValueError("name must not be empty")
@@ -54,17 +60,17 @@ class RosterService:
             "updated_at": now,
         }
 
-        doc_ref = self._roster_collection(org_id).document(participant_id)
+        doc_ref = self._roster_collection(program_id).document(participant_id)
         doc_ref.set(doc_data, merge=True)
 
         doc_data["id"] = participant_id
         return doc_data
 
-    def delete_participant(self, org_id: str, participant_id: str):
-        self._roster_collection(org_id).document(participant_id).delete()
+    def delete_participant(self, program_id: str, participant_id: str):
+        self._roster_collection(program_id).document(participant_id).delete()
 
-    def get_participant(self, org_id: str, participant_id: str) -> Optional[dict]:
-        doc = self._roster_collection(org_id).document(participant_id).get()
+    def get_participant(self, program_id: str, participant_id: str) -> Optional[dict]:
+        doc = self._roster_collection(program_id).document(participant_id).get()
         if not doc.exists:
             return None
         data = doc.to_dict()

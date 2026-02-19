@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Route, Routes, Navigate, useLocation, Link } f
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { AuthProvider, useAuth } from "./contexts/AuthContext"
-import { OrganizationProvider, useOrganization } from "./contexts/OrganizationContext"
+import { ProgramProvider, useProgram } from "./contexts/ProgramContext"
 import LoginPage from "./pages/LoginPage"
 import AuthVerifyPage from "./pages/AuthVerifyPage"
 import LandingPage from "./pages/LandingPage"
@@ -13,7 +13,7 @@ import { RosterPage } from "./pages/RosterPage"
 import { AdminDashboard } from "./pages/admin/AdminDashboard"
 import AdminHelpPage from "./pages/admin/AdminHelpPage"
 import InviteAcceptPage from "./pages/InviteAcceptPage"
-import OrganizationSelectorPage from "./pages/OrganizationSelectorPage"
+import ProgramSelectorPage from "./pages/ProgramSelectorPage"
 import RosterPrintPage from "./pages/RosterPrintPage"
 import HelpPage from "./pages/HelpPage"
 import LegalPage from "./pages/LegalPage"
@@ -21,11 +21,11 @@ import PreviousGroupsPage from "./pages/PreviousGroupsPage"
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
-  const { currentOrg, needsOrgSelection, loading: orgLoading, organizations } = useOrganization();
+  const { currentProgram, needsProgramSelection, loading: programLoading, programs } = useProgram();
   const location = useLocation();
 
-  // Wait for both auth and org data to load
-  if (authLoading || orgLoading) {
+  // Wait for both auth and program data to load
+  if (authLoading || programLoading) {
     return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
   }
 
@@ -34,34 +34,34 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" />;
   }
 
-  // Allow admin page access without org membership
-  if (organizations.length === 0 && !location.pathname.startsWith('/admin')) {
+  // Allow admin page access without program membership
+  if (programs.length === 0 && !location.pathname.startsWith('/admin')) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <h2>No Organization Access</h2>
-        <p>You are not a member of any organization. Please contact your administrator to receive an invitation.</p>
+        <h2>No Program Access</h2>
+        <p>You are not a member of any program. Please contact your administrator to receive an invitation.</p>
       </div>
     );
   }
-  
-  // Admin pages don't require org selection
+
+  // Admin pages don't require program selection
   if (location.pathname.startsWith('/admin')) {
     return <>{children}</>;
   }
 
-  // Redirect to org selector if needed (and not already there)
-  if (needsOrgSelection && location.pathname !== '/select-organization') {
-    return <Navigate to="/select-organization" />;
+  // Redirect to program selector if needed (and not already there)
+  if (needsProgramSelection && location.pathname !== '/select-program') {
+    return <Navigate to="/select-program" />;
   }
 
-  // Don't require org selection for the selector page itself
-  if (location.pathname === '/select-organization') {
+  // Don't require program selection for the selector page itself
+  if (location.pathname === '/select-program') {
     return <>{children}</>;
   }
 
-  // Ensure org is selected before accessing protected routes
-  if (!currentOrg) {
-    return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading organization...</div>;
+  // Ensure program is selected before accessing protected routes
+  if (!currentProgram) {
+    return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading program...</div>;
   }
 
   return <>{children}</>;
@@ -94,7 +94,7 @@ const queryClient = new QueryClient({
 const App: React.FC = () => {
   return (
     <AuthProvider>
-      <OrganizationProvider>
+      <ProgramProvider>
         <QueryClientProvider client={queryClient}>
           <Router>
             <NavBar />
@@ -106,10 +106,10 @@ const App: React.FC = () => {
               <Route path="/legal" element={<LegalPage />} />
 
               <Route
-                path="/select-organization"
+                path="/select-program"
                 element={
                   <ProtectedRoute>
-                    <OrganizationSelectorPage />
+                    <ProgramSelectorPage />
                   </ProtectedRoute>
                 }
               />
@@ -182,7 +182,7 @@ const App: React.FC = () => {
           </Router>
           <ReactQueryDevtools initialIsOpen={false} />
         </QueryClientProvider>
-      </OrganizationProvider>
+      </ProgramProvider>
     </AuthProvider>
   )
 }

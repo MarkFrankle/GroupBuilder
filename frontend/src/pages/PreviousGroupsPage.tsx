@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Loader2, FolderOpen } from 'lucide-react'
 import { useSessionsList } from '@/hooks/queries'
 
-import { useOrganization } from '@/contexts/OrganizationContext'
+import { useProgram } from '@/contexts/ProgramContext'
 
 interface SessionSummary {
   session_id: string
@@ -17,9 +17,9 @@ interface SessionSummary {
 }
 
 const PreviousGroupsPage: React.FC = () => {
-  const { currentOrg } = useOrganization()
+  const { currentProgram } = useProgram()
   const navigate = useNavigate()
-  const { data: sessions = [], isLoading, error } = useSessionsList(currentOrg?.id ?? null) as {
+  const { data: sessions = [], isLoading, error } = useSessionsList(currentProgram?.id ?? null) as {
     data: SessionSummary[] | undefined; isLoading: boolean; error: Error | null
   }
 

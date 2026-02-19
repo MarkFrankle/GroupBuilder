@@ -1,5 +1,5 @@
 /**
- * Modal for creating a new organization
+ * Modal for creating a new program
  */
 import React, { useState } from 'react';
 import {
@@ -15,13 +15,13 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { apiRequest } from '../../utils/apiClient';
 
-interface CreateOrgModalProps {
+interface CreateProgramModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function CreateOrgModal({ open, onClose, onSuccess }: CreateOrgModalProps) {
+export function CreateProgramModal({ open, onClose, onSuccess }: CreateProgramModalProps) {
   const [name, setName] = useState('');
   const [emails, setEmails] = useState('');
   const [loading, setLoading] = useState(false);
@@ -51,7 +51,7 @@ export function CreateOrgModal({ open, onClose, onSuccess }: CreateOrgModalProps
         invites: Array<{email: string; invite_link: string; email_sent: boolean; error?: string}>;
         partial_failure: boolean;
       }>(
-        '/api/admin/organizations',
+        '/api/admin/programs',
         {
           method: 'POST',
           headers: {
@@ -68,7 +68,7 @@ export function CreateOrgModal({ open, onClose, onSuccess }: CreateOrgModalProps
       setInviteLinks(response.invites);
       setPartialFailure(response.partial_failure);
     } catch (err: any) {
-      setError(err.message || 'Failed to create organization');
+      setError(err.message || 'Failed to create program');
     } finally {
       setLoading(false);
     }
@@ -90,18 +90,18 @@ export function CreateOrgModal({ open, onClose, onSuccess }: CreateOrgModalProps
   if (success) {
     const sentCount = inviteLinks.filter(i => i.email_sent).length;
     const failedCount = inviteLinks.filter(i => !i.email_sent).length;
-    
+
     return (
       <Dialog open={open} onOpenChange={handleClose}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              {partialFailure ? '⚠️ Organization Created with Warnings' : '✓ Organization Created'}
+              {partialFailure ? '⚠️ Program Created with Warnings' : '✓ Program Created'}
             </DialogTitle>
             <DialogDescription>
-              {partialFailure 
-                ? 'Your organization has been created, but some invites could not be sent.'
-                : 'Your organization has been created and invites have been sent.'}
+              {partialFailure
+                ? 'Your program has been created, but some invites could not be sent.'
+                : 'Your program has been created and invites have been sent.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -112,7 +112,7 @@ export function CreateOrgModal({ open, onClose, onSuccess }: CreateOrgModalProps
 
             {partialFailure && (
               <div className="text-sm text-amber-700 bg-amber-50 p-3 rounded border border-amber-200">
-                {failedCount} of {inviteLinks.length} invitation emails failed to send. 
+                {failedCount} of {inviteLinks.length} invitation emails failed to send.
                 You can share the invite links manually below.
               </div>
             )}
@@ -159,7 +159,7 @@ export function CreateOrgModal({ open, onClose, onSuccess }: CreateOrgModalProps
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Create Organization</DialogTitle>
+          <DialogTitle>Create Program</DialogTitle>
           <DialogDescription>
             Set up a new group and invite facilitators to collaborate.
           </DialogDescription>

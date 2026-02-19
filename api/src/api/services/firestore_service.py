@@ -1,4 +1,4 @@
-"""Firestore service layer for organization and session access."""
+"""Firestore service layer for program and session access."""
 from typing import List, Optional, Dict, Any
 from google.cloud.firestore_v1 import Client
 from ..firebase_admin import get_firestore_client
@@ -11,36 +11,36 @@ class FirestoreService:
         """Initialize with Firestore client."""
         self.db: Client = get_firestore_client()
 
-    def get_user_organizations(self, user_id: str) -> List[Dict[str, Any]]:
-        """Get all active organizations a user belongs to.
+    def get_user_programs(self, user_id: str) -> List[Dict[str, Any]]:
+        """Get all active programs a user belongs to.
 
         Args:
             user_id: Firebase user ID
 
         Returns:
-            List of active organization documents with id and data
+            List of active program documents with id and data
         """
-        orgs = []
+        programs = []
 
-        # Query all organizations
-        orgs_ref = self.db.collection("organizations")
-        org_docs = orgs_ref.stream()
+        # Query all programs
+        programs_ref = self.db.collection("organizations")
+        program_docs = programs_ref.stream()
 
-        for org_doc in org_docs:
-            org_data = org_doc.to_dict()
+        for program_doc in program_docs:
+            program_data = program_doc.to_dict()
 
-            # Skip inactive organizations
-            if not org_data.get("active", True):
+            # Skip inactive programs
+            if not program_data.get("active", True):
                 continue
 
-            # Check if user is a member of this org
-            member_ref = org_doc.reference.collection("members").document(user_id)
+            # Check if user is a member of this program
+            member_ref = program_doc.reference.collection("members").document(user_id)
             member_doc = member_ref.get()
 
             if member_doc.exists:
-                orgs.append({"id": org_doc.id, **org_data})
+                programs.append({"id": program_doc.id, **program_data})
 
-        return orgs
+        return programs
 
     def check_user_can_access_session(self, user_id: str, session_id: str) -> bool:
         """Check if user has access to a session.
@@ -50,17 +50,17 @@ class FirestoreService:
             session_id: Session UUID
 
         Returns:
-            True if user belongs to session's organization
+            True if user belongs to session's program
         """
-        # Get all organizations user belongs to
-        user_orgs = self.get_user_organizations(user_id)
-        user_org_ids = {org["id"] for org in user_orgs}
+        # Get all programs user belongs to
+        user_programs = self.get_user_programs(user_id)
+        user_program_ids = {program["id"] for program in user_programs}
 
-        if not user_org_ids:
+        if not user_program_ids:
             return False
 
-        # Find which org owns this session
-        # Use collection group query to search across all orgs
+        # Find which program owns this session
+        # Use collection group query to search across all programs
         sessions_ref = self.db.collection_group("sessions")
         session_query = sessions_ref.where("session_id", "==", session_id).limit(1)
         session_docs = list(session_query.stream())
@@ -69,19 +69,19 @@ class FirestoreService:
             return False
 
         session_doc = session_docs[0]
-        # Get org ID from parent reference
-        org_id = session_doc.reference.parent.parent.id
+        # Get program ID from parent reference
+        program_id = session_doc.reference.parent.parent.id
 
-        return org_id in user_org_ids
+        return program_id in user_program_ids
 
-    def get_session_organization_id(self, session_id: str) -> Optional[str]:
-        """Get the organization ID that owns a session.
+    def get_session_program_id(self, session_id: str) -> Optional[str]:
+        """Get the program ID that owns a session.
 
         Args:
             session_id: Session UUID
 
         Returns:
-            Organization ID or None if session not found
+            Program ID or None if session not found
         """
         sessions_ref = self.db.collection_group("sessions")
         session_query = sessions_ref.where("session_id", "==", session_id).limit(1)

@@ -1,15 +1,15 @@
 /**
- * Organization switcher component - shows current org and allows switching for multi-org users
+ * Program switcher component - shows current program and allows switching for multi-program users
  */
 import React, { useState } from 'react';
-import { useOrganization } from '../contexts/OrganizationContext';
+import { useProgram } from '../contexts/ProgramContext';
 
-export function OrganizationSwitcher() {
-  const { currentOrg, organizations, setCurrentOrg } = useOrganization();
+export function ProgramSwitcher() {
+  const { currentProgram, programs, setCurrentProgram } = useProgram();
   const [isOpen, setIsOpen] = useState(false);
 
-  // Don't show if no org selected or only one org
-  if (!currentOrg || organizations.length <= 1) {
+  // Don't show if no program selected or only one program
+  if (!currentProgram || programs.length <= 1) {
     return null;
   }
 
@@ -29,7 +29,7 @@ export function OrganizationSwitcher() {
           gap: '8px',
         }}
       >
-        <span style={{ fontWeight: '500' }}>{currentOrg.name}</span>
+        <span style={{ fontWeight: '500' }}>{currentProgram.name}</span>
         <span style={{ fontSize: '12px', color: '#666' }}>▼</span>
       </button>
 
@@ -64,37 +64,37 @@ export function OrganizationSwitcher() {
             }}
           >
             <div style={{ padding: '8px 0' }}>
-              {organizations.map((org) => (
+              {programs.map((program) => (
                 <button
-                  key={org.id}
+                  key={program.id}
                   onClick={() => {
-                    setCurrentOrg(org);
+                    setCurrentProgram(program);
                     setIsOpen(false);
                   }}
                   style={{
                     width: '100%',
                     padding: '10px 16px',
                     border: 'none',
-                    backgroundColor: org.id === currentOrg.id ? '#f0f8ff' : 'white',
+                    backgroundColor: program.id === currentProgram.id ? '#f0f8ff' : 'white',
                     cursor: 'pointer',
                     textAlign: 'left',
                     fontSize: '14px',
-                    fontWeight: org.id === currentOrg.id ? '600' : '400',
-                    color: org.id === currentOrg.id ? '#2196F3' : '#333',
+                    fontWeight: program.id === currentProgram.id ? '600' : '400',
+                    color: program.id === currentProgram.id ? '#2196F3' : '#333',
                   }}
                   onMouseEnter={(e) => {
-                    if (org.id !== currentOrg.id) {
+                    if (program.id !== currentProgram.id) {
                       e.currentTarget.style.backgroundColor = '#f5f5f5';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (org.id !== currentOrg.id) {
+                    if (program.id !== currentProgram.id) {
                       e.currentTarget.style.backgroundColor = 'white';
                     }
                   }}
                 >
-                  {org.name}
-                  {org.id === currentOrg.id && (
+                  {program.name}
+                  {program.id === currentProgram.id && (
                     <span style={{ marginLeft: '8px', color: '#2196F3' }}>✓</span>
                   )}
                 </button>

@@ -624,13 +624,13 @@ async def save_edited_assignments(
 
 @router.get("/sessions")
 async def list_sessions(
-    org_id: str = Query(..., description="Organization ID"),
+    program_id: str = Query(..., description="Program ID"),
     user: AuthUser = Depends(get_current_user),
 ):
-    """List all sessions for an organization, sorted by most recent."""
+    """List all sessions for a program, sorted by most recent."""
     session_storage = get_session_storage()
-    logger.info(f"Listing sessions for org: {org_id}")
-    return session_storage.get_sessions_for_org(org_id)
+    logger.info(f"Listing sessions for program: {program_id}")
+    return session_storage.get_sessions_for_program(program_id)
 
 
 @router.get("/sessions/{session_id}/metadata")
@@ -691,7 +691,7 @@ async def clone_session_with_params(
         logger.warning(f"Source session not found: {session_id}")
         raise HTTPException(status_code=404, detail="Source session not found.")
 
-    # Get original session data (includes org_id)
+    # Get original session data (includes program_id)
     original_session = session_storage.get_session(session_id)
     participant_dict = original_session.get("participant_data", [])
 
@@ -706,10 +706,10 @@ async def clone_session_with_params(
 
     # Create new session with same participant data but new parameters
     new_session_id = str(uuid.uuid4())
-    org_id = original_session.get("org_id")
+    program_id = original_session.get("org_id")
 
     session_storage.save_session(
-        org_id=org_id,
+        org_id=program_id,
         session_id=new_session_id,
         user_id=user.user_id,
         participant_data=participant_dict,
@@ -719,7 +719,7 @@ async def clone_session_with_params(
     )
 
     logger.info(
-        f"Successfully cloned session. New session ID: {new_session_id} in org {org_id}"
+        f"Successfully cloned session. New session ID: {new_session_id} in program {program_id}"
     )
 
     return {"message": "Session cloned successfully", "session_id": new_session_id}

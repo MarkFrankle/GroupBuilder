@@ -6,9 +6,9 @@ import { Screenshot, TipCallout, WarningCallout, InfoCallout } from "../../compo
 
 const tocItems = [
   { id: "getting-started", label: "Getting Started as an Admin" },
-  { id: "creating-an-organization", label: "Creating an Organization" },
-  { id: "managing-an-organization", label: "Managing an Organization" },
-  { id: "deleting-an-organization", label: "Deleting an Organization" },
+  { id: "creating-a-program", label: "Creating a Program" },
+  { id: "managing-a-program", label: "Managing a Program" },
+  { id: "deleting-a-program", label: "Deleting a Program" },
   { id: "onboarding-facilitators", label: "Onboarding a New Facilitator" },
   { id: "logins-and-access", label: "Logins, Sharing, and Who Can See What" },
   { id: "quick-reference", label: "Common Admin Tasks" },
@@ -42,7 +42,7 @@ export function AdminHelpPage() {
       <div className="max-w-[700px] mx-auto px-4 py-8 sm:py-12">
         <h1 className="text-3xl font-bold mb-2">Admin Help</h1>
         <p className="text-slate-600 mb-8">
-          A guide to managing organizations and onboarding facilitators. If something
+          A guide to managing programs and onboarding facilitators. If something
           isn't working as expected, see the{" "}
           <a href="#troubleshooting" className="text-blue-600 hover:text-blue-800 underline">
             Troubleshooting
@@ -73,8 +73,8 @@ export function AdminHelpPage() {
             Getting Started as an Admin
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            The admin panel is where you create and manage <strong>organizations</strong> —
-            each organization corresponds to one cohort or seminar series run by a set
+            The admin panel is where you create and manage <strong>programs</strong> —
+            each program corresponds to one cohort or seminar series run by a set
             of facilitators.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
@@ -89,19 +89,19 @@ export function AdminHelpPage() {
 
           <InfoCallout>
             Admin access and facilitator access are independent. You can be an admin
-            without being a member of any organization, and vice versa. Being an admin
-            lets you manage organizations — it does not give you access to the roster
+            without being a member of any program, and vice versa. Being an admin
+            lets you manage programs — it does not give you access to the roster
             or group assignment tools that facilitators use.
           </InfoCallout>
         </section>
 
-        {/* ===================== Section 2: Creating an Organization ===================== */}
+        {/* ===================== Section 2: Creating a Program ===================== */}
         <section className="mb-12">
-          <h2 id="creating-an-organization" className="text-2xl font-bold mb-4 scroll-mt-8">
-            Creating an Organization
+          <h2 id="creating-a-program" className="text-2xl font-bold mb-4 scroll-mt-8">
+            Creating a Program
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            Click <strong>"+ Create Organization"</strong> from the dashboard to open
+            Click <strong>"+ Create Program"</strong> from the dashboard to open
             the creation form.
           </p>
 
@@ -129,32 +129,32 @@ export function AdminHelpPage() {
           </ol>
 
           <WarningCallout>
-            If an email fails to send, the organization is still created and the
+            If an email fails to send, the program is still created and the
             facilitator still has an invite — it just wasn't delivered automatically.
-            Do not re-create the organization. Use the manual link shown on the
+            Do not re-create the program. Use the manual link shown on the
             confirmation screen, or go to Manage → Add New Invite.
           </WarningCallout>
 
           <Screenshot
             src="/images/help-admin/create-organization-modal.png"
-            alt="The Create Organization form showing the Series Name field and the multi-line Facilitator Emails textarea"
-            caption="The Create Organization form — enter a specific series name and one email per line"
+            alt="The Create Program form showing the Series Name field and the multi-line Facilitator Emails textarea"
+            caption="The Create Program form — enter a specific series name and one email per line"
           />
 
           <Screenshot
             src="/images/help-admin/organization-created-confirmation.png"
-            alt="Post-creation confirmation showing the org name and two sent invites with green checkmarks"
+            alt="Post-creation confirmation showing the program name and two sent invites with green checkmarks"
             caption="After creation — each invited email shows a green checkmark when successfully sent"
           />
         </section>
 
-        {/* ===================== Section 3: Managing an Organization ===================== */}
+        {/* ===================== Section 3: Managing a Program ===================== */}
         <section className="mb-12">
-          <h2 id="managing-an-organization" className="text-2xl font-bold mb-4 scroll-mt-8">
-            Managing an Organization
+          <h2 id="managing-a-program" className="text-2xl font-bold mb-4 scroll-mt-8">
+            Managing a Program
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            Click <strong>"Manage"</strong> on any organization card to open the
+            Click <strong>"Manage"</strong> on any program card to open the
             management panel. It has two sections:
           </p>
 
@@ -163,12 +163,12 @@ export function AdminHelpPage() {
             People who have already accepted an invite and have active access. Each row
             shows their email, the date they joined, and their role. You can{" "}
             <strong>Remove</strong> a member at any time — they'll lose access to the
-            organization immediately but can be re-invited later.
+            program immediately but can be re-invited later.
           </p>
 
           <h3 className="text-xl font-semibold mb-2">Invites</h3>
           <p className="mb-2 text-slate-700 leading-relaxed">
-            A full history of every invitation sent for this organization. Each invite
+            A full history of every invitation sent for this program. Each invite
             shows the invited email, when it was sent, and its status:
           </p>
           <ul className="list-disc pl-5 space-y-2 text-slate-700 leading-relaxed mb-4">
@@ -176,7 +176,7 @@ export function AdminHelpPage() {
             <li><strong>Accepted</strong> — the person clicked the link and joined</li>
             <li><strong>Expired</strong> — the link was not used before the expiry date</li>
             <li><strong>Revoked</strong> — you cancelled it manually</li>
-            <li><strong>Removed</strong> — the person was removed from the organization after accepting</li>
+            <li><strong>Removed</strong> — the person was removed from the program after accepting</li>
           </ul>
           <p className="mb-4 text-slate-700 leading-relaxed">
             You can <strong>Revoke</strong> any pending invite before it's accepted.
@@ -187,12 +187,12 @@ export function AdminHelpPage() {
           <p className="mb-4 text-slate-700 leading-relaxed">
             At the top of the Invites section there's a single-email form. Enter an
             email and click <strong>"Send Invite"</strong> to add a new facilitator to
-            an existing organization without going through the Create flow.
+            an existing program without going through the Create flow.
           </p>
 
           <InfoCallout>
             Removing a member does not delete any of the work they did in the
-            organization (roster edits, generated groups, etc.). It only removes
+            program (roster edits, generated groups, etc.). It only removes
             their access.
           </InfoCallout>
 
@@ -203,19 +203,19 @@ export function AdminHelpPage() {
           />
         </section>
 
-        {/* ===================== Section 4: Deleting an Organization ===================== */}
+        {/* ===================== Section 4: Deleting a Program ===================== */}
         <section className="mb-12">
-          <h2 id="deleting-an-organization" className="text-2xl font-bold mb-4 scroll-mt-8">
-            Deleting an Organization
+          <h2 id="deleting-a-program" className="text-2xl font-bold mb-4 scroll-mt-8">
+            Deleting a Program
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            Click <strong>"Delete"</strong> on an organization card to soft-delete it.
-            The organization disappears from the default list, but all its data (roster,
+            Click <strong>"Delete"</strong> on a program card to soft-delete it.
+            The program disappears from the default list, but all its data (roster,
             assignments, results) is preserved in the database.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            To see deleted organizations, check <strong>"Show deleted organizations"</strong>{" "}
-            at the top of the dashboard. Deleted organizations appear grayed-out with a
+            To see deleted programs, check <strong>"Show deleted programs"</strong>{" "}
+            at the top of the dashboard. Deleted programs appear grayed-out with a
             "Deleted" badge. They cannot be managed or re-activated from the UI — if you
             need to recover one, contact whoever manages the backend.
           </p>
@@ -227,7 +227,7 @@ export function AdminHelpPage() {
 
           <Screenshot
             src="/images/help-admin/delete-organization-modal.png"
-            alt="The delete confirmation dialog asking to confirm deleting an organization"
+            alt="The delete confirmation dialog asking to confirm deleting a program"
             caption="The delete confirmation dialog — check the name carefully before confirming"
           />
         </section>
@@ -248,14 +248,14 @@ export function AdminHelpPage() {
             <div>
               <p className="leading-relaxed mb-2">
                 <span className="font-semibold">1. The invitation email</span> arrives
-                from GroupBuilder with the subject "You're invited to facilitate [org
+                from GroupBuilder with the subject "You're invited to facilitate [program
                 name] on GroupBuilder." It shows who sent the invite — your email
                 address appears as "Invited by" — and contains an "Accept Invitation"
                 button.
               </p>
               <Screenshot
                 src="/images/help-admin/facilitator-invite-email.png"
-                alt="The invitation email showing the org name, Invited by field, and Accept Invitation button"
+                alt="The invitation email showing the program name, Invited by field, and Accept Invitation button"
                 caption="The invitation email — facilitators see who invited them and can click Accept Invitation"
               />
             </div>
@@ -265,7 +265,7 @@ export function AdminHelpPage() {
               <p className="leading-relaxed mb-2">
                 <span className="font-semibold">2. Clicking the button</span> takes them
                 to the invite acceptance page. They'll see a "You're Invited!" screen
-                showing the organization name and the email address the invite was sent
+                showing the program name and the email address the invite was sent
                 to, confirming they're in the right place.
               </p>
               <p className="leading-relaxed mb-2">
@@ -275,8 +275,8 @@ export function AdminHelpPage() {
               </p>
               <Screenshot
                 src="/images/help-admin/accept-facilitator-invite-page.png"
-                alt="The invite acceptance page showing the organization name, invited email, and a green Accept Invite button"
-                caption="The acceptance page — org name, their email, and the green Accept Invite button"
+                alt="The invite acceptance page showing the program name, invited email, and a green Accept Invite button"
+                caption="The acceptance page — program name, their email, and the green Accept Invite button"
               />
               <InfoCallout>
                 <p className="font-semibold mb-1">Email mismatch warning</p>
@@ -291,8 +291,8 @@ export function AdminHelpPage() {
             <div>
               <p className="leading-relaxed mb-2">
                 <span className="font-semibold">4. First time in the app</span> — they
-                land on the Home page for the organization they just joined. If they
-                were invited to multiple organizations, they'll see a selector first.
+                land on the Home page for the program they just joined. If they
+                were invited to multiple programs, they'll see a selector first.
               </p>
               <p className="leading-relaxed mb-2">
                 <span className="font-semibold">5. Staying logged in</span> — the app
@@ -328,24 +328,24 @@ export function AdminHelpPage() {
           <h3 className="text-xl font-semibold mb-2">Multiple facilitators can be logged in at the same time</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
             There is no concept of "one person at a time." If two facilitators from the
-            same organization both have the app open, they are both looking at the same
+            same program both have the app open, they are both looking at the same
             shared data: the same roster, the same generated groups, the same assignment
             history. Either of them can make changes. This is intentional — it supports
             co-facilitation and delegation.
           </p>
 
-          <h3 className="text-xl font-semibold mb-2">Facilitators only see their own organization's data</h3>
+          <h3 className="text-xl font-semibold mb-2">Facilitators only see their own program's data</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            Access is scoped strictly to the organizations a facilitator has been invited
+            Access is scoped strictly to the programs a facilitator has been invited
             to and accepted. A facilitator in "Spring 2026 Cohort" cannot see anything in
-            "Fall 2025 Cohort" unless they were separately invited to that organization.
-            Admins can see all organizations in the admin panel, but only for management
+            "Fall 2025 Cohort" unless they were separately invited to that program.
+            Admins can see all programs in the admin panel, but only for management
             purposes — the admin panel doesn't give roster or group access.
           </p>
 
           <h3 className="text-xl font-semibold mb-2">The expected ownership model</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            The typical setup is one facilitator per organization who "owns" the tool —
+            The typical setup is one facilitator per program who "owns" the tool —
             they build the roster, run the solver, and manage the results. Additional
             facilitators can be invited (e.g., a co-facilitator or backup) and will have
             full equal access. There is no read-only role; all invited facilitators can
@@ -387,13 +387,13 @@ export function AdminHelpPage() {
               </thead>
               <tbody>
                 {[
-                  ["Create a new cohort", "Dashboard → \"+ Create Organization\""],
+                  ["Create a new cohort", "Dashboard → \"+ Create Program\""],
                   ["Add a facilitator to an existing cohort", "Dashboard → Manage → Add New Invite"],
                   ["See if a facilitator accepted their invite", "Dashboard → Manage → Invites (check status)"],
                   ["Re-send an invite (if expired)", "Dashboard → Manage → Add New Invite (same email)"],
                   ["Remove a facilitator's access", "Dashboard → Manage → Members → Remove"],
                   ["Cancel an invite before it's accepted", "Dashboard → Manage → Invites → Revoke"],
-                  ["See soft-deleted organizations", "Dashboard → check \"Show deleted organizations\""],
+                  ["See soft-deleted programs", "Dashboard → check \"Show deleted programs\""],
                 ].map(([task, where], i) => (
                   <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-slate-50"}>
                     <td className="p-3 border border-slate-200">{task}</td>
@@ -415,7 +415,7 @@ export function AdminHelpPage() {
             <InfoCallout>
               <p className="font-bold mb-1">An invite email failed to send</p>
               <p>
-                The organization was still created and the invite link exists. Use the
+                The program was still created and the invite link exists. Use the
                 manual link shown in the post-creation dialog, or go to Manage → Add
                 New Invite with the same address.
               </p>
@@ -430,7 +430,7 @@ export function AdminHelpPage() {
             </InfoCallout>
 
             <InfoCallout>
-              <p className="font-bold mb-1">A facilitator is signed in but can't see the organization</p>
+              <p className="font-bold mb-1">A facilitator is signed in but can't see the program</p>
               <p>
                 They may not have clicked Accept Invite. Have them check their original
                 invitation email, or send a new invite via Manage → Add New Invite.
@@ -447,9 +447,9 @@ export function AdminHelpPage() {
             </InfoCallout>
 
             <InfoCallout>
-              <p className="font-bold mb-1">I can't find an organization I created</p>
+              <p className="font-bold mb-1">I can't find a program I created</p>
               <p>
-                Check "Show deleted organizations" on the dashboard. If it appears there,
+                Check "Show deleted programs" on the dashboard. If it appears there,
                 it was soft-deleted. Data is intact; UI recovery isn't currently
                 supported — contact your system administrator.
               </p>
