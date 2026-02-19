@@ -1,4 +1,4 @@
-"""Admin routes for organization management."""
+"""Admin routes for program management."""
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from typing import List
@@ -13,14 +13,14 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
 class CreateOrgRequest(BaseModel):
-    """Request to create a new organization."""
+    """Request to create a new program."""
 
     name: str
     facilitator_emails: List[EmailStr]
 
 
-class OrganizationResponse(BaseModel):
-    """Organization summary."""
+class ProgramResponse(BaseModel):
+    """Program summary."""
 
     id: str
     name: str
@@ -49,20 +49,20 @@ async def require_bb_admin(user: AuthUser = Depends(get_current_user)) -> AuthUs
     return user
 
 
-@router.post("/organizations", response_model=dict)
-async def create_organization(
+@router.post("/programs", response_model=dict)
+async def create_program(
     request: CreateOrgRequest, user: AuthUser = Depends(require_bb_admin)
 ):
-    """Create new organization and send invites.
+    """Create new program and send invites.
 
     Returns:
-        Created org ID and invite status
+        Created program ID and invite status
     """
     db = get_firestore_client()
 
-    # Create organization document
-    org_ref = db.collection("organizations").document()
-    org_ref.set(
+    # Create program document
+    program_ref = db.collection("organizations").document()
+    program_ref.set(
         {
             "name": request.name,
             "created_at": datetime.now(timezone.utc),
@@ -75,7 +75,7 @@ async def create_organization(
     invites = []
     for email in request.facilitator_emails:
         invite_token = secrets.token_urlsafe(32)
-        invite_ref = org_ref.collection("invites").document()
+        invite_ref = program_ref.collection("invites").document()
         invite_ref.set(
             {
                 "email": email,
@@ -103,79 +103,81 @@ async def create_organization(
             }
         )
 
-    return {"org_id": org_ref.id, "invites": invites}
+    return {"program_id": program_ref.id, "invites": invites}
 
 
-@router.get("/organizations", response_model=List[OrganizationResponse])
-async def list_organizations(
+@router.get("/programs", response_model=List[ProgramResponse])
+async def list_programs(
     show_inactive: bool = False, user: AuthUser = Depends(require_bb_admin)
 ):
-    """List organizations (admin only).
+    """List programs (admin only).
 
     Args:
-        show_inactive: If True, include inactive organizations
+        show_inactive: If True, include inactive programs
     """
     db = get_firestore_client()
 
-    orgs = []
-    org_docs = db.collection("organizations").stream()
+    programs = []
+    program_docs = db.collection("organizations").stream()
 
-    for org_doc in org_docs:
-        org_data = org_doc.to_dict()
+    for program_doc in program_docs:
+        program_data = program_doc.to_dict()
 
-        # Filter inactive orgs unless show_inactive is True
-        is_active = org_data.get("active", True)  # Default to True for legacy orgs
+        # Filter inactive programs unless show_inactive is True
+        is_active = program_data.get(
+            "active", True
+        )  # Default to True for legacy programs
         if not show_inactive and not is_active:
             continue
 
         # Count members
-        members = org_doc.reference.collection("members").stream()
+        members = program_doc.reference.collection("members").stream()
         member_count = sum(1 for _ in members)
 
         # Convert Firestore timestamp to Unix timestamp
-        created_at = org_data["created_at"]
+        created_at = program_data["created_at"]
         created_at_unix = created_at.timestamp() if created_at else 0
 
-        orgs.append(
+        programs.append(
             {
-                "id": org_doc.id,
-                "name": org_data["name"],
+                "id": program_doc.id,
+                "name": program_data["name"],
                 "created_at": created_at_unix,
                 "member_count": member_count,
                 "active": is_active,
             }
         )
 
-    return orgs
+    return programs
 
 
-@router.delete("/organizations/{org_id}")
-async def delete_organization(org_id: str, user: AuthUser = Depends(require_bb_admin)):
-    """Soft delete an organization by marking it as inactive.
+@router.delete("/programs/{program_id}")
+async def delete_program(program_id: str, user: AuthUser = Depends(require_bb_admin)):
+    """Soft delete a program by marking it as inactive.
 
     Args:
-        org_id: Organization ID
+        program_id: Program ID
         user: Authenticated admin user
 
     Returns:
         Success message
 
     Raises:
-        HTTPException: 404 if organization not found
+        HTTPException: 404 if program not found
     """
     db = get_firestore_client()
 
-    # Get organization
-    org_ref = db.collection("organizations").document(org_id)
-    org_doc = org_ref.get()
+    # Get program
+    program_ref = db.collection("organizations").document(program_id)
+    program_doc = program_ref.get()
 
-    if not org_doc.exists:
+    if not program_doc.exists:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Program not found"
         )
 
     # Soft delete by marking as inactive
-    org_ref.update(
+    program_ref.update(
         {
             "active": False,
             "deleted_at": datetime.now(timezone.utc),
@@ -183,4 +185,4 @@ async def delete_organization(org_id: str, user: AuthUser = Depends(require_bb_a
         }
     )
 
-    return {"success": True, "message": "Organization deleted successfully"}
+    return {"success": True, "message": "Program deleted successfully"}

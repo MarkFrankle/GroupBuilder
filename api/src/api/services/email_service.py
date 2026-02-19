@@ -98,7 +98,7 @@ class EmailService:
 
         Args:
             to_email: Recipient email address
-            org_name: Name of the organization
+            org_name: Name of the program
             invite_token: Unique invite token
             inviter_email: Email of person who sent invite (optional)
 

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiRequest } from '@/utils/apiClient'
 
-interface Organization {
+interface Program {
   id: string
   name: string
   created_at: number
@@ -9,7 +9,7 @@ interface Organization {
   active?: boolean
 }
 
-interface OrgDetails {
+interface ProgramDetails {
   id: string
   name: string
   created_at: number
@@ -18,17 +18,17 @@ interface OrgDetails {
   invites: any[]
 }
 
-export function useAdminOrganizations(showInactive: boolean) {
+export function useAdminPrograms(showInactive: boolean) {
   return useQuery({
-    queryKey: ['admin-organizations', showInactive],
-    queryFn: () => apiRequest<Organization[]>(`/api/admin/organizations?show_inactive=${showInactive}`),
+    queryKey: ['admin-programs', showInactive],
+    queryFn: () => apiRequest<Program[]>(`/api/admin/programs?show_inactive=${showInactive}`),
   })
 }
 
-export function useOrgDetails(orgId: string | null, enabled: boolean) {
+export function useProgramDetails(programId: string | null, enabled: boolean) {
   return useQuery({
-    queryKey: ['admin-org-details', orgId],
-    queryFn: () => apiRequest<OrgDetails>(`/api/admin/organizations/${orgId}`),
-    enabled: enabled && !!orgId,
+    queryKey: ['admin-program-details', programId],
+    queryFn: () => apiRequest<ProgramDetails>(`/api/admin/programs/${programId}`),
+    enabled: enabled && !!programId,
   })
 }

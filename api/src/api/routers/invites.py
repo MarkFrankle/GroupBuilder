@@ -11,8 +11,8 @@ router = APIRouter(prefix="/api/invites", tags=["invites"])
 class InviteDetailsResponse(BaseModel):
     """Invite details for display before acceptance."""
 
-    org_id: str
-    org_name: str
+    program_id: str
+    program_name: str
     invited_email: str
     expires_at: float  # Unix timestamp
     status: str
@@ -32,14 +32,14 @@ async def get_invite_details(token: str):
         token: The invite token from the URL
 
     Returns:
-        Invite details including org name and expiration
+        Invite details including program name and expiration
 
     Raises:
         HTTPException: 404 if invite not found, 410 if expired/used
     """
     db = get_firestore_client()
 
-    # Search for invite across all organizations using collection group query
+    # Search for invite across all programs using collection group query
     invites_query = db.collection_group("invites").where("token", "==", token).limit(1)
     invite_docs = list(invites_query.stream())
 
@@ -51,19 +51,19 @@ async def get_invite_details(token: str):
     invite_doc = invite_docs[0]
     invite_data = invite_doc.to_dict()
 
-    # Get organization ID from the invite's parent reference
-    org_id = invite_doc.reference.parent.parent.id
+    # Get program ID from the invite's parent reference
+    program_id = invite_doc.reference.parent.parent.id
 
-    # Get organization details
-    org_ref = db.collection("organizations").document(org_id)
-    org_doc = org_ref.get()
+    # Get program details
+    program_ref = db.collection("organizations").document(program_id)
+    program_doc = program_ref.get()
 
-    if not org_doc.exists:
+    if not program_doc.exists:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Program not found"
         )
 
-    org_data = org_doc.to_dict()
+    program_data = program_doc.to_dict()
 
     # Check if invite is still valid
     if invite_data["status"] != "pending":
@@ -82,8 +82,8 @@ async def get_invite_details(token: str):
     expires_at_unix = expires_at.timestamp() if expires_at else 0
 
     return {
-        "org_id": org_id,
-        "org_name": org_data["name"],
+        "program_id": program_id,
+        "program_name": program_data["name"],
         "invited_email": invite_data["email"],
         "expires_at": expires_at_unix,
         "status": invite_data["status"],
@@ -94,14 +94,14 @@ async def get_invite_details(token: str):
 async def accept_invite(
     request: AcceptInviteRequest, user: AuthUser = Depends(get_current_user)
 ):
-    """Accept an invite and add user to organization.
+    """Accept an invite and add user to program.
 
     Args:
         request: Contains the invite token
         user: Authenticated user from Firebase token
 
     Returns:
-        Success message with org details
+        Success message with program details
 
     Raises:
         HTTPException: 404 if invite not found, 403 if wrong email, 410 if expired/used
@@ -122,8 +122,8 @@ async def accept_invite(
     invite_doc = invite_docs[0]
     invite_data = invite_doc.to_dict()
 
-    # Get organization ID from parent reference
-    org_id = invite_doc.reference.parent.parent.id
+    # Get program ID from parent reference
+    program_id = invite_doc.reference.parent.parent.id
 
     # Validate invite status
     if invite_data["status"] != "pending":
@@ -147,19 +147,19 @@ async def accept_invite(
             detail=f"This invite is for {invite_data['email']}, but you are logged in as {user.email}",
         )
 
-    # Get organization
-    org_ref = db.collection("organizations").document(org_id)
-    org_doc = org_ref.get()
+    # Get program
+    program_ref = db.collection("organizations").document(program_id)
+    program_doc = program_ref.get()
 
-    if not org_doc.exists:
+    if not program_doc.exists:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Program not found"
         )
 
-    org_data = org_doc.to_dict()
+    program_data = program_doc.to_dict()
 
-    # Add user to organization members
-    member_ref = org_ref.collection("members").document(user.user_id)
+    # Add user to program members
+    member_ref = program_ref.collection("members").document(user.user_id)
     member_ref.set(
         {
             "user_id": user.user_id,
@@ -181,7 +181,7 @@ async def accept_invite(
 
     return {
         "success": True,
-        "org_id": org_id,
-        "org_name": org_data["name"],
+        "program_id": program_id,
+        "program_name": program_data["name"],
         "role": "facilitator",
     }

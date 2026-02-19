@@ -95,41 +95,41 @@ async def upload_file(
 
         participant_dict = dataframe_to_participant_dict(participant_dataframe)
 
-        # Get user's organizations
-        user_orgs = firestore_service.get_user_organizations(user.user_id)
+        # Get user's programs
+        user_programs = firestore_service.get_user_programs(user.user_id)
 
-        if not user_orgs:
-            logger.error(f"User {user.email} has no organizations")
+        if not user_programs:
+            logger.error(f"User {user.email} has no programs")
             raise HTTPException(
                 status_code=403,
-                detail="You are not a member of any organization. Please contact your administrator.",
+                detail="You are not a member of any program. Please contact your administrator.",
             )
 
-        user_org_ids = {org["id"] for org in user_orgs}
+        user_program_ids = {program["id"] for program in user_programs}
 
-        # Validate or auto-select organization
+        # Validate or auto-select program
         if orgId:
-            # Validate user is a member of the specified org
-            if orgId not in user_org_ids:
+            # Validate user is a member of the specified program
+            if orgId not in user_program_ids:
                 logger.warning(
-                    f"User {user.email} attempted upload to unauthorized org {orgId}"
+                    f"User {user.email} attempted upload to unauthorized program {orgId}"
                 )
                 raise HTTPException(
-                    status_code=403, detail="You are not a member of this organization."
+                    status_code=403, detail="You are not a member of this program."
                 )
-            org_id = orgId
+            program_id = orgId
         else:
-            # Auto-select first organization
-            org_id = user_orgs[0]["id"]
+            # Auto-select first program
+            program_id = user_programs[0]["id"]
 
-        logger.info(f"User {user.email} uploading to organization {org_id}")
+        logger.info(f"User {user.email} uploading to program {program_id}")
 
         session_id = str(uuid.uuid4())
 
         # Use Firestore SessionStorage instead of Redis
         session_storage = SessionStorage()
         session_storage.save_session(
-            org_id=org_id,
+            org_id=program_id,
             session_id=session_id,
             user_id=user.user_id,
             participant_data=participant_dict,
@@ -139,7 +139,7 @@ async def upload_file(
         )
 
         logger.info(
-            f"Successfully stored data for {file.filename} with session ID: {session_id} in org {org_id}"
+            f"Successfully stored data for {file.filename} with session ID: {session_id} in program {program_id}"
         )
 
         return {

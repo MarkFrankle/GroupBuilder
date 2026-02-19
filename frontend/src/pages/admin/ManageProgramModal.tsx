@@ -1,5 +1,5 @@
 /**
- * Modal for managing organization details, members, and invites
+ * Modal for managing program details, members, and invites
  */
 import React, { useState } from 'react';
 import {
@@ -12,16 +12,16 @@ import {
 import { Button } from '../../components/ui/button';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { apiRequest } from '../../utils/apiClient';
-import { useOrgDetails } from '@/hooks/queries';
+import { useProgramDetails } from '@/hooks/queries';
 import { useQueryClient } from '@tanstack/react-query';
 
-interface ManageOrgModalProps {
+interface ManageProgramModalProps {
   open: boolean;
   onClose: () => void;
-  orgId: string | null;
+  programId: string | null;
 }
 
-export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
+export function ManageProgramModal({ open, onClose, programId }: ManageProgramModalProps) {
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [newInviteEmail, setNewInviteEmail] = useState('');
@@ -30,17 +30,17 @@ export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<{ userId: string; email: string } | null>(null);
 
-  const { data: orgDetails = null, isLoading: loading, error: fetchError } = useOrgDetails(orgId, open);
+  const { data: programDetails = null, isLoading: loading, error: fetchError } = useProgramDetails(programId, open);
 
   const handleAddInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!orgId || !newInviteEmail.trim()) return;
+    if (!programId || !newInviteEmail.trim()) return;
 
     setSendingInvite(true);
     setError(null);
 
     try {
-      await apiRequest(`/api/admin/organizations/${orgId}/invites`, {
+      await apiRequest(`/api/admin/programs/${programId}/invites`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -51,7 +51,7 @@ export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
       });
 
       setNewInviteEmail('');
-      await queryClient.invalidateQueries({ queryKey: ['admin-org-details', orgId] }); // Reload to show new invite
+      await queryClient.invalidateQueries({ queryKey: ['admin-program-details', programId] }); // Reload to show new invite
     } catch (err: any) {
       setError(err.message || 'Failed to send invite');
     } finally {
@@ -60,17 +60,17 @@ export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
   };
 
   const handleRevokeInvite = async (inviteId: string) => {
-    if (!orgId) return;
+    if (!programId) return;
 
     setRevokingInviteId(inviteId);
     setError(null);
 
     try {
-      await apiRequest(`/api/admin/organizations/${orgId}/invites/${inviteId}`, {
+      await apiRequest(`/api/admin/programs/${programId}/invites/${inviteId}`, {
         method: 'DELETE',
       });
 
-      await queryClient.invalidateQueries({ queryKey: ['admin-org-details', orgId] }); // Reload to update invite status
+      await queryClient.invalidateQueries({ queryKey: ['admin-program-details', programId] }); // Reload to update invite status
     } catch (err: any) {
       setError(err.message || 'Failed to revoke invite');
     } finally {
@@ -79,23 +79,23 @@ export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
   };
 
   const handleRemoveMember = async (userId: string, email: string) => {
-    if (!orgId) return;
-    
+    if (!programId) return;
+
     setConfirmRemove({ userId, email });
   };
 
   const confirmRemoveMember = async () => {
-    if (!orgId || !confirmRemove) return;
+    if (!programId || !confirmRemove) return;
 
     setRemovingMemberId(confirmRemove.userId);
     setError(null);
 
     try {
-      await apiRequest(`/api/admin/organizations/${orgId}/members/${confirmRemove.userId}`, {
+      await apiRequest(`/api/admin/programs/${programId}/members/${confirmRemove.userId}`, {
         method: 'DELETE',
       });
 
-      await queryClient.invalidateQueries({ queryKey: ['admin-org-details', orgId] }); // Reload to update members list
+      await queryClient.invalidateQueries({ queryKey: ['admin-program-details', programId] }); // Reload to update members list
     } catch (err: any) {
       setError(err.message || 'Failed to remove member');
     } finally {
@@ -106,8 +106,8 @@ export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
 
   const formatDate = (timestamp: string | number) => {
     // Handle Unix timestamps (numbers) by converting to milliseconds
-    const date = typeof timestamp === 'number' 
-      ? new Date(timestamp * 1000) 
+    const date = typeof timestamp === 'number'
+      ? new Date(timestamp * 1000)
       : new Date(timestamp);
     return date.toLocaleDateString('en-US', {
       month: 'short',
@@ -127,9 +127,9 @@ export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
       revoked: 'bg-red-100 text-red-800',
       removed: 'bg-orange-100 text-orange-800'
     };
-    
+
     const style = styles[status as keyof typeof styles] || 'bg-gray-100 text-gray-800';
-    
+
     return (
       <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${style}`}>
         {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -148,10 +148,10 @@ export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {orgDetails?.name || 'Organization Details'}
+            {programDetails?.name || 'Program Details'}
           </DialogTitle>
           <DialogDescription>
-            View members and invites for this organization
+            View members and invites for this program
           </DialogDescription>
         </DialogHeader>
 
@@ -166,18 +166,18 @@ export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
             <p className="mt-4 text-gray-600">Loading details...</p>
           </div>
-        ) : orgDetails ? (
+        ) : programDetails ? (
           <div className="space-y-6">
             {/* Members Section */}
             <div>
               <h3 className="text-lg font-semibold mb-3">
-                Members ({orgDetails.members.length})
+                Members ({programDetails.members.length})
               </h3>
-              {orgDetails.members.length === 0 ? (
+              {programDetails.members.length === 0 ? (
                 <p className="text-gray-500 text-sm">No members yet</p>
               ) : (
                 <div className="space-y-2">
-                  {orgDetails.members.map((member) => (
+                  {programDetails.members.map((member) => (
                     <div
                       key={member.user_id}
                       className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
@@ -206,7 +206,7 @@ export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
             {/* Invites Section */}
             <div>
               <h3 className="text-lg font-semibold mb-3">
-                Invites ({orgDetails.invites.length})
+                Invites ({programDetails.invites.length})
               </h3>
 
               {/* Add Invite Form */}
@@ -229,11 +229,11 @@ export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
                 </div>
               </form>
 
-              {orgDetails.invites.length === 0 ? (
+              {programDetails.invites.length === 0 ? (
                 <p className="text-gray-500 text-sm">No invites sent yet</p>
               ) : (
                 <div className="space-y-2">
-                  {orgDetails.invites.map((invite) => (
+                  {programDetails.invites.map((invite) => (
                     <div
                       key={invite.id}
                       className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
@@ -288,7 +288,7 @@ export function ManageOrgModal({ open, onClose, orgId }: ManageOrgModalProps) {
         onClose={() => setConfirmRemove(null)}
         onConfirm={confirmRemoveMember}
         title="Remove Member"
-        description={`Remove ${confirmRemove?.email} from this organization?`}
+        description={`Remove ${confirmRemove?.email} from this program?`}
         confirmText="Remove"
         variant="danger"
       />

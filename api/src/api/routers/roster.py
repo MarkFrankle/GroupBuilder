@@ -31,20 +31,20 @@ async def _get_org_id(
     user: AuthUser = Depends(get_current_user),
     firestore_service: FirestoreService = Depends(get_firestore_service),
 ) -> str:
-    orgs = firestore_service.get_user_organizations(user.user_id)
-    if not orgs:
-        raise HTTPException(status_code=403, detail="User has no organization")
-    return orgs[0]["id"]
+    programs = firestore_service.get_user_programs(user.user_id)
+    if not programs:
+        raise HTTPException(status_code=403, detail="User has no program")
+    return programs[0]["id"]
 
 
 @router.get("/")
 @limiter.limit("30/minute")
 async def get_roster(
     request: Request,
-    org_id: str = Depends(_get_org_id),
+    program_id: str = Depends(_get_org_id),
     roster_service: RosterService = Depends(get_roster_service),
 ):
-    participants = roster_service.get_roster(org_id)
+    participants = roster_service.get_roster(program_id)
     return {"participants": participants}
 
 
@@ -56,7 +56,7 @@ REQUIRED_COLUMNS = {"Name", "Religion", "Gender", "Partner"}
 async def import_roster(
     request: Request,
     file: UploadFile = File(...),
-    org_id: str = Depends(_get_org_id),
+    program_id: str = Depends(_get_org_id),
     roster_service: RosterService = Depends(get_roster_service),
 ):
     if not file.filename.endswith((".xlsx", ".xls")):
@@ -75,9 +75,9 @@ async def import_roster(
         )
 
     # Clear existing roster
-    existing = roster_service.get_roster(org_id)
+    existing = roster_service.get_roster(program_id)
     for p in existing:
-        roster_service.delete_participant(org_id, p["id"])
+        roster_service.delete_participant(program_id, p["id"])
 
     # First pass: create without partners
     name_to_id = {}
@@ -105,7 +105,7 @@ async def import_roster(
             is_facilitator = fac_val in ("yes", "y", "true", "1")
 
         roster_service.upsert_participant(
-            org_id,
+            program_id,
             pid,
             {
                 "name": name,
@@ -138,9 +138,9 @@ async def import_roster(
             partner_pid = name_to_id[partner_name]
             p = [x for x in participants if x["id"] == pid][0]
             p["partner_id"] = partner_pid
-            roster_service.upsert_participant(org_id, pid, {**p})
+            roster_service.upsert_participant(program_id, pid, {**p})
 
-    final = roster_service.get_roster(org_id)
+    final = roster_service.get_roster(program_id)
     return {"participants": final}
 
 
@@ -190,10 +190,10 @@ async def generate_from_roster(
     request: Request,
     data: GenerateRequest,
     user: AuthUser = Depends(get_current_user),
-    org_id: str = Depends(_get_org_id),
+    program_id: str = Depends(_get_org_id),
     roster_service: RosterService = Depends(get_roster_service),
 ):
-    participants = roster_service.get_roster(org_id)
+    participants = roster_service.get_roster(program_id)
     if not participants:
         raise HTTPException(status_code=400, detail="Roster is empty")
 
@@ -217,7 +217,7 @@ async def generate_from_roster(
     session_id = str(uuid.uuid4())
     storage = SessionStorage()
     storage.save_session(
-        org_id=org_id,
+        org_id=program_id,
         session_id=session_id,
         user_id=user.user_id,
         participant_data=participant_list,
@@ -235,12 +235,12 @@ async def upsert_participant(
     request: Request,
     participant_id: str,
     data: ParticipantData,
-    org_id: str = Depends(_get_org_id),
+    program_id: str = Depends(_get_org_id),
     roster_service: RosterService = Depends(get_roster_service),
 ):
     try:
         result = roster_service.upsert_participant(
-            org_id, participant_id, data.model_dump()
+            program_id, participant_id, data.model_dump()
         )
         return result
     except ValueError as e:
@@ -252,15 +252,15 @@ async def upsert_participant(
 async def delete_participant(
     request: Request,
     participant_id: str,
-    org_id: str = Depends(_get_org_id),
+    program_id: str = Depends(_get_org_id),
     roster_service: RosterService = Depends(get_roster_service),
 ):
-    participant = roster_service.get_participant(org_id, participant_id)
+    participant = roster_service.get_participant(program_id, participant_id)
     if participant and participant.get("partner_id"):
-        partner = roster_service.get_participant(org_id, participant["partner_id"])
+        partner = roster_service.get_participant(program_id, participant["partner_id"])
         if partner and partner.get("partner_id") == participant_id:
             roster_service.upsert_participant(
-                org_id, participant["partner_id"], {**partner, "partner_id": None}
+                program_id, participant["partner_id"], {**partner, "partner_id": None}
             )
-    roster_service.delete_participant(org_id, participant_id)
+    roster_service.delete_participant(program_id, participant_id)
     return {"status": "deleted"}

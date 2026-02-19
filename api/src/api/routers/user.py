@@ -8,20 +8,20 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/me/organizations")
-async def get_my_organizations(
+@router.get("/me/programs")
+async def get_my_programs(
     user: AuthUser = Depends(get_current_user),
     firestore_service: FirestoreService = Depends(get_firestore_service),
 ):
-    """Get all organizations the current user belongs to.
+    """Get all programs the current user belongs to.
 
     Returns:
-        List of organizations with id, name, and user's role
+        List of programs with id, name, and user's role
     """
-    logger.info(f"Fetching organizations for user: {user.email}")
+    logger.info(f"Fetching programs for user: {user.email}")
 
-    organizations = firestore_service.get_user_organizations(user.user_id)
+    programs = firestore_service.get_user_programs(user.user_id)
 
-    logger.info(f"User {user.email} belongs to {len(organizations)} organization(s)")
+    logger.info(f"User {user.email} belongs to {len(programs)} program(s)")
 
-    return {"organizations": organizations, "count": len(organizations)}
+    return {"programs": programs, "count": len(programs)}
