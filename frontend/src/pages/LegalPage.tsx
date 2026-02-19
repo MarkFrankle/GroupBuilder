@@ -84,6 +84,14 @@ export default function LegalPage() {
         <h2 className="text-lg font-semibold text-gray-900">Terms of Service</h2>
         <p><strong>Last updated:</strong> February 2026</p>
 
+        <h3 className="font-semibold text-gray-900 pt-2">Intellectual property</h3>
+        <p>
+          GroupBuilder is owned by Mark Frankle. All rights reserved. Nothing in
+          these terms grants you any ownership interest in the software, its
+          code, or its design.
+        </p>
+
+        <h3 className="font-semibold text-gray-900 pt-2">Your use of the service</h3>
         <p>
           By using GroupBuilder you agree to the following:
         </p>
