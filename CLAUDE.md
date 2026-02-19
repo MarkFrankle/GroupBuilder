@@ -8,6 +8,7 @@
 - Before committing frontend changes, run `npm run lint` and `npx tsc --noEmit` in `frontend/`. ESLint and Jest don't catch TypeScript type errors — only `tsc` does.
 - When a user mentions a feature idea or wish, add it to `BACKLOG.md`. Don't plan or implement backlog items unless explicitly asked.
 - **Use superpowers skills for planning.** Don't write ad-hoc plans — use the writing-plans skill and save to `docs/plans/`. The user prefers the deliberative back-and-forth of the skill workflow over "here's a plan, shall I start?"
+- **When closing a feature branch**, update the corresponding plan in `docs/plans/` with a status line at the top: `**Status: Implemented** — merged PR #XX`.
 
 ## Development Rules
 
@@ -58,6 +59,28 @@ Three independent packages (no monorepo tooling):
 | `agent_docs/architecture.md` | adding routes, changing auth, data model, stack questions |
 | `agent_docs/testing.md` | writing or debugging tests, CI failures |
 | `agent_docs/frontend_design.md` | adding or modifying UI components, buttons, dialogs |
+
+## Product Philosophy
+
+GroupBuilder exists to make thoughtful group mixing effortless. Two things must work well: **intuitive UI** and **reliable assignments**. When they conflict, UI wins — a perfect algorithm that confuses volunteers fails the mission.
+
+**Before adding or changing anything, ask:**
+1. Does it serve the mission?
+2. Is there a third use case demanding it? (YAGNI — resist configurability "just in case")
+3. Does it maintain solver correctness?
+4. Will it confuse a non-technical event coordinator?
+5. Can we test it?
+
+If any answer is no, defer or reject.
+
+**Anti-patterns to avoid:**
+- Clever abstractions that save a few lines of code
+- Configuration options no user has asked for
+- Skipping tests because "it's a small change"
+- Optimizing before profiling
+- Technical jargon in user-facing error messages
+- Features that require documentation to discover
+- Error messages that don't tell the user how to fix the problem
 
 ## Tool Preferences
 
