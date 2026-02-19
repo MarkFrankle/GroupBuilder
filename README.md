@@ -139,10 +139,6 @@ cd frontend && CI=true npm test -- --watchAll=false
 - **Frontend:** Netlify — connected to GitHub, auto-deploys on push to `main`
 - **Database:** Google Cloud Firestore
 
-## License
-
-MIT License — see LICENSE file for details.
-
 ---
 
 *Built for [Building Bridges Together](https://buildingbridgestogether.net), a tri-faith interfaith dialogue nonprofit.*
