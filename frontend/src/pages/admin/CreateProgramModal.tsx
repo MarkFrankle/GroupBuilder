@@ -47,7 +47,7 @@ export function CreateProgramModal({ open, onClose, onSuccess }: CreateProgramMo
       }
 
       const response = await apiRequest<{
-        org_id: string;
+        program_id: string;
         invites: Array<{email: string; invite_link: string; email_sent: boolean; error?: string}>;
         partial_failure: boolean;
       }>(
