@@ -96,7 +96,7 @@ const App: React.FC = () => {
     <AuthProvider>
       <ProgramProvider>
         <QueryClientProvider client={queryClient}>
-          <Router>
+          <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <NavBar />
             <Routes>
               <Route path="/login" element={<LoginPage />} />
