@@ -11,8 +11,8 @@ import { apiRequest } from '../utils/apiClient';
 import { API_BASE_URL } from '../config/api';
 
 interface InviteDetails {
-  org_id: string;
-  org_name: string;
+  program_id: string;
+  program_name: string;
   invited_email: string;
   expires_at: string;
   status: string;
@@ -145,7 +145,7 @@ export function InviteAcceptPage() {
               Invite Accepted!
             </h1>
             <p className="text-gray-600 mb-4">
-              You've successfully joined <strong>{inviteDetails?.org_name}</strong>
+              You've successfully joined <strong>{inviteDetails?.program_name}</strong>
             </p>
             <p className="text-sm text-gray-500">
               Redirecting you to the app...
@@ -191,7 +191,7 @@ export function InviteAcceptPage() {
               You're Invited!
             </h1>
             <p className="text-lg text-gray-600 mb-4">
-              Join <strong>{inviteDetails.org_name}</strong> on GroupBuilder
+              Join <strong>{inviteDetails.program_name}</strong> on GroupBuilder
             </p>
             <p className="text-sm text-gray-500 mb-2">
               Invited as: <strong>{inviteDetails.invited_email}</strong>
@@ -231,7 +231,7 @@ export function InviteAcceptPage() {
               You're Invited!
             </h1>
             <p className="text-lg text-gray-600 mb-4">
-              Join <strong>{inviteDetails.org_name}</strong> as a facilitator
+              Join <strong>{inviteDetails.program_name}</strong> as a facilitator
             </p>
             <p className="text-sm text-gray-500 mb-2">
               Invited as: <strong>{inviteDetails.invited_email}</strong>
