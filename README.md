@@ -1,328 +1,148 @@
 # GroupBuilder
 
-**Automated table assignment optimizer for multi-session interfaith dialogues and seminars.**
+**Automated group assignment optimizer for multi-session events.**
 
-GroupBuilder helps event organizers create balanced, diverse table assignments across multiple sessions. Originally built for interfaith seminar series, it's useful for any event where you need to mix participants thoughtfully across sessions while respecting social dynamics.
+[Live app](https://group-builder.netlify.app) · [Report a bug](https://github.com/MarkFrankle/GroupBuilder/issues)
+
+---
 
 ## The Problem
 
-Running multi-session dialogue events (interfaith dinners, community seminars, networking events) requires careful table assignments:
+Running multi-session dialogue events — interfaith dinners, community seminars, networking series — requires careful table assignments:
 
-- **Diversity matters**: Each table should have balanced representation (religion, gender, background)
+- **Diversity matters**: Each table should have balanced representation across religion, gender, and background
 - **Couples need separation**: Partners should sit at different tables to encourage broader dialogue
-- **Multiple sessions complicate things**: With 3-6 sessions, manually ensuring people meet new tablemates each time becomes combinatorially complex
+- **Multiple sessions complicate things**: With 3–6 sessions, manually ensuring people meet new tablemates each time becomes combinatorially complex
 - **Time is limited**: Event coordinators are volunteers with limited time for spreadsheet gymnastics
 
 GroupBuilder solves this in seconds using constraint programming.
 
-## Features
+## What it does
 
-- ✅ **Intelligent assignment** - Uses Google OR-Tools CP-SAT solver to optimize table assignments
-- ✅ **Diversity balancing** - Ensures even distribution of religions, genders across all tables
-- ✅ **Couple separation** - Automatically seats partners at different tables
-- ✅ **Multi-session optimization** - Minimizes repeat pairings across sessions (weighted toward early sessions)
-- ✅ **Excel-based workflow** - Upload a spreadsheet, download assignments
-- ✅ **Magic links** - Bookmarkable results URLs valid for 30 days
-- ✅ **Input validation** - Clear error messages for invalid data
-- ✅ **Fast** - Handles 100 participants, 10 tables, 6 sessions in under 2 minutes
+GroupBuilder is a login-gated web application for event organizers. Facilitators sign in with a magic link (no password), join a program, and use the app to manage their participant roster and generate optimized seating assignments.
 
-## Quick Start
+- **Roster management** — Add and edit participants with name, religion, gender, and partner fields directly in the app; or import from an Excel spreadsheet
+- **Intelligent assignment** — CP-SAT constraint solver optimizes table assignments across all sessions simultaneously
+- **Diversity balancing** — Even distribution of religions and genders across all tables, every session
+- **Couple separation** — Partners automatically seated at different tables
+- **Multi-session optimization** — Minimizes repeat pairings across sessions, weighted toward early sessions so people keep meeting new tablemates
+- **Seating charts** — Circular table visualization with religion color-coding for each session
+- **Print-ready output** — Roster print view formatted for facilitator use
+- **Session history** — View and compare prior group assignments
+- **Multi-program support** — Admin dashboard for creating programs, managing facilitators, and sending invitations
 
-### Prerequisites
+## How it works
 
-- **Frontend**: Node.js 16+, npm
-- **Backend**: Python 3.10+, Poetry
-- **Excel template**: Download from `/public/template.xlsx`
+GroupBuilder models table assignment as a **constraint satisfaction problem** using Google OR-Tools CP-SAT. Each participant is assigned to exactly one table per session. Hard constraints enforce balanced table sizes and even distribution of religions and genders; couples are never seated together. The solver then minimizes a weighted objective that penalizes repeat pairings across sessions — weighted toward early sessions so the improvement compounds over time.
 
-### 1. Backend Setup
-
-```bash
-# Install API dependencies
-cd api
-poetry install
-
-# Install assignment solver dependencies
-cd ../assignment_logic
-poetry install
-
-# Run the API server
-cd ../api
-poetry run uvicorn src.api.main:app --reload
-```
-
-API will be available at `http://localhost:8000`
-
-**Optional: Redis for Persistent Storage**
-
-By default, the API uses in-memory storage (data is lost on restart). For production or to test magic links across server restarts:
-
-```bash
-# Option 1: Local Redis with Docker
-docker run -d -p 6379:6379 redis:7-alpine
-
-# Option 2: Use Upstash Redis (free tier)
-# Create account at upstash.com, create Redis database, copy URL
-
-# Set environment variable
-cd api
-echo 'REDIS_URL=redis://localhost:6379' > .env
-
-# Or for Upstash:
-# echo 'REDIS_URL=redis://default:<password>@<host>:6379' > .env
-```
-
-The API will automatically use Redis if `REDIS_URL` is set, otherwise falls back to in-memory storage.
-
-### 2. Frontend Setup
-
-```bash
-cd frontend
-npm install
-npm start
-```
-
-Frontend will open at `http://localhost:3000`
-
-### 3. Upload Your Data
-
-1. Download the Excel template from the app
-2. Fill in participant data:
-   - **Name**: Full name
-   - **Religion**: Religious background (used for diversity balancing)
-   - **Gender**: Gender identity (used for diversity balancing)
-   - **Partner**: Name of partner (if applicable) - they'll be seated separately
-
-3. Upload the file and configure:
-   - **Number of tables**: 1-10 (based on your venue)
-   - **Number of sessions**: 1-6 (number of dinners/meetings)
-   - **Email** (optional): Get a bookmarkable link to results
-
-4. Click "Generate Assignments" and wait (~5-120 seconds depending on complexity)
+Typical solve times range from under a second for small events to around two minutes for large ones (100 participants, 10 tables, 6 sessions). The solver returns the best feasible solution found within a 120-second timeout.
 
 ## Tech Stack
 
 ### Frontend
-- **React 18.3** + **TypeScript** - Modern, type-safe UI
-- **Tailwind CSS** - Utility-first styling
-- **Radix UI** - Accessible component primitives
-- **React Router** - Client-side routing
+- **React 18** + **TypeScript** — type-safe SPA (Create React App + craco)
+- **TanStack Query** — data fetching and caching
+- **Tailwind CSS** + **shadcn/ui** — styling and accessible components
+- **Firebase SDK** — passwordless magic-link authentication
 - Deployed on **Netlify**
 
 ### Backend
-- **FastAPI** - Modern Python web framework
-- **Pandas** - Excel file processing
-- **Pydantic** - Request validation
-- **Uvicorn/Gunicorn** - ASGI server
+- **FastAPI** — Python web framework
+- **Pydantic v2** — request validation
+- **Firebase Admin SDK** — token verification, Firestore access
+- **Google Cloud Firestore** — primary database (programs, rosters, sessions, results)
+- **Pandas** + **openpyxl** — Excel roster import
+- **SendGrid** — email delivery for magic links (optional)
+- Deployed on **Google Cloud Run**
 
 ### Assignment Engine
-- **Google OR-Tools** - Constraint programming solver (CP-SAT)
-- **Custom optimization model** - Minimizes repeat pairings while respecting hard constraints
-
-### Infrastructure (Recommended for Production)
-- **Fly.io** - Backend hosting (free tier: 3 VMs, 160GB transfer/month)
-- **Upstash Redis** - Session storage (free tier: 10k commands/day, 256MB)
-- **SendGrid** - Email delivery for magic links (free tier: 100 emails/day)
-
-## How It Works
-
-GroupBuilder models table assignment as a **constraint satisfaction problem** (CSP):
-
-### Decision Variables
-- `x[participant, table, session]` → boolean: is this participant at this table in this session?
-
-### Hard Constraints
-1. Each participant sits at exactly one table per session
-2. All tables have balanced size (within ±1 person)
-3. No table has more than ±1 person of any religion compared to other tables
-4. No table has more than ±1 person of any gender compared to other tables
-5. Couples never sit at the same table
-
-### Optimization Objective
-Minimize weighted pairings across sessions:
-- Weighted sum of all participant pairings across sessions
-- Earlier sessions weighted more heavily (encourages meeting new people later)
-
-### Solver
-- **CP-SAT** (Constraint Programming - Satisfiability) from Google OR-Tools
-- Timeout: 120 seconds (returns best solution found within time limit)
-- Typical solve times:
-  - 20 people, 4 tables, 3 sessions: ~1 second
-  - 50 people, 5 tables, 6 sessions: ~30 seconds
-  - 100 people, 10 tables, 6 sessions: ~2 minutes
+- **Google OR-Tools CP-SAT** — constraint programming solver
+- Custom optimization model in `assignment_logic/` (local Poetry package)
 
 ## Project Structure
 
 ```
 GroupBuilder/
-├── frontend/              # React TypeScript UI
-│   ├── src/
-│   │   ├── pages/         # Landing page, results page
-│   │   ├── components/    # Reusable UI components
-│   │   └── App.tsx        # Main routing
-│   └── package.json
+├── frontend/                  # React 18 TypeScript SPA
+│   └── src/
+│       ├── pages/             # All page components (login, roster, assignments, admin, etc.)
+│       ├── components/        # Reusable UI components
+│       ├── contexts/          # Auth and program context providers
+│       ├── services/          # Firebase client, API client
+│       └── App.tsx            # Routing
 │
-├── api/                   # FastAPI backend
-│   ├── src/api/
-│   │   ├── main.py        # FastAPI app
-│   │   ├── routers/       # Upload, assignments endpoints
-│   │   └── utils/         # Data transformation
-│   └── pyproject.toml
+├── api/                       # FastAPI backend
+│   └── src/api/
+│       ├── routers/           # upload, assignments, roster, admin, invites, user
+│       ├── middleware/        # Firebase auth verification
+│       ├── services/          # Firestore, email, roster logic
+│       └── main.py
 │
-├── assignment_logic/      # Constraint solver
-│   ├── src/assignment_logic/
-│   │   ├── group_builder.py   # CP-SAT model
-│   │   └── api_handler.py     # API wrapper
-│   ├── tests/             # Solver test suite
-│   └── pyproject.toml
+├── assignment_logic/          # Constraint solver (local Poetry dependency of api/)
+│   └── src/assignment_logic/
+│       ├── group_builder.py   # CP-SAT model
+│       └── api_handler.py     # API wrapper
 │
-└── README.md
+├── agent_docs/                # Developer reference docs
+├── Dockerfile                 # Cloud Run container
+└── deploy.sh                  # Cloud Run deployment script
 ```
 
-## Configuration Limits
+## Development Setup
 
-To ensure reasonable solve times, the following limits are enforced:
+GroupBuilder requires a Firebase project for auth and Firestore. Local development without Firebase is not currently supported. See [`agent_docs/deployment.md`](agent_docs/deployment.md) for full environment variable setup.
 
-- **Tables**: 1-10
-- **Sessions**: 1-6
-- **Participants**: 200 max
+### Prerequisites
+- Node.js 18+, npm
+- Python 3.10+, Poetry
+- A Firebase project with Authentication (Email link sign-in) and Firestore enabled
 
-These limits are based on the O(S × T × P²) complexity of the pairings objective. Larger problems may timeout.
-
-## Development
-
-### Running Tests
+### Backend
 
 ```bash
-cd assignment_logic
-poetry run pytest tests/ -v
+cd api
+poetry install
+
+cd ../assignment_logic
+poetry install
+
+cd ../api
+poetry run uvicorn src.api.main:app --reload
+# API available at http://localhost:8000
 ```
 
-Test coverage includes:
-- Simple assignments
-- Couple separation
-- Balanced table sizes
-- Multiple sessions
-- Diversity distribution
-- Solution quality validation
-
-### Code Quality
-
-The backend uses:
-- **Black** - Code formatting
-- **Flake8** - Linting
-- **MyPy** - Type checking
+### Frontend
 
 ```bash
-cd assignment_logic
-poetry run black src/
-poetry run flake8 src/
-poetry run mypy src/
+cd frontend
+npm install
+npm start
+# App available at http://localhost:3000 (proxies /api → :8000)
+```
+
+### Running tests
+
+```bash
+# Backend
+cd api && poetry run pytest --cov=src --cov-report=term-missing
+
+# Assignment solver
+cd assignment_logic && poetry run pytest tests/ -v
+
+# Frontend
+cd frontend && CI=true npm test -- --watchAll=false
 ```
 
 ## Deployment
 
-### Option 1: Fly.io + Upstash (Recommended)
-
-**Backend (Fly.io):**
-```bash
-cd api
-fly launch
-fly deploy
-```
-
-**Session Storage (Upstash Redis):**
-1. Create free account at upstash.com
-2. Create Redis database
-3. Add `REDIS_URL` to Fly secrets
-
-**Email Delivery (SendGrid - Optional):**
-1. Create free account at sendgrid.com (100 emails/day free tier)
-2. Create API key with Mail Send permissions
-3. Add to Fly secrets:
-   ```bash
-   fly secrets set SENDGRID_API_KEY=your_api_key_here
-   fly secrets set FROM_EMAIL=noreply@groupbuilder.app
-   fly secrets set FRONTEND_URL=https://your-app.netlify.app
-   ```
-4. If not configured, magic links will be logged but not emailed
-
-**Frontend (Netlify):**
-1. Connect GitHub repo to Netlify
-2. Set build command: `cd frontend && npm run build`
-3. Set publish directory: `frontend/build`
-4. Add environment variable: `REACT_APP_API_BASE_URL=<your-fly-url>`
-
-### Option 2: Docker (Alternative)
-
-Docker support coming soon.
-
-## Contributing
-
-This is open-source software built for the public good. Contributions welcome!
-
-**Areas for contribution:**
-- Excel export functionality for generated assignments
-- PDF generation for printable table cards
-- Additional constraint types (dietary restrictions, accessibility needs)
-- Performance optimizations for larger events
-- Localization/internationalization
-
-**To contribute:**
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run tests (`poetry run pytest`)
-5. Commit with clear messages
-6. Push and open a Pull Request
-
-## Use Cases
-
-GroupBuilder was originally built for interfaith dialogue seminars, but works for any event needing thoughtful group mixing:
-
-- 🕊️ **Interfaith dialogues** - Balance religious backgrounds across tables
-- 🏢 **Professional networking** - Mix industries, roles, seniority levels
-- 🎓 **Educational seminars** - Diverse student discussion groups
-- 🤝 **Community building** - Neighborhood dinners, civic engagement events
-- 💼 **Corporate offsites** - Cross-functional team building
-
-## Known Limitations
-
-- **Large problems may timeout**: With >100 participants and 6 sessions, the solver may not find optimal solutions within 2 minutes. It will return the best feasible solution found.
-- **No real-time collaboration**: Multiple organizers can't edit the same event simultaneously
-- **In-memory storage**: Results expire after 30 days (use persistent storage like Redis for longer retention)
-- **English only**: UI and error messages are currently English-only
-
-## Roadmap
-
-- [ ] Excel export of generated assignments
-- [x] Redis integration for production deployments
-- [x] Email delivery via SendGrid
-- [ ] Downloadable PDF table cards
-- [ ] User accounts and event history
-- [ ] Additional balancing attributes (age, profession, etc.)
-- [ ] Mobile-responsive results view
-- [ ] Analytics dashboard (usage stats for administrators)
+- **Backend:** Google Cloud Run — see [`agent_docs/deployment.md`](agent_docs/deployment.md)
+- **Frontend:** Netlify — connected to GitHub, auto-deploys on push to `main`
+- **Database:** Google Cloud Firestore
 
 ## License
 
-MIT License - see LICENSE file for details.
-
-This software is free to use, modify, and distribute. We encourage non-profits, religious organizations, and community groups to use it freely.
-
-## Acknowledgments
-
-Built with love for the interfaith dialogue community and all organizations working to bring diverse people together.
-
-Special thanks to:
-- The Google OR-Tools team for the excellent CP-SAT solver
-- All the non-profit event coordinators who provided feedback and testing
-
-## Support
-
-- **Issues**: Please report bugs via [GitHub Issues](https://github.com/MarkFrankle/GroupBuilder/issues)
-- **Questions**: Open a discussion in the GitHub Discussions tab
-- **Email**: For private inquiries about large-scale deployments
+MIT License — see LICENSE file for details.
 
 ---
 
-*Made with care for communities building bridges through dialogue.*
+*Built for [Building Bridges Together](https://buildingbridgestogether.net), a tri-faith interfaith dialogue nonprofit.*

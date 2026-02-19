@@ -173,3 +173,5 @@ firebase-service-account.json
 .firebase/
 .firebaserc
 .serena/
+.specify/
+docs/plans/
