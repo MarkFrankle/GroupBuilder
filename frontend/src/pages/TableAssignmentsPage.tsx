@@ -695,24 +695,26 @@ const TableAssignmentsPage: React.FC = () => {
           <div className="flex justify-between items-center mb-6">
             <div className="flex gap-2">
               <Button
-                variant={viewMode === 'compact' ? 'outline' : 'ghost'}
+                variant="outline"
                 onClick={() => setViewMode('compact')}
                 size="sm"
-                className={viewMode === 'compact' ? 'border-2 border-primary' : ''}
                 disabled={editMode}
                 aria-label="Compact view"
+                className={`gap-1.5 ${viewMode === 'compact' ? 'bg-gray-200 border-gray-600 font-medium hover:bg-gray-200 hover:border-gray-600' : ''}`}
               >
                 <LayoutGrid className="h-4 w-4" />
+                Compact
               </Button>
               <Button
-                variant={viewMode === 'detailed' ? 'outline' : 'ghost'}
+                variant="outline"
                 onClick={() => setViewMode('detailed')}
                 size="sm"
-                className={viewMode === 'detailed' ? 'border-2 border-primary' : ''}
                 disabled={editMode}
                 aria-label="Detailed view"
+                className={`gap-1.5 ${viewMode === 'detailed' ? 'bg-gray-200 border-gray-600 font-medium hover:bg-gray-200 hover:border-gray-600' : ''}`}
               >
                 <List className="h-4 w-4" />
+                Detailed
               </Button>
             </div>
 
