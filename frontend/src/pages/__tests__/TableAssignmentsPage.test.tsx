@@ -239,14 +239,20 @@ describe('TableAssignmentsPage unified control bar', () => {
     const detailedButton = await screen.findByRole('button', { name: /detailed view/i })
     fireEvent.click(detailedButton)
 
-    // Session dropdown, Edit, Regenerate, Prev/Next should all be visible
+    // Session dropdown, Edit, Prev/Next should all be visible in view mode
     await waitFor(() => {
       expect(screen.getByRole('combobox', { name: /select session/i })).toBeInTheDocument()
     })
     expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /regenerate session/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /regenerate session/i })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /prev/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /next/i })).toBeInTheDocument()
+
+    // Regenerate Session only appears in edit mode
+    fireEvent.click(screen.getByRole('button', { name: /^edit$/i }))
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /regenerate session/i })).toBeInTheDocument()
+    })
   })
 
   it('hides session controls in compact view', async () => {
@@ -285,7 +291,7 @@ describe('TableAssignmentsPage unified control bar', () => {
     expect(printButton).toBeEnabled()
   })
 
-  it('disables Print Seating button in edit mode', async () => {
+  it('hides Print Seating button in edit mode', async () => {
     const QueryWrapper = createQueryWrapper()
     render(
       <BrowserRouter>
@@ -303,9 +309,9 @@ describe('TableAssignmentsPage unified control bar', () => {
     const editButton = await screen.findByRole('button', { name: /^edit$/i })
     fireEvent.click(editButton)
 
-    // Print Seating button should be disabled
+    // Print Seating button should be hidden in edit mode
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /print seating/i })).toBeDisabled()
+      expect(screen.queryByRole('button', { name: /print seating/i })).not.toBeInTheDocument()
     })
   })
 

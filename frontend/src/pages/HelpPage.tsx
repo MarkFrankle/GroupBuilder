@@ -483,8 +483,8 @@ function HelpPage() {
 
           <Screenshot
             src="/images/help/print-roster-copy-link-print-seating.png"
-            alt="The results page toolbar showing Print Roster, Copy Link, and version picker at the top, with Edit, Regenerate Session, and Print Seating controls below"
-            caption="The results page controls — Print Roster and Copy Link in the top toolbar, with session-specific actions (Edit, Regenerate Session, Print Seating) below"
+            alt="The results page toolbar showing Print Roster, Copy Link, and version picker at the top, with Edit and Print Seating controls below"
+            caption="The results page controls — Print Roster and Copy Link in the top toolbar, with session-specific actions (Edit, Print Seating) below. Regenerate Session appears inside edit mode."
           />
         </section>
 
@@ -517,10 +517,12 @@ function HelpPage() {
           <p className="mb-4 text-slate-700 leading-relaxed">
             Sometimes most sessions look great but one is off — maybe Session 3 has a
             couple at the same table, or the gender balance is uneven. In detailed view,
-            navigate to the problem session and click <strong>"Regenerate Session."</strong>{" "}
+            navigate to the problem session, click <strong>"Edit,"</strong> then click{" "}
+            <strong>"Regenerate Session."</strong>{" "}
             This re-runs the solver for just that one session (it's nearly instant)
             while keeping all other sessions exactly as they are. Any participants
             you've marked as absent will stay absent in the regenerated session.
+            Click <strong>"Done Editing"</strong> to save the result.
           </p>
 
           {/* Edit Mode */}
@@ -563,9 +565,9 @@ function HelpPage() {
 
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Saving your edits:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            When you're done, click <strong>"Done Editing."</strong> Your changes are
-            saved as a new version automatically. You can switch back to any previous
-            version using the version picker at the top of the page.
+            When you're done, click <strong>"Done Editing."</strong> If you made any
+            changes, they're saved as a new version automatically. You can switch back
+            to any previous version using the version picker at the top of the page.
           </p>
 
           <Screenshot
