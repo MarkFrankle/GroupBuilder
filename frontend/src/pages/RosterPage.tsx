@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
-import { useQueryClient } from '@tanstack/react-query';
+
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -26,7 +26,6 @@ type SaveStatus = 'saved' | 'saving' | 'error';
 export function RosterPage() {
   const navigate = useNavigate();
   const { data: rosterData, isLoading: loading, error: fetchError } = useRoster();
-  const queryClient = useQueryClient();
   const [participants, setParticipants] = useState<RosterParticipant[]>([]);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const [error, setError] = useState<string | null>(null);
@@ -73,24 +72,22 @@ export function RosterPage() {
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ['roster'] });
       setSaveStatus('saved');
     } catch {
       setSaveStatus('error');
     }
-  }, [participants, queryClient]);
+  }, [participants]);
 
   const handleDelete = useCallback(async (id: string) => {
     setSaveStatus('saving');
     setParticipants(prev => prev.filter(p => p.id !== id));
     try {
       await apiDeleteParticipant(id);
-      queryClient.invalidateQueries({ queryKey: ['roster'] });
       setSaveStatus('saved');
     } catch {
       setSaveStatus('error');
     }
-  }, [queryClient]);
+  }, []);
 
   const handleAdd = useCallback(async (data: Omit<RosterParticipant, 'id'>) => {
     const newId = uuidv4();
@@ -99,12 +96,11 @@ export function RosterPage() {
     setParticipants(prev => [...prev, newParticipant]);
     try {
       await upsertParticipant(newId, data);
-      queryClient.invalidateQueries({ queryKey: ['roster'] });
       setSaveStatus('saved');
     } catch {
       setSaveStatus('error');
     }
-  }, [queryClient]);
+  }, []);
 
   const handleGenerate = async () => {
     setError(null);
@@ -215,6 +211,7 @@ export function RosterPage() {
           )}
 
           <Button
+            variant="outline"
             className="w-full"
             onClick={handleGenerate}
             disabled={!canGenerate || generating}
