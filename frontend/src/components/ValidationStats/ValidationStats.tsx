@@ -1,7 +1,7 @@
 import React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { CheckCircle2, AlertCircle } from 'lucide-react'
-import { expectedWithinTableDeviation, expectedDeviationForTableSize, actualWithinTableDeviation, formatAttributeCounts } from '@/utils/balanceStats'
+import { expectedWithinTableDeviation, expectedDeviationForTableSize, formatAttributeCounts } from '@/utils/balanceStats'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 
 interface Participant {
