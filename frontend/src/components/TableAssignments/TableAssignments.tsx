@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Heart } from 'lucide-react'
 import { getReligionStyle } from '@/constants/colors'
-import { expectedWithinTableDeviation, formatAttributeCounts } from '@/utils/balanceStats'
+import { expectedWithinTableDeviation, expectedDeviationForTableSize, formatAttributeCounts } from '@/utils/balanceStats'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
 
 interface Participant {
@@ -138,12 +138,14 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
       religionCounts[p.religion] = (religionCounts[p.religion] || 0) + 1
     })
     const numTables = Object.keys(assignment.tables).length
+    const totalParticipants = allParticipants.length
     return {
       gender: expectedWithinTableDeviation(genderCounts, numTables),
       religion: expectedWithinTableDeviation(religionCounts, numTables),
       genderCounts,
       religionCounts,
       numTables,
+      totalParticipants,
     }
   }, [assignment.tables])
 
@@ -167,7 +169,13 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
     const genderDeviation = genderValues.length > 1
       ? Math.max(...genderValues) - Math.min(...genderValues)
       : 0
-    const hasGenderImbalance = genderDeviation > sessionExpected.gender
+    const tableSize = realParticipants.length
+    const tableExpectedGender = expectedDeviationForTableSize(
+      sessionExpected.genderCounts,
+      sessionExpected.totalParticipants,
+      tableSize
+    )
+    const hasGenderImbalance = genderDeviation > tableExpectedGender
 
     // Religion deviation — use full roster set (zero-filled) so missing religions count as 0
     const religionCountMap: Record<string, number> = {}
@@ -179,7 +187,12 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
     const religionDeviation = religionValues.length > 1
       ? Math.max(...religionValues) - Math.min(...religionValues)
       : 0
-    const hasReligionImbalance = religionDeviation > sessionExpected.religion
+    const tableExpectedReligion = expectedDeviationForTableSize(
+      sessionExpected.religionCounts,
+      sessionExpected.totalParticipants,
+      tableSize
+    )
+    const hasReligionImbalance = religionDeviation > tableExpectedReligion
 
     const coupleViolations = new Set<string>()
     realParticipants.forEach(p => {
@@ -195,9 +208,11 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
       count: realParticipants.length,
       genderSplit: genderSplit || '0',
       genderDeviation,
+      tableExpectedGender,
       hasGenderImbalance,
       religionCount: religions.size,
       religionDeviation,
+      tableExpectedReligion,
       hasReligionImbalance,
       hasCoupleViolation: coupleViolations.size > 0,
       facilitatorCount,
@@ -340,7 +355,7 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
                             </span>
                           </TooltipTrigger>
                           <TooltipContent>
-                            {`Gender imbalance exceeds what this roster allows. Best achievable: ±${sessionExpected.gender} (${formatAttributeCounts(sessionExpected.genderCounts, true)} across ${sessionExpected.numTables} tables). This table: ±${stats.genderDeviation}.`}
+                            {`Gender imbalance exceeds what's expected for a table this size. Expected: ±${stats.tableExpectedGender} (${formatAttributeCounts(sessionExpected.genderCounts, true)} across ${sessionExpected.numTables} tables). This table: ±${stats.genderDeviation}.`}
                           </TooltipContent>
                         </Tooltip>
                       ) : (
@@ -353,7 +368,7 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
                             </span>
                           </TooltipTrigger>
                           <TooltipContent>
-                            {`Religion imbalance exceeds what this roster allows. Best achievable: ±${sessionExpected.religion} (${formatAttributeCounts(sessionExpected.religionCounts)} across ${sessionExpected.numTables} tables). This table: ±${stats.religionDeviation}.`}
+                            {`Religion imbalance exceeds what's expected for a table this size. Expected: ±${stats.tableExpectedReligion} (${formatAttributeCounts(sessionExpected.religionCounts)} across ${sessionExpected.numTables} tables). This table: ±${stats.religionDeviation}.`}
                           </TooltipContent>
                         </Tooltip>
                       ) : (

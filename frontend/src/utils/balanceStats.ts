@@ -41,6 +41,30 @@ export function actualWithinTableDeviation(
 }
 
 /**
+ * For a single table of a given size, returns the minimum achievable within-table
+ * deviation given the roster distribution and total participant count.
+ *
+ * Scales the roster proportionally to the table size:
+ * ceil(max_count × tableSize / total) - floor(min_count × tableSize / total)
+ *
+ * More accurate than the session-level formula for unequal table sizes — a
+ * 2-person table from a 20-person session should have a lower expected deviation.
+ */
+export function expectedDeviationForTableSize(
+  rosterCounts: Record<string, number>,
+  totalParticipants: number,
+  tableSize: number
+): number {
+  const values = Object.values(rosterCounts)
+  if (values.length <= 1 || totalParticipants === 0 || tableSize === 0) return 0
+  const maxCount = Math.max(...values)
+  const minCount = Math.min(...values)
+  const expectedMax = Math.ceil((maxCount * tableSize) / totalParticipants)
+  const expectedMin = Math.floor((minCount * tableSize) / totalParticipants)
+  return Math.max(0, expectedMax - expectedMin)
+}
+
+/**
  * Formats a count map as a human-readable string sorted by count descending.
  * e.g. {Female: 10, Male: 6} → "10 Female / 6 Male"
  * With abbreviate=true → "10F / 6M"
