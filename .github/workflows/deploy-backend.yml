@@ -44,6 +44,14 @@ jobs:
 
       - name: Deploy to Cloud Run
         run: |
+          cat > /tmp/env-vars.yaml <<EOF
+          UPSTASH_REDIS_REST_URL: "${{ secrets.UPSTASH_REDIS_REST_URL }}"
+          UPSTASH_REDIS_REST_TOKEN: "${{ secrets.UPSTASH_REDIS_REST_TOKEN }}"
+          CORS_ORIGINS: "${{ secrets.FRONTEND_URL }}"
+          FROM_EMAIL: "${{ secrets.FROM_EMAIL }}"
+          FRONTEND_URL: "${{ secrets.FRONTEND_URL }}"
+          SENDGRID_API_KEY: "${{ secrets.SENDGRID_API_KEY }}"
+          EOF
           gcloud run deploy groupbuilder-api \
             --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/groupbuilder-api:${{ github.sha }} \
             --platform managed \
@@ -54,7 +62,7 @@ jobs:
             --timeout 300 \
             --max-instances 10 \
             --min-instances 0 \
-            --set-env-vars "UPSTASH_REDIS_REST_URL=${{ secrets.UPSTASH_REDIS_REST_URL }},UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_REST_TOKEN }},CORS_ORIGINS=${{ secrets.FRONTEND_URL }},FROM_EMAIL=${{ secrets.FROM_EMAIL }},FRONTEND_URL=${{ secrets.FRONTEND_URL }},SENDGRID_API_KEY=${{ secrets.SENDGRID_API_KEY }}" \
+            --env-vars-file /tmp/env-vars.yaml \
             --cpu-boost
 
       - name: Show deployed service URL
