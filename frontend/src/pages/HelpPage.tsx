@@ -225,9 +225,8 @@ function HelpPage() {
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
             After generating assignments, you'll land on the results page. There are
-            two ways to view your groups. You'll see two small icons below the quality
-            summary — a grid icon and a list icon. These switch between compact and
-            detailed view.
+            two ways to view your groups. You'll see two buttons below the quality
+            summary — <strong>Compact</strong> and <strong>Detailed</strong> — that switch between views.
           </p>
 
           {/* Compact View */}
