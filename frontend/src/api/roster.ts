@@ -34,20 +34,6 @@ export async function deleteParticipant(participantId: string): Promise<void> {
   }
 }
 
-export async function importRoster(file: File): Promise<RosterParticipant[]> {
-  const formData = new FormData();
-  formData.append('file', file);
-  const response = await authenticatedFetch('/api/roster/import', {
-    method: 'POST',
-    body: formData,
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to import roster: ${response.status}`);
-  }
-  const data = await response.json();
-  return data.participants;
-}
-
 export async function generateFromRoster(
   numTables: number,
   numSessions: number
