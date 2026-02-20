@@ -81,8 +81,8 @@ function HelpPage() {
           </p>
           <ul className="list-disc pl-5 space-y-2 text-slate-700 leading-relaxed mb-4">
             <li>
-              <strong>Home</strong> — Your starting point. From here you can manage
-              your roster, import from a spreadsheet, or view previous results.
+              <strong>Home</strong> — Your starting point. Three cards link to Roster,
+              Groups, and Help.
             </li>
             <li>
               <strong>Roster</strong> — Where you add and edit your list of participants.
@@ -103,22 +103,16 @@ function HelpPage() {
           <h2 id="creating-your-roster" className="text-2xl font-bold mb-4 scroll-mt-8">
             Creating Your Roster
           </h2>
-          <Screenshot
-            src="/images/help/home-page-ui.png"
-            alt="The Home page with Manage Roster and Import from Excel options, plus a Download Template link"
-            caption="The Home page — your starting point for managing participants and importing data"
-          />
-
           <p className="mb-4 text-slate-700 leading-relaxed">
             Before you can generate groups, you need to tell Group Builder who your
-            participants are. There are two ways to do this.
+            participants are.
           </p>
 
           <h3 className="text-xl font-semibold mb-2">Using the Roster Manager</h3>
           <p className="mb-2 text-slate-700 leading-relaxed">
-            Click <strong>Roster</strong> in the nav bar (or <strong>"Manage
-            Roster"</strong> on the Home page) to open the roster manager. You'll see
-            a spreadsheet-like table where you can add and edit participants one by one.
+            Click <strong>Roster</strong> in the nav bar to open the roster manager.
+            You'll see a spreadsheet-like table where you can add and edit participants
+            one by one.
           </p>
 
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Adding a participant:</p>
@@ -169,29 +163,6 @@ function HelpPage() {
             caption="The roster manager with participants, their details, partner links, and facilitator checkboxes"
           />
 
-          <h3 className="text-xl font-semibold mt-8 mb-2">Importing from Excel</h3>
-          <p className="mb-2 text-slate-700 leading-relaxed">
-            If you already have your participant list in a spreadsheet, you can import
-            it instead of typing everyone in by hand.
-          </p>
-          <ol className="list-decimal pl-5 space-y-2 text-slate-700 leading-relaxed mb-4">
-            <li>
-              On the Home page, click <strong>"Download Template with Sample Data"</strong>{" "}
-              to get an Excel file showing the expected format.
-            </li>
-            <li>
-              Open the template, replace the sample data with your participants, and save
-              the file. Keep the column headers as they are.
-            </li>
-            <li>
-              Back on the Home page, click <strong>"Import from Excel"</strong> and select
-              your file. Your participants will be loaded into the roster.
-            </li>
-          </ol>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            After importing, you can always go to the Roster page to make corrections —
-            fix a name, change a religion, add a partner pairing, and so on.
-          </p>
 
         </section>
 
@@ -597,13 +568,10 @@ function HelpPage() {
             </InfoCallout>
 
             <InfoCallout>
-              <p className="font-bold mb-1">"My session expired" or "I can't find my assignments"</p>
+              <p className="font-bold mb-1">"I can't find my assignments"</p>
               <p>
-                If you uploaded a roster via Excel import, that upload session lasts for
-                1 hour. After that, go to the Home page and re-import your file, or
-                rebuild your roster using the Roster Manager. If you previously generated
-                assignments and saved them, click <strong>Groups</strong> in the nav bar
-                to browse all your past group assignments.
+                Click <strong>Groups</strong> in the nav bar to browse all your past
+                group assignments.
               </p>
             </InfoCallout>
 
