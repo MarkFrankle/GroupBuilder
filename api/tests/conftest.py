@@ -6,7 +6,6 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 from io import BytesIO
-import pandas as pd
 from unittest.mock import MagicMock, patch
 
 # Patch slowapi BEFORE any imports to disable rate limiting in tests
@@ -393,78 +392,6 @@ def mock_storage():
         mock.incr = mock_incr
 
         yield mock
-
-
-@pytest.fixture
-def sample_excel_file():
-    """Create a valid sample Excel file for testing."""
-    data = {
-        "Name": ["Alice Johnson", "Bob Smith", "Charlie Davis", "Diana Prince"],
-        "Religion": ["Christian", "Jewish", "Muslim", "Christian"],
-        "Gender": ["Female", "Male", "Male", "Female"],
-        "Partner": ["Bob Smith", "Alice Johnson", "", "N/A"],
-    }
-    df = pd.DataFrame(data)
-
-    # Write to BytesIO
-    buffer = BytesIO()
-    df.to_excel(buffer, index=False, engine="openpyxl")
-    buffer.seek(0)
-
-    return buffer
-
-
-@pytest.fixture
-def sample_excel_file_large():
-    """Create an Excel file with many participants (100)."""
-    data = {
-        "Name": [f"Person {i}" for i in range(100)],
-        "Religion": ["Christian", "Jewish", "Muslim", "Other"] * 25,
-        "Gender": ["Male", "Female"] * 50,
-        "Partner": [""] * 100,
-    }
-    df = pd.DataFrame(data)
-
-    buffer = BytesIO()
-    df.to_excel(buffer, index=False, engine="openpyxl")
-    buffer.seek(0)
-
-    return buffer
-
-
-@pytest.fixture
-def sample_excel_file_too_many():
-    """Create an Excel file with too many participants (201)."""
-    data = {
-        "Name": [f"Person {i}" for i in range(201)],
-        "Religion": ["Christian"] * 201,
-        "Gender": ["Male"] * 201,
-        "Partner": [""] * 201,
-    }
-    df = pd.DataFrame(data)
-
-    buffer = BytesIO()
-    df.to_excel(buffer, index=False, engine="openpyxl")
-    buffer.seek(0)
-
-    return buffer
-
-
-@pytest.fixture
-def sample_excel_file_missing_columns():
-    """Create an Excel file with missing required columns."""
-    data = {
-        "Name": ["Alice", "Bob"],
-        "Religion": ["Christian", "Jewish"],
-        # Missing 'Gender' and 'Partner'
-    }
-    df = pd.DataFrame(data)
-
-    buffer = BytesIO()
-    df.to_excel(buffer, index=False, engine="openpyxl")
-    buffer.seek(0)
-
-    return buffer
 
 
 @pytest.fixture

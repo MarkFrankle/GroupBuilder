@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from api.routers import (
-    upload,
     assignments,
     admin,
     invites,
@@ -61,7 +60,6 @@ app.add_middleware(
 
 logger.info(f"CORS enabled for origins: {allowed_origins}")
 
-app.include_router(upload.router, prefix="/api/upload", tags=["upload"])
 app.include_router(assignments.router, prefix="/api/assignments", tags=["assignments"])
 app.include_router(admin.router)
 app.include_router(admin_org_details.router)
