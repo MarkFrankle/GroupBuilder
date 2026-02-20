@@ -95,6 +95,26 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd }: RosterGr
     }
   }, [emptyRow, onAdd]);
 
+  const handleEmptyRowFieldChange = useCallback((updater: (prev: EmptyRowState) => EmptyRowState) => {
+    setEmptyRow(prev => {
+      const next = updater(prev);
+      if (next.name.trim()) {
+        // Commit after the state update settles so onAdd sees the final values
+        setTimeout(() => {
+          onAdd({
+            name: next.name.trim(),
+            religion: next.religion,
+            gender: next.gender,
+            partner_id: next.partner_id,
+            is_facilitator: next.is_facilitator,
+          });
+          setEmptyRow({ ...EMPTY_ROW });
+        }, 0);
+      }
+      return next;
+    });
+  }, [onAdd]);
+
   const handleEmptyRowBlur = useCallback(() => {
     // Delay check so focus has time to settle (Radix Select portals the dropdown)
     setTimeout(() => {
@@ -212,7 +232,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd }: RosterGr
                 />
               </TableCell>
               <TableCell className="p-1">
-                <Select value={emptyRow.religion} onValueChange={v => setEmptyRow(prev => ({ ...prev, religion: v as Religion }))}>
+                <Select value={emptyRow.religion} onValueChange={v => handleEmptyRowFieldChange(prev => ({ ...prev, religion: v as Religion }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {RELIGIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
@@ -220,7 +240,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd }: RosterGr
                 </Select>
               </TableCell>
               <TableCell className="p-1">
-                <Select value={emptyRow.gender} onValueChange={v => setEmptyRow(prev => ({ ...prev, gender: v as Gender }))}>
+                <Select value={emptyRow.gender} onValueChange={v => handleEmptyRowFieldChange(prev => ({ ...prev, gender: v as Gender }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {GENDERS.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
