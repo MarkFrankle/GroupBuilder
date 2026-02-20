@@ -541,6 +541,9 @@ const TableAssignmentsPage: React.FC = () => {
           // Update URL to reflect new version
           const newUrl = `${window.location.pathname}?session=${sessionId}&version=${result.version_id}`
           window.history.replaceState({}, '', newUrl)
+
+          // Clear undo stack — saved state is now the baseline
+          setUndoStack([])
         } catch (err) {
           console.error('Failed to save edits as new version:', err)
           setError('Failed to save your edits. Please try again.')
@@ -758,7 +761,7 @@ const TableAssignmentsPage: React.FC = () => {
                   {editMode ? 'Done Editing' : 'Edit'}
                 </Button>
 
-                {!editMode && (
+                {editMode && (
                   <Button
                     variant="outline"
                     onClick={() => handleRegenerateSession(currentSession)}
@@ -779,15 +782,16 @@ const TableAssignmentsPage: React.FC = () => {
                   </Button>
                 )}
 
-                <Button
-                  variant="outline"
-                  onClick={handlePrintSeating}
-                  size="sm"
-                  disabled={editMode}
-                >
-                  <Printer className="h-4 w-4 mr-2" />
-                  Print Seating
-                </Button>
+                {!editMode && (
+                  <Button
+                    variant="outline"
+                    onClick={handlePrintSeating}
+                    size="sm"
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print Seating
+                  </Button>
+                )}
 
                 {editMode && (
                   <>
