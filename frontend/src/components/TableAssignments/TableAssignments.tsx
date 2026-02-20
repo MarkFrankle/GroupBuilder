@@ -161,9 +161,11 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
       .map(([gender, count]) => `${count}${gender.charAt(0)}`)
       .join('/')
 
-    const genderCountValues = Object.values(genderCounts)
-    const genderDeviation = genderCountValues.length > 1
-      ? Math.max(...genderCountValues) - Math.min(...genderCountValues)
+    // Gender — use full roster set (zero-filled) so missing genders count as 0
+    const allGenders = Object.keys(sessionExpected.genderCounts)
+    const genderValues = allGenders.map(g => genderCounts[g] ?? 0)
+    const genderDeviation = genderValues.length > 1
+      ? Math.max(...genderValues) - Math.min(...genderValues)
       : 0
     const hasGenderImbalance = genderDeviation > sessionExpected.gender
 
