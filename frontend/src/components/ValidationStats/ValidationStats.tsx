@@ -24,7 +24,7 @@ interface ValidationStatsProps {
 }
 
 interface ValidationResult {
-  coupleViolations: number;
+  coupleOffendingTables: string[];
   genderOffendingTables: string[];
   religionOffendingTables: string[];
   numTables: number;
@@ -39,7 +39,7 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
   const calculateStats = (): ValidationResult => {
     if (assignments.length === 0) {
       return {
-        coupleViolations: 0,
+        coupleOffendingTables: [],
         genderOffendingTables: [],
         religionOffendingTables: [],
         numTables: 0,
@@ -55,32 +55,10 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
     const firstSession = assignments[0]
     const allParticipants: Participant[] = []
     Object.values(firstSession.tables).forEach(participants => {
-      // Filter out empty/undefined/null participants
       const realParticipants = participants.filter((p): p is Participant => p !== null && p !== undefined && p.name !== '')
       allParticipants.push(...realParticipants)
     })
     const totalParticipants = allParticipants.length
-
-    // Check couple separation violations
-    let coupleViolations = 0
-    assignments.forEach(assignment => {
-      Object.values(assignment.tables).forEach(participants => {
-        // Filter out empty/undefined/null participants
-        const realParticipants = participants.filter((p): p is Participant => p !== null && p !== undefined && p.name !== '')
-        const couples = new Set<string>()
-        realParticipants.forEach(p => {
-          if (p.partner) {
-            // Check if partner is at same table
-            const partnerAtTable = realParticipants.some(other => other && other.name === p.partner)
-            if (partnerAtTable) {
-              const coupleKey = [p.name, p.partner].sort().join('-')
-              couples.add(coupleKey)
-            }
-          }
-        })
-        coupleViolations += couples.size
-      })
-    })
 
     // Roster-level attribute counts
     const genderRosterCounts: Record<string, number> = {}
@@ -94,14 +72,26 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
     const allGenders = Object.keys(genderRosterCounts)
     const allReligions = Object.keys(religionRosterCounts)
 
+    const coupleOffendingTables: string[] = []
     const genderOffendingTables: string[] = []
     const religionOffendingTables: string[] = []
+
     assignments.forEach(assignment => {
       Object.entries(assignment.tables).forEach(([tableNumber, participants]) => {
         const real = participants.filter((p): p is Participant => p !== null && p !== undefined && p.name !== '')
         const tableSize = real.length
         const label = `Session ${assignment.session} Table ${tableNumber}`
 
+        // Couple violations
+        const couples = new Set<string>()
+        real.forEach(p => {
+          if (p.partner && real.some(other => other.name === p.partner)) {
+            couples.add([p.name, p.partner].sort().join('-'))
+          }
+        })
+        if (couples.size > 0) coupleOffendingTables.push(label)
+
+        // Gender balance
         const genderCounts: Record<string, number> = {}
         real.forEach(p => { genderCounts[p.gender] = (genderCounts[p.gender] || 0) + 1 })
         const genderVals = allGenders.map(g => genderCounts[g] ?? 0)
@@ -110,6 +100,7 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
           genderOffendingTables.push(label)
         }
 
+        // Religion balance
         const religionCounts: Record<string, number> = {}
         real.forEach(p => { religionCounts[p.religion] = (religionCounts[p.religion] || 0) + 1 })
         const religionVals = allReligions.map(r => religionCounts[r] ?? 0)
@@ -122,12 +113,9 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
 
     // Calculate repeat pairings
     const pairingsCount = new Map<string, number>()
-
     assignments.forEach(assignment => {
       Object.values(assignment.tables).forEach(participants => {
-        // Filter out empty/undefined/null participants
         const realParticipants = participants.filter((p): p is Participant => p !== null && p !== undefined && p.name !== '')
-        // For each table, count all pairings
         for (let i = 0; i < realParticipants.length; i++) {
           for (let j = i + 1; j < realParticipants.length; j++) {
             const pairKey = [realParticipants[i].name, realParticipants[j].name].sort().join('|')
@@ -137,41 +125,25 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
       })
     })
 
-    // Count how many pairs met more than once
     let repeatPairings = 0
-    pairingsCount.forEach(count => {
-      if (count > 1) {
-        repeatPairings++
-      }
-    })
+    pairingsCount.forEach(count => { if (count > 1) repeatPairings++ })
 
     // Calculate average new people met
-    // For each person, count unique people they sat with across all sessions
     const participantPairings = new Map<string, Set<string>>()
-
-    allParticipants.forEach(p => {
-      participantPairings.set(p.name, new Set())
-    })
-
+    allParticipants.forEach(p => { participantPairings.set(p.name, new Set()) })
     assignments.forEach(assignment => {
       Object.values(assignment.tables).forEach(participants => {
-        // Filter out empty/undefined/null participants
         const realParticipants = participants.filter((p): p is Participant => p !== null && p !== undefined && p.name !== '')
         realParticipants.forEach(p1 => {
           realParticipants.forEach(p2 => {
-            if (p1.name !== p2.name) {
-              participantPairings.get(p1.name)?.add(p2.name)
-            }
+            if (p1.name !== p2.name) participantPairings.get(p1.name)?.add(p2.name)
           })
         })
       })
     })
 
     let totalUniquePeopleMet = 0
-    participantPairings.forEach(uniquePeople => {
-      totalUniquePeopleMet += uniquePeople.size
-    })
-
+    participantPairings.forEach(uniquePeople => { totalUniquePeopleMet += uniquePeople.size })
     const avgNewPeopleMet = totalParticipants > 0
       ? Math.round((totalUniquePeopleMet / totalParticipants) * 10) / 10
       : 0
@@ -182,14 +154,15 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
     if (hasFacilitators) {
       assignments.forEach(assignment => {
         Object.values(assignment.tables).forEach(participants => {
-          const hasF = participants.some(p => p !== null && p !== undefined && p.is_facilitator)
-          if (!hasF) tablesWithoutFacilitator++
+          if (!participants.some(p => p !== null && p !== undefined && p.is_facilitator)) {
+            tablesWithoutFacilitator++
+          }
         })
       })
     }
 
     return {
-      coupleViolations,
+      coupleOffendingTables,
       genderOffendingTables,
       religionOffendingTables,
       numTables,
@@ -203,15 +176,17 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
 
   const stats = calculateStats()
   const allConstraintsSatisfied =
-    stats.coupleViolations === 0 &&
+    stats.coupleOffendingTables.length === 0 &&
     stats.genderOffendingTables.length === 0 &&
     stats.religionOffendingTables.length === 0 &&
     stats.tablesWithoutFacilitator === 0
 
-  const buildOffenderTooltip = (offenders: string[]): string => {
-    if (offenders.length === 0) return 'All tables are balanced.'
-    return `Imbalanced: ${offenders.join(', ')}`
-  }
+  const OffenderList = ({ offenders }: { offenders: string[] }) => (
+    <div>
+      <div className="font-medium mb-1">Tables with issues:</div>
+      {offenders.map(t => <div key={t}>{t}</div>)}
+    </div>
+  )
 
   return (
     <TooltipProvider>
@@ -233,14 +208,25 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
               <h3 className="font-semibold text-sm text-muted-foreground">Constraints</h3>
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  {stats.coupleViolations === 0 ? (
+                  {stats.coupleOffendingTables.length === 0 ? (
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
                   ) : (
                     <AlertCircle className="h-4 w-4 text-red-600" />
                   )}
-                  <span className="text-sm">
-                    {stats.coupleViolations === 0 ? 'All couples separated' : `${stats.coupleViolations} couple violations`}
-                  </span>
+                  {stats.coupleOffendingTables.length === 0 ? (
+                    <span className="text-sm">All couples separated</span>
+                  ) : (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-sm cursor-help underline decoration-dotted">
+                          {stats.coupleOffendingTables.length} couple violation{stats.coupleOffendingTables.length !== 1 ? 's' : ''}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <OffenderList offenders={stats.coupleOffendingTables} />
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   {stats.religionOffendingTables.length === 0 ? (
@@ -255,7 +241,9 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>
-                      {buildOffenderTooltip(stats.religionOffendingTables)}
+                      {stats.religionOffendingTables.length === 0
+                        ? 'All tables are balanced.'
+                        : <OffenderList offenders={stats.religionOffendingTables} />}
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -272,7 +260,9 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>
-                      {buildOffenderTooltip(stats.genderOffendingTables)}
+                      {stats.genderOffendingTables.length === 0
+                        ? 'All tables are balanced.'
+                        : <OffenderList offenders={stats.genderOffendingTables} />}
                     </TooltipContent>
                   </Tooltip>
                 </div>
