@@ -125,6 +125,28 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
     return map
   }, [tablesWithEmptySlots, editMode])
 
+  // Session-level expected within-table deviations — the minimum achievable given the roster
+  const sessionExpected = useMemo(() => {
+    const allParticipants = Object.values(assignment.tables)
+      .flatMap(participants =>
+        participants.filter((p): p is Participant => p !== null && p !== undefined)
+      )
+    const genderCounts: Record<string, number> = {}
+    const religionCounts: Record<string, number> = {}
+    allParticipants.forEach(p => {
+      genderCounts[p.gender] = (genderCounts[p.gender] || 0) + 1
+      religionCounts[p.religion] = (religionCounts[p.religion] || 0) + 1
+    })
+    const numTables = Object.keys(assignment.tables).length
+    return {
+      gender: expectedWithinTableDeviation(genderCounts, numTables),
+      religion: expectedWithinTableDeviation(religionCounts, numTables),
+      genderCounts,
+      religionCounts,
+      numTables,
+    }
+  }, [assignment.tables])
+
   const calculateTableStats = (participants: (Participant | null)[]) => {
     const realParticipants = participants.filter((p): p is Participant => p !== null)
     const genderCounts: { [key: string]: number } = {}
@@ -286,31 +308,9 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
     return { sizeMap, expectedMin, expectedMax }
   }, [editMode, tablesWithEmptySlots, assignment.tables])
 
-  // Session-level expected within-table deviations — the minimum achievable given the roster
-  const sessionExpected = useMemo(() => {
-    const allParticipants = Object.values(assignment.tables)
-      .flatMap(participants =>
-        participants.filter((p): p is Participant => p !== null && p !== undefined)
-      )
-    const genderCounts: Record<string, number> = {}
-    const religionCounts: Record<string, number> = {}
-    allParticipants.forEach(p => {
-      genderCounts[p.gender] = (genderCounts[p.gender] || 0) + 1
-      religionCounts[p.religion] = (religionCounts[p.religion] || 0) + 1
-    })
-    const numTables = Object.keys(assignment.tables).length
-    return {
-      gender: expectedWithinTableDeviation(genderCounts, numTables),
-      religion: expectedWithinTableDeviation(religionCounts, numTables),
-      genderCounts,
-      religionCounts,
-      numTables,
-    }
-  }, [assignment.tables])
-
   return (
     <TooltipProvider>
-    <div>
+      <div>
       <h2 className="text-2xl font-bold mb-6">
         Session {assignment.session}
         {editMode && <span className="text-sm font-normal text-muted-foreground ml-3">(Edit Mode)</span>}
@@ -480,7 +480,7 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
             )
           })}
       </div>
-    </div>
+      </div>
     </TooltipProvider>
   )
 }
