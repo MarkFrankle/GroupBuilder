@@ -360,19 +360,24 @@ function HelpPage() {
               </p>
             </div>
             <div className="pl-4 border-l-2 border-slate-200">
-              <p className="font-medium text-slate-800">Religion Balanced</p>
+              <p className="font-medium text-slate-800">Religion: Good / Suboptimal</p>
               <p className="text-slate-700 text-sm leading-relaxed">
-                Shows how evenly different religions are spread across tables. You'll
-                see something like "±1" — that means no table has more than 1 extra
-                person of any religion compared to other tables. Religion balance is
-                always enforced.
+                Shows whether religion is as evenly spread as the roster allows.
+                "Good" means every table's mix is as balanced as it can be given
+                how many people of each religion are in the group. "Suboptimal"
+                means at least one table is more imbalanced than necessary — hover
+                the label to see exactly which table(s). Individual tables also
+                show their religion count in red when flagged.
               </p>
             </div>
             <div className="pl-4 border-l-2 border-slate-200">
-              <p className="font-medium text-slate-800">Gender Balanced</p>
+              <p className="font-medium text-slate-800">Gender: Good / Suboptimal</p>
               <p className="text-slate-700 text-sm leading-relaxed">
-                Same idea as religion balance, but for gender distribution. Gender
-                balance is always enforced.
+                Same idea as religion balance, but for gender. If your roster has
+                unequal gender counts, some imbalance per table is unavoidable —
+                "Good" means the solver distributed genders as evenly as
+                mathematically possible. Hover the label when Suboptimal to see
+                which tables are off.
               </p>
             </div>
             <div className="pl-4 border-l-2 border-slate-200">
@@ -409,9 +414,9 @@ function HelpPage() {
           </p>
           <ul className="list-disc pl-5 space-y-2 text-slate-700 leading-relaxed mb-4">
             <li>
-              <strong>Green</strong> means all the hard constraints are satisfied (couples
-              separated, facilitators at every table) and the balance metrics are within
-              acceptable range.
+              <strong>Green</strong> means all hard constraints are satisfied (couples
+              separated, facilitators at every table) and both religion and gender
+              are rated "Good" across all tables.
             </li>
             <li>
               <strong>Yellow</strong> means something needs attention. Check which line
