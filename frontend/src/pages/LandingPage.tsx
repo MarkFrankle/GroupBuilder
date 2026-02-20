@@ -28,7 +28,7 @@ const LandingPage: React.FC = () => {
               <CardContent className="pt-6 text-center">
                 <LayoutGrid className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                 <h3 className="font-semibold">Groups</h3>
-                <p className="text-sm text-muted-foreground">Generate and view assignments</p>
+                <p className="text-sm text-muted-foreground">View previously made assignments</p>
               </CardContent>
             </Card>
           </Link>
