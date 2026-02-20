@@ -3,7 +3,7 @@
  */
 import React, { useState } from 'react';
 import { BookOpen } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { CreateProgramModal } from './CreateProgramModal';
@@ -25,6 +25,11 @@ export function AdminDashboard() {
   const [showInactive, setShowInactive] = useState(false);
 
   const { data: rawPrograms = [], isLoading: loading, error: fetchError } = useAdminPrograms(showInactive);
+
+  // Redirect non-admins rather than showing the page shell with an error banner
+  if (fetchError && (fetchError.message.includes('Admin access required') || fetchError.message.includes('Access denied'))) {
+    return <Navigate to="/" replace />;
+  }
 
   // Sort by created date (newest first)
   const programs = [...rawPrograms].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());

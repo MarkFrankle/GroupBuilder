@@ -1,6 +1,8 @@
 import React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { CheckCircle2, AlertCircle } from 'lucide-react'
+import { expectedDeviationForTableSize } from '@/utils/balanceStats'
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 
 interface Participant {
   name: string;
@@ -22,12 +24,13 @@ interface ValidationStatsProps {
 }
 
 interface ValidationResult {
-  coupleViolations: number;
-  maxReligionDeviation: number;
-  maxGenderDeviation: number;
+  coupleOffendingTables: string[];
+  genderOffendingTables: string[];
+  religionOffendingTables: string[];
+  numTables: number;
+  totalParticipants: number;
   repeatPairings: number;
   avgNewPeopleMet: number;
-  totalParticipants: number;
   tablesWithoutFacilitator: number;
   hasFacilitators: boolean;
 }
@@ -36,12 +39,13 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
   const calculateStats = (): ValidationResult => {
     if (assignments.length === 0) {
       return {
-        coupleViolations: 0,
-        maxReligionDeviation: 0,
-        maxGenderDeviation: 0,
+        coupleOffendingTables: [],
+        genderOffendingTables: [],
+        religionOffendingTables: [],
+        numTables: 0,
+        totalParticipants: 0,
         repeatPairings: 0,
         avgNewPeopleMet: 0,
-        totalParticipants: 0,
         tablesWithoutFacilitator: 0,
         hasFacilitators: false,
       }
@@ -51,88 +55,67 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
     const firstSession = assignments[0]
     const allParticipants: Participant[] = []
     Object.values(firstSession.tables).forEach(participants => {
-      // Filter out empty/undefined/null participants
       const realParticipants = participants.filter((p): p is Participant => p !== null && p !== undefined && p.name !== '')
       allParticipants.push(...realParticipants)
     })
     const totalParticipants = allParticipants.length
 
-    // Check couple separation violations
-    let coupleViolations = 0
-    assignments.forEach(assignment => {
-      Object.values(assignment.tables).forEach(participants => {
-        // Filter out empty/undefined/null participants
-        const realParticipants = participants.filter((p): p is Participant => p !== null && p !== undefined && p.name !== '')
-        const couples = new Set<string>()
-        realParticipants.forEach(p => {
-          if (p.partner) {
-            // Check if partner is at same table
-            const partnerAtTable = realParticipants.some(other => other && other.name === p.partner)
-            if (partnerAtTable) {
-              const coupleKey = [p.name, p.partner].sort().join('-')
-              couples.add(coupleKey)
-            }
-          }
-        })
-        coupleViolations += couples.size
-      })
+    // Roster-level attribute counts
+    const genderRosterCounts: Record<string, number> = {}
+    const religionRosterCounts: Record<string, number> = {}
+    allParticipants.forEach(p => {
+      genderRosterCounts[p.gender] = (genderRosterCounts[p.gender] || 0) + 1
+      religionRosterCounts[p.religion] = (religionRosterCounts[p.religion] || 0) + 1
     })
 
-    // Check religion and gender balance
-    let maxReligionDeviation = 0
-    let maxGenderDeviation = 0
+    const numTables = Object.keys(firstSession.tables).length
+    const allGenders = Object.keys(genderRosterCounts)
+    const allReligions = Object.keys(religionRosterCounts)
+
+    const coupleOffendingTables: string[] = []
+    const genderOffendingTables: string[] = []
+    const religionOffendingTables: string[] = []
 
     assignments.forEach(assignment => {
-      const tables = Object.values(assignment.tables)
+      Object.entries(assignment.tables).forEach(([tableNumber, participants]) => {
+        const real = participants.filter((p): p is Participant => p !== null && p !== undefined && p.name !== '')
+        const tableSize = real.length
+        const label = `Session ${assignment.session} Table ${tableNumber}`
 
-      // Religion balance
-      const religionCounts = tables.map(participants => {
-        const counts: { [key: string]: number } = {}
-        // Filter out empty/undefined/null participants
-        const realParticipants = participants.filter((p): p is Participant => p !== null && p !== undefined && p.name !== '')
-        realParticipants.forEach(p => {
-          counts[p.religion] = (counts[p.religion] || 0) + 1
+        // Couple violations
+        const couples = new Set<string>()
+        real.forEach(p => {
+          if (p.partner && real.some(other => other.name === p.partner)) {
+            couples.add([p.name, p.partner].sort().join('-'))
+          }
         })
-        return counts
-      })
+        if (couples.size > 0) coupleOffendingTables.push(label)
 
-      // Check deviation for each religion
-      const allReligions = new Set(allParticipants.map(p => p.religion))
-      allReligions.forEach(religion => {
-        const countsForReligion = religionCounts.map(rc => rc[religion] || 0)
-        const min = Math.min(...countsForReligion)
-        const max = Math.max(...countsForReligion)
-        maxReligionDeviation = Math.max(maxReligionDeviation, max - min)
-      })
+        // Gender balance
+        const genderCounts: Record<string, number> = {}
+        real.forEach(p => { genderCounts[p.gender] = (genderCounts[p.gender] || 0) + 1 })
+        const genderVals = allGenders.map(g => genderCounts[g] ?? 0)
+        const tableGenderDev = genderVals.length > 1 ? Math.max(...genderVals) - Math.min(...genderVals) : 0
+        if (tableGenderDev > expectedDeviationForTableSize(genderRosterCounts, totalParticipants, tableSize)) {
+          genderOffendingTables.push(label)
+        }
 
-      // Gender balance
-      const genderCounts = tables.map(participants => {
-        const counts: { [key: string]: number } = {}
-        // Filter out empty/undefined/null participants
-        const realParticipants = participants.filter((p): p is Participant => p !== null && p !== undefined && p.name !== '')
-        realParticipants.forEach(p => {
-          counts[p.gender] = (counts[p.gender] || 0) + 1
-        })
-        return counts
-      })
-
-      const allGenders = new Set(allParticipants.map(p => p.gender))
-      allGenders.forEach(gender => {
-        const countsForGender = genderCounts.map(gc => gc[gender] || 0)
-        const min = Math.min(...countsForGender)
-        const max = Math.max(...countsForGender)
-        maxGenderDeviation = Math.max(maxGenderDeviation, max - min)
+        // Religion balance
+        const religionCounts: Record<string, number> = {}
+        real.forEach(p => { religionCounts[p.religion] = (religionCounts[p.religion] || 0) + 1 })
+        const religionVals = allReligions.map(r => religionCounts[r] ?? 0)
+        const tableReligionDev = religionVals.length > 1 ? Math.max(...religionVals) - Math.min(...religionVals) : 0
+        if (tableReligionDev > expectedDeviationForTableSize(religionRosterCounts, totalParticipants, tableSize)) {
+          religionOffendingTables.push(label)
+        }
       })
     })
 
     // Calculate repeat pairings
     const pairingsCount = new Map<string, number>()
-
     assignments.forEach(assignment => {
       Object.values(assignment.tables).forEach(participants => {
-        // Filter out empty/undefined/null participants
         const realParticipants = participants.filter((p): p is Participant => p !== null && p !== undefined && p.name !== '')
-        // For each table, count all pairings
         for (let i = 0; i < realParticipants.length; i++) {
           for (let j = i + 1; j < realParticipants.length; j++) {
             const pairKey = [realParticipants[i].name, realParticipants[j].name].sort().join('|')
@@ -142,41 +125,25 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
       })
     })
 
-    // Count how many pairs met more than once
     let repeatPairings = 0
-    pairingsCount.forEach(count => {
-      if (count > 1) {
-        repeatPairings++
-      }
-    })
+    pairingsCount.forEach(count => { if (count > 1) repeatPairings++ })
 
     // Calculate average new people met
-    // For each person, count unique people they sat with across all sessions
     const participantPairings = new Map<string, Set<string>>()
-
-    allParticipants.forEach(p => {
-      participantPairings.set(p.name, new Set())
-    })
-
+    allParticipants.forEach(p => { participantPairings.set(p.name, new Set()) })
     assignments.forEach(assignment => {
       Object.values(assignment.tables).forEach(participants => {
-        // Filter out empty/undefined/null participants
         const realParticipants = participants.filter((p): p is Participant => p !== null && p !== undefined && p.name !== '')
         realParticipants.forEach(p1 => {
           realParticipants.forEach(p2 => {
-            if (p1.name !== p2.name) {
-              participantPairings.get(p1.name)?.add(p2.name)
-            }
+            if (p1.name !== p2.name) participantPairings.get(p1.name)?.add(p2.name)
           })
         })
       })
     })
 
     let totalUniquePeopleMet = 0
-    participantPairings.forEach(uniquePeople => {
-      totalUniquePeopleMet += uniquePeople.size
-    })
-
+    participantPairings.forEach(uniquePeople => { totalUniquePeopleMet += uniquePeople.size })
     const avgNewPeopleMet = totalParticipants > 0
       ? Math.round((totalUniquePeopleMet / totalParticipants) * 10) / 10
       : 0
@@ -187,131 +154,172 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
     if (hasFacilitators) {
       assignments.forEach(assignment => {
         Object.values(assignment.tables).forEach(participants => {
-          const hasF = participants.some(p => p !== null && p !== undefined && p.is_facilitator)
-          if (!hasF) tablesWithoutFacilitator++
+          if (!participants.some(p => p !== null && p !== undefined && p.is_facilitator)) {
+            tablesWithoutFacilitator++
+          }
         })
       })
     }
 
     return {
-      coupleViolations,
-      maxReligionDeviation,
-      maxGenderDeviation,
+      coupleOffendingTables,
+      genderOffendingTables,
+      religionOffendingTables,
+      numTables,
+      totalParticipants,
       repeatPairings,
       avgNewPeopleMet,
-      totalParticipants,
       tablesWithoutFacilitator,
       hasFacilitators,
     }
   }
 
   const stats = calculateStats()
-  const allConstraintsSatisfied = stats.coupleViolations === 0 &&
-                                   stats.maxReligionDeviation <= 1 &&
-                                   stats.maxGenderDeviation <= 1 &&
-                                   stats.tablesWithoutFacilitator === 0
+  const allConstraintsSatisfied =
+    stats.coupleOffendingTables.length === 0 &&
+    stats.genderOffendingTables.length === 0 &&
+    stats.religionOffendingTables.length === 0 &&
+    stats.tablesWithoutFacilitator === 0
+
+  const OffenderList = ({ offenders }: { offenders: string[] }) => (
+    <div>
+      <div className="font-medium mb-1">Tables with issues:</div>
+      {offenders.map(t => <div key={t}>{t}</div>)}
+    </div>
+  )
 
   return (
-    <Card className="mb-6">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          {allConstraintsSatisfied ? (
-            <CheckCircle2 className="h-5 w-5 text-green-600" />
-          ) : (
-            <AlertCircle className="h-5 w-5 text-yellow-600" />
-          )}
-          Validation Summary
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Constraint Checks */}
-          <div className="space-y-2">
-            <h3 className="font-semibold text-sm text-muted-foreground">Constraints</h3>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                {stats.coupleViolations === 0 ? (
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                ) : (
-                  <AlertCircle className="h-4 w-4 text-red-600" />
-                )}
-                <span className="text-sm">
-                  {stats.coupleViolations === 0 ? 'All couples separated' : `${stats.coupleViolations} couple violations`}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                {stats.maxReligionDeviation <= 1 ? (
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                ) : (
-                  <AlertCircle className="h-4 w-4 text-yellow-600" />
-                )}
-                <span className="text-sm">
-                  Religion balanced (±{stats.maxReligionDeviation})
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                {stats.maxGenderDeviation <= 1 ? (
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                ) : (
-                  <AlertCircle className="h-4 w-4 text-yellow-600" />
-                )}
-                <span className="text-sm">
-                  Gender balanced (±{stats.maxGenderDeviation})
-                </span>
-              </div>
-              {stats.hasFacilitators && (
+    <TooltipProvider>
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            {allConstraintsSatisfied ? (
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+            ) : (
+              <AlertCircle className="h-5 w-5 text-yellow-600" />
+            )}
+            Validation Summary
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Constraint Checks */}
+            <div className="space-y-2">
+              <h3 className="font-semibold text-sm text-muted-foreground">Constraints</h3>
+              <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  {stats.tablesWithoutFacilitator === 0 ? (
+                  {stats.coupleOffendingTables.length === 0 ? (
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
                   ) : (
                     <AlertCircle className="h-4 w-4 text-red-600" />
                   )}
-                  <span className="text-sm">
-                    {stats.tablesWithoutFacilitator === 0
-                      ? 'All tables have facilitators'
-                      : `${stats.tablesWithoutFacilitator} table(s) without facilitator`}
-                  </span>
+                  {stats.coupleOffendingTables.length === 0 ? (
+                    <span className="text-sm">All couples separated</span>
+                  ) : (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-sm cursor-help underline decoration-dotted">
+                          {stats.coupleOffendingTables.length} couple violation{stats.coupleOffendingTables.length !== 1 ? 's' : ''}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <OffenderList offenders={stats.coupleOffendingTables} />
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {stats.religionOffendingTables.length === 0 ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 text-yellow-600" />
+                  )}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-sm cursor-help underline decoration-dotted">
+                        Religion: {stats.religionOffendingTables.length === 0 ? 'Good' : 'Suboptimal'}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {stats.religionOffendingTables.length === 0
+                        ? 'All tables are balanced.'
+                        : <OffenderList offenders={stats.religionOffendingTables} />}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <div className="flex items-center gap-2">
+                  {stats.genderOffendingTables.length === 0 ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 text-yellow-600" />
+                  )}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-sm cursor-help underline decoration-dotted">
+                        Gender: {stats.genderOffendingTables.length === 0 ? 'Good' : 'Suboptimal'}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {stats.genderOffendingTables.length === 0
+                        ? 'All tables are balanced.'
+                        : <OffenderList offenders={stats.genderOffendingTables} />}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                {stats.hasFacilitators && (
+                  <div className="flex items-center gap-2">
+                    {stats.tablesWithoutFacilitator === 0 ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-red-600" />
+                    )}
+                    <span className="text-sm">
+                      {stats.tablesWithoutFacilitator === 0
+                        ? 'All tables have facilitators'
+                        : `${stats.tablesWithoutFacilitator} table(s) without facilitator`}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Mixing Stats */}
+            <div className="space-y-2">
+              <h3 className="font-semibold text-sm text-muted-foreground">Mixing Quality</h3>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-base">👥</span>
+                  Avg {stats.avgNewPeopleMet} unique tablemates per person
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-base">🔄</span>
+                  {stats.repeatPairings} pairs meet more than once
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Across {assignments.length} session{assignments.length !== 1 ? 's' : ''}
+                </div>
+              </div>
+            </div>
+
+            {/* Overall Status */}
+            <div className="space-y-2">
+              <h3 className="font-semibold text-sm text-muted-foreground">Overall</h3>
+              {allConstraintsSatisfied ? (
+                <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                  <span className="text-3xl">✅</span>
+                  <div className="font-semibold text-sm text-green-900">Looks Good</div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-300">
+                  <span className="text-3xl">🚧</span>
+                  <div className="font-semibold text-sm text-yellow-900">Has Issues</div>
                 </div>
               )}
             </div>
           </div>
-
-          {/* Mixing Stats */}
-          <div className="space-y-2">
-            <h3 className="font-semibold text-sm text-muted-foreground">Mixing Quality</h3>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-base">👥</span>
-                Avg {stats.avgNewPeopleMet} unique tablemates per person
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-base">🔄</span>
-                {stats.repeatPairings} pairs meet more than once
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                Across {assignments.length} session{assignments.length !== 1 ? 's' : ''}
-              </div>
-            </div>
-          </div>
-
-          {/* Overall Status */}
-          <div className="space-y-2">
-            <h3 className="font-semibold text-sm text-muted-foreground">Overall</h3>
-            {allConstraintsSatisfied ? (
-              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
-                <span className="text-3xl">✅</span>
-                <div className="font-semibold text-sm text-green-900">Looks Good</div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-300">
-                <span className="text-3xl">🚧</span>
-                <div className="font-semibold text-sm text-yellow-900">Has Issues</div>
-              </div>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </TooltipProvider>
   )
 }
 

@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Heart } from 'lucide-react'
 import { getReligionStyle } from '@/constants/colors'
+import { expectedWithinTableDeviation, expectedDeviationForTableSize, formatAttributeCounts } from '@/utils/balanceStats'
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
 
 interface Participant {
   name: string;
@@ -123,6 +125,30 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
     return map
   }, [tablesWithEmptySlots, editMode])
 
+  // Session-level expected within-table deviations — the minimum achievable given the roster
+  const sessionExpected = useMemo(() => {
+    const allParticipants = Object.values(assignment.tables)
+      .flatMap(participants =>
+        participants.filter((p): p is Participant => p !== null && p !== undefined)
+      )
+    const genderCounts: Record<string, number> = {}
+    const religionCounts: Record<string, number> = {}
+    allParticipants.forEach(p => {
+      genderCounts[p.gender] = (genderCounts[p.gender] || 0) + 1
+      religionCounts[p.religion] = (religionCounts[p.religion] || 0) + 1
+    })
+    const numTables = Object.keys(assignment.tables).length
+    const totalParticipants = allParticipants.length
+    return {
+      gender: expectedWithinTableDeviation(genderCounts, numTables),
+      religion: expectedWithinTableDeviation(religionCounts, numTables),
+      genderCounts,
+      religionCounts,
+      numTables,
+      totalParticipants,
+    }
+  }, [assignment.tables])
+
   const calculateTableStats = (participants: (Participant | null)[]) => {
     const realParticipants = participants.filter((p): p is Participant => p !== null)
     const genderCounts: { [key: string]: number } = {}
@@ -137,10 +163,36 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
       .map(([gender, count]) => `${count}${gender.charAt(0)}`)
       .join('/')
 
-    // Check gender imbalance (deviation > 1)
-    const genderCountValues = Object.values(genderCounts)
-    const hasGenderImbalance = genderCountValues.length > 0 &&
-      (Math.max(...genderCountValues) - Math.min(...genderCountValues) > 1)
+    // Gender — use full roster set (zero-filled) so missing genders count as 0
+    const allGenders = Object.keys(sessionExpected.genderCounts)
+    const genderValues = allGenders.map(g => genderCounts[g] ?? 0)
+    const genderDeviation = genderValues.length > 1
+      ? Math.max(...genderValues) - Math.min(...genderValues)
+      : 0
+    const tableSize = realParticipants.length
+    const tableExpectedGender = expectedDeviationForTableSize(
+      sessionExpected.genderCounts,
+      sessionExpected.totalParticipants,
+      tableSize
+    )
+    const hasGenderImbalance = genderDeviation > tableExpectedGender
+
+    // Religion deviation — use full roster set (zero-filled) so missing religions count as 0
+    const religionCountMap: Record<string, number> = {}
+    realParticipants.forEach(p => {
+      religionCountMap[p.religion] = (religionCountMap[p.religion] || 0) + 1
+    })
+    const allReligions = Object.keys(sessionExpected.religionCounts)
+    const religionValues = allReligions.map(r => religionCountMap[r] ?? 0)
+    const religionDeviation = religionValues.length > 1
+      ? Math.max(...religionValues) - Math.min(...religionValues)
+      : 0
+    const tableExpectedReligion = expectedDeviationForTableSize(
+      sessionExpected.religionCounts,
+      sessionExpected.totalParticipants,
+      tableSize
+    )
+    const hasReligionImbalance = religionDeviation > tableExpectedReligion
 
     const coupleViolations = new Set<string>()
     realParticipants.forEach(p => {
@@ -155,9 +207,14 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
     return {
       count: realParticipants.length,
       genderSplit: genderSplit || '0',
-      religionCount: religions.size,
-      hasCoupleViolation: coupleViolations.size > 0,
+      genderDeviation,
+      tableExpectedGender,
       hasGenderImbalance,
+      religionCount: religions.size,
+      religionDeviation,
+      tableExpectedReligion,
+      hasReligionImbalance,
+      hasCoupleViolation: coupleViolations.size > 0,
       facilitatorCount,
     }
   }
@@ -269,7 +326,8 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
   }, [editMode, tablesWithEmptySlots, assignment.tables])
 
   return (
-    <div>
+    <TooltipProvider>
+      <div>
       <h2 className="text-2xl font-bold mb-6">
         Session {assignment.session}
         {editMode && <span className="text-sm font-normal text-muted-foreground ml-3">(Edit Mode)</span>}
@@ -289,7 +347,33 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
                   <CardTitle className="text-lg flex items-center justify-between">
                     <span className={stats.hasCoupleViolation || isUnbalanced ? 'text-red-600' : ''}>Table {tableNumber}</span>
                     <span className="text-sm font-normal text-muted-foreground">
-                      <span className={isUnbalanced ? 'text-red-600' : ''}>{stats.count} {stats.count === 1 ? 'person' : 'people'}</span> • <span className={stats.facilitatorCount === 0 ? 'text-red-600 font-semibold' : ''}>{stats.facilitatorCount} {stats.facilitatorCount === 1 ? 'facilitator' : 'facilitators'}</span> • <span className={stats.hasGenderImbalance ? 'text-red-600' : ''}>{stats.genderSplit}</span> • {stats.religionCount} {stats.religionCount === 1 ? 'religion' : 'religions'}
+                      <span className={isUnbalanced ? 'text-red-600' : ''}>{stats.count} {stats.count === 1 ? 'person' : 'people'}</span> • <span className={stats.facilitatorCount === 0 ? 'text-red-600 font-semibold' : ''}>{stats.facilitatorCount} {stats.facilitatorCount === 1 ? 'facilitator' : 'facilitators'}</span> • {stats.hasGenderImbalance ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-red-600 cursor-help underline decoration-dotted">
+                              {stats.genderSplit}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {`Gender imbalance exceeds what's expected for a table this size. Expected: ±${stats.tableExpectedGender} (${formatAttributeCounts(sessionExpected.genderCounts, true)} across ${sessionExpected.numTables} tables). This table: ±${stats.genderDeviation}.`}
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <span>{stats.genderSplit}</span>
+                      )} • {stats.hasReligionImbalance ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-red-600 cursor-help underline decoration-dotted">
+                              {stats.religionCount} {stats.religionCount === 1 ? 'religion' : 'religions'}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {`Religion imbalance exceeds what's expected for a table this size. Expected: ±${stats.tableExpectedReligion} (${formatAttributeCounts(sessionExpected.religionCounts)} across ${sessionExpected.numTables} tables). This table: ±${stats.religionDeviation}.`}
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <span>{stats.religionCount} {stats.religionCount === 1 ? 'religion' : 'religions'}</span>
+                      )}
                       {stats.hasCoupleViolation && <span className="text-red-600"> • ⚠️ Couple</span>}
                     </span>
                   </CardTitle>
@@ -413,7 +497,8 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
             )
           })}
       </div>
-    </div>
+      </div>
+    </TooltipProvider>
   )
 }
 
