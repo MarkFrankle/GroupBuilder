@@ -1,7 +1,7 @@
 import React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { CheckCircle2, AlertCircle } from 'lucide-react'
-import { expectedWithinTableDeviation, expectedDeviationForTableSize, formatAttributeCounts } from '@/utils/balanceStats'
+import { expectedDeviationForTableSize } from '@/utils/balanceStats'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 
 interface Participant {
@@ -25,14 +25,8 @@ interface ValidationStatsProps {
 
 interface ValidationResult {
   coupleViolations: number;
-  expectedGenderDeviation: number;
-  actualGenderDeviation: number;
-  genderAnyTableExceedsExpected: boolean;
-  genderRosterCounts: Record<string, number>;
-  expectedReligionDeviation: number;
-  actualReligionDeviation: number;
-  religionAnyTableExceedsExpected: boolean;
-  religionRosterCounts: Record<string, number>;
+  genderOffendingTables: string[];
+  religionOffendingTables: string[];
   numTables: number;
   totalParticipants: number;
   repeatPairings: number;
@@ -46,14 +40,8 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
     if (assignments.length === 0) {
       return {
         coupleViolations: 0,
-        expectedGenderDeviation: 0,
-        actualGenderDeviation: 0,
-        genderAnyTableExceedsExpected: false,
-        genderRosterCounts: {},
-        expectedReligionDeviation: 0,
-        actualReligionDeviation: 0,
-        religionAnyTableExceedsExpected: false,
-        religionRosterCounts: {},
+        genderOffendingTables: [],
+        religionOffendingTables: [],
         numTables: 0,
         totalParticipants: 0,
         repeatPairings: 0,
@@ -106,33 +94,29 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
     const allGenders = Object.keys(genderRosterCounts)
     const allReligions = Object.keys(religionRosterCounts)
 
-    const expectedGenderDeviation = expectedWithinTableDeviation(genderRosterCounts, numTables)
-    const expectedReligionDeviation = expectedWithinTableDeviation(religionRosterCounts, numTables)
-
-    let actualGenderDeviation = 0
-    let actualReligionDeviation = 0
-    let genderAnyTableExceedsExpected = false
-    let religionAnyTableExceedsExpected = false
+    const genderOffendingTables: string[] = []
+    const religionOffendingTables: string[] = []
     assignments.forEach(assignment => {
-      Object.values(assignment.tables).forEach(participants => {
+      Object.entries(assignment.tables).forEach(([tableNumber, participants]) => {
         const real = participants.filter((p): p is Participant => p !== null && p !== undefined && p.name !== '')
         const tableSize = real.length
+        const label = `Session ${assignment.session} Table ${tableNumber}`
 
         const genderCounts: Record<string, number> = {}
         real.forEach(p => { genderCounts[p.gender] = (genderCounts[p.gender] || 0) + 1 })
         const genderVals = allGenders.map(g => genderCounts[g] ?? 0)
         const tableGenderDev = genderVals.length > 1 ? Math.max(...genderVals) - Math.min(...genderVals) : 0
-        actualGenderDeviation = Math.max(actualGenderDeviation, tableGenderDev)
-        const tableExpectedGender = expectedDeviationForTableSize(genderRosterCounts, totalParticipants, tableSize)
-        if (tableGenderDev > tableExpectedGender) genderAnyTableExceedsExpected = true
+        if (tableGenderDev > expectedDeviationForTableSize(genderRosterCounts, totalParticipants, tableSize)) {
+          genderOffendingTables.push(label)
+        }
 
         const religionCounts: Record<string, number> = {}
         real.forEach(p => { religionCounts[p.religion] = (religionCounts[p.religion] || 0) + 1 })
         const religionVals = allReligions.map(r => religionCounts[r] ?? 0)
         const tableReligionDev = religionVals.length > 1 ? Math.max(...religionVals) - Math.min(...religionVals) : 0
-        actualReligionDeviation = Math.max(actualReligionDeviation, tableReligionDev)
-        const tableExpectedReligion = expectedDeviationForTableSize(religionRosterCounts, totalParticipants, tableSize)
-        if (tableReligionDev > tableExpectedReligion) religionAnyTableExceedsExpected = true
+        if (tableReligionDev > expectedDeviationForTableSize(religionRosterCounts, totalParticipants, tableSize)) {
+          religionOffendingTables.push(label)
+        }
       })
     })
 
@@ -206,14 +190,8 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
 
     return {
       coupleViolations,
-      expectedGenderDeviation,
-      actualGenderDeviation,
-      genderAnyTableExceedsExpected,
-      genderRosterCounts,
-      expectedReligionDeviation,
-      actualReligionDeviation,
-      religionAnyTableExceedsExpected,
-      religionRosterCounts,
+      genderOffendingTables,
+      religionOffendingTables,
       numTables,
       totalParticipants,
       repeatPairings,
@@ -226,27 +204,13 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
   const stats = calculateStats()
   const allConstraintsSatisfied =
     stats.coupleViolations === 0 &&
-    !stats.genderAnyTableExceedsExpected &&
-    !stats.religionAnyTableExceedsExpected &&
+    stats.genderOffendingTables.length === 0 &&
+    stats.religionOffendingTables.length === 0 &&
     stats.tablesWithoutFacilitator === 0
 
-  const buildBalanceTooltip = (
-    rosterCounts: Record<string, number>,
-    expected: number,
-    actual: number,
-    numTables: number,
-    abbreviate = false
-  ): string => {
-    const breakdown = formatAttributeCounts(rosterCounts, abbreviate)
-    const isGood = actual <= expected
-    return [
-      `Roster: ${breakdown} across ${numTables} tables.`,
-      `Best achievable per table: ±${expected}.`,
-      `Actual worst table: ±${actual}.`,
-      isGood
-        ? 'Distribution is as good as this roster allows.'
-        : 'Try regenerating to improve distribution.',
-    ].join(' ')
+  const buildOffenderTooltip = (offenders: string[]): string => {
+    if (offenders.length === 0) return 'All tables are balanced.'
+    return `Imbalanced: ${offenders.join(', ')}`
   }
 
   return (
@@ -279,7 +243,7 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {!stats.religionAnyTableExceedsExpected ? (
+                  {stats.religionOffendingTables.length === 0 ? (
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
                   ) : (
                     <AlertCircle className="h-4 w-4 text-yellow-600" />
@@ -287,16 +251,16 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className="text-sm cursor-help underline decoration-dotted">
-                        Religion: {!stats.religionAnyTableExceedsExpected ? 'Good' : 'Suboptimal'}
+                        Religion: {stats.religionOffendingTables.length === 0 ? 'Good' : 'Suboptimal'}
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>
-                      {buildBalanceTooltip(stats.religionRosterCounts, stats.expectedReligionDeviation, stats.actualReligionDeviation, stats.numTables)}
+                      {buildOffenderTooltip(stats.religionOffendingTables)}
                     </TooltipContent>
                   </Tooltip>
                 </div>
                 <div className="flex items-center gap-2">
-                  {!stats.genderAnyTableExceedsExpected ? (
+                  {stats.genderOffendingTables.length === 0 ? (
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
                   ) : (
                     <AlertCircle className="h-4 w-4 text-yellow-600" />
@@ -304,11 +268,11 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className="text-sm cursor-help underline decoration-dotted">
-                        Gender: {!stats.genderAnyTableExceedsExpected ? 'Good' : 'Suboptimal'}
+                        Gender: {stats.genderOffendingTables.length === 0 ? 'Good' : 'Suboptimal'}
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>
-                      {buildBalanceTooltip(stats.genderRosterCounts, stats.expectedGenderDeviation, stats.actualGenderDeviation, stats.numTables, true)}
+                      {buildOffenderTooltip(stats.genderOffendingTables)}
                     </TooltipContent>
                   </Tooltip>
                 </div>
