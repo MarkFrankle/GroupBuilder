@@ -1,1 +1,4 @@
+# Redirect netlify subdomain to custom domain
+https://group-builder.netlify.app/*  https://group-builder.com/:splat  301!
+
 /*    /index.html   200
