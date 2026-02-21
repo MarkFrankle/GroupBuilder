@@ -2,7 +2,7 @@
 
 **Automated group assignment optimizer for multi-session events.**
 
-[Live app](https://group-builder.netlify.app) · [Report a bug](https://github.com/MarkFrankle/GroupBuilder/issues)
+[Live app](https://group-builder.com) · [Report a bug](https://github.com/MarkFrankle/GroupBuilder/issues)
 
 ---
 
