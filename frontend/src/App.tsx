@@ -78,7 +78,7 @@ function NavBar() {
       <Link to="/roster" className="text-muted-foreground hover:text-foreground transition-colors">Roster</Link>
       <Link to="/groups" className="text-muted-foreground hover:text-foreground transition-colors">Groups</Link>
       <Link to="/help" className="text-muted-foreground hover:text-foreground transition-colors">Help</Link>
-      {isAdmin && <Link to="/admin" className="text-muted-foreground hover:text-foreground transition-colors">Admin</Link>}
+      {isAdmin && <Link to="/admin" className="ml-auto text-muted-foreground hover:text-foreground transition-colors">Admin</Link>}
     </nav>
   );
 }
