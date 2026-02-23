@@ -49,6 +49,12 @@ async def require_bb_admin(user: AuthUser = Depends(get_current_user)) -> AuthUs
     return user
 
 
+@router.get("/check")
+async def check_admin(user: AuthUser = Depends(require_bb_admin)):
+    """Check if the current user is an admin."""
+    return {"is_admin": True}
+
+
 @router.post("/programs", response_model=dict)
 async def create_program(
     request: CreateOrgRequest, user: AuthUser = Depends(require_bb_admin)
