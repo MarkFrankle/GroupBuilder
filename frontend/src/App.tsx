@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Route, Routes, Navigate, useLocation, Link } f
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { AuthProvider, useAuth } from "./contexts/AuthContext"
+import { useIsAdmin } from "./hooks/queries"
 import { ProgramProvider, useProgram } from "./contexts/ProgramContext"
 import LoginPage from "./pages/LoginPage"
 import AuthVerifyPage from "./pages/AuthVerifyPage"
@@ -69,6 +70,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function NavBar() {
   const { user } = useAuth();
+  const { data: isAdmin } = useIsAdmin(!!user);
   if (!user) return null;
   return (
     <nav className="no-print border-b px-4 py-2 flex gap-4 text-sm">
@@ -76,6 +78,7 @@ function NavBar() {
       <Link to="/roster" className="text-muted-foreground hover:text-foreground transition-colors">Roster</Link>
       <Link to="/groups" className="text-muted-foreground hover:text-foreground transition-colors">Groups</Link>
       <Link to="/help" className="text-muted-foreground hover:text-foreground transition-colors">Help</Link>
+      {isAdmin && <Link to="/admin" className="text-muted-foreground hover:text-foreground transition-colors">Admin</Link>}
     </nav>
   );
 }

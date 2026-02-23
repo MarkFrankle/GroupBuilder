@@ -18,6 +18,16 @@ interface ProgramDetails {
   invites: any[]
 }
 
+export function useIsAdmin(enabled = true) {
+  return useQuery({
+    queryKey: ['admin-check'],
+    queryFn: () => apiRequest<{ is_admin: boolean }>('/api/admin/check').then(() => true).catch(() => false),
+    staleTime: Infinity,
+    retry: false,
+    enabled,
+  })
+}
+
 export function useAdminPrograms(showInactive: boolean) {
   return useQuery({
     queryKey: ['admin-programs', showInactive],
