@@ -21,7 +21,7 @@ GroupBuilder solves this in seconds using constraint programming.
 
 GroupBuilder is a login-gated web application for event organizers. Facilitators sign in with a magic link (no password), join a program, and use the app to manage their participant roster and generate optimized seating assignments.
 
-- **Roster management** — Add and edit participants with name, religion, gender, and partner fields directly in the app; or import from an Excel spreadsheet
+- **Roster management** — Add and edit participants with name, religion, gender, and partner fields directly in the app
 - **Intelligent assignment** — CP-SAT constraint solver optimizes table assignments across all sessions simultaneously
 - **Diversity balancing** — Even distribution of religions and genders across all tables, every session
 - **Couple separation** — Partners automatically seated at different tables
@@ -51,7 +51,6 @@ Typical solve times range from under a second for small events to around two min
 - **Pydantic v2** — request validation
 - **Firebase Admin SDK** — token verification, Firestore access
 - **Google Cloud Firestore** — primary database (programs, rosters, sessions, results)
-- **Pandas** + **openpyxl** — Excel roster import
 - **SendGrid** — email delivery for magic links (optional)
 - Deployed on **Google Cloud Run**
 
