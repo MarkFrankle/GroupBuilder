@@ -74,7 +74,7 @@ export function AdminHelpPage() {
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
             The admin panel is where you create and manage <strong>programs</strong> —
-            each program corresponds to one cohort or seminar series run by a set
+            each program represents one cohort or session series run by a set
             of facilitators.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
@@ -82,9 +82,11 @@ export function AdminHelpPage() {
             added or removed, just ask him.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            To reach the admin panel, navigate to{" "}
-            <strong>/admin</strong> directly in your browser. The admin panel is
-            entirely separate from the facilitator interface.
+            To reach the admin panel, click the <strong>Admin</strong> link on
+            the right side of the navigation bar, or go directly to{" "}
+            <a href="https://group-builder.com/admin" className="text-blue-600 hover:text-blue-800 underline">
+              group-builder.com/admin
+            </a>. The admin panel is entirely separate from the facilitator interface.
           </p>
 
           <InfoCallout>
@@ -93,6 +95,12 @@ export function AdminHelpPage() {
             lets you manage programs — it does not give you access to the roster
             or group assignment tools that facilitators use.
           </InfoCallout>
+
+          <TipCallout>
+            If you want to see the roster and group assignments for a program,
+            invite yourself as a facilitator using your own email address. Admin
+            access alone doesn't include facilitator tools.
+          </TipCallout>
         </section>
 
         {/* ===================== Section 2: Creating a Program ===================== */}
