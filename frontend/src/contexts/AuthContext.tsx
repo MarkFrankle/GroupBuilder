@@ -29,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await firebaseSignOut();
+    localStorage.removeItem('emailForSignIn');
     setUser(null);
   };
 
