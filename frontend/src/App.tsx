@@ -70,14 +70,18 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function NavBar() {
   const { user } = useAuth();
+  const { currentProgram } = useProgram();
   const { data: isAdmin } = useIsAdmin(!!user);
   if (!user) return null;
+  const hasProgram = !!currentProgram;
   return (
     <nav className="no-print border-b px-4 py-2 flex gap-4 text-sm">
-      <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
-      <Link to="/roster" className="text-muted-foreground hover:text-foreground transition-colors">Roster</Link>
-      <Link to="/groups" className="text-muted-foreground hover:text-foreground transition-colors">Groups</Link>
-      <Link to="/help" className="text-muted-foreground hover:text-foreground transition-colors">Help</Link>
+      {hasProgram && <>
+        <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
+        <Link to="/roster" className="text-muted-foreground hover:text-foreground transition-colors">Roster</Link>
+        <Link to="/groups" className="text-muted-foreground hover:text-foreground transition-colors">Groups</Link>
+        <Link to="/help" className="text-muted-foreground hover:text-foreground transition-colors">Help</Link>
+      </>}
       {isAdmin && <Link to="/admin" className="ml-auto text-muted-foreground hover:text-foreground transition-colors">Admin</Link>}
     </nav>
   );
