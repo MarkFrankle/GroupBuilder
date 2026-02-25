@@ -28,10 +28,11 @@ export function useIsAdmin(enabled = true) {
   })
 }
 
-export function useAdminPrograms(showInactive: boolean) {
+export function useAdminPrograms(showInactive: boolean, enabled = true) {
   return useQuery({
     queryKey: ['admin-programs', showInactive],
     queryFn: () => apiRequest<Program[]>(`/api/admin/programs?show_inactive=${showInactive}`),
+    enabled,
   })
 }
 

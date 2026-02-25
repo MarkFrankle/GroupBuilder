@@ -11,7 +11,7 @@ import { ManageProgramModal } from './ManageProgramModal';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { apiRequest } from '../../utils/apiClient';
 import { useAuth } from '../../contexts/AuthContext';
-import { useAdminPrograms } from '@/hooks/queries';
+import { useAdminPrograms, useIsAdmin } from '@/hooks/queries';
 import { useQueryClient } from '@tanstack/react-query';
 
 export function AdminDashboard() {
@@ -24,10 +24,11 @@ export function AdminDashboard() {
   const [deletingProgramId, setDeletingProgramId] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
 
-  const { data: rawPrograms = [], isLoading: loading, error: fetchError } = useAdminPrograms(showInactive);
+  const { data: isAdmin, isLoading: adminLoading } = useIsAdmin(!!user);
+  const { data: rawPrograms = [], isLoading: loading, error: fetchError } = useAdminPrograms(showInactive, isAdmin === true);
 
-  // Show access denied page for non-admins instead of silently redirecting
-  if (fetchError && (fetchError.message.includes('Admin access required') || fetchError.message.includes('Access denied'))) {
+  // Show access denied page for non-admins — check useIsAdmin first to avoid flashing the page shell
+  if (!adminLoading && isAdmin === false) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="max-w-md text-center space-y-4">
