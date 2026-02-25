@@ -94,7 +94,12 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 2 * 60 * 1000,  // 2 min — data under 2 min old served from cache
       gcTime: 5 * 60 * 1000,     // 5 min — unused cache entries garbage collected
-      retry: 1,
+      retry: (failureCount, error) => {
+        // Don't retry auth or permission errors — they're not transient
+        if (error?.name === 'AuthenticationError') return false;
+        if (error instanceof Error && /\b(40[13])\b/.test(error.message)) return false;
+        return failureCount < 1;
+      },
       refetchOnWindowFocus: false,
     },
   },
