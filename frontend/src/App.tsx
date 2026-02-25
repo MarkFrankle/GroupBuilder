@@ -72,11 +72,13 @@ function NavBar() {
   const { user } = useAuth();
   const { currentProgram } = useProgram();
   const { data: isAdmin } = useIsAdmin(!!user);
+  const location = useLocation();
   if (!user) return null;
   const hasProgram = !!currentProgram;
+  const isAdminPage = location.pathname.startsWith('/admin');
   return (
     <nav className="no-print border-b px-4 py-2 flex gap-4 text-sm">
-      {hasProgram && <>
+      {(hasProgram || isAdminPage) && <>
         <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
         <Link to="/roster" className="text-muted-foreground hover:text-foreground transition-colors">Roster</Link>
         <Link to="/groups" className="text-muted-foreground hover:text-foreground transition-colors">Groups</Link>

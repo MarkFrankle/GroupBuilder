@@ -2,13 +2,15 @@
  * Login page with magic link email input
  */
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { sendMagicLink } from '../services/firebase';
 
 // Email validation regex
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function LoginPage() {
+  const { user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -22,6 +24,11 @@ export function LoginPage() {
       setSent(true);
     }
   }, []);
+
+  // Redirect if already logged in (after all hooks)
+  if (!authLoading && user) {
+    return <Navigate to="/" replace />;
+  }
 
   const validateEmail = (email: string): boolean => {
     return EMAIL_REGEX.test(email);
