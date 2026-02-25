@@ -30,9 +30,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
   }
 
-  // Redirect to login if not authenticated
+  // Redirect to login if not authenticated, preserving return URL
   if (!user) {
-    return <Navigate to="/login" />;
+    return <Navigate to={`/login?returnTo=${encodeURIComponent(location.pathname)}`} />;
   }
 
   // Allow admin page access without program membership
@@ -69,20 +69,26 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function NavBar() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { currentProgram } = useProgram();
   const { data: isAdmin } = useIsAdmin(!!user);
+  const location = useLocation();
   if (!user) return null;
   const hasProgram = !!currentProgram;
+  const isAdminPage = location.pathname.startsWith('/admin');
   return (
-    <nav className="no-print border-b px-4 py-2 flex gap-4 text-sm">
-      {hasProgram && <>
+    <nav className="no-print border-b px-4 py-2 flex gap-4 text-sm items-center">
+      {(hasProgram || isAdminPage) && <>
         <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
         <Link to="/roster" className="text-muted-foreground hover:text-foreground transition-colors">Roster</Link>
         <Link to="/groups" className="text-muted-foreground hover:text-foreground transition-colors">Groups</Link>
         <Link to="/help" className="text-muted-foreground hover:text-foreground transition-colors">Help</Link>
       </>}
-      {isAdmin && <Link to="/admin" className="ml-auto text-muted-foreground hover:text-foreground transition-colors">Admin</Link>}
+      <div className="ml-auto flex gap-4 items-center">
+        {isAdmin && <Link to="/admin" className="text-muted-foreground hover:text-foreground transition-colors">Admin</Link>}
+        <span className="text-muted-foreground">{user.email}</span>
+        <button onClick={() => signOut()} className="text-muted-foreground hover:text-foreground transition-colors">Logout</button>
+      </div>
     </nav>
   );
 }
@@ -92,7 +98,12 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 2 * 60 * 1000,  // 2 min — data under 2 min old served from cache
       gcTime: 5 * 60 * 1000,     // 5 min — unused cache entries garbage collected
-      retry: 1,
+      retry: (failureCount, error) => {
+        // Don't retry auth or permission errors — they're not transient
+        if (error?.name === 'AuthenticationError') return false;
+        if (error instanceof Error && /\b(40[13])\b/.test(error.message)) return false;
+        return failureCount < 1;
+      },
       refetchOnWindowFocus: false,
     },
   },

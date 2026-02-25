@@ -3,7 +3,7 @@
  */
 import React, { useState } from 'react';
 import { BookOpen } from 'lucide-react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { CreateProgramModal } from './CreateProgramModal';
@@ -11,7 +11,7 @@ import { ManageProgramModal } from './ManageProgramModal';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { apiRequest } from '../../utils/apiClient';
 import { useAuth } from '../../contexts/AuthContext';
-import { useAdminPrograms } from '@/hooks/queries';
+import { useAdminPrograms, useIsAdmin } from '@/hooks/queries';
 import { useQueryClient } from '@tanstack/react-query';
 
 export function AdminDashboard() {
@@ -24,11 +24,30 @@ export function AdminDashboard() {
   const [deletingProgramId, setDeletingProgramId] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
 
-  const { data: rawPrograms = [], isLoading: loading, error: fetchError } = useAdminPrograms(showInactive);
+  const { data: isAdmin, isLoading: adminLoading } = useIsAdmin(!!user);
+  const { data: rawPrograms = [], isLoading: loading, error: fetchError } = useAdminPrograms(showInactive, isAdmin === true);
 
-  // Redirect non-admins rather than showing the page shell with an error banner
-  if (fetchError && (fetchError.message.includes('Admin access required') || fetchError.message.includes('Access denied'))) {
-    return <Navigate to="/" replace />;
+  // Show access denied page for non-admins — check useIsAdmin first to avoid flashing the page shell
+  if (!adminLoading && isAdmin === false) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="max-w-md text-center space-y-4">
+          <h2 className="text-xl font-semibold">Admin Access Required</h2>
+          <p className="text-muted-foreground">
+            The account <strong>{user?.email}</strong> does not have admin access.
+            If you have another account with admin privileges, you can switch to it.
+          </p>
+          <div className="flex gap-3 justify-center">
+            <Button variant="outline" onClick={() => window.history.back()}>
+              Go Back
+            </Button>
+            <Button variant="outline" onClick={() => signOut()}>
+              Switch Account
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Sort by created date (newest first)
@@ -79,18 +98,12 @@ export function AdminDashboard() {
       <header className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">GroupBuilder Admin</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600">{user?.email}</span>
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/admin/help" className="flex items-center gap-1.5">
-                <BookOpen className="h-4 w-4" />
-                Admin Help
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" onClick={signOut}>
-              Logout
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/admin/help" className="flex items-center gap-1.5">
+              <BookOpen className="h-4 w-4" />
+              Admin Help
+            </Link>
+          </Button>
         </div>
       </header>
 

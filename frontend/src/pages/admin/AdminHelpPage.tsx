@@ -1,7 +1,6 @@
 import { ArrowUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
-import { useAuth } from "../../contexts/AuthContext";
 import { Screenshot, TipCallout, WarningCallout, InfoCallout } from "../../components/HelpCallouts";
 
 const tocItems = [
@@ -16,8 +15,6 @@ const tocItems = [
 ];
 
 export function AdminHelpPage() {
-  const { user, signOut } = useAuth();
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -26,15 +23,9 @@ export function AdminHelpPage() {
           <h1 className="text-2xl font-bold">
             <Link to="/admin" className="hover:underline">GroupBuilder Admin</Link>
           </h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600">{user?.email}</span>
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/admin">← Back to Dashboard</Link>
-            </Button>
-            <Button variant="outline" size="sm" onClick={signOut}>
-              Logout
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/admin">← Back to Dashboard</Link>
+          </Button>
         </div>
       </header>
 

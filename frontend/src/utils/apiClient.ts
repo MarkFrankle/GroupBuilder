@@ -27,8 +27,6 @@ export async function authenticatedFetch(
     // Common causes: session revoked, user deleted, token expired beyond refresh
     console.error('Token refresh failed:', error);
     
-    // Redirect to login
-    window.location.href = '/login';
     throw new AuthenticationError('Session expired. Please sign in again.');
   }
 
@@ -60,7 +58,6 @@ export async function apiRequest<T>(
   if (!response.ok) {
     // Handle 401 - token may have been invalidated server-side
     if (response.status === 401) {
-      window.location.href = '/login';
       throw new AuthenticationError('Session expired. Please sign in again.');
     }
 

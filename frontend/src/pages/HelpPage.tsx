@@ -560,9 +560,10 @@ function HelpPage() {
             <InfoCallout>
               <p className="font-bold mb-1">"I got logged out" or "I need to sign in again"</p>
               <p>
-                This is normal — login links expire after 60 minutes for security. Go
-                to the login page, enter your email, and you'll receive a fresh login
-                link. Your data is safe; nothing is lost when you're logged out.
+                This is normal — login links expire after 60 minutes for security.
+                Click <strong>Logout</strong> in the top right corner, then enter your
+                email to receive a fresh login link. Your data is safe; nothing is
+                lost when you're logged out.
               </p>
             </InfoCallout>
 
