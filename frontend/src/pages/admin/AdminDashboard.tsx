@@ -3,7 +3,7 @@
  */
 import React, { useState } from 'react';
 import { BookOpen } from 'lucide-react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { CreateProgramModal } from './CreateProgramModal';
@@ -26,9 +26,27 @@ export function AdminDashboard() {
 
   const { data: rawPrograms = [], isLoading: loading, error: fetchError } = useAdminPrograms(showInactive);
 
-  // Redirect non-admins rather than showing the page shell with an error banner
+  // Show access denied page for non-admins instead of silently redirecting
   if (fetchError && (fetchError.message.includes('Admin access required') || fetchError.message.includes('Access denied'))) {
-    return <Navigate to="/" replace />;
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="max-w-md text-center space-y-4">
+          <h2 className="text-xl font-semibold">Admin Access Required</h2>
+          <p className="text-muted-foreground">
+            The account <strong>{user?.email}</strong> does not have admin access.
+            If you have another account with admin privileges, you can switch to it.
+          </p>
+          <div className="flex gap-3 justify-center">
+            <Button variant="outline" onClick={() => window.history.back()}>
+              Go Back
+            </Button>
+            <Button onClick={() => signOut()}>
+              Switch Account
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Sort by created date (newest first)
