@@ -98,18 +98,12 @@ export function AdminDashboard() {
       <header className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">GroupBuilder Admin</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600">{user?.email}</span>
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/admin/help" className="flex items-center gap-1.5">
-                <BookOpen className="h-4 w-4" />
-                Admin Help
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" onClick={signOut}>
-              Logout
-            </Button>
-          </div>
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/admin/help" className="flex items-center gap-1.5">
+              <BookOpen className="h-4 w-4" />
+              Admin Help
+            </Link>
+          </Button>
         </div>
       </header>
 
