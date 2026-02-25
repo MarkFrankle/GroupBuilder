@@ -30,9 +30,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
   }
 
-  // Redirect to login if not authenticated
+  // Redirect to login if not authenticated, preserving return URL
   if (!user) {
-    return <Navigate to="/login" />;
+    return <Navigate to={`/login?returnTo=${encodeURIComponent(location.pathname)}`} />;
   }
 
   // Allow admin page access without program membership

@@ -33,10 +33,13 @@ const auth = getAuth(app);
 /**
  * Send magic link to user's email
  */
-export async function sendMagicLink(email: string): Promise<void> {
+export async function sendMagicLink(email: string, returnTo?: string): Promise<void> {
+  const verifyUrl = returnTo
+    ? `${window.location.origin}/auth/verify?redirect=${encodeURIComponent(returnTo)}`
+    : `${window.location.origin}/auth/verify`;
   const actionCodeSettings = {
     // URL to redirect to after email link click
-    url: window.location.origin + '/auth/verify',
+    url: verifyUrl,
     handleCodeInApp: true,
   };
 
