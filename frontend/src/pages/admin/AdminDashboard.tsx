@@ -40,7 +40,7 @@ export function AdminDashboard() {
             <Button variant="outline" onClick={() => window.history.back()}>
               Go Back
             </Button>
-            <Button onClick={() => signOut()}>
+            <Button variant="outline" onClick={() => signOut()}>
               Switch Account
             </Button>
           </div>
