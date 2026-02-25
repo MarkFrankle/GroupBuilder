@@ -69,7 +69,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function NavBar() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { currentProgram } = useProgram();
   const { data: isAdmin } = useIsAdmin(!!user);
   const location = useLocation();
@@ -77,14 +77,18 @@ function NavBar() {
   const hasProgram = !!currentProgram;
   const isAdminPage = location.pathname.startsWith('/admin');
   return (
-    <nav className="no-print border-b px-4 py-2 flex gap-4 text-sm">
+    <nav className="no-print border-b px-4 py-2 flex gap-4 text-sm items-center">
       {(hasProgram || isAdminPage) && <>
         <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
         <Link to="/roster" className="text-muted-foreground hover:text-foreground transition-colors">Roster</Link>
         <Link to="/groups" className="text-muted-foreground hover:text-foreground transition-colors">Groups</Link>
         <Link to="/help" className="text-muted-foreground hover:text-foreground transition-colors">Help</Link>
       </>}
-      {isAdmin && <Link to="/admin" className="ml-auto text-muted-foreground hover:text-foreground transition-colors">Admin</Link>}
+      <div className="ml-auto flex gap-4 items-center">
+        {isAdmin && <Link to="/admin" className="text-muted-foreground hover:text-foreground transition-colors">Admin</Link>}
+        <span className="text-muted-foreground">{user.email}</span>
+        <button onClick={() => signOut()} className="text-muted-foreground hover:text-foreground transition-colors">Logout</button>
+      </div>
     </nav>
   );
 }
