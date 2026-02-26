@@ -250,26 +250,24 @@ export function InviteAcceptPage() {
             </div>
           )}
 
-          <button
-            onClick={handleAcceptInvite}
-            disabled={accepting || emailMismatch}
-            className={`w-full py-3 text-white rounded-md font-medium transition-colors ${
-              emailMismatch
-                ? 'bg-gray-400 cursor-not-allowed'
-                : accepting
-                ? 'bg-green-500 opacity-70 cursor-wait'
-                : 'bg-green-500 hover:bg-green-600 cursor-pointer'
-            }`}
-          >
-            {accepting ? 'Accepting...' : emailMismatch ? 'Wrong Email Address' : 'Accept Invite'}
-          </button>
-
-          {emailMismatch && (
+          {emailMismatch ? (
             <button
               onClick={() => navigate('/login')}
-              className="w-full mt-3 py-3 bg-white text-blue-500 border border-blue-500 rounded-md font-medium hover:bg-blue-50 transition-colors"
+              className="w-full py-3 bg-white text-blue-500 border border-blue-500 rounded-md font-medium hover:bg-blue-50 transition-colors"
             >
               Sign In with Different Email
+            </button>
+          ) : (
+            <button
+              onClick={handleAcceptInvite}
+              disabled={accepting}
+              className={`w-full py-3 text-white rounded-md font-medium transition-colors ${
+                accepting
+                  ? 'bg-green-500 opacity-70 cursor-wait'
+                  : 'bg-green-500 hover:bg-green-600 cursor-pointer'
+              }`}
+            >
+              {accepting ? 'Accepting...' : 'Accept Invite'}
             </button>
           )}
         </div>
