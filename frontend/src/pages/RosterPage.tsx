@@ -16,6 +16,7 @@ import {
   generateFromRoster,
 } from '@/api/roster';
 import { useRoster } from '@/hooks/queries';
+import { useProgram } from '@/contexts/ProgramContext';
 import { fetchWithRetry } from '@/utils/fetchWithRetry';
 import { API_BASE_URL } from '@/config/api';
 import { MAX_TABLES, MAX_SESSIONS } from '@/constants';
@@ -25,6 +26,7 @@ type SaveStatus = 'saved' | 'saving' | 'error';
 
 export function RosterPage() {
   const navigate = useNavigate();
+  const { currentProgram } = useProgram();
   const { data: rosterData, isLoading: loading, error: fetchError } = useRoster();
   const [participants, setParticipants] = useState<RosterParticipant[]>([]);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
@@ -49,13 +51,13 @@ export function RosterPage() {
     const newPartnerId = data.partner_id;
 
     try {
-      await upsertParticipant(id, data);
+      await upsertParticipant(currentProgram!.id, id, data);
 
       if (oldPartnerId !== newPartnerId) {
         if (oldPartnerId) {
           const oldPartner = participants.find(p => p.id === oldPartnerId);
           if (oldPartner && oldPartner.partner_id === id) {
-            await upsertParticipant(oldPartnerId, { ...oldPartner, partner_id: null });
+            await upsertParticipant(currentProgram!.id, oldPartnerId, { ...oldPartner, partner_id: null });
             setParticipants(prev => prev.map(p =>
               p.id === oldPartnerId ? { ...p, partner_id: null } : p
             ));
@@ -64,7 +66,7 @@ export function RosterPage() {
         if (newPartnerId) {
           const newPartner = participants.find(p => p.id === newPartnerId);
           if (newPartner) {
-            await upsertParticipant(newPartnerId, { ...newPartner, partner_id: id });
+            await upsertParticipant(currentProgram!.id, newPartnerId, { ...newPartner, partner_id: id });
             setParticipants(prev => prev.map(p =>
               p.id === newPartnerId ? { ...p, partner_id: id } : p
             ));
@@ -76,18 +78,18 @@ export function RosterPage() {
     } catch {
       setSaveStatus('error');
     }
-  }, [participants]);
+  }, [participants, currentProgram]);
 
   const handleDelete = useCallback(async (id: string) => {
     setSaveStatus('saving');
     setParticipants(prev => prev.filter(p => p.id !== id));
     try {
-      await apiDeleteParticipant(id);
+      await apiDeleteParticipant(currentProgram!.id, id);
       setSaveStatus('saved');
     } catch {
       setSaveStatus('error');
     }
-  }, []);
+  }, [currentProgram]);
 
   const handleAdd = useCallback(async (data: Omit<RosterParticipant, 'id'>) => {
     const newId = uuidv4();
@@ -95,12 +97,12 @@ export function RosterPage() {
     setSaveStatus('saving');
     setParticipants(prev => [...prev, newParticipant]);
     try {
-      await upsertParticipant(newId, data);
+      await upsertParticipant(currentProgram!.id, newId, data);
       setSaveStatus('saved');
     } catch {
       setSaveStatus('error');
     }
-  }, []);
+  }, [currentProgram]);
 
   const handleGenerate = async () => {
     setError(null);
@@ -113,7 +115,7 @@ export function RosterPage() {
     setLoadingMessage('Creating session from roster...');
     try {
       const sessionId = await generateFromRoster(
-        parseInt(numTables), parseInt(numSessions)
+        currentProgram!.id, parseInt(numTables), parseInt(numSessions)
       );
       setLoadingMessage('Generating assignments...');
       const response = await fetchWithRetry(
