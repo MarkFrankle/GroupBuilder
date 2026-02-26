@@ -39,6 +39,15 @@ def initialize_firebase():
     app = firebase_admin.get_app()
     logger.info(f"Firebase Admin SDK initialized with project: {app.project_id}")
 
+    if os.getenv("FIRESTORE_EMULATOR_HOST"):
+        logger.info(
+            f"Using Firestore emulator at {os.getenv('FIRESTORE_EMULATOR_HOST')}"
+        )
+    if os.getenv("FIREBASE_AUTH_EMULATOR_HOST"):
+        logger.info(
+            f"Using Auth emulator at {os.getenv('FIREBASE_AUTH_EMULATOR_HOST')}"
+        )
+
 
 def get_firestore_client() -> Client:
     """Get initialized Firestore client.
