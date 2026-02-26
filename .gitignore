@@ -171,6 +171,7 @@ cython_debug/
 firebase-service-account.json
 .claude/settings.local.json
 .firebase/
+emulator-data/
 .firebaserc
 .serena/
 .specify/

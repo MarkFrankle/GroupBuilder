@@ -29,6 +29,7 @@ export function ManageProgramModal({ open, onClose, programId }: ManageProgramMo
   const [revokingInviteId, setRevokingInviteId] = useState<string | null>(null);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<{ userId: string; email: string } | null>(null);
+  const [failedInviteLink, setFailedInviteLink] = useState<string | null>(null);
 
   const { data: programDetails = null, isLoading: loading, error: fetchError } = useProgramDetails(programId, open);
 
@@ -38,9 +39,12 @@ export function ManageProgramModal({ open, onClose, programId }: ManageProgramMo
 
     setSendingInvite(true);
     setError(null);
+    setFailedInviteLink(null);
 
     try {
-      await apiRequest(`/api/admin/programs/${programId}/invites`, {
+      const response = await apiRequest<{
+        invites: Array<{ email: string; invite_link: string; email_sent: boolean; error?: string }>;
+      }>(`/api/admin/programs/${programId}/invites`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -51,7 +55,13 @@ export function ManageProgramModal({ open, onClose, programId }: ManageProgramMo
       });
 
       setNewInviteEmail('');
-      await queryClient.invalidateQueries({ queryKey: ['admin-program-details', programId] }); // Reload to show new invite
+      await queryClient.invalidateQueries({ queryKey: ['admin-program-details', programId] });
+
+      // Show invite link if email delivery failed
+      const invite = response.invites?.[0];
+      if (invite && !invite.email_sent) {
+        setFailedInviteLink(invite.invite_link);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to send invite');
     } finally {
@@ -228,6 +238,29 @@ export function ManageProgramModal({ open, onClose, programId }: ManageProgramMo
                   </Button>
                 </div>
               </form>
+
+              {failedInviteLink && (
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-2">
+                    The email couldn't be delivered. You can copy the invite link below and send it to them directly.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <code className="text-xs bg-gray-100 px-2 py-1 rounded break-all flex-1">
+                      {failedInviteLink}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(failedInviteLink);
+                      }}
+                    >
+                      Copy link
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {programDetails.invites.length === 0 ? (
                 <p className="text-gray-500 text-sm">No invites sent yet</p>

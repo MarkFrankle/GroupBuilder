@@ -130,13 +130,22 @@ export function CreateProgramModal({ open, onClose, onSuccess }: CreateProgramMo
                     <div className="flex-1">
                       <span>{invite.email}</span>
                       {!invite.email_sent && (
-                        <div className="mt-1">
-                          <span className="text-red-600 text-xs">{invite.error || 'Email failed'}</span>
-                          <div className="mt-1">
-                            <span className="text-gray-500 text-xs">Manual link: </span>
-                            <code className="text-xs bg-gray-100 px-1 py-0.5 rounded break-all">
+                        <div className="mt-1 space-y-1">
+                          <p className="text-xs text-gray-600">
+                            The email couldn't be delivered. You can copy the invite link below and send it to them directly.
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <code className="text-xs bg-gray-100 px-2 py-1 rounded break-all flex-1">
                               {invite.invite_link}
                             </code>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              type="button"
+                              onClick={() => navigator.clipboard.writeText(invite.invite_link)}
+                            >
+                              Copy link
+                            </Button>
                           </div>
                         </div>
                       )}
@@ -148,7 +157,7 @@ export function CreateProgramModal({ open, onClose, onSuccess }: CreateProgramMo
           </div>
 
           <DialogFooter>
-            <Button onClick={handleClose}>Done</Button>
+            <Button variant="outline" onClick={handleClose}>Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

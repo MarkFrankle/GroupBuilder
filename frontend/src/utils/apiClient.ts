@@ -68,7 +68,11 @@ export async function apiRequest<T>(
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
         const error = await response.json();
-        errorMessage = error.detail || errorMessage;
+        errorMessage = typeof error.detail === 'string'
+          ? error.detail
+          : Array.isArray(error.detail)
+            ? error.detail.map((e: any) => e.msg).join(', ')
+            : errorMessage;
       } else {
         // Non-JSON response (likely HTML error page)
         const text = await response.text();
