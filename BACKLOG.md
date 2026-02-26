@@ -4,8 +4,11 @@ Ideas, feature requests, and wishlist items. Not prioritized, not committed to.
 
 ## Feature Requests
 
+- **New facilitator welcome page** — First-time facilitators (no programs/rosters yet, or `has_seen_welcome` flag) see a welcome landing page with two paths: "Learn how it works" → Help page, "Get started" → Roster/program creation. Returning facilitators skip straight to their normal flow. (Requested by admin user feedback, 2026-02)
 - **Google Drive file picker** — Allow direct file selection from Google Drive instead of download-then-upload. Uses Google Picker API (client-side only, no Drive access). Low priority — current upload flow works fine. (Requested by user, 2026-02)
 - **TanStack Query for client-side caching** — Replace manual useEffect/useState fetch pattern with TanStack Query for stale-while-revalidate caching. Pages show cached data instantly on revisit, background refetch keeps data fresh. Mechanical refactor across ~5-6 page components. Biggest quick win for perceived performance. (2026-02) **DONE**
+
+- **Local storage backend for localhost** — Dev mode currently hits live Firestore. Add a local storage option (Firebase emulator suite or in-memory mock) for localhost development to avoid unnecessary Firestore reads/writes and speed up local iteration. (2026-02)
 
 ## Chores
 
