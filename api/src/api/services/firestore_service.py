@@ -40,6 +40,8 @@ class FirestoreService:
             if member_doc.exists:
                 programs.append({"id": program_doc.id, **program_data})
 
+        # Sort by created_at descending (newest first)
+        programs.sort(key=lambda p: p.get("created_at", ""), reverse=True)
         return programs
 
     def check_user_can_access_session(self, user_id: str, session_id: str) -> bool:
