@@ -9,6 +9,7 @@ import {
   signInWithEmailLink,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  connectAuthEmulator,
   User
 } from 'firebase/auth';
 
@@ -29,6 +30,11 @@ if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.proj
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+
+// Connect to Auth emulator in local development
+if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+  connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+}
 
 /**
  * Send magic link to user's email
