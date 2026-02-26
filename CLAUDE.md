@@ -49,7 +49,7 @@ poetry run pytest tests/ -v                        # All tests
 ### Firebase Emulators — local dev without hitting production
 
 ```bash
-firebase emulators:start --only auth,firestore  # Auth (:9099) + Firestore (:8080) + UI (:4000)
+firebase emulators:start --only auth,firestore --export-on-exit=./emulator-data --import=./emulator-data
 ```
 
 Start emulators FIRST, then frontend + backend. Magic link emails appear in emulator UI at http://localhost:4000 (Auth tab). Backend auto-detects emulators via `FIRESTORE_EMULATOR_HOST` and `FIREBASE_AUTH_EMULATOR_HOST` env vars in `api/.env`.
