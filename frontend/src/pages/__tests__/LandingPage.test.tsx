@@ -4,10 +4,23 @@ import { BrowserRouter } from 'react-router-dom'
 import '@testing-library/jest-dom'
 import LandingPage from '../LandingPage'
 
+jest.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { uid: 'test-uid', email: 'test@example.com' }, loading: false }),
+}))
+
 const renderWithRouter = (component: React.ReactElement) =>
   render(<BrowserRouter>{component}</BrowserRouter>)
 
 describe('Landing Page', () => {
+  beforeEach(() => {
+    // Mark welcome as seen so tests see the normal landing page
+    localStorage.setItem('groupbuilder_welcome_seen_test-uid', 'true')
+  })
+
+  afterEach(() => {
+    localStorage.clear()
+  })
+
   test('renders app title', () => {
     renderWithRouter(<LandingPage />)
     expect(screen.getByText('Group Builder')).toBeInTheDocument()

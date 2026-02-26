@@ -1,9 +1,33 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, CardContent } from "@/components/ui/card"
 import { Users, LayoutGrid, HelpCircle } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
+import WelcomePage from './WelcomePage'
+
+function getWelcomeKey(uid: string) {
+  return `groupbuilder_welcome_seen_${uid}`
+}
 
 const LandingPage: React.FC = () => {
+  const { user } = useAuth()
+  const uid = user?.uid ?? ''
+  const [showWelcome, setShowWelcome] = useState(() => {
+    if (!uid) return false
+    return !localStorage.getItem(getWelcomeKey(uid))
+  })
+
+  const dismissWelcome = () => {
+    if (uid) {
+      localStorage.setItem(getWelcomeKey(uid), 'true')
+    }
+    setShowWelcome(false)
+  }
+
+  if (showWelcome) {
+    return <WelcomePage onDismiss={dismissWelcome} />
+  }
+
   return (
     <div className="container mx-auto p-4">
       <div className="max-w-2xl mx-auto mt-16 space-y-8">
