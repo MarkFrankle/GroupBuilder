@@ -7,14 +7,14 @@ const mockFetch = authenticatedFetch as jest.MockedFunction<typeof authenticated
 describe('roster API', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  test('getRoster calls GET /api/roster/', async () => {
+  test('getRoster calls GET /api/roster/ with program_id', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ participants: [] }),
     } as Response);
 
-    const result = await getRoster();
-    expect(mockFetch).toHaveBeenCalledWith('/api/roster/');
+    const result = await getRoster('test-program-id');
+    expect(mockFetch).toHaveBeenCalledWith('/api/roster/?program_id=test-program-id');
     expect(result).toEqual([]);
   });
 
@@ -24,19 +24,19 @@ describe('roster API', () => {
       json: async () => ({ id: 'p1', name: 'Alice' }),
     } as Response);
 
-    await upsertParticipant('p1', {
+    await upsertParticipant('test-program-id', 'p1', {
       name: 'Alice', religion: 'Christian',
       gender: 'Female', partner_id: null,
     });
-    expect(mockFetch).toHaveBeenCalledWith('/api/roster/p1', expect.objectContaining({
+    expect(mockFetch).toHaveBeenCalledWith('/api/roster/p1?program_id=test-program-id', expect.objectContaining({
       method: 'PUT',
     }));
   });
 
   test('deleteParticipant calls DELETE', async () => {
     mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) } as Response);
-    await deleteParticipant('p1');
-    expect(mockFetch).toHaveBeenCalledWith('/api/roster/p1', expect.objectContaining({
+    await deleteParticipant('test-program-id', 'p1');
+    expect(mockFetch).toHaveBeenCalledWith('/api/roster/p1?program_id=test-program-id', expect.objectContaining({
       method: 'DELETE',
     }));
   });
@@ -47,8 +47,8 @@ describe('roster API', () => {
       json: async () => ({ session_id: 'abc' }),
     } as Response);
 
-    const result = await generateFromRoster(3, 2);
-    expect(mockFetch).toHaveBeenCalledWith('/api/roster/generate', expect.objectContaining({
+    const result = await generateFromRoster('test-program-id', 3, 2);
+    expect(mockFetch).toHaveBeenCalledWith('/api/roster/generate?program_id=test-program-id', expect.objectContaining({
       method: 'POST',
     }));
     expect(result).toBe('abc');

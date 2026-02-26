@@ -1,8 +1,8 @@
 import { authenticatedFetch } from '@/utils/apiClient';
 import { RosterParticipant } from '@/types/roster';
 
-export async function getRoster(): Promise<RosterParticipant[]> {
-  const response = await authenticatedFetch('/api/roster/');
+export async function getRoster(programId: string): Promise<RosterParticipant[]> {
+  const response = await authenticatedFetch(`/api/roster/?program_id=${programId}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch roster: ${response.status}`);
   }
@@ -11,10 +11,11 @@ export async function getRoster(): Promise<RosterParticipant[]> {
 }
 
 export async function upsertParticipant(
+  programId: string,
   participantId: string,
   data: Omit<RosterParticipant, 'id'>
 ): Promise<RosterParticipant> {
-  const response = await authenticatedFetch(`/api/roster/${participantId}`, {
+  const response = await authenticatedFetch(`/api/roster/${participantId}?program_id=${programId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -25,8 +26,8 @@ export async function upsertParticipant(
   return response.json();
 }
 
-export async function deleteParticipant(participantId: string): Promise<void> {
-  const response = await authenticatedFetch(`/api/roster/${participantId}`, {
+export async function deleteParticipant(programId: string, participantId: string): Promise<void> {
+  const response = await authenticatedFetch(`/api/roster/${participantId}?program_id=${programId}`, {
     method: 'DELETE',
   });
   if (!response.ok) {
@@ -35,10 +36,11 @@ export async function deleteParticipant(participantId: string): Promise<void> {
 }
 
 export async function generateFromRoster(
+  programId: string,
   numTables: number,
   numSessions: number
 ): Promise<string> {
-  const response = await authenticatedFetch('/api/roster/generate', {
+  const response = await authenticatedFetch(`/api/roster/generate?program_id=${programId}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ num_tables: numTables, num_sessions: numSessions }),

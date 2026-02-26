@@ -11,6 +11,17 @@ jest.mock('uuid', () => ({
 jest.mock('@/utils/apiClient');
 const mockFetch = authenticatedFetch as jest.MockedFunction<typeof authenticatedFetch>;
 
+jest.mock('@/contexts/ProgramContext', () => ({
+  useProgram: () => ({
+    currentProgram: { id: 'test-program-id', name: 'Test' },
+    programs: [],
+    loading: false,
+    needsProgramSelection: false,
+    setCurrentProgram: jest.fn(),
+    refreshPrograms: jest.fn(),
+  }),
+}));
+
 const renderPage = () => {
   const QueryWrapper = createQueryWrapper();
   return render(
