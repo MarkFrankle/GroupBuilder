@@ -74,6 +74,11 @@ function HelpPage() {
             </li>
           </ol>
 
+          <TipCallout>
+            The first time you sign in, you'll see a welcome page where you can
+            choose to read this guide or jump straight to building your roster.
+          </TipCallout>
+
           <h3 className="text-xl font-semibold mb-2">Finding your way around</h3>
           <p className="mb-2 text-slate-700 leading-relaxed">
             Once you're signed in, you'll see a navigation bar at the top of every page
