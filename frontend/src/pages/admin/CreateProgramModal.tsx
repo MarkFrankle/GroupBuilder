@@ -130,25 +130,22 @@ export function CreateProgramModal({ open, onClose, onSuccess }: CreateProgramMo
                     <div className="flex-1">
                       <span>{invite.email}</span>
                       {!invite.email_sent && (
-                        <div className="mt-1">
-                          <span className="text-red-600 text-xs">{invite.error || 'Email failed'}</span>
-                          <div className="mt-1 flex items-center gap-1">
-                            <a
-                              href={invite.invite_link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-blue-600 hover:underline break-all"
-                            >
+                        <div className="mt-1 space-y-1">
+                          <p className="text-xs text-gray-600">
+                            The email couldn't be delivered. You can copy the invite link below and send it to them directly.
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <code className="text-xs bg-gray-100 px-2 py-1 rounded break-all flex-1">
                               {invite.invite_link}
-                            </a>
-                            <button
+                            </code>
+                            <Button
+                              variant="outline"
+                              size="sm"
                               type="button"
-                              className="shrink-0 text-xs text-gray-500 hover:text-gray-700 px-1"
                               onClick={() => navigator.clipboard.writeText(invite.invite_link)}
-                              title="Copy link"
                             >
-                              📋
-                            </button>
+                              Copy link
+                            </Button>
                           </div>
                         </div>
                       )}
