@@ -157,7 +157,7 @@ export function CreateProgramModal({ open, onClose, onSuccess }: CreateProgramMo
           </div>
 
           <DialogFooter>
-            <Button onClick={handleClose}>Done</Button>
+            <Button variant="outline" onClick={handleClose}>Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
