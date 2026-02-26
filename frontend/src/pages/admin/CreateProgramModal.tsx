@@ -132,11 +132,23 @@ export function CreateProgramModal({ open, onClose, onSuccess }: CreateProgramMo
                       {!invite.email_sent && (
                         <div className="mt-1">
                           <span className="text-red-600 text-xs">{invite.error || 'Email failed'}</span>
-                          <div className="mt-1">
-                            <span className="text-gray-500 text-xs">Manual link: </span>
-                            <code className="text-xs bg-gray-100 px-1 py-0.5 rounded break-all">
+                          <div className="mt-1 flex items-center gap-1">
+                            <a
+                              href={invite.invite_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 hover:underline break-all"
+                            >
                               {invite.invite_link}
-                            </code>
+                            </a>
+                            <button
+                              type="button"
+                              className="shrink-0 text-xs text-gray-500 hover:text-gray-700 px-1"
+                              onClick={() => navigator.clipboard.writeText(invite.invite_link)}
+                              title="Copy link"
+                            >
+                              📋
+                            </button>
                           </div>
                         </div>
                       )}
