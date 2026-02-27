@@ -88,10 +88,10 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
         const tableSize = real.length
         const label = `Session ${assignment.session} Table ${tableNumber}`
 
-        // Couple violations
+        // Couple violations (skip keep-together pairs — they're supposed to be together)
         const couples = new Set<string>()
         real.forEach(p => {
-          if (p.partner && real.some(other => other.name === p.partner)) {
+          if (p.partner && !p.keep_together && real.some(other => other.name === p.partner)) {
             couples.add([p.name, p.partner].sort().join('-'))
           }
         })

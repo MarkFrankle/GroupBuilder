@@ -489,7 +489,27 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
                     return (
                       <>
                         <div className="space-y-3">
-                          {regularParticipants.map(renderSlot)}
+                          {(() => {
+                            // Sort linked (keep-together) partners adjacent
+                            const sorted: typeof regularParticipants = []
+                            const placed = new Set<number>()
+                            for (const entry of regularParticipants) {
+                              if (placed.has(entry.index)) continue
+                              sorted.push(entry)
+                              placed.add(entry.index)
+                              const p = entry.participant
+                              if (p?.keep_together && p?.partner) {
+                                const partnerEntry = regularParticipants.find(
+                                  e => !placed.has(e.index) && e.participant?.name === p.partner
+                                )
+                                if (partnerEntry) {
+                                  sorted.push(partnerEntry)
+                                  placed.add(partnerEntry.index)
+                                }
+                              }
+                            }
+                            return sorted.map(renderSlot)
+                          })()}
                         </div>
                         {facilitatorEntries.length > 0 && (
                           <div className="mt-4 pt-3 border-t border-gray-200">
