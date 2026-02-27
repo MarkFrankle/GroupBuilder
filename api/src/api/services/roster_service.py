@@ -57,6 +57,7 @@ class RosterService:
             "gender": gender,
             "partner_id": data.get("partner_id"),
             "is_facilitator": bool(data.get("is_facilitator", False)),
+            "keep_together": bool(data.get("keep_together", False)),
             "updated_at": now,
         }
 

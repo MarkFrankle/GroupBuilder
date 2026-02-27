@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Heart } from 'lucide-react'
+import { Heart, Link } from 'lucide-react'
 import { getReligionStyle } from '@/constants/colors'
 import { expectedWithinTableDeviation, expectedDeviationForTableSize, formatAttributeCounts } from '@/utils/balanceStats'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
@@ -11,6 +11,7 @@ interface Participant {
   gender: string;
   partner: string | null;
   is_facilitator?: boolean;
+  keep_together?: boolean;
 }
 
 interface Assignment {
@@ -196,7 +197,7 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
 
     const coupleViolations = new Set<string>()
     realParticipants.forEach(p => {
-      if (p.partner && realParticipants.some(other => other && other.name === p.partner)) {
+      if (p.partner && !p.keep_together && realParticipants.some(other => other && other.name === p.partner)) {
         const coupleKey = [p.name, p.partner].sort().join('-')
         coupleViolations.add(coupleKey)
       }
@@ -446,10 +447,19 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
                                 <span className="font-medium">{participant.name}</span>
                                 {participant.partner && (() => {
                                   const partnerAtSameTable = allParticipants.some(p => p !== null && p.name === participant.partner)
+                                  const isKeepTogether = participant.keep_together
                                   return (
-                                    <div className="flex items-center gap-1 text-xs text-red-600">
-                                      <Heart className="h-3 w-3 fill-current" />
-                                      <span className={partnerAtSameTable ? 'text-red-600' : 'text-gray-900'}>with {participant.partner}</span>
+                                    <div className={`flex items-center gap-1 text-xs ${isKeepTogether ? 'text-blue-600' : 'text-red-600'}`}>
+                                      {isKeepTogether ? (
+                                        <Link className="h-3 w-3" />
+                                      ) : (
+                                        <Heart className="h-3 w-3 fill-current" />
+                                      )}
+                                      <span className={
+                                        isKeepTogether
+                                          ? 'text-blue-600'
+                                          : partnerAtSameTable ? 'text-red-600' : 'text-gray-900'
+                                      }>with {participant.partner}</span>
                                     </div>
                                   )
                                 })()}
@@ -479,7 +489,27 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
                     return (
                       <>
                         <div className="space-y-3">
-                          {regularParticipants.map(renderSlot)}
+                          {(() => {
+                            // Sort linked (keep-together) partners adjacent
+                            const sorted: typeof regularParticipants = []
+                            const placed = new Set<number>()
+                            for (const entry of regularParticipants) {
+                              if (placed.has(entry.index)) continue
+                              sorted.push(entry)
+                              placed.add(entry.index)
+                              const p = entry.participant
+                              if (p?.keep_together && p?.partner) {
+                                const partnerEntry = regularParticipants.find(
+                                  e => !placed.has(e.index) && e.participant?.name === p.partner
+                                )
+                                if (partnerEntry) {
+                                  sorted.push(partnerEntry)
+                                  placed.add(partnerEntry.index)
+                                }
+                              }
+                            }
+                            return sorted.map(renderSlot)
+                          })()}
                         </div>
                         {facilitatorEntries.length > 0 && (
                           <div className="mt-4 pt-3 border-t border-gray-200">

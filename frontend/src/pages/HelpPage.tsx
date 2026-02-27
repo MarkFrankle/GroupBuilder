@@ -139,12 +139,15 @@ function HelpPage() {
           <p className="mb-4 text-slate-700 leading-relaxed">
             If two participants are a couple, use the <strong>Partner</strong> dropdown
             on either person's row to link them. You only need to do this on one person —
-            the other person updates automatically. The solver will make sure partners are
-            always placed at <em>different</em> tables, so they each meet new people.
-            Only mark a couple as partners if you want them <strong>separated</strong>.
-            If a couple needs to stay together (for example, for health reasons),
-            do not mark them as partners — the solver will treat them as individuals
-            and may place them together or apart naturally.
+            the other person updates automatically. By default, the solver will place
+            partners at <em>different</em> tables so they each meet new people.
+          </p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            If a couple needs to stay <strong>together</strong> at the same table (for
+            example, for health or accessibility reasons), click the{" "}
+            <strong>link icon</strong> next to the partner name. The icon toggles
+            between separated (unlink icon) and together (link icon). When linked,
+            both partners will always be assigned to the same table in every session.
           </p>
 
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Marking facilitators:</p>
@@ -298,13 +301,15 @@ function HelpPage() {
             <li>
               <strong>Participant rows</strong> — Each person gets their own row showing
               their name in bold, color-coded religion and gender badges, and (if they
-              have a partner) a heart icon with their partner's name.
+              have a partner) a heart icon with their partner's name. Keep-together
+              partners show a link icon instead.
             </li>
             <li>
-              <strong>Partner warning</strong> — If partners end up at the same table
-              (a constraint violation), the table header shows a{" "}
+              <strong>Partner warning</strong> — If separated partners end up at the same
+              table (a constraint violation), the table header shows a{" "}
               <span className="text-red-600 font-medium">red warning triangle</span> and
-              the heart icons next to their names turn red.
+              the heart icons next to their names turn red. This does not apply to
+              keep-together partners, who are supposed to be at the same table.
             </li>
             <li>
               <strong>Facilitator section</strong> — Facilitators are listed in their
@@ -335,8 +340,9 @@ function HelpPage() {
             <div className="pl-4 border-l-2 border-slate-200">
               <p className="font-medium text-slate-800">Couples Separated</p>
               <p className="text-slate-700 text-sm leading-relaxed">
-                A green checkmark means no partners were placed at the same table.
-                Couples are always separated — this is guaranteed.
+                A green checkmark means no separated partners were placed at the same
+                table. Keep-together partners are expected to be together and are not
+                flagged here.
               </p>
             </div>
             <div className="pl-4 border-l-2 border-slate-200">
@@ -395,8 +401,8 @@ function HelpPage() {
           <ul className="list-disc pl-5 space-y-2 text-slate-700 leading-relaxed mb-4">
             <li>
               <strong>Green</strong> means all hard constraints are satisfied (couples
-              separated, facilitators at every table) and both religion and gender
-              are rated "Good" across all tables.
+              separated, linked partners together, facilitators at every table)
+              and both religion and gender are rated "Good" across all tables.
             </li>
             <li>
               <strong>Yellow</strong> means something needs attention. Check which line
@@ -505,7 +511,7 @@ function HelpPage() {
           <h3 className="text-xl font-semibold mt-8 mb-2">Fixing One Session: Regenerate Session</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Sometimes most sessions look great but one is off — maybe Session 3 has a
-            couple at the same table, or the gender balance is uneven. In detailed view,
+            separated couple at the same table, or the gender balance is uneven. In detailed view,
             navigate to the problem session, click <strong>"Edit,"</strong> then click{" "}
             <strong>"Regenerate Session."</strong>{" "}
             This re-runs the solver for just that one session (it's nearly instant)
