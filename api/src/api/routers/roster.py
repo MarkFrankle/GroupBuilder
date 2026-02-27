@@ -21,6 +21,7 @@ class ParticipantData(BaseModel):
     gender: str
     partner_id: Optional[str] = None
     is_facilitator: bool = False
+    keep_together: bool = False
 
 
 async def _validate_program_access(
@@ -68,20 +69,30 @@ def _roster_to_participant_list(participants: list[dict]) -> list[dict]:
                 "gender": p["gender"],
                 "partner": partner_name,
                 "couple_id": None,
+                "linked_id": None,
                 "is_facilitator": p.get("is_facilitator", False),
+                "keep_together": p.get("keep_together", False),
             }
         )
 
-    # Assign couple IDs
+    # Assign couple IDs (separate) and linked IDs (keep-together)
     couple_map = {}
+    linked_map = {}
     next_couple_id = 1
+    next_linked_id = 1
     for p in result:
         if p["partner"]:
             key = tuple(sorted([p["name"], p["partner"]]))
-            if key not in couple_map:
-                couple_map[key] = next_couple_id
-                next_couple_id += 1
-            p["couple_id"] = couple_map[key]
+            if p["keep_together"]:
+                if key not in linked_map:
+                    linked_map[key] = next_linked_id
+                    next_linked_id += 1
+                p["linked_id"] = linked_map[key]
+            else:
+                if key not in couple_map:
+                    couple_map[key] = next_couple_id
+                    next_couple_id += 1
+                p["couple_id"] = couple_map[key]
 
     return result
 
@@ -162,7 +173,9 @@ async def delete_participant(
         partner = roster_service.get_participant(program_id, participant["partner_id"])
         if partner and partner.get("partner_id") == participant_id:
             roster_service.upsert_participant(
-                program_id, participant["partner_id"], {**partner, "partner_id": None}
+                program_id,
+                participant["partner_id"],
+                {**partner, "partner_id": None, "keep_together": False},
             )
     roster_service.delete_participant(program_id, participant_id)
     return {"status": "deleted"}

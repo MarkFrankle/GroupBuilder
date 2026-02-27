@@ -1,5 +1,67 @@
 import pytest
 
+from api.routers.roster import _roster_to_participant_list
+
+
+class TestRosterToParticipantList:
+    def test_keep_together_pairs_get_linked_id(self):
+        participants = [
+            {
+                "id": "a",
+                "name": "Alice",
+                "religion": "Christian",
+                "gender": "Female",
+                "partner_id": "b",
+                "keep_together": True,
+            },
+            {
+                "id": "b",
+                "name": "Bob",
+                "religion": "Christian",
+                "gender": "Male",
+                "partner_id": "a",
+                "keep_together": True,
+            },
+        ]
+        result = _roster_to_participant_list(participants)
+        for p in result:
+            assert p["linked_id"] is not None
+            assert p["couple_id"] is None
+        assert result[0]["linked_id"] == result[1]["linked_id"]
+
+    def test_separate_pairs_get_couple_id(self):
+        participants = [
+            {
+                "id": "a",
+                "name": "Alice",
+                "religion": "Christian",
+                "gender": "Female",
+                "partner_id": "b",
+                "keep_together": False,
+            },
+            {
+                "id": "b",
+                "name": "Bob",
+                "religion": "Christian",
+                "gender": "Male",
+                "partner_id": "a",
+                "keep_together": False,
+            },
+        ]
+        result = _roster_to_participant_list(participants)
+        for p in result:
+            assert p["couple_id"] is not None
+            assert p["linked_id"] is None
+        assert result[0]["couple_id"] == result[1]["couple_id"]
+
+    def test_unpaired_get_neither(self):
+        participants = [
+            {"id": "a", "name": "Alice", "religion": "Christian", "gender": "Female"},
+        ]
+        result = _roster_to_participant_list(participants)
+        assert result[0]["couple_id"] is None
+        assert result[0]["linked_id"] is None
+
 
 class TestGetRoster:
     def test_returns_empty_roster(self, client):
