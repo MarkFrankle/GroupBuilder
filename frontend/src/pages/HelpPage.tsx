@@ -139,12 +139,15 @@ function HelpPage() {
           <p className="mb-4 text-slate-700 leading-relaxed">
             If two participants are a couple, use the <strong>Partner</strong> dropdown
             on either person's row to link them. You only need to do this on one person —
-            the other person updates automatically. The solver will make sure partners are
-            always placed at <em>different</em> tables, so they each meet new people.
-            Only mark a couple as partners if you want them <strong>separated</strong>.
-            If a couple needs to stay together (for example, for health reasons),
-            do not mark them as partners — the solver will treat them as individuals
-            and may place them together or apart naturally.
+            the other person updates automatically. By default, the solver will place
+            partners at <em>different</em> tables so they each meet new people.
+          </p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            If a couple needs to stay <strong>together</strong> at the same table (for
+            example, for health or accessibility reasons), click the{" "}
+            <strong>link icon</strong> next to the partner name. The icon toggles
+            between separated (unlink icon) and together (link icon). When linked,
+            both partners will always be assigned to the same table in every session.
           </p>
 
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Marking facilitators:</p>
