@@ -8,10 +8,34 @@ class TestGroupBuilder:
     def test_simple_assignment_single_session(self):
         """Test that a simple problem with one session can be solved"""
         participants = [
-            {"id": 1, "name": "Alice", "religion": "Christian", "gender": "Female", "couple_id": None},
-            {"id": 2, "name": "Bob", "religion": "Jewish", "gender": "Male", "couple_id": None},
-            {"id": 3, "name": "Charlie", "religion": "Muslim", "gender": "Male", "couple_id": None},
-            {"id": 4, "name": "Diana", "religion": "Christian", "gender": "Female", "couple_id": None},
+            {
+                "id": 1,
+                "name": "Alice",
+                "religion": "Christian",
+                "gender": "Female",
+                "couple_id": None,
+            },
+            {
+                "id": 2,
+                "name": "Bob",
+                "religion": "Jewish",
+                "gender": "Male",
+                "couple_id": None,
+            },
+            {
+                "id": 3,
+                "name": "Charlie",
+                "religion": "Muslim",
+                "gender": "Male",
+                "couple_id": None,
+            },
+            {
+                "id": 4,
+                "name": "Diana",
+                "religion": "Christian",
+                "gender": "Female",
+                "couple_id": None,
+            },
         ]
 
         builder = GroupBuilder(participants, num_tables=2, num_sessions=1)
@@ -24,10 +48,34 @@ class TestGroupBuilder:
     def test_couple_separation(self):
         """Test that couples are seated at different tables"""
         participants = [
-            {"id": 1, "name": "John", "religion": "Christian", "gender": "Male", "couple_id": 1},
-            {"id": 2, "name": "Jane", "religion": "Christian", "gender": "Female", "couple_id": 1},
-            {"id": 3, "name": "Bob", "religion": "Jewish", "gender": "Male", "couple_id": 2},
-            {"id": 4, "name": "Alice", "religion": "Jewish", "gender": "Female", "couple_id": 2},
+            {
+                "id": 1,
+                "name": "John",
+                "religion": "Christian",
+                "gender": "Male",
+                "couple_id": 1,
+            },
+            {
+                "id": 2,
+                "name": "Jane",
+                "religion": "Christian",
+                "gender": "Female",
+                "couple_id": 1,
+            },
+            {
+                "id": 3,
+                "name": "Bob",
+                "religion": "Jewish",
+                "gender": "Male",
+                "couple_id": 2,
+            },
+            {
+                "id": 4,
+                "name": "Alice",
+                "religion": "Jewish",
+                "gender": "Female",
+                "couple_id": 2,
+            },
         ]
 
         builder = GroupBuilder(participants, num_tables=2, num_sessions=1)
@@ -40,18 +88,103 @@ class TestGroupBuilder:
         tables = session["tables"]
 
         # Build map of participant names to their couple_id
-        couple_map = {p["name"]: p["couple_id"] for p in participants if p.get("couple_id")}
+        couple_map = {
+            p["name"]: p["couple_id"] for p in participants if p.get("couple_id")
+        }
 
         for table_id, participants_at_table in tables.items():
             # Get couple_ids for participants at this table
-            couple_ids = [couple_map.get(p["name"]) for p in participants_at_table if couple_map.get(p["name"]) is not None]
+            couple_ids = [
+                couple_map.get(p["name"])
+                for p in participants_at_table
+                if couple_map.get(p["name"]) is not None
+            ]
             # No duplicate couple_ids should exist at the same table
-            assert len(couple_ids) == len(set(couple_ids)), f"Table {table_id} has couples together: {couple_ids}"
+            assert len(couple_ids) == len(
+                set(couple_ids)
+            ), f"Table {table_id} has couples together: {couple_ids}"
+
+    def test_linked_partners_same_table(self):
+        """Test that linked partners (keep_together) are seated at the same table"""
+        participants = [
+            {
+                "id": 1,
+                "name": "John",
+                "religion": "Christian",
+                "gender": "Male",
+                "linked_id": 1,
+            },
+            {
+                "id": 2,
+                "name": "Jane",
+                "religion": "Christian",
+                "gender": "Female",
+                "linked_id": 1,
+            },
+            {
+                "id": 3,
+                "name": "Bob",
+                "religion": "Jewish",
+                "gender": "Male",
+                "couple_id": 2,
+            },
+            {
+                "id": 4,
+                "name": "Alice",
+                "religion": "Jewish",
+                "gender": "Female",
+                "couple_id": 2,
+            },
+            {"id": 5, "name": "Mo", "religion": "Muslim", "gender": "Male"},
+            {"id": 6, "name": "Sara", "religion": "Muslim", "gender": "Female"},
+            {"id": 7, "name": "David", "religion": "Christian", "gender": "Male"},
+            {"id": 8, "name": "Fatima", "religion": "Muslim", "gender": "Female"},
+        ]
+        for p in participants:
+            p.setdefault("couple_id", None)
+            p.setdefault("linked_id", None)
+            p.setdefault("is_facilitator", False)
+
+        builder = GroupBuilder(participants, num_tables=2, num_sessions=2)
+        result = builder.generate_assignments()
+        assert result["status"] == "success"
+
+        for session in result["assignments"]:
+            john_table = None
+            jane_table = None
+            for table_id, table_participants in session["tables"].items():
+                for p in table_participants:
+                    if p["name"] == "John":
+                        john_table = table_id
+                    if p["name"] == "Jane":
+                        jane_table = table_id
+            assert (
+                john_table == jane_table
+            ), f"Session {session['session']}: John at table {john_table}, Jane at table {jane_table}"
+
+        for session in result["assignments"]:
+            bob_table = None
+            alice_table = None
+            for table_id, table_participants in session["tables"].items():
+                for p in table_participants:
+                    if p["name"] == "Bob":
+                        bob_table = table_id
+                    if p["name"] == "Alice":
+                        alice_table = table_id
+            assert (
+                bob_table != alice_table
+            ), f"Session {session['session']}: Bob and Alice both at table {bob_table}"
 
     def test_balanced_table_sizes(self):
         """Test that all tables have balanced sizes (within 1 person)"""
         participants = [
-            {"id": i, "name": f"Person{i}", "religion": "Christian", "gender": "Male", "couple_id": None}
+            {
+                "id": i,
+                "name": f"Person{i}",
+                "religion": "Christian",
+                "gender": "Male",
+                "couple_id": None,
+            }
             for i in range(1, 11)  # 10 participants
         ]
 
@@ -69,12 +202,48 @@ class TestGroupBuilder:
     def test_multiple_sessions(self):
         """Test that multiple sessions can be generated"""
         participants = [
-            {"id": 1, "name": "Alice", "religion": "Christian", "gender": "Female", "couple_id": None},
-            {"id": 2, "name": "Bob", "religion": "Jewish", "gender": "Male", "couple_id": None},
-            {"id": 3, "name": "Charlie", "religion": "Muslim", "gender": "Male", "couple_id": None},
-            {"id": 4, "name": "Diana", "religion": "Christian", "gender": "Female", "couple_id": None},
-            {"id": 5, "name": "Eve", "religion": "Jewish", "gender": "Female", "couple_id": None},
-            {"id": 6, "name": "Frank", "religion": "Muslim", "gender": "Male", "couple_id": None},
+            {
+                "id": 1,
+                "name": "Alice",
+                "religion": "Christian",
+                "gender": "Female",
+                "couple_id": None,
+            },
+            {
+                "id": 2,
+                "name": "Bob",
+                "religion": "Jewish",
+                "gender": "Male",
+                "couple_id": None,
+            },
+            {
+                "id": 3,
+                "name": "Charlie",
+                "religion": "Muslim",
+                "gender": "Male",
+                "couple_id": None,
+            },
+            {
+                "id": 4,
+                "name": "Diana",
+                "religion": "Christian",
+                "gender": "Female",
+                "couple_id": None,
+            },
+            {
+                "id": 5,
+                "name": "Eve",
+                "religion": "Jewish",
+                "gender": "Female",
+                "couple_id": None,
+            },
+            {
+                "id": 6,
+                "name": "Frank",
+                "religion": "Muslim",
+                "gender": "Male",
+                "couple_id": None,
+            },
         ]
 
         builder = GroupBuilder(participants, num_tables=2, num_sessions=3)
@@ -91,8 +260,20 @@ class TestGroupBuilder:
         """Test that small groups with more tables than ideal still work"""
         # 2 participants with 3 tables - solver should handle this (some tables may be empty or very unbalanced)
         participants = [
-            {"id": 1, "name": "Alice", "religion": "Christian", "gender": "Female", "couple_id": None},
-            {"id": 2, "name": "Bob", "religion": "Jewish", "gender": "Male", "couple_id": None},
+            {
+                "id": 1,
+                "name": "Alice",
+                "religion": "Christian",
+                "gender": "Female",
+                "couple_id": None,
+            },
+            {
+                "id": 2,
+                "name": "Bob",
+                "religion": "Jewish",
+                "gender": "Male",
+                "couple_id": None,
+            },
         ]
 
         builder = GroupBuilder(participants, num_tables=3, num_sessions=1)
@@ -108,12 +289,48 @@ class TestGroupBuilder:
     def test_diversity_distribution(self):
         """Test that religions are distributed evenly across tables"""
         participants = [
-            {"id": 1, "name": "Christian1", "religion": "Christian", "gender": "Male", "couple_id": None},
-            {"id": 2, "name": "Christian2", "religion": "Christian", "gender": "Female", "couple_id": None},
-            {"id": 3, "name": "Jewish1", "religion": "Jewish", "gender": "Male", "couple_id": None},
-            {"id": 4, "name": "Jewish2", "religion": "Jewish", "gender": "Female", "couple_id": None},
-            {"id": 5, "name": "Muslim1", "religion": "Muslim", "gender": "Male", "couple_id": None},
-            {"id": 6, "name": "Muslim2", "religion": "Muslim", "gender": "Female", "couple_id": None},
+            {
+                "id": 1,
+                "name": "Christian1",
+                "religion": "Christian",
+                "gender": "Male",
+                "couple_id": None,
+            },
+            {
+                "id": 2,
+                "name": "Christian2",
+                "religion": "Christian",
+                "gender": "Female",
+                "couple_id": None,
+            },
+            {
+                "id": 3,
+                "name": "Jewish1",
+                "religion": "Jewish",
+                "gender": "Male",
+                "couple_id": None,
+            },
+            {
+                "id": 4,
+                "name": "Jewish2",
+                "religion": "Jewish",
+                "gender": "Female",
+                "couple_id": None,
+            },
+            {
+                "id": 5,
+                "name": "Muslim1",
+                "religion": "Muslim",
+                "gender": "Male",
+                "couple_id": None,
+            },
+            {
+                "id": 6,
+                "name": "Muslim2",
+                "religion": "Muslim",
+                "gender": "Female",
+                "couple_id": None,
+            },
         ]
 
         builder = GroupBuilder(participants, num_tables=2, num_sessions=1)
@@ -137,7 +354,13 @@ class TestGroupBuilder:
     def test_solution_quality_metadata(self):
         """Test that the result includes solution quality metadata"""
         participants = [
-            {"id": i, "name": f"Person{i}", "religion": "Christian", "gender": "Male", "couple_id": None}
+            {
+                "id": i,
+                "name": f"Person{i}",
+                "religion": "Christian",
+                "gender": "Male",
+                "couple_id": None,
+            }
             for i in range(1, 7)
         ]
 
@@ -154,12 +377,48 @@ class TestGroupBuilder:
         """Test that require_different_assignments=True enforces different table assignments when feasible"""
         # Use fewer participants with more tables for more flexibility
         participants = [
-            {"id": 1, "name": "Alice", "religion": "Christian", "gender": "Female", "couple_id": None},
-            {"id": 2, "name": "Bob", "religion": "Jewish", "gender": "Male", "couple_id": None},
-            {"id": 3, "name": "Charlie", "religion": "Muslim", "gender": "Male", "couple_id": None},
-            {"id": 4, "name": "Diana", "religion": "Christian", "gender": "Female", "couple_id": None},
-            {"id": 5, "name": "Eve", "religion": "Jewish", "gender": "Female", "couple_id": None},
-            {"id": 6, "name": "Frank", "religion": "Muslim", "gender": "Male", "couple_id": None},
+            {
+                "id": 1,
+                "name": "Alice",
+                "religion": "Christian",
+                "gender": "Female",
+                "couple_id": None,
+            },
+            {
+                "id": 2,
+                "name": "Bob",
+                "religion": "Jewish",
+                "gender": "Male",
+                "couple_id": None,
+            },
+            {
+                "id": 3,
+                "name": "Charlie",
+                "religion": "Muslim",
+                "gender": "Male",
+                "couple_id": None,
+            },
+            {
+                "id": 4,
+                "name": "Diana",
+                "religion": "Christian",
+                "gender": "Female",
+                "couple_id": None,
+            },
+            {
+                "id": 5,
+                "name": "Eve",
+                "religion": "Jewish",
+                "gender": "Female",
+                "couple_id": None,
+            },
+            {
+                "id": 6,
+                "name": "Frank",
+                "religion": "Muslim",
+                "gender": "Male",
+                "couple_id": None,
+            },
         ]
 
         # Forbid Bob (id=2, not the first participant) from table 1
@@ -173,11 +432,13 @@ class TestGroupBuilder:
             num_tables=3,  # More tables = more flexibility
             num_sessions=1,
             current_table_assignments=current_table_assignments,
-            require_different_assignments=True
+            require_different_assignments=True,
         )
         result = builder.generate_assignments(max_time_seconds=10)
 
-        assert result["status"] == "success", f"Expected success but got {result.get('status')}: {result.get('error')}"
+        assert (
+            result["status"] == "success"
+        ), f"Expected success but got {result.get('status')}: {result.get('error')}"
 
         # Verify Bob is NOT at table 1
         session = result["assignments"][0]
@@ -190,7 +451,9 @@ class TestGroupBuilder:
                     bob_table = int(table_id) - 1  # Convert to 0-indexed
 
         assert bob_table is not None, "Bob should be assigned to a table"
-        assert bob_table != 1, f"Hard constraint should prevent Bob from being at table 1, but he's at table {bob_table}"
+        assert (
+            bob_table != 1
+        ), f"Hard constraint should prevent Bob from being at table 1, but he's at table {bob_table}"
 
     def test_require_different_assignments_impossible_case(self):
         """Test graceful failure when different assignments are impossible"""
@@ -198,8 +461,20 @@ class TestGroupBuilder:
         # Only 2 participants and 2 tables - only 2 valid arrangements exist (A,B) or (B,A)
         # If we lock them to (A,B) with couples constraint, (B,A) may be infeasible
         participants = [
-            {"id": 1, "name": "John", "religion": "Christian", "gender": "Male", "couple_id": 1},
-            {"id": 2, "name": "Jane", "religion": "Christian", "gender": "Female", "couple_id": 1},
+            {
+                "id": 1,
+                "name": "John",
+                "religion": "Christian",
+                "gender": "Male",
+                "couple_id": 1,
+            },
+            {
+                "id": 2,
+                "name": "Jane",
+                "religion": "Christian",
+                "gender": "Female",
+                "couple_id": 1,
+            },
         ]
 
         # Current assignment: John at table 0, Jane at table 1 (couples separated)
@@ -213,7 +488,7 @@ class TestGroupBuilder:
             num_tables=2,
             num_sessions=1,
             current_table_assignments=current_table_assignments,
-            require_different_assignments=True
+            require_different_assignments=True,
         )
         result = builder.generate_assignments(max_time_seconds=5)
 
@@ -224,8 +499,20 @@ class TestGroupBuilder:
     def test_soft_constraint_allows_same_assignments(self):
         """Test that without require_different_assignments, same assignments are allowed if optimal"""
         participants = [
-            {"id": 1, "name": "John", "religion": "Christian", "gender": "Male", "couple_id": 1},
-            {"id": 2, "name": "Jane", "religion": "Christian", "gender": "Female", "couple_id": 1},
+            {
+                "id": 1,
+                "name": "John",
+                "religion": "Christian",
+                "gender": "Male",
+                "couple_id": 1,
+            },
+            {
+                "id": 2,
+                "name": "Jane",
+                "religion": "Christian",
+                "gender": "Female",
+                "couple_id": 1,
+            },
         ]
 
         # Current assignment: already optimal (couples separated)
@@ -239,7 +526,7 @@ class TestGroupBuilder:
             num_tables=2,
             num_sessions=1,
             current_table_assignments=current_table_assignments,
-            require_different_assignments=False  # Soft constraint
+            require_different_assignments=False,  # Soft constraint
         )
         result = builder.generate_assignments(max_time_seconds=5)
 
@@ -250,12 +537,60 @@ class TestGroupBuilder:
 def test_facilitator_coverage():
     """Every table must have at least one facilitator."""
     participants = [
-        {"id": 1, "name": "Fac1", "religion": "Christian", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
-        {"id": 2, "name": "Fac2", "religion": "Jewish", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": True},
-        {"id": 3, "name": "P1", "religion": "Muslim", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": False},
-        {"id": 4, "name": "P2", "religion": "Christian", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": False},
-        {"id": 5, "name": "P3", "religion": "Jewish", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": False},
-        {"id": 6, "name": "P4", "religion": "Muslim", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": False},
+        {
+            "id": 1,
+            "name": "Fac1",
+            "religion": "Christian",
+            "gender": "Male",
+            "partner": None,
+            "couple_id": None,
+            "is_facilitator": True,
+        },
+        {
+            "id": 2,
+            "name": "Fac2",
+            "religion": "Jewish",
+            "gender": "Female",
+            "partner": None,
+            "couple_id": None,
+            "is_facilitator": True,
+        },
+        {
+            "id": 3,
+            "name": "P1",
+            "religion": "Muslim",
+            "gender": "Male",
+            "partner": None,
+            "couple_id": None,
+            "is_facilitator": False,
+        },
+        {
+            "id": 4,
+            "name": "P2",
+            "religion": "Christian",
+            "gender": "Female",
+            "partner": None,
+            "couple_id": None,
+            "is_facilitator": False,
+        },
+        {
+            "id": 5,
+            "name": "P3",
+            "religion": "Jewish",
+            "gender": "Male",
+            "partner": None,
+            "couple_id": None,
+            "is_facilitator": False,
+        },
+        {
+            "id": 6,
+            "name": "P4",
+            "religion": "Muslim",
+            "gender": "Female",
+            "partner": None,
+            "couple_id": None,
+            "is_facilitator": False,
+        },
     ]
     gb = GroupBuilder(participants, num_tables=2, num_sessions=1)
     result = gb.generate_assignments()
@@ -271,14 +606,78 @@ def test_facilitator_religion_diversity_per_table():
     # 4 facilitators (2 Christian, 2 Jewish), 2 tables — each table gets 2 facilitators
     # who must be different religions.
     participants = [
-        {"id": 1, "name": "Fac_C1", "religion": "Christian", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
-        {"id": 2, "name": "Fac_C2", "religion": "Christian", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": True},
-        {"id": 3, "name": "Fac_J1", "religion": "Jewish", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
-        {"id": 4, "name": "Fac_J2", "religion": "Jewish", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": True},
-        {"id": 5, "name": "P1", "religion": "Muslim", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": False},
-        {"id": 6, "name": "P2", "religion": "Christian", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": False},
-        {"id": 7, "name": "P3", "religion": "Jewish", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": False},
-        {"id": 8, "name": "P4", "religion": "Muslim", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": False},
+        {
+            "id": 1,
+            "name": "Fac_C1",
+            "religion": "Christian",
+            "gender": "Male",
+            "partner": None,
+            "couple_id": None,
+            "is_facilitator": True,
+        },
+        {
+            "id": 2,
+            "name": "Fac_C2",
+            "religion": "Christian",
+            "gender": "Female",
+            "partner": None,
+            "couple_id": None,
+            "is_facilitator": True,
+        },
+        {
+            "id": 3,
+            "name": "Fac_J1",
+            "religion": "Jewish",
+            "gender": "Male",
+            "partner": None,
+            "couple_id": None,
+            "is_facilitator": True,
+        },
+        {
+            "id": 4,
+            "name": "Fac_J2",
+            "religion": "Jewish",
+            "gender": "Female",
+            "partner": None,
+            "couple_id": None,
+            "is_facilitator": True,
+        },
+        {
+            "id": 5,
+            "name": "P1",
+            "religion": "Muslim",
+            "gender": "Male",
+            "partner": None,
+            "couple_id": None,
+            "is_facilitator": False,
+        },
+        {
+            "id": 6,
+            "name": "P2",
+            "religion": "Christian",
+            "gender": "Female",
+            "partner": None,
+            "couple_id": None,
+            "is_facilitator": False,
+        },
+        {
+            "id": 7,
+            "name": "P3",
+            "religion": "Jewish",
+            "gender": "Male",
+            "partner": None,
+            "couple_id": None,
+            "is_facilitator": False,
+        },
+        {
+            "id": 8,
+            "name": "P4",
+            "religion": "Muslim",
+            "gender": "Female",
+            "partner": None,
+            "couple_id": None,
+            "is_facilitator": False,
+        },
     ]
     gb = GroupBuilder(participants, num_tables=2, num_sessions=1)
     result = gb.generate_assignments()
@@ -287,18 +686,50 @@ def test_facilitator_religion_diversity_per_table():
         for table_num, table_participants in session["tables"].items():
             facilitators = [p for p in table_participants if p.get("is_facilitator")]
             religions = [f["religion"] for f in facilitators]
-            assert len(religions) == len(set(religions)), (
-                f"Table {table_num}: facilitators share religion: {religions}"
-            )
+            assert len(religions) == len(
+                set(religions)
+            ), f"Table {table_num}: facilitators share religion: {religions}"
 
 
 def test_facilitator_output_includes_flag():
     """Solver output includes is_facilitator in participant dicts."""
     participants = [
-        {"id": 1, "name": "Fac1", "religion": "Christian", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": True},
-        {"id": 2, "name": "P1", "religion": "Jewish", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": False},
-        {"id": 3, "name": "P2", "religion": "Muslim", "gender": "Male", "partner": None, "couple_id": None, "is_facilitator": False},
-        {"id": 4, "name": "P3", "religion": "Christian", "gender": "Female", "partner": None, "couple_id": None, "is_facilitator": False},
+        {
+            "id": 1,
+            "name": "Fac1",
+            "religion": "Christian",
+            "gender": "Male",
+            "partner": None,
+            "couple_id": None,
+            "is_facilitator": True,
+        },
+        {
+            "id": 2,
+            "name": "P1",
+            "religion": "Jewish",
+            "gender": "Female",
+            "partner": None,
+            "couple_id": None,
+            "is_facilitator": False,
+        },
+        {
+            "id": 3,
+            "name": "P2",
+            "religion": "Muslim",
+            "gender": "Male",
+            "partner": None,
+            "couple_id": None,
+            "is_facilitator": False,
+        },
+        {
+            "id": 4,
+            "name": "P3",
+            "religion": "Christian",
+            "gender": "Female",
+            "partner": None,
+            "couple_id": None,
+            "is_facilitator": False,
+        },
     ]
     gb = GroupBuilder(participants, num_tables=1, num_sessions=1)
     result = gb.generate_assignments()

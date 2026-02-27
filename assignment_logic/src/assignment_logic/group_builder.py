@@ -7,9 +7,18 @@ logger = logging.getLogger(__name__)
 
 
 class GroupBuilder:
-    def __init__(self, participants, num_tables, num_sessions, locked_assignments=None, historical_pairings=None,
-                 current_table_assignments=None, pairing_window_size=None, solver_num_workers=None,
-                 require_different_assignments=False):
+    def __init__(
+        self,
+        participants,
+        num_tables,
+        num_sessions,
+        locked_assignments=None,
+        historical_pairings=None,
+        current_table_assignments=None,
+        pairing_window_size=None,
+        solver_num_workers=None,
+        require_different_assignments=False,
+    ):
         """
         Initialize the GroupBuilder.
 
@@ -29,21 +38,37 @@ class GroupBuilder:
         self.participants = participants
         self.tables = range(num_tables)
         self.sessions = range(num_sessions)
-        self.religions = set([participant["religion"] for participant in self.participants])
+        self.religions = set(
+            [participant["religion"] for participant in self.participants]
+        )
         self.genders = set([participant["gender"] for participant in self.participants])
-        self.facilitator_ids = [p["id"] for p in participants if p.get("is_facilitator", False)]
+        self.facilitator_ids = [
+            p["id"] for p in participants if p.get("is_facilitator", False)
+        ]
         self.locked_assignments = locked_assignments or {}
-        self.historical_pairings = historical_pairings or set()  # Pairings from previous batches
-        self.current_table_assignments = current_table_assignments or {}  # Current table assignments to forbid
-        self.require_different_assignments = require_different_assignments  # Hard vs soft constraint
+        self.historical_pairings = (
+            historical_pairings or set()
+        )  # Pairings from previous batches
+        self.current_table_assignments = (
+            current_table_assignments or {}
+        )  # Current table assignments to forbid
+        self.require_different_assignments = (
+            require_different_assignments  # Hard vs soft constraint
+        )
 
         # Configurable solver parameters (can be overridden by env vars or constructor args)
-        self.pairing_window_size = pairing_window_size or int(os.getenv("SOLVER_PAIRING_WINDOW", "3"))
-        self.solver_num_workers = solver_num_workers or int(os.getenv("SOLVER_NUM_WORKERS", "4"))
+        self.pairing_window_size = pairing_window_size or int(
+            os.getenv("SOLVER_PAIRING_WINDOW", "3")
+        )
+        self.solver_num_workers = solver_num_workers or int(
+            os.getenv("SOLVER_NUM_WORKERS", "4")
+        )
 
     def generate_assignments(self, max_time_seconds=120) -> dict:
-        logger.info(f"Setting up model for {len(self.participants)} participants, "
-                   f"{len(self.tables)} tables, {len(self.sessions)} sessions")
+        logger.info(
+            f"Setting up model for {len(self.participants)} participants, "
+            f"{len(self.tables)} tables, {len(self.sessions)} sessions"
+        )
         self.setup_model()
         logger.info("Adding constraints to model")
         self._add_constraints_to_model()
@@ -54,12 +79,16 @@ class GroupBuilder:
         logger.info("Running solver")
         return self._run_solver(max_time_seconds=max_time_seconds)
 
-    def _calculate_batch_timeouts(self, total_sessions: int, batch_size: int, max_time_seconds: float) -> list[float]:
+    def _calculate_batch_timeouts(
+        self, total_sessions: int, batch_size: int, max_time_seconds: float
+    ) -> list[float]:
         """
         Calculate timeout allocation for each batch.
         First batch gets 50% of time (typically hardest), rest distributed evenly.
         """
-        num_batches = (total_sessions + batch_size - 1) // batch_size  # Ceiling division
+        num_batches = (
+            total_sessions + batch_size - 1
+        ) // batch_size  # Ceiling division
 
         if num_batches == 1:
             return [max_time_seconds]
@@ -69,8 +98,13 @@ class GroupBuilder:
         other_batch_time = remaining_time / (num_batches - 1)
         return [first_batch_time] + [other_batch_time] * (num_batches - 1)
 
-    def _track_historical_pairings(self, assignment: dict, batch_start: int, batch_end: int,
-                                    historical_pairings: set) -> None:
+    def _track_historical_pairings(
+        self,
+        assignment: dict,
+        batch_start: int,
+        batch_end: int,
+        historical_pairings: set,
+    ) -> None:
         """
         Track all pairings from newly solved sessions for future batch constraints.
         """
@@ -81,9 +115,17 @@ class GroupBuilder:
             for table_num, participants in assignment["tables"].items():
                 # Get all pairs at this table
                 for i, p1_data in enumerate(participants):
-                    for p2_data in participants[i+1:]:
-                        p1_id = next(p["id"] for p in self.participants if p["name"] == p1_data["name"])
-                        p2_id = next(p["id"] for p in self.participants if p["name"] == p2_data["name"])
+                    for p2_data in participants[i + 1 :]:
+                        p1_id = next(
+                            p["id"]
+                            for p in self.participants
+                            if p["name"] == p1_data["name"]
+                        )
+                        p2_id = next(
+                            p["id"]
+                            for p in self.participants
+                            if p["name"] == p2_data["name"]
+                        )
                         pair_key = tuple(sorted([p1_id, p2_id]))
                         historical_pairings.add(pair_key)
 
@@ -98,8 +140,7 @@ class GroupBuilder:
             for p_data in participants:
                 # Find participant ID from name
                 participant_id = next(
-                    p["id"] for p in self.participants
-                    if p["name"] == p_data["name"]
+                    p["id"] for p in self.participants if p["name"] == p_data["name"]
                 )
                 locked[(participant_id, session_idx, table_idx)] = True
 
@@ -108,7 +149,9 @@ class GroupBuilder:
                     if other_table != table_idx:
                         locked[(participant_id, session_idx, other_table)] = False
 
-    def generate_assignments_incremental(self, batch_size=2, max_time_seconds=120) -> dict:
+    def generate_assignments_incremental(
+        self, batch_size=2, max_time_seconds=120
+    ) -> dict:
         """
         Generate assignments incrementally by solving sessions in batches.
         This dramatically reduces solve time by breaking the problem into smaller pieces.
@@ -129,24 +172,30 @@ class GroupBuilder:
         total_conflicts = 0
 
         # Calculate timeout distribution
-        batch_timeouts = self._calculate_batch_timeouts(total_sessions, batch_size, max_time_seconds)
+        batch_timeouts = self._calculate_batch_timeouts(
+            total_sessions, batch_size, max_time_seconds
+        )
         num_batches = len(batch_timeouts)
 
-        logger.info(f"Starting incremental solve: {len(self.participants)} participants, "
-                   f"{len(self.tables)} tables, {total_sessions} sessions "
-                   f"(batch size: {batch_size}, {num_batches} batches, "
-                   f"timeout: {max_time_seconds}s total)")
+        logger.info(
+            f"Starting incremental solve: {len(self.participants)} participants, "
+            f"{len(self.tables)} tables, {total_sessions} sessions "
+            f"(batch size: {batch_size}, {num_batches} batches, "
+            f"timeout: {max_time_seconds}s total)"
+        )
         logger.info(f"Batch timeouts: {', '.join(f'{t:.1f}s' for t in batch_timeouts)}")
 
         for batch_idx, batch_start in enumerate(range(0, total_sessions, batch_size)):
             batch_end = min(batch_start + batch_size, total_sessions)
             batch_timeout = batch_timeouts[batch_idx]
 
-            logger.info(f"=== Batch {batch_idx + 1}/{num_batches}: "
-                       f"Sessions {batch_start + 1}-{batch_end} "
-                       f"({batch_start} locked, {batch_end - batch_start} free, "
-                       f"{len(historical_pairings)} historical pairings, "
-                       f"timeout: {batch_timeout:.1f}s) ===")
+            logger.info(
+                f"=== Batch {batch_idx + 1}/{num_batches}: "
+                f"Sessions {batch_start + 1}-{batch_end} "
+                f"({batch_start} locked, {batch_end - batch_start} free, "
+                f"{len(historical_pairings)} historical pairings, "
+                f"timeout: {batch_timeout:.1f}s) ==="
+            )
 
             # Create a new GroupBuilder for sessions 0 through batch_end
             # This includes all previous sessions (locked) plus current batch (free)
@@ -155,13 +204,15 @@ class GroupBuilder:
                 len(self.tables),
                 batch_end,  # Only model up to end of current batch
                 locked_assignments=locked,
-                historical_pairings=historical_pairings
+                historical_pairings=historical_pairings,
             )
 
             result = gb.generate_assignments(max_time_seconds=batch_timeout)
 
             if result["status"] != "success":
-                logger.error(f"Batch {batch_idx + 1} failed: {result.get('error', 'Unknown error')}")
+                logger.error(
+                    f"Batch {batch_idx + 1} failed: {result.get('error', 'Unknown error')}"
+                )
                 return result
 
             # Accumulate stats
@@ -177,27 +228,38 @@ class GroupBuilder:
 
             # Extract assignments for this batch only (not the locked ones we already have)
             batch_assignments = [
-                a for a in result["assignments"]
+                a
+                for a in result["assignments"]
                 if batch_start <= a["session"] - 1 < batch_end
             ]
             all_assignments.extend(batch_assignments)
 
             # Enhanced logging with full solver stats
-            deviation_str = f"deviation: {batch_deviation}" if batch_deviation is not None else "deviation: N/A"
-            logger.info(f"Batch {batch_idx + 1} complete: "
-                       f"{batch_quality.upper()} in {batch_time:.2f}s | "
-                       f"{deviation_str} | "
-                       f"{batch_branches:,} branches | "
-                       f"{batch_conflicts:,} conflicts")
+            deviation_str = (
+                f"deviation: {batch_deviation}"
+                if batch_deviation is not None
+                else "deviation: N/A"
+            )
+            logger.info(
+                f"Batch {batch_idx + 1} complete: "
+                f"{batch_quality.upper()} in {batch_time:.2f}s | "
+                f"{deviation_str} | "
+                f"{batch_branches:,} branches | "
+                f"{batch_conflicts:,} conflicts"
+            )
 
             # Lock ALL sessions we've solved so far AND track historical pairings
             for assignment in result["assignments"]:
-                self._track_historical_pairings(assignment, batch_start, batch_end, historical_pairings)
+                self._track_historical_pairings(
+                    assignment, batch_start, batch_end, historical_pairings
+                )
                 self._lock_batch_assignments(assignment, locked)
 
-        logger.info(f"Incremental solve complete: {total_solve_time:.2f}s total "
-                   f"({total_branches:,} branches, {total_conflicts:,} conflicts, "
-                   f"{len(historical_pairings)} unique pairings tracked)")
+        logger.info(
+            f"Incremental solve complete: {total_solve_time:.2f}s total "
+            f"({total_branches:,} branches, {total_conflicts:,} conflicts, "
+            f"{len(historical_pairings)} unique pairings tracked)"
+        )
 
         # Return combined results
         return {
@@ -220,7 +282,9 @@ class GroupBuilder:
         for participant in self.participants:
             for session in self.sessions:
                 for table in self.tables:
-                    self.participant_table_assignments[(participant["id"], session, table)] = self.model.NewBoolVar(
+                    self.participant_table_assignments[
+                        (participant["id"], session, table)
+                    ] = self.model.NewBoolVar(
                         f"assign_p{participant['id']}_s{session}_t{table}"
                     )
 
@@ -229,13 +293,21 @@ class GroupBuilder:
 
         # Log historical pairings tracking
         if self.historical_pairings:
-            logger.info(f"Penalizing {len(self.historical_pairings)} historical pairings from previous batches")
+            logger.info(
+                f"Penalizing {len(self.historical_pairings)} historical pairings from previous batches"
+            )
 
     def _add_constraints_to_model(self):
         # Each participants sits at one table per session
         for p in self.participants:
             for s in self.sessions:
-                self.model.Add(sum(self.participant_table_assignments[(p["id"], s, t)] for t in self.tables) == 1)
+                self.model.Add(
+                    sum(
+                        self.participant_table_assignments[(p["id"], s, t)]
+                        for t in self.tables
+                    )
+                    == 1
+                )
 
         # All tables are within 1 participant of all other tables
         max_participants = {}
@@ -251,7 +323,8 @@ class GroupBuilder:
 
             for t in self.tables:
                 table_participant_count = sum(
-                    self.participant_table_assignments[(p["id"], s, t)] for p in self.participants
+                    self.participant_table_assignments[(p["id"], s, t)]
+                    for p in self.participants
                 )
                 self.model.Add(max_participants[s] >= table_participant_count)
                 self.model.Add(min_participants[s] <= table_participant_count)
@@ -322,7 +395,11 @@ class GroupBuilder:
         for s in self.sessions:
             for t in self.tables:
                 self.model.Add(
-                    sum(self.participant_table_assignments[(f, s, t)] for f in self.facilitator_ids) >= 1
+                    sum(
+                        self.participant_table_assignments[(f, s, t)]
+                        for f in self.facilitator_ids
+                    )
+                    >= 1
                 )
 
         # Balance: facilitators spread evenly (no table has >1 more than any other)
@@ -330,7 +407,10 @@ class GroupBuilder:
         max_per_table = min_per_table + (1 if num_facilitators % num_tables != 0 else 0)
         for s in self.sessions:
             for t in self.tables:
-                facilitator_count = sum(self.participant_table_assignments[(f, s, t)] for f in self.facilitator_ids)
+                facilitator_count = sum(
+                    self.participant_table_assignments[(f, s, t)]
+                    for f in self.facilitator_ids
+                )
                 self.model.Add(facilitator_count >= min_per_table)
                 self.model.Add(facilitator_count <= max_per_table)
 
@@ -347,7 +427,11 @@ class GroupBuilder:
                     if len(fac_ids) > 1:
                         # At most 1 facilitator of this religion per table
                         self.model.Add(
-                            sum(self.participant_table_assignments[(f, s, t)] for f in fac_ids) <= 1
+                            sum(
+                                self.participant_table_assignments[(f, s, t)]
+                                for f in fac_ids
+                            )
+                            <= 1
                         )
 
     def _add_objective_functions_to_model(self):
@@ -360,7 +444,29 @@ class GroupBuilder:
         for s in self.sessions:
             for t in self.tables:
                 for group in couples.values():
-                    self.model.Add(sum(self.participant_table_assignments[(p["id"], s, t)] for p in group) <= 1)
+                    self.model.Add(
+                        sum(
+                            self.participant_table_assignments[(p["id"], s, t)]
+                            for p in group
+                        )
+                        <= 1
+                    )
+
+        # Keep linked partners at the same table
+        linked = defaultdict(list)
+        for p in self.participants:
+            if p.get("linked_id"):
+                linked[p["linked_id"]].append(p)
+
+        for s in self.sessions:
+            for group in linked.values():
+                if len(group) == 2:
+                    p1, p2 = group
+                    for t in self.tables:
+                        self.model.Add(
+                            self.participant_table_assignments[(p1["id"], s, t)]
+                            == self.participant_table_assignments[(p2["id"], s, t)]
+                        )
 
         # OPTIMIZED: Rolling window approach - penalize pairs meeting within N sessions
         # This balances sophistication with performance: better than "count all repeats",
@@ -369,8 +475,10 @@ class GroupBuilder:
 
         penalty_count = 0
         for i, p1 in enumerate(self.participants):
-            for p2 in self.participants[i+1:]:
-                pair_key = tuple(sorted([p1["id"], p2["id"]]))  # Canonical pair representation
+            for p2 in self.participants[i + 1 :]:
+                pair_key = tuple(
+                    sorted([p1["id"], p2["id"]])
+                )  # Canonical pair representation
 
                 # For each session, track if this pair meets (across all tables)
                 pair_meets_session = {}
@@ -383,7 +491,10 @@ class GroupBuilder:
                         )
                         self.model.AddMultiplicationEquality(
                             both_at_table,
-                            [self.participant_table_assignments[(p1["id"], s, t)], self.participant_table_assignments[(p2["id"], s, t)]]
+                            [
+                                self.participant_table_assignments[(p1["id"], s, t)],
+                                self.participant_table_assignments[(p2["id"], s, t)],
+                            ],
                         )
                         session_meeting_vars.append(both_at_table)
 
@@ -391,7 +502,9 @@ class GroupBuilder:
                     pair_meets_session[s] = self.model.NewBoolVar(
                         f'pair_{p1["id"]}_{p2["id"]}_meets_s{s}'
                     )
-                    self.model.AddMaxEquality(pair_meets_session[s], session_meeting_vars)
+                    self.model.AddMaxEquality(
+                        pair_meets_session[s], session_meeting_vars
+                    )
 
                     # HISTORY-AWARE: Penalize if this pair met in previous batches
                     if pair_key in self.historical_pairings:
@@ -399,14 +512,17 @@ class GroupBuilder:
 
                 # Penalize if they meet in sessions within pairing_window_size of each other
                 for s1 in self.sessions:
-                    for s2 in range(s1 + 1, min(s1 + self.pairing_window_size + 1, len(self.sessions))):
+                    for s2 in range(
+                        s1 + 1,
+                        min(s1 + self.pairing_window_size + 1, len(self.sessions)),
+                    ):
                         # Penalty if they meet in both s1 and s2 (which are close together)
                         both_sessions = self.model.NewBoolVar(
                             f'penalty_{p1["id"]}_{p2["id"]}_s{s1}_s{s2}'
                         )
                         self.model.AddMultiplicationEquality(
                             both_sessions,
-                            [pair_meets_session[s1], pair_meets_session[s2]]
+                            [pair_meets_session[s1], pair_meets_session[s2]],
                         )
                         penalty_count += both_sessions
 
@@ -422,9 +538,16 @@ class GroupBuilder:
                         # Forbid assignment to same table in session 0 (only regenerating one session)
                         # Note: When regenerating, num_sessions=1, so we only check session 0
                         if 0 in self.sessions and current_table in self.tables:
-                            self.model.Add(self.participant_table_assignments[(p_id, 0, current_table)] == 0)
-                logger.info(f"Added HARD constraints: {len(self.current_table_assignments)} participants "
-                           f"CANNOT be assigned to their previous tables")
+                            self.model.Add(
+                                self.participant_table_assignments[
+                                    (p_id, 0, current_table)
+                                ]
+                                == 0
+                            )
+                logger.info(
+                    f"Added HARD constraints: {len(self.current_table_assignments)} participants "
+                    f"CANNOT be assigned to their previous tables"
+                )
             else:
                 # SOFT CONSTRAINT: Penalize same table assignments
                 # This gives users the feeling that "something happened" when they click regenerate
@@ -434,15 +557,23 @@ class GroupBuilder:
                     if p_id in self.current_table_assignments:
                         current_table = self.current_table_assignments[p_id]
                         if 0 in self.sessions and current_table in self.tables:
-                            penalty_count += self.participant_table_assignments[(p_id, 0, current_table)]
+                            penalty_count += self.participant_table_assignments[
+                                (p_id, 0, current_table)
+                            ]
 
         self.model.Minimize(penalty_count)
 
     def _add_symmetry_breaking(self):
         """Break table symmetry by fixing first participant to first table in first session."""
-        if len(self.participants) > 0 and len(self.sessions) > 0 and len(self.tables) > 0:
+        if (
+            len(self.participants) > 0
+            and len(self.sessions) > 0
+            and len(self.tables) > 0
+        ):
             first_participant_id = self.participants[0]["id"]
-            self.model.Add(self.participant_table_assignments[(first_participant_id, 0, 0)] == 1)
+            self.model.Add(
+                self.participant_table_assignments[(first_participant_id, 0, 0)] == 1
+            )
 
     def _apply_locked_assignments(self):
         """Fix variables for locked sessions based on pre-assigned seating."""
@@ -452,12 +583,17 @@ class GroupBuilder:
         locked_count = 0
         for (p_id, s, t), value in self.locked_assignments.items():
             if (p_id, s, t) in self.participant_table_assignments:
-                self.model.Add(self.participant_table_assignments[(p_id, s, t)] == (1 if value else 0))
+                self.model.Add(
+                    self.participant_table_assignments[(p_id, s, t)]
+                    == (1 if value else 0)
+                )
                 if value:
                     locked_count += 1
 
         if locked_count > 0:
-            logger.info(f"Applied {locked_count} locked assignments from previous batches")
+            logger.info(
+                f"Applied {locked_count} locked assignments from previous batches"
+            )
 
     def _run_solver(self, max_time_seconds=120):
         self.solver = cp_model.CpSolver()
@@ -466,10 +602,14 @@ class GroupBuilder:
         self.solver.parameters.num_search_workers = self.solver_num_workers
         self.solver.parameters.log_search_progress = False
 
-        logger.info(f"Starting CP-SAT solver (max time: {max_time_seconds:.1f}s, {self.solver.parameters.num_search_workers} workers)")
+        logger.info(
+            f"Starting CP-SAT solver (max time: {max_time_seconds:.1f}s, {self.solver.parameters.num_search_workers} workers)"
+        )
         status = self.solver.Solve(self.model)
-        logger.info(f"Solver completed with status: {self.solver.StatusName(status)} "
-                   f"in {self.solver.WallTime():.2f}s")
+        logger.info(
+            f"Solver completed with status: {self.solver.StatusName(status)} "
+            f"in {self.solver.WallTime():.2f}s"
+        )
 
         if status in [cp_model.FEASIBLE, cp_model.OPTIMAL]:
             assignments = []
@@ -478,7 +618,9 @@ class GroupBuilder:
                 session_data = {"session": s + 1, "tables": defaultdict(list)}
                 for t in self.tables:
                     for p in self.participants:
-                        if self.solver.BooleanValue(self.participant_table_assignments[(p["id"], s, t)]):
+                        if self.solver.BooleanValue(
+                            self.participant_table_assignments[(p["id"], s, t)]
+                        ):
                             session_data["tables"][t + 1].append(
                                 {
                                     "name": p["name"],
@@ -486,6 +628,7 @@ class GroupBuilder:
                                     "gender": p["gender"],
                                     "partner": p.get("partner"),
                                     "is_facilitator": p.get("is_facilitator", False),
+                                    "keep_together": p.get("keep_together", False),
                                 }
                             )
                 # Convert defaultdict to a regular dict for JSON compatibility
@@ -496,7 +639,11 @@ class GroupBuilder:
 
             try:
                 objective_value = self.solver.ObjectiveValue()
-                if objective_value != objective_value or objective_value == float('inf') or objective_value == float('-inf'):
+                if (
+                    objective_value != objective_value
+                    or objective_value == float("inf")
+                    or objective_value == float("-inf")
+                ):
                     objective_value = None
             except (RuntimeError, AttributeError):
                 # ObjectiveValue() may not be available for all solution types
@@ -514,23 +661,23 @@ class GroupBuilder:
         elif status == cp_model.INFEASIBLE:
             return {
                 "status": "failure",
-                "error": "No solution exists with the given constraints. Try fewer sessions or more tables."
+                "error": "No solution exists with the given constraints. Try fewer sessions or more tables.",
             }
         elif status == cp_model.MODEL_INVALID:
             return {
                 "status": "failure",
-                "error": "Internal error: Invalid constraint model."
+                "error": "Internal error: Invalid constraint model.",
             }
         else:
             return {
                 "status": "failure",
-                "error": "Solver timed out or encountered an unknown error."
+                "error": "Solver timed out or encountered an unknown error.",
             }
 
 
 if __name__ == "__main__":
     # Set up logging to see the incremental progress
-    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
     data = [
         {
@@ -605,16 +752,16 @@ if __name__ == "__main__":
         },
     ]
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TESTING INCREMENTAL SOLVER")
-    print("="*60)
+    print("=" * 60)
 
     gb = GroupBuilder(data, 4, 6)
     result = gb.generate_assignments_incremental(batch_size=2)
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("RESULTS")
-    print("="*60)
+    print("=" * 60)
     print(f"Status: {result['status']}")
     print(f"Solution quality: {result['solution_quality']}")
     print(f"Total solve time: {result['solve_time']:.2f}s")
@@ -623,7 +770,7 @@ if __name__ == "__main__":
     print(f"Sessions generated: {len(result['assignments'])}")
 
     # Show first session as a sanity check
-    if result['assignments']:
+    if result["assignments"]:
         print(f"\nSession 1 preview:")
-        for table_num, participants in result['assignments'][0]['tables'].items():
+        for table_num, participants in result["assignments"][0]["tables"].items():
             print(f"  Table {table_num}: {', '.join(p['name'] for p in participants)}")
