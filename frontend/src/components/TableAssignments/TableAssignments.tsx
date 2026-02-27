@@ -197,7 +197,7 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
 
     const coupleViolations = new Set<string>()
     realParticipants.forEach(p => {
-      if (p.partner && realParticipants.some(other => other && other.name === p.partner)) {
+      if (p.partner && !p.keep_together && realParticipants.some(other => other && other.name === p.partner)) {
         const coupleKey = [p.name, p.partner].sort().join('-')
         coupleViolations.add(coupleKey)
       }
