@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/select';
 import { Trash2, Link, Unlink } from 'lucide-react';
 import { RosterParticipant, Religion, Gender, RELIGIONS, GENDERS } from '@/types/roster';
+import { sortWithPartnerAdjacency } from '@/utils/sortWithPartnerAdjacency';
 
 interface RosterGridProps {
   participants: RosterParticipant[];
@@ -31,6 +32,7 @@ const EMPTY_ROW: EmptyRowState = {
 };
 
 export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepTogetherToggle }: RosterGridProps) {
+  const sortedParticipants = sortWithPartnerAdjacency(participants);
   const [editingNames, setEditingNames] = useState<Record<string, string>>({});
   const [emptyRow, setEmptyRow] = useState<EmptyRowState>({ ...EMPTY_ROW });
 
@@ -156,7 +158,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
             </TableRow>
           </TableHeader>
           <TableBody>
-            {participants.map(p => {
+            {sortedParticipants.map(p => {
               const currentName = editingNames[p.id] ?? p.name;
               const hasError = !currentName.trim() || duplicateNames.has(p.name);
 
