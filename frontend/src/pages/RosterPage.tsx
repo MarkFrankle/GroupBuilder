@@ -21,6 +21,7 @@ import { fetchWithRetry } from '@/utils/fetchWithRetry';
 import { API_BASE_URL } from '@/config/api';
 import { MAX_TABLES, MAX_SESSIONS } from '@/constants';
 import { AlertCircle, Loader2 } from 'lucide-react';
+import { movePartnerAdjacent } from '@/utils/sortWithPartnerAdjacency';
 
 type SaveStatus = 'saved' | 'saving' | 'error';
 
@@ -67,9 +68,12 @@ export function RosterPage() {
           const newPartner = participants.find(p => p.id === newPartnerId);
           if (newPartner) {
             await upsertParticipant(currentProgram!.id, newPartnerId, { ...newPartner, partner_id: id });
-            setParticipants(prev => prev.map(p =>
-              p.id === newPartnerId ? { ...p, partner_id: id } : p
-            ));
+            setParticipants(prev => {
+              const updated = prev.map(p =>
+                p.id === newPartnerId ? { ...p, partner_id: id } : p
+              );
+              return movePartnerAdjacent(updated, id);
+            });
           }
         }
       }
