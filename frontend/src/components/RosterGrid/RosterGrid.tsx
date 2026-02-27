@@ -198,7 +198,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
                         <SelectContent className="max-h-60 overflow-y-auto border shadow-md">
                           <SelectItem value="none">None</SelectItem>
                           {[...participants]
-                            .filter(other => other.id !== p.id)
+                            .filter(other => other.id !== p.id && (!other.partner_id || other.partner_id === p.id))
                             .sort((a, b) => a.name.localeCompare(b.name))
                             .map(other => (
                               <SelectItem key={other.id} value={other.id}>{other.name}</SelectItem>
