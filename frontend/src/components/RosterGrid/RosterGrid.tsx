@@ -194,7 +194,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
                         value={p.partner_id ?? 'none'}
                         onValueChange={v => handleFieldChange(p, 'partner_id', v)}
                       >
-                        <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                        <SelectTrigger className="min-w-0"><SelectValue placeholder="None" /></SelectTrigger>
                         <SelectContent className="max-h-60 overflow-y-auto border shadow-md">
                           <SelectItem value="none">None</SelectItem>
                           {[...participants]
