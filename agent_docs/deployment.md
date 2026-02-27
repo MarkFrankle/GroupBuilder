@@ -27,9 +27,24 @@
 
 ## Environment Setup
 
-**Frontend** (`frontend/.env`, checked in): `REACT_APP_FIREBASE_API_KEY`, `REACT_APP_FIREBASE_AUTH_DOMAIN`, `REACT_APP_FIREBASE_PROJECT_ID`
+Env vars live in three places, each serving a different build/runtime system:
 
-**Backend** (`api/.env`, gitignored): `FIREBASE_SERVICE_ACCOUNT_PATH=../firebase-service-account.json`, `FIREBASE_PROJECT_ID=group-builder-backend`. The service account JSON lives at repo root (gitignored).
+**Netlify env vars** (frontend build-time, baked into JS bundle):
+- `CI` — treats warnings as errors
+- `REACT_APP_API_BASE_URL` — Cloud Run backend URL
+- `REACT_APP_FIREBASE_API_KEY`, `REACT_APP_FIREBASE_AUTH_DOMAIN`, `REACT_APP_FIREBASE_PROJECT_ID`
+
+**GitHub Actions secrets** (CI + backend deploy, injected into Cloud Run at deploy time):
+- `GCP_PROJECT_ID`, `GCP_SA_KEY` — for gcloud auth during deploy
+- `FIREBASE_PROJECT_ID` — passed to Cloud Run as env var
+- `RESEND_API_KEY`, `FROM_EMAIL`, `FRONTEND_URL` — email service config (Resend)
+- `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` — rate limiting
+- `CORS_ORIGINS` — allowed frontend origins
+- `REQUIRE_PERSISTENT_STORAGE` — feature flag
+
+**Local dev** (`api/.env`, gitignored): `FIREBASE_SERVICE_ACCOUNT_PATH=../firebase-service-account.json`, `FIREBASE_PROJECT_ID=group-builder-backend`, plus emulator host vars. The service account JSON lives at repo root (gitignored).
+
+**Important:** GitHub Actions secrets become Cloud Run env vars only after a deploy. Updating a secret doesn't affect the running revision — you must redeploy.
 
 ## Gotchas
 

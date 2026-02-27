@@ -51,7 +51,7 @@ jobs:
           CORS_ORIGINS: "${{ secrets.FRONTEND_URL }}"
           FROM_EMAIL: "${{ secrets.FROM_EMAIL }}"
           FRONTEND_URL: "https://group-builder.com"
-          SENDGRID_API_KEY: "${{ secrets.SENDGRID_API_KEY }}"
+          RESEND_API_KEY: "${{ secrets.RESEND_API_KEY }}"
           EOF
           gcloud run deploy groupbuilder-api \
             --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/groupbuilder-api:${{ github.sha }} \

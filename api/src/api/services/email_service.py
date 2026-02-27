@@ -1,13 +1,12 @@
-"""Email service using SendGrid for transactional emails."""
+"""Email service using Resend for transactional emails."""
 import logging
 import os
 from pathlib import Path
 from typing import Optional
 
+import resend
 from firebase_admin import auth as firebase_auth
 from jinja2 import Environment, FileSystemLoader
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email, To, Content
 
 logger = logging.getLogger(__name__)
 
@@ -19,22 +18,23 @@ _jinja_env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)), autoescape=
 
 
 class EmailService:
-    """Service for sending transactional emails via SendGrid."""
+    """Service for sending transactional emails via Resend."""
 
     def __init__(self):
-        """Initialize with SendGrid API key from environment."""
-        self.api_key = os.getenv("SENDGRID_API_KEY")
+        """Initialize with Resend API key from environment."""
+        self.api_key = os.getenv("RESEND_API_KEY")
         self.from_email = os.getenv("FROM_EMAIL", "noreply@groupbuilder.app")
         self.frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
         if not self.api_key:
-            # Log warning but don't fail - allows running without SendGrid configured
-            logger.warning("SENDGRID_API_KEY not set - emails will be skipped")
+            logger.warning("RESEND_API_KEY not set - emails will be skipped")
+        else:
+            resend.api_key = self.api_key
 
     def _send_email(
         self, to_email: str, subject: str, html_content: str, plain_content: str
     ) -> bool:
-        """Send an email via SendGrid.
+        """Send an email via Resend.
 
         Args:
             to_email: Recipient email address
@@ -50,24 +50,21 @@ class EmailService:
             return False
 
         try:
-            message = Mail(
-                from_email=Email(self.from_email, "GroupBuilder"),
-                to_emails=To(to_email),
-                subject=subject,
-                html_content=Content("text/html", html_content),
-                plain_text_content=Content("text/plain", plain_content),
-            )
+            params = {
+                "from": f"GroupBuilder <{self.from_email}>",
+                "to": [to_email],
+                "subject": subject,
+                "html": html_content,
+                "text": plain_content,
+            }
 
-            client = SendGridAPIClient(self.api_key)
-            response = client.send(message)
+            response = resend.Emails.send(params)
 
-            if response.status_code in (200, 201, 202):
+            if response and response.id:
                 logger.info(f"Email sent successfully to {to_email}")
                 return True
             else:
-                logger.error(
-                    f"Email delivery failed to {to_email}: HTTP {response.status_code}"
-                )
+                logger.error(f"Email delivery failed to {to_email}: {response}")
                 return False
 
         except Exception as e:
