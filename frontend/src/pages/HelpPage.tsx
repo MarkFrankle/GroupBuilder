@@ -17,8 +17,8 @@ function HelpPage() {
       <div className="max-w-[700px] mx-auto px-4 py-8 sm:py-12">
         <h1 className="text-3xl font-bold mb-2">Group Builder Help</h1>
         <p className="text-slate-600 mb-8">
-          A step-by-step guide to creating balanced small groups for your seminar
-          series. If you get stuck at any point, check the{" "}
+          A step-by-step guide to creating balanced small groups for your
+          program. If you get stuck at any point, check the{" "}
           <a href="#troubleshooting" className="text-blue-600 hover:text-blue-800 underline">
             Troubleshooting
           </a>{" "}
@@ -50,7 +50,7 @@ function HelpPage() {
 
           <h3 className="text-xl font-semibold mb-2">What is Group Builder?</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            Group Builder helps you create balanced small groups for a seminar series.
+            Group Builder helps you create balanced small groups for a program.
             If you have, say, 20 participants meeting over 5 weekly sessions, Group
             Builder will assign them to tables each week so that everyone gets to sit
             with as many different people as possible. It takes into account gender,
@@ -141,6 +141,10 @@ function HelpPage() {
             on either person's row to link them. You only need to do this on one person —
             the other person updates automatically. The solver will make sure partners are
             always placed at <em>different</em> tables, so they each meet new people.
+            Only mark a couple as partners if you want them <strong>separated</strong>.
+            If a couple needs to stay together (for example, for health reasons),
+            do not mark them as partners — the solver will treat them as individuals
+            and may place them together or apart naturally.
           </p>
 
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Marking facilitators:</p>
@@ -186,7 +190,8 @@ function HelpPage() {
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             This is how many groups you want per session. If you have 20 participants
-            and choose 4 tables, each table will have about 5 people.
+            and choose 4 tables, each table will have about 5 participants and at
+            least 1 facilitator.
           </p>
 
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">
@@ -194,7 +199,7 @@ function HelpPage() {
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             This is how many rounds of different groupings you need — typically one per
-            week of your seminar. If your seminar runs for 5 weeks, choose 5 sessions.
+            week of your program. If your program runs for 5 weeks, choose 5 sessions.
             Each session will have a completely different arrangement so people meet new
             tablemates each week.
           </p>
@@ -238,7 +243,7 @@ function HelpPage() {
           <h3 className="text-xl font-semibold mb-2">Compact View</h3>
           <p className="mb-2 text-slate-700 leading-relaxed">
             This is the default. It shows all sessions side by side in a grid, giving
-            you a bird's-eye view of the entire seminar at once. Each person appears
+            you a bird's-eye view of the entire program at once. Each person appears
             as a small colored chip with their name. Chips are color-coded by
             religion — blue for Jewish, red for Christian, green for Muslim, and
             yellow for Other — so you can see the religious mix at each table at a
@@ -251,7 +256,7 @@ function HelpPage() {
             <li>
               <strong>Track someone across sessions:</strong> Click any person's name.
               Their chip will highlight in every session so you can trace their path
-              through the seminar — who they sit with each week. Click again to
+              through the program — who they sit with each week. Click again to
               deselect.
             </li>
             <li>
@@ -436,7 +441,15 @@ function HelpPage() {
             every session's table assignments listed out (who's at which table), plus
             circular seating charts showing where each person sits. From there, use
             your browser's Print function (Ctrl+P on Windows, Cmd+P on Mac) or click
-            the Print button on the page. This is great for handing out at the seminar.
+            the Print button on the page.
+          </p>
+
+          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Saving as PDF to share by email:</p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            To send the assignments to other facilitators, you can save them as a PDF:
+            click <strong>"Print Roster"</strong>, then in the print dialog choose{" "}
+            <strong>"Save as PDF"</strong> instead of a printer. This creates a PDF
+            file you can attach to an email or share however you like.
           </p>
 
           <h3 className="text-xl font-semibold mb-2">Print Seating Charts</h3>
@@ -449,11 +462,12 @@ function HelpPage() {
 
           <h3 className="text-xl font-semibold mb-2">Copy Link</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            Click <strong>"Copy Link"</strong> to copy a shareable URL to your
-            clipboard. You can paste this into an email, text message, or group chat.
-            Anyone with the link can view that specific version of the assignments — they'll
-            need to be signed into Group Builder to see it. Links stay active as long
-            as someone accesses them at least once every 30 days.
+            If another facilitator has a Group Builder account, you can share
+            assignments directly: click <strong>"Copy Link"</strong> to copy a
+            shareable URL to your clipboard and send it to them. They'll need to be
+            signed into Group Builder to view it. Links stay active as long as
+            someone accesses them at least once every 30 days. For facilitators who
+            don't have Group Builder accounts, use the PDF method above instead.
           </p>
 
           <Screenshot
