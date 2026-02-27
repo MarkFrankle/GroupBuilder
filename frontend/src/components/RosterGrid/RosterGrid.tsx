@@ -195,10 +195,11 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
                         onValueChange={v => handleFieldChange(p, 'partner_id', v)}
                       >
                         <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
-                        <SelectContent className="max-h-60 overflow-y-auto">
+                        <SelectContent className="max-h-60 overflow-y-auto border shadow-md">
                           <SelectItem value="none">None</SelectItem>
-                          {participants
+                          {[...participants]
                             .filter(other => other.id !== p.id)
+                            .sort((a, b) => a.name.localeCompare(b.name))
                             .map(other => (
                               <SelectItem key={other.id} value={other.id}>{other.name}</SelectItem>
                             ))}
