@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Heart } from 'lucide-react'
+import { Heart, Link } from 'lucide-react'
 import { getReligionStyle } from '@/constants/colors'
 import { expectedWithinTableDeviation, expectedDeviationForTableSize, formatAttributeCounts } from '@/utils/balanceStats'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
@@ -11,6 +11,7 @@ interface Participant {
   gender: string;
   partner: string | null;
   is_facilitator?: boolean;
+  keep_together?: boolean;
 }
 
 interface Assignment {
@@ -446,10 +447,19 @@ const TableAssignments: React.FC<TableAssignmentsProps> = ({
                                 <span className="font-medium">{participant.name}</span>
                                 {participant.partner && (() => {
                                   const partnerAtSameTable = allParticipants.some(p => p !== null && p.name === participant.partner)
+                                  const isKeepTogether = participant.keep_together
                                   return (
-                                    <div className="flex items-center gap-1 text-xs text-red-600">
-                                      <Heart className="h-3 w-3 fill-current" />
-                                      <span className={partnerAtSameTable ? 'text-red-600' : 'text-gray-900'}>with {participant.partner}</span>
+                                    <div className={`flex items-center gap-1 text-xs ${isKeepTogether ? 'text-blue-600' : 'text-red-600'}`}>
+                                      {isKeepTogether ? (
+                                        <Link className="h-3 w-3" />
+                                      ) : (
+                                        <Heart className="h-3 w-3 fill-current" />
+                                      )}
+                                      <span className={
+                                        isKeepTogether
+                                          ? 'text-blue-600'
+                                          : partnerAtSameTable ? 'text-red-600' : 'text-gray-900'
+                                      }>with {participant.partner}</span>
                                     </div>
                                   )
                                 })()}

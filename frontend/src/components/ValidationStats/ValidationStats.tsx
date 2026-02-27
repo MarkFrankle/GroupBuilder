@@ -10,6 +10,7 @@ interface Participant {
   gender: string;
   partner: string | null;
   is_facilitator?: boolean;
+  keep_together?: boolean;
 }
 
 interface Assignment {
@@ -25,6 +26,7 @@ interface ValidationStatsProps {
 
 interface ValidationResult {
   coupleOffendingTables: string[];
+  linkedOffendingTables: string[];
   genderOffendingTables: string[];
   religionOffendingTables: string[];
   numTables: number;
@@ -33,6 +35,7 @@ interface ValidationResult {
   avgNewPeopleMet: number;
   tablesWithoutFacilitator: number;
   hasFacilitators: boolean;
+  hasLinkedPairs: boolean;
 }
 
 const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
@@ -40,6 +43,7 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
     if (assignments.length === 0) {
       return {
         coupleOffendingTables: [],
+        linkedOffendingTables: [],
         genderOffendingTables: [],
         religionOffendingTables: [],
         numTables: 0,
@@ -48,6 +52,7 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
         avgNewPeopleMet: 0,
         tablesWithoutFacilitator: 0,
         hasFacilitators: false,
+        hasLinkedPairs: false,
       }
     }
 
@@ -73,6 +78,7 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
     const allReligions = Object.keys(religionRosterCounts)
 
     const coupleOffendingTables: string[] = []
+    const linkedOffendingTables: string[] = []
     const genderOffendingTables: string[] = []
     const religionOffendingTables: string[] = []
 
@@ -90,6 +96,15 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
           }
         })
         if (couples.size > 0) coupleOffendingTables.push(label)
+
+        // Keep-together violations (only checked when relevant)
+        const linkedPairs = new Set<string>()
+        real.forEach(p => {
+          if (p.keep_together && p.partner && !real.some(other => other.name === p.partner)) {
+            linkedPairs.add([p.name, p.partner].sort().join('-'))
+          }
+        })
+        if (linkedPairs.size > 0) linkedOffendingTables.push(label)
 
         // Gender balance
         const genderCounts: Record<string, number> = {}
@@ -148,6 +163,9 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
       ? Math.round((totalUniquePeopleMet / totalParticipants) * 10) / 10
       : 0
 
+    // Check if any participant has keep_together
+    const hasLinkedPairs = allParticipants.some(p => p.keep_together === true)
+
     // Check facilitator coverage
     const hasFacilitators = allParticipants.some(p => p.is_facilitator)
     let tablesWithoutFacilitator = 0
@@ -163,6 +181,7 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
 
     return {
       coupleOffendingTables,
+      linkedOffendingTables,
       genderOffendingTables,
       religionOffendingTables,
       numTables,
@@ -171,12 +190,14 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
       avgNewPeopleMet,
       tablesWithoutFacilitator,
       hasFacilitators,
+      hasLinkedPairs,
     }
   }
 
   const stats = calculateStats()
   const allConstraintsSatisfied =
     stats.coupleOffendingTables.length === 0 &&
+    stats.linkedOffendingTables.length === 0 &&
     stats.genderOffendingTables.length === 0 &&
     stats.religionOffendingTables.length === 0 &&
     stats.tablesWithoutFacilitator === 0
@@ -228,6 +249,29 @@ const ValidationStats: React.FC<ValidationStatsProps> = ({ assignments }) => {
                     </Tooltip>
                   )}
                 </div>
+                {stats.hasLinkedPairs && (
+                  <div className="flex items-center gap-2">
+                    {stats.linkedOffendingTables.length === 0 ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-red-600" />
+                    )}
+                    {stats.linkedOffendingTables.length === 0 ? (
+                      <span className="text-sm">All linked partners together</span>
+                    ) : (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-sm cursor-help underline decoration-dotted">
+                            {stats.linkedOffendingTables.length} linked-pair violation{stats.linkedOffendingTables.length !== 1 ? 's' : ''}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <OffenderList offenders={stats.linkedOffendingTables} />
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
+                )}
                 <div className="flex items-center gap-2">
                   {stats.religionOffendingTables.length === 0 ? (
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
