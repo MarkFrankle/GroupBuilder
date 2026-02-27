@@ -1,6 +1,30 @@
 import { RosterParticipant } from '@/types/roster';
 
 /**
+ * Sort all partners adjacent on initial load. Iterates top-to-bottom;
+ * when it encounters the first of a pair, pulls the partner right after.
+ */
+export function sortPartnersAdjacent(participants: RosterParticipant[]): RosterParticipant[] {
+  const result: RosterParticipant[] = [];
+  const placed = new Set<string>();
+
+  for (const p of participants) {
+    if (placed.has(p.id)) continue;
+    result.push(p);
+    placed.add(p.id);
+
+    if (p.partner_id) {
+      const partner = participants.find(other => other.id === p.partner_id);
+      if (partner && !placed.has(partner.id)) {
+        result.push(partner);
+        placed.add(partner.id);
+      }
+    }
+  }
+  return result;
+}
+
+/**
  * Move a participant's partner to be adjacent (right after them) in the list.
  * The edited participant stays in place; their partner moves.
  * Returns a new array. If no partner or already adjacent, returns unchanged order.

@@ -1,4 +1,4 @@
-import { movePartnerAdjacent } from '../sortWithPartnerAdjacency';
+import { movePartnerAdjacent, sortPartnersAdjacent } from '../sortWithPartnerAdjacency';
 import { RosterParticipant } from '@/types/roster';
 
 const makeParticipant = (id: string, name: string, partner_id: string | null = null): RosterParticipant => ({
@@ -56,5 +56,38 @@ describe('movePartnerAdjacent', () => {
 
   test('empty array', () => {
     expect(movePartnerAdjacent([], '1')).toEqual([]);
+  });
+});
+
+describe('sortPartnersAdjacent', () => {
+  test('pulls partners together on load', () => {
+    const participants = [
+      makeParticipant('1', 'A'),
+      makeParticipant('2', 'B', '4'),
+      makeParticipant('3', 'C'),
+      makeParticipant('4', 'D', '2'),
+    ];
+    const result = sortPartnersAdjacent(participants);
+    expect(result.map(p => p.name)).toEqual(['A', 'B', 'D', 'C']);
+  });
+
+  test('multiple pairs sorted adjacent', () => {
+    const participants = [
+      makeParticipant('1', 'A', '3'),
+      makeParticipant('2', 'B', '4'),
+      makeParticipant('3', 'C', '1'),
+      makeParticipant('4', 'D', '2'),
+    ];
+    const result = sortPartnersAdjacent(participants);
+    expect(result.map(p => p.name)).toEqual(['A', 'C', 'B', 'D']);
+  });
+
+  test('no partners - unchanged', () => {
+    const participants = [
+      makeParticipant('1', 'A'),
+      makeParticipant('2', 'B'),
+    ];
+    const result = sortPartnersAdjacent(participants);
+    expect(result.map(p => p.name)).toEqual(['A', 'B']);
   });
 });

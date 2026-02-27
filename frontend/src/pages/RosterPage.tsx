@@ -21,7 +21,7 @@ import { fetchWithRetry } from '@/utils/fetchWithRetry';
 import { API_BASE_URL } from '@/config/api';
 import { MAX_TABLES, MAX_SESSIONS } from '@/constants';
 import { AlertCircle, Loader2 } from 'lucide-react';
-import { movePartnerAdjacent } from '@/utils/sortWithPartnerAdjacency';
+import { movePartnerAdjacent, sortPartnersAdjacent } from '@/utils/sortWithPartnerAdjacency';
 
 type SaveStatus = 'saved' | 'saving' | 'error';
 
@@ -39,7 +39,7 @@ export function RosterPage() {
 
   useEffect(() => {
     if (rosterData) {
-      setParticipants(rosterData);
+      setParticipants(sortPartnersAdjacent(rosterData));
     }
   }, [rosterData]);
 
