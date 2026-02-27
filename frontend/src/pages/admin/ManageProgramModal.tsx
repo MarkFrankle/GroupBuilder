@@ -74,6 +74,7 @@ export function ManageProgramModal({ open, onClose, programId }: ManageProgramMo
 
     setRevokingInviteId(inviteId);
     setError(null);
+    setFailedInviteLink(null);
 
     try {
       await apiRequest(`/api/admin/programs/${programId}/invites/${inviteId}`, {
