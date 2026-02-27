@@ -4,6 +4,7 @@ export interface RosterParticipant {
   religion: "Christian" | "Jewish" | "Muslim" | "Other";
   gender: "Male" | "Female" | "Other";
   partner_id: string | null;
+  keep_together?: boolean;
   is_facilitator?: boolean;
 }
 

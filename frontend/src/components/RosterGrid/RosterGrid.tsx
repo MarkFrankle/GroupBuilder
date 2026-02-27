@@ -7,7 +7,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Link, Unlink } from 'lucide-react';
 import { RosterParticipant, Religion, Gender, RELIGIONS, GENDERS } from '@/types/roster';
 
 interface RosterGridProps {
@@ -15,6 +15,7 @@ interface RosterGridProps {
   onUpdate: (id: string, data: Omit<RosterParticipant, 'id'>) => void;
   onDelete: (id: string) => void;
   onAdd: (data: Omit<RosterParticipant, 'id'>) => void;
+  onKeepTogetherToggle: (id: string) => void;
 }
 
 interface EmptyRowState {
@@ -29,7 +30,7 @@ const EMPTY_ROW: EmptyRowState = {
   name: '', religion: 'Other', gender: 'Other', partner_id: null, is_facilitator: false,
 };
 
-export function RosterGrid({ participants, onUpdate, onDelete, onAdd }: RosterGridProps) {
+export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepTogetherToggle }: RosterGridProps) {
   const [editingNames, setEditingNames] = useState<Record<string, string>>({});
   const [emptyRow, setEmptyRow] = useState<EmptyRowState>({ ...EMPTY_ROW });
 
@@ -46,6 +47,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd }: RosterGr
         gender: participant.gender,
         partner_id: participant.partner_id,
         is_facilitator: participant.is_facilitator ?? false,
+        keep_together: participant.keep_together,
       });
     }
     setEditingNames(prev => {
@@ -67,6 +69,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd }: RosterGr
       gender: field === 'gender' ? value as Gender : participant.gender,
       partner_id: partnerValue,
       is_facilitator: participant.is_facilitator ?? false,
+      keep_together: participant.keep_together,
     });
   };
 
@@ -77,6 +80,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd }: RosterGr
       gender: participant.gender,
       partner_id: participant.partner_id,
       is_facilitator: checked,
+      keep_together: participant.keep_together,
     });
   };
 
@@ -184,20 +188,35 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd }: RosterGr
                     </Select>
                   </TableCell>
                   <TableCell className="p-1">
-                    <Select
-                      value={p.partner_id ?? 'none'}
-                      onValueChange={v => handleFieldChange(p, 'partner_id', v)}
-                    >
-                      <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {participants
-                          .filter(other => other.id !== p.id)
-                          .map(other => (
-                            <SelectItem key={other.id} value={other.id}>{other.name}</SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center gap-1">
+                      <Select
+                        value={p.partner_id ?? 'none'}
+                        onValueChange={v => handleFieldChange(p, 'partner_id', v)}
+                      >
+                        <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {participants
+                            .filter(other => other.id !== p.id)
+                            .map(other => (
+                              <SelectItem key={other.id} value={other.id}>{other.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      {p.partner_id && (
+                        <button
+                          onClick={() => onKeepTogetherToggle(p.id)}
+                          className="p-0.5 rounded hover:bg-gray-100 shrink-0"
+                          title={p.keep_together ? "Partner will be at the same table (click to separate)" : "Partner will be at a different table (click to keep together)"}
+                        >
+                          {p.keep_together ? (
+                            <Link className="h-4 w-4 text-blue-600" />
+                          ) : (
+                            <Unlink className="h-4 w-4 text-gray-400" />
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="p-1 text-center">
                     <input

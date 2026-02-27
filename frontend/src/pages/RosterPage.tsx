@@ -57,9 +57,9 @@ export function RosterPage() {
         if (oldPartnerId) {
           const oldPartner = participants.find(p => p.id === oldPartnerId);
           if (oldPartner && oldPartner.partner_id === id) {
-            await upsertParticipant(currentProgram!.id, oldPartnerId, { ...oldPartner, partner_id: null });
+            await upsertParticipant(currentProgram!.id, oldPartnerId, { ...oldPartner, partner_id: null, keep_together: false });
             setParticipants(prev => prev.map(p =>
-              p.id === oldPartnerId ? { ...p, partner_id: null } : p
+              p.id === oldPartnerId ? { ...p, partner_id: null, keep_together: false } : p
             ));
           }
         }
@@ -103,6 +103,34 @@ export function RosterPage() {
       setSaveStatus('error');
     }
   }, [currentProgram]);
+
+  const handleKeepTogetherToggle = useCallback(async (id: string) => {
+    const participant = participants.find(p => p.id === id);
+    if (!participant?.partner_id) return;
+
+    const newValue = !participant.keep_together;
+    const partnerId = participant.partner_id;
+
+    // Optimistic update on both sides
+    setParticipants(prev => prev.map(p => {
+      if (p.id === id || p.id === partnerId) {
+        return { ...p, keep_together: newValue };
+      }
+      return p;
+    }));
+
+    setSaveStatus('saving');
+    try {
+      const partnerObj = participants.find(p => p.id === partnerId);
+      await upsertParticipant(currentProgram!.id, id, { ...participant, keep_together: newValue });
+      if (partnerObj) {
+        await upsertParticipant(currentProgram!.id, partnerId, { ...partnerObj, keep_together: newValue });
+      }
+      setSaveStatus('saved');
+    } catch {
+      setSaveStatus('error');
+    }
+  }, [participants, currentProgram]);
 
   const handleGenerate = async () => {
     setError(null);
@@ -165,6 +193,7 @@ export function RosterPage() {
             onUpdate={handleUpdate}
             onDelete={handleDelete}
             onAdd={handleAdd}
+            onKeepTogetherToggle={handleKeepTogetherToggle}
           />
 
           <div className="flex space-x-4">
