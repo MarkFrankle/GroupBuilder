@@ -40,10 +40,18 @@ export async function authenticatedFetch(
   // Prepend API_BASE_URL to relative paths so they hit the backend, not the SPA host
   const resolvedUrl = url.startsWith('/') ? `${API_BASE_URL}${url}` : url;
 
-  return fetch(resolvedUrl, {
-    ...options,
-    headers,
-  });
+  const fetchOptions = { ...options, headers };
+
+  try {
+    return await fetch(resolvedUrl, fetchOptions);
+  } catch (error) {
+    // Network errors (e.g. cold start timeout) — retry once after a short delay
+    if (error instanceof TypeError && /network|fetch/i.test(error.message)) {
+      await new Promise((r) => setTimeout(r, 3000));
+      return fetch(resolvedUrl, fetchOptions);
+    }
+    throw error;
+  }
 }
 
 /**
