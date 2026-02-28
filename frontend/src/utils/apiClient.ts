@@ -47,8 +47,16 @@ export async function authenticatedFetch(
   } catch (error) {
     // Network errors (e.g. cold start timeout) — retry once after a short delay
     if (error instanceof TypeError && /network|fetch/i.test(error.message)) {
+      console.warn('Network error, retrying in 3s:', error.message);
       await new Promise((r) => setTimeout(r, 3000));
-      return fetch(resolvedUrl, fetchOptions);
+      try {
+        return await fetch(resolvedUrl, fetchOptions);
+      } catch (retryError) {
+        console.error('Retry also failed:', retryError);
+        throw new Error(
+          "Couldn't reach the server. Check your connection and try again."
+        );
+      }
     }
     throw error;
   }
@@ -70,6 +78,15 @@ export async function apiRequest<T>(
     }
 
     // Try to parse error as JSON, fallback to text if it fails
+    // 5xx errors get a friendly message — the user can't fix server problems
+    if (response.status >= 500) {
+      console.error(`Server error ${response.status} from ${url}`);
+      throw new Error(
+        'Something went wrong on our end. Please try again.'
+      );
+    }
+
+    // 4xx errors: extract the API's detail message (these are user-meaningful)
     let errorMessage = `HTTP ${response.status}`;
 
     try {

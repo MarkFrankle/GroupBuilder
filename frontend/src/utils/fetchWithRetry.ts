@@ -60,7 +60,10 @@ export async function fetchWithRetry(
   }
 
   // All retries failed
-  throw new Error(
+  console.error(
     `Failed to fetch ${url} after ${maxRetries} attempts. Last error: ${lastError?.message || 'Unknown error'}`
+  );
+  throw new Error(
+    "Couldn't reach the server. Check your connection and try again."
   )
 }
