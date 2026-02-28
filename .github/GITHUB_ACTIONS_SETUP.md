@@ -87,13 +87,13 @@ Your Netlify frontend URL (e.g., `https://group-builder.netlify.app`)
 This is used for CORS configuration.
 
 #### `FROM_EMAIL` (Optional)
-Email address for SendGrid "from" field (e.g., `noreply@yourdomain.com`)
+Email address for Resend "from" field (e.g., `noreply@yourdomain.com`)
 Only needed if using email functionality.
 
-#### `SENDGRID_API_KEY` (Optional)
-Your SendGrid API key for sending emails
+#### `RESEND_API_KEY` (Optional)
+Your Resend API key for sending emails
 Only needed if using email functionality.
-Get this from: https://app.sendgrid.com/settings/api_keys
+Get this from: https://resend.com/api-keys
 
 ## Testing the Workflow
 
