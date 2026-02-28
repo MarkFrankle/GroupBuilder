@@ -13,7 +13,7 @@ Ideas, feature requests, and wishlist items. Not prioritized, not committed to.
 
 - **Roster table truncation with long names** — When partner names are long (e.g., "Christopher Montgomery-Wellington"), the Partner column truncates aggressively ("Christopher...") because the column is fixed at 200px and shares space with the link/unlink icon. The Name column also truncates. Tried: (1) `min-w-0` on SelectTrigger — helps prevent layout breakage but doesn't give more space; (2) flexible column widths (`min-w-[160px]` instead of `w-[200px]`) — causes column jitter when selecting partners, worse UX. Probably needs a different approach: wider partner column, responsive table, or tooltip on hover showing full name. Low priority — BBT roster has normal-length names. (2026-02)
 
-- **User-friendly frontend error messages** — Technical errors like "NetworkError when attempting to fetch resource" are shown directly to users. Should show friendly messages with actionable guidance instead (e.g., "Couldn't reach the server. Please try again in a moment."). Network errors now auto-retry once (3s delay) in `authenticatedFetch`, which handles cold start timeouts. This backlog item covers the remaining UX: friendly messages for errors that persist after retry, 500s, and other API failures across all pages. (2026-02)
+- ~~**User-friendly frontend error messages**~~ — Done (PR #91). Network errors and 5xx now show friendly messages; technical details logged to console. (2026-02)
 
 ## Chores
 
