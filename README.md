@@ -51,7 +51,7 @@ Typical solve times range from under a second for small events to around two min
 - **Pydantic v2** — request validation
 - **Firebase Admin SDK** — token verification, Firestore access
 - **Google Cloud Firestore** — primary database (programs, rosters, sessions, results)
-- **SendGrid** — email delivery for magic links (optional)
+- **Resend** — email delivery for magic links (optional)
 - Deployed on **Google Cloud Run**
 
 ### Assignment Engine
