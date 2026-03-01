@@ -24,7 +24,7 @@ const WelcomePage: React.FC<WelcomePageProps> = ({ onDismiss }) => {
           </a>
           <h1 className="text-3xl font-bold">Welcome to Group Builder</h1>
           <p className="text-muted-foreground text-lg">
-            A <a href="https://www.buildingbridgestogether.net/" target="_blank" rel="noopener noreferrer" className="text-primary underline">Building Bridges Together™</a> tool for creating balanced, diverse groups for your seminar series.
+            A <a href="https://www.buildingbridgestogether.net/" target="_blank" rel="noopener noreferrer" className="text-primary underline">Building Bridges Together™</a> tool for creating balanced, diverse groups for your Building Bridges™ program.
           </p>
         </div>
 
