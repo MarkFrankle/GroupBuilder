@@ -34,7 +34,7 @@ const LandingPage: React.FC = () => {
         <div className="text-center">
           <h1 className="text-3xl font-bold">Group Builder</h1>
           <p className="text-muted-foreground mt-2">
-            Create balanced and diverse groups for your seminar series
+            Create balanced and diverse groups for your Building Bridges Together™ program
           </p>
         </div>
         <div className="grid grid-cols-3 gap-4">
@@ -65,6 +65,12 @@ const LandingPage: React.FC = () => {
               </CardContent>
             </Card>
           </Link>
+        </div>
+        <div className="text-center pt-4">
+          <div className="inline-flex flex-col items-center gap-2 text-muted-foreground">
+            <img src="/images/bbt-logo.png" alt="Building Bridges Together" className="h-16" />
+            <span className="text-sm">A Building Bridges Together™ tool</span>
+          </div>
         </div>
       </div>
     </div>

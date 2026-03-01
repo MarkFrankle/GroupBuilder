@@ -452,10 +452,12 @@ function HelpPage() {
 
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Saving as PDF to share by email:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            To send the assignments to other facilitators, you can save them as a PDF:
-            click <strong>"Print Roster"</strong>, then in the print dialog choose{" "}
-            <strong>"Save as PDF"</strong> instead of a printer. This creates a PDF
-            file you can attach to an email or share however you like.
+            To send the assignments to other facilitators, you can save them as a
+            PDF: click <strong>"Print Roster"</strong>, then in the print dialog
+            instead of choosing a printer, choose{" "}
+            <strong>"Save as PDF."</strong> This will create and download a PDF file
+            you can rename if desired and attach to an email or share however you
+            like.
           </p>
 
           <h3 className="text-xl font-semibold mb-2">Print Seating Charts</h3>
