@@ -15,9 +15,16 @@ const WelcomePage: React.FC<WelcomePageProps> = ({ onDismiss }) => {
     <div className="container mx-auto p-4">
       <div className="max-w-2xl mx-auto mt-16 space-y-8">
         <div className="text-center space-y-3">
+          <a
+            href="https://www.buildingbridgestogether.net/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <img src="/images/bbt-logo.png" alt="Building Bridges Together" className="h-20 mx-auto" />
+          </a>
           <h1 className="text-3xl font-bold">Welcome to Group Builder</h1>
           <p className="text-muted-foreground text-lg">
-            Group Builder helps you create balanced, diverse groups for your seminar series.
+            A <a href="https://www.buildingbridgestogether.net/" target="_blank" rel="noopener noreferrer" className="text-primary underline">Building Bridges Together™</a> tool for creating balanced, diverse groups for your seminar series.
           </p>
         </div>
 

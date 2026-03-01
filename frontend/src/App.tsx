@@ -68,6 +68,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function useShowChrome() {
+  const { user } = useAuth();
+  const location = useLocation();
+  if (!user) return false;
+  const hiddenPaths = ['/login', '/auth/verify', '/invite/'];
+  return !hiddenPaths.some(p => location.pathname.startsWith(p));
+}
+
 function NavBar() {
   const { user, signOut } = useAuth();
   const { currentProgram } = useProgram();
@@ -93,6 +101,24 @@ function NavBar() {
   );
 }
 
+function Footer() {
+  const showChrome = useShowChrome();
+  if (!showChrome) return null;
+  return (
+    <footer className="no-print border-t px-4 py-2 text-xs text-muted-foreground text-center">
+      Developed in collaboration with{' '}
+      <a
+        href="https://www.buildingbridgestogether.net/"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary underline"
+      >
+        Building Bridges Together™
+      </a>
+    </footer>
+  );
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -115,7 +141,9 @@ const App: React.FC = () => {
       <ProgramProvider>
         <QueryClientProvider client={queryClient}>
           <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <div className="flex flex-col min-h-screen">
             <NavBar />
+            <div className="flex-1">
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/auth/verify" element={<AuthVerifyPage />} />
@@ -197,6 +225,9 @@ const App: React.FC = () => {
                 }
               />
             </Routes>
+            </div>
+            <Footer />
+            </div>
           </Router>
           <ReactQueryDevtools initialIsOpen={false} />
         </QueryClientProvider>
