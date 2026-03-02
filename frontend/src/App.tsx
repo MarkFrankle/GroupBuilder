@@ -84,9 +84,10 @@ function NavBar() {
   if (!user) return null;
   const hasProgram = !!currentProgram;
   const isAdminPage = location.pathname.startsWith('/admin');
+  const isHelpPage = location.pathname === '/help';
   return (
     <nav className="no-print border-b px-4 py-2 flex gap-4 text-sm items-center">
-      {(hasProgram || isAdminPage) && <>
+      {(hasProgram || isAdminPage || isHelpPage) && <>
         <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
         <Link to="/roster" className="text-muted-foreground hover:text-foreground transition-colors">Roster</Link>
         <Link to="/groups" className="text-muted-foreground hover:text-foreground transition-colors">Groups</Link>
