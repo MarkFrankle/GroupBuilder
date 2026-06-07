@@ -15,6 +15,10 @@ Ideas, feature requests, and wishlist items. Not prioritized, not committed to.
 
 - ~~**User-friendly frontend error messages**~~ — Done (PR #91). Network errors and 5xx now show friendly messages; technical details logged to console. (2026-02)
 
+- **Improve Regenerate All Sessions modal copy** — Current copy undersells destruction: says "a completely new set of assignments" and "your current version will be saved" without explicitly naming that saved absences are lost. Should say so plainly. (2026-06)
+
+- **Worked examples in Help page** — Three real mid-flight scenarios users struggle with: (1) saving absences then regenerating a session, (2) discovering partner/linking requirements after sessions are generated, (3) discovering participants need to be separated after sessions are generated. Show the step-by-step correct flow for each. (2026-06)
+
 ## Chores
 
 - **Custom SMTP for Firebase Auth emails** — Firebase's sign-in link email template is non-editable (body is hardcoded, shows project ID "group-builder-backend" as app name). Custom domain (`noreply@group-builder.com`) and SPF/DKIM are already configured. To customize the email content: configure SMTP settings in Firebase Console → Authentication → Templates → SMTP settings to send through Resend. Then replace Firebase's `sendSignInLinkToEmail()` in `frontend/src/services/firebase.ts` with a backend endpoint that generates the sign-in link via Admin SDK (`generate_sign_in_with_email_link` — already used in `api/src/api/services/email_service.py` for invites) and sends a custom-branded email through Resend. Purely aesthetic — sign-in emails currently work and land in inbox. (2026-02)
