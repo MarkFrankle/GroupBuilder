@@ -767,7 +767,6 @@ const TableAssignmentsPage: React.FC = () => {
                 <Select
                   value={currentSession.toString()}
                   onValueChange={(value) => setCurrentSession(parseInt(value))}
-                  disabled={editMode}
                 >
                   <SelectTrigger className="w-[180px]" aria-label="Select session">
                     <SelectValue placeholder="Select session" />
@@ -856,7 +855,7 @@ const TableAssignmentsPage: React.FC = () => {
                 <Button
                   variant="outline"
                   onClick={handlePreviousSession}
-                  disabled={currentSession === 1 || editMode}
+                  disabled={currentSession === 1}
                   size="sm"
                 >
                   ← Prev
@@ -864,7 +863,7 @@ const TableAssignmentsPage: React.FC = () => {
                 <Button
                   variant="outline"
                   onClick={handleNextSession}
-                  disabled={currentSession === assignments.length || editMode}
+                  disabled={currentSession === assignments.length}
                   size="sm"
                 >
                   Next →
