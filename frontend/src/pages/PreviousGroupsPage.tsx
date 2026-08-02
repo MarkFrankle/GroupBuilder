@@ -59,17 +59,17 @@ const PreviousGroupsPage: React.FC = () => {
                   <FolderOpen className="h-5 w-5 text-muted-foreground shrink-0" />
                   <div>
                     <div className="font-medium flex items-center gap-2">
-                      {index === 0 && (
-                        <span className="text-xs font-medium bg-primary text-primary-foreground px-1.5 py-0.5 rounded">
-                          Latest
-                        </span>
-                      )}
                       {session.created_at
                         ? new Date(session.created_at * 1000).toLocaleString(undefined, {
                             month: 'short', day: 'numeric', year: 'numeric',
                             hour: 'numeric', minute: '2-digit'
                           })
                         : 'Unknown date'}
+                      {index === 0 && (
+                        <span className="text-xs font-medium text-muted-foreground">
+                          Latest
+                        </span>
+                      )}
                     </div>
                     <div className="text-sm text-muted-foreground">
                       {session.num_participants} participants &middot; {session.num_tables} tables &middot; {session.num_sessions} session{session.num_sessions !== 1 ? 's' : ''}

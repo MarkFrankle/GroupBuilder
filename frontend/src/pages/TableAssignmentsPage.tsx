@@ -31,6 +31,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import { authenticatedFetch } from '@/utils/apiClient'
 import { useResultVersions, useAssignmentResults } from '@/hooks/queries'
 
@@ -84,6 +86,7 @@ const TableAssignmentsPage: React.FC = () => {
   const [selectedParticipantSlot, setSelectedParticipantSlot] = useState<{tableNum: number, participantIndex: number} | null>(null)
   const [clearSelectionKey, setClearSelectionKey] = useState(0)
   const [showRegenerateDialog, setShowRegenerateDialog] = useState<boolean>(false)
+  const [maintainAbsencesOnRegen, setMaintainAbsencesOnRegen] = useState<boolean>(true)
   const [regenerating, setRegenerating] = useState<boolean>(false)
   const [regenerateSuccess, setRegenerateSuccess] = useState<boolean>(false)
   const [newVersionId, setNewVersionId] = useState<string | null>(null)
@@ -277,8 +280,32 @@ const TableAssignmentsPage: React.FC = () => {
       }
 
       const result = await response.json()
+      let finalVersionId: string = result.version_id
+
+      // Apply per-session absences from current assignments if requested
+      if (maintainAbsencesOnRegen) {
+        const sessionsWithAbsences = assignments
+          .map(s => ({ sessionNumber: s.session, absent: s.absentParticipants || [] }))
+          .filter(s => s.absent.length > 0)
+
+        for (const { sessionNumber, absent } of sessionsWithAbsences) {
+          const regenRes = await authenticatedFetch(
+            `/api/assignments/regenerate/${sessionId}/session/${sessionNumber}?max_time_seconds=60&version_id=${finalVersionId}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(absent),
+            }
+          )
+          if (regenRes.ok) {
+            const regenResult = await regenRes.json()
+            finalVersionId = regenResult.version_id
+          }
+        }
+      }
+
       // Save new version ID but don't auto-switch
-      setNewVersionId(result.version_id)
+      setNewVersionId(finalVersionId)
       setRegenerateSuccess(true)
 
       // Invalidate queries so versions list refreshes
@@ -919,6 +946,14 @@ const TableAssignmentsPage: React.FC = () => {
             <p className="text-sm text-muted-foreground">
               Your current version will be saved and you can switch back anytime.
             </p>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="maintain-absences-regen"
+                checked={maintainAbsencesOnRegen}
+                onCheckedChange={(checked: boolean | 'indeterminate') => setMaintainAbsencesOnRegen(checked === true)}
+              />
+              <Label htmlFor="maintain-absences-regen">Maintain saved absences</Label>
+            </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowRegenerateDialog(false)}>
                 Cancel
