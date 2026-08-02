@@ -946,13 +946,32 @@ const TableAssignmentsPage: React.FC = () => {
             <p className="text-sm text-muted-foreground">
               Your current version will be saved and you can switch back anytime.
             </p>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="maintain-absences-regen"
-                checked={maintainAbsencesOnRegen}
-                onCheckedChange={(checked: boolean | 'indeterminate') => setMaintainAbsencesOnRegen(checked === true)}
-              />
-              <Label htmlFor="maintain-absences-regen">Maintain saved absences</Label>
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="maintain-absences-regen"
+                  checked={maintainAbsencesOnRegen}
+                  onCheckedChange={(checked: boolean | 'indeterminate') => setMaintainAbsencesOnRegen(checked === true)}
+                />
+                <Label htmlFor="maintain-absences-regen">Maintain saved absences</Label>
+              </div>
+              <div className="ml-6 text-xs text-muted-foreground space-y-0.5">
+                {assignments.every(s => !s.absentParticipants?.length) ? (
+                  <span>No absences recorded in this session.</span>
+                ) : (
+                  assignments
+                    .slice()
+                    .sort((a, b) => a.session - b.session)
+                    .map(s => (
+                      <div key={s.session}>
+                        <span className="font-medium">Session {s.session}:</span>{' '}
+                        {s.absentParticipants?.length
+                          ? s.absentParticipants.map(p => p.name).join(', ')
+                          : 'no absences'}
+                      </div>
+                    ))
+                )}
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowRegenerateDialog(false)}>
