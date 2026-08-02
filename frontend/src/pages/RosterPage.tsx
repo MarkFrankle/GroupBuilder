@@ -242,30 +242,21 @@ export function RosterPage() {
       setLoadingMessage('Creating session from roster...');
       const newSessionId = await generateFromRoster(currentProgram!.id, srcTables, srcSessions);
 
-      // Full solve — all participants present
+      // Solve all sessions, applying absences, in a single backend call
       setLoadingMessage('Generating assignments...');
-      const solveRes = await fetchWithRetry(
-        `${API_BASE_URL}/api/assignments/?session_id=${newSessionId}&max_time_seconds=120`
+      const perSessionAbsences = sessionsWithAbsences.map(s => ({
+        session_number: s.sessionNumber,
+        absent_participants: s.absent,
+      }));
+      const solveRes = await authenticatedFetch(
+        `/api/assignments/regenerate/${newSessionId}/with_absences?max_time_seconds=120`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(perSessionAbsences),
+        }
       );
       if (!solveRes.ok) throw new Error('Assignment generation failed');
-
-      // Re-solve each session that had absences, in order
-      if (sessionsWithAbsences.length > 0) {
-        setLoadingMessage(`Applying absences to ${sessionsWithAbsences.length} session(s)...`);
-        for (const { sessionNumber, absent } of sessionsWithAbsences) {
-          const regenRes = await authenticatedFetch(
-            `/api/assignments/regenerate/${newSessionId}/session/${sessionNumber}?max_time_seconds=60`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(absent),
-            }
-          );
-          if (!regenRes.ok) {
-            console.warn(`Could not apply absences for session ${sessionNumber}`);
-          }
-        }
-      }
 
       queryClient.invalidateQueries({ queryKey: ['sessions', currentProgram?.id] });
       navigate(`/table-assignments?session=${newSessionId}`);

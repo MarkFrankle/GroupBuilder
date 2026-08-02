@@ -270,11 +270,21 @@ const TableAssignmentsPage: React.FC = () => {
         throw new Error('Session ID not found. Please upload a file again.')
       }
 
-      console.log('[Regenerate] Requesting regeneration with max_time_seconds:', DEFAULT_SOLVER_TIMEOUT_SECONDS)
-      const response = await authenticatedFetch(`/api/assignments/regenerate/${sessionId}?max_time_seconds=${DEFAULT_SOLVER_TIMEOUT_SECONDS}`, {
-        method: 'POST',
-        signal: controller.signal,
-      })
+      const perSessionAbsences = maintainAbsencesOnRegen
+        ? assignments
+            .filter(s => s.absentParticipants && s.absentParticipants.length > 0)
+            .map(s => ({ session_number: s.session, absent_participants: s.absentParticipants }))
+        : []
+
+      const response = await authenticatedFetch(
+        `/api/assignments/regenerate/${sessionId}/with_absences?max_time_seconds=${DEFAULT_SOLVER_TIMEOUT_SECONDS}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(perSessionAbsences),
+          signal: controller.signal,
+        }
+      )
 
       if (!response.ok) {
         const errorData = await response.json()
@@ -282,29 +292,7 @@ const TableAssignmentsPage: React.FC = () => {
       }
 
       const result = await response.json()
-      let finalVersionId: string = result.version_id
-
-      // Apply per-session absences from current assignments if requested
-      if (maintainAbsencesOnRegen) {
-        const sessionsWithAbsences = assignments
-          .map(s => ({ sessionNumber: s.session, absent: s.absentParticipants || [] }))
-          .filter(s => s.absent.length > 0)
-
-        for (const { sessionNumber, absent } of sessionsWithAbsences) {
-          const regenRes = await authenticatedFetch(
-            `/api/assignments/regenerate/${sessionId}/session/${sessionNumber}?max_time_seconds=60&version_id=${finalVersionId}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(absent),
-            }
-          )
-          if (regenRes.ok) {
-            const regenResult = await regenRes.json()
-            finalVersionId = regenResult.version_id
-          }
-        }
-      }
+      const finalVersionId: string = result.version_id
 
       // Save new version ID but don't auto-switch
       setNewVersionId(finalVersionId)

@@ -288,6 +288,109 @@ async def regenerate_assignments(
         )
 
 
+@router.post("/regenerate/{session_id}/with_absences")
+@limiter.limit("5/minute")
+async def regenerate_all_with_absences(
+    request: Request,
+    session_id: str = Path(
+        ..., min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$"
+    ),
+    max_time_seconds: int = Query(120, ge=30, le=240),
+    per_session_absences: List[Dict[str, Any]] = Body(default=[]),
+    user: AuthUser = Depends(get_current_user),
+):
+    """
+    Regenerate all sessions with per-session absences, saving exactly one new version.
+
+    per_session_absences: [{"session_number": 1, "absent_participants": [...]}, ...]
+    Sessions not listed are solved with all participants present.
+    """
+    session_storage = get_session_storage()
+    if not session_storage.session_exists(session_id):
+        raise HTTPException(status_code=404, detail="Session not found.")
+
+    session_data = session_storage.get_session(session_id)
+    participants = session_data["participant_data"]
+    num_tables = session_data["num_tables"]
+    num_sessions = session_data["num_sessions"]
+
+    absence_map: Dict[int, List[Dict[str, Any]]] = {}
+    for entry in per_session_absences:
+        sn = entry.get("session_number")
+        absent = entry.get("absent_participants", [])
+        if sn and absent:
+            absence_map[int(sn)] = absent
+
+    # Full solve — all participants present
+    results = handle_generate_assignments(
+        participants, num_tables, num_sessions, max_time_seconds=max_time_seconds
+    )
+    if results["status"] != "success":
+        raise HTTPException(
+            status_code=400, detail=results.get("error", "Solver failed")
+        )
+
+    assignments = results["assignments"]
+
+    # Re-solve sessions with absences, keeping other sessions' pairings as history
+    for session_number, absent in absence_map.items():
+        if session_number < 1 or session_number > num_sessions:
+            continue
+        active = _get_active_participants(participants, absent)
+        if len(active) < num_tables:
+            logger.warning(
+                f"Skipping absence regen for session {session_number}: "
+                f"only {len(active)} active participants for {num_tables} tables"
+            )
+            continue
+        historical = _extract_pairings_from_sessions(
+            assignments, exclude_session=session_number
+        )
+        builder = GroupBuilder(
+            participants=active,
+            num_tables=num_tables,
+            num_sessions=1,
+            historical_pairings=historical,
+            solver_num_workers=4,
+        )
+        single_result = builder.generate_assignments(
+            max_time_seconds=min(60, max_time_seconds)
+        )
+        if single_result["status"] == "success":
+            assignments[session_number - 1] = {
+                "session": session_number,
+                "tables": single_result["assignments"][0]["tables"],
+                "absentParticipants": absent,
+            }
+        else:
+            logger.warning(
+                f"Could not apply absences for session {session_number}, keeping full-solve result"
+            )
+
+    # Save exactly one new version
+    existing_versions = session_storage.get_result_versions(session_id)
+    version_num = len(existing_versions) + 1
+    version_id = f"v{version_num}"
+
+    session_storage.save_results(
+        session_id=session_id,
+        version_id=version_id,
+        assignments=assignments,
+        metadata={
+            "solution_quality": results.get("solution_quality"),
+            "solve_time": results.get("solve_time"),
+            "total_deviation": results.get("total_deviation"),
+            "max_time_seconds": max_time_seconds,
+            "regenerated": True,
+        },
+    )
+
+    logger.info(
+        f"Saved regen-with-absences result as {version_id} for session {session_id}"
+    )
+    return {"version_id": version_id, "assignments": assignments}
+
+
 @router.post("/regenerate/{session_id}/session/{session_number}")
 @limiter.limit(
     "20/minute"
