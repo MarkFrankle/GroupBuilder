@@ -331,6 +331,7 @@ async def regenerate_all_with_absences(
         )
 
     assignments = results["assignments"]
+    absences_applied = False
 
     # Re-solve sessions with absences, keeping other sessions' pairings as history
     for session_number, absent in absence_map.items():
@@ -342,6 +343,9 @@ async def regenerate_all_with_absences(
                 f"Skipping absence regen for session {session_number}: "
                 f"only {len(active)} active participants for {num_tables} tables"
             )
+            # Preserve the absence record so it survives future regenerations,
+            # even though the tables keep the full-solve (everyone-present) layout.
+            assignments[session_number - 1]["absentParticipants"] = absent
             continue
         historical = _extract_pairings_from_sessions(
             assignments, exclude_session=session_number
@@ -362,27 +366,40 @@ async def regenerate_all_with_absences(
                 "tables": single_result["assignments"][0]["tables"],
                 "absentParticipants": absent,
             }
+            absences_applied = True
         else:
             logger.warning(
                 f"Could not apply absences for session {session_number}, keeping full-solve result"
             )
+            # Preserve the absence record even when the re-solve failed.
+            assignments[session_number - 1]["absentParticipants"] = absent
 
     # Save exactly one new version
     existing_versions = session_storage.get_result_versions(session_id)
     version_num = len(existing_versions) + 1
     version_id = f"v{version_num}"
 
+    # The full-solve quality metrics only describe the all-present solve. Once any
+    # session was re-solved with absences, those aggregate numbers no longer match
+    # the saved assignments, so drop them rather than report stale values.
+    metadata = {
+        "max_time_seconds": max_time_seconds,
+        "regenerated": True,
+    }
+    if absences_applied:
+        metadata["solution_quality"] = None
+        metadata["solve_time"] = None
+        metadata["total_deviation"] = None
+    else:
+        metadata["solution_quality"] = results.get("solution_quality")
+        metadata["solve_time"] = results.get("solve_time")
+        metadata["total_deviation"] = results.get("total_deviation")
+
     session_storage.save_results(
         session_id=session_id,
         version_id=version_id,
         assignments=assignments,
-        metadata={
-            "solution_quality": results.get("solution_quality"),
-            "solve_time": results.get("solve_time"),
-            "total_deviation": results.get("total_deviation"),
-            "max_time_seconds": max_time_seconds,
-            "regenerated": True,
-        },
+        metadata=metadata,
     )
 
     logger.info(

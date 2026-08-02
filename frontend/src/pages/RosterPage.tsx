@@ -225,17 +225,19 @@ export function RosterPage() {
     setGenerating(true);
 
     try {
-      // Read per-session absences from the most recent session's results
+      // Reuse the per-session absences already loaded on mount; only fall back to
+      // a fetch if they haven't finished loading yet.
       let sessionsWithAbsences: { sessionNumber: number; absent: AbsentParticipant[] }[] = [];
       if (maintainAbsences) {
-        setLoadingMessage('Reading saved absences...');
-        const resultsRes = await authenticatedFetch(`/api/assignments/results/${srcSessionId}`);
-        if (resultsRes.ok) {
-          const sourceResults: SessionResult[] = await resultsRes.json();
-          sessionsWithAbsences = sourceResults
-            .map(s => ({ sessionNumber: s.session, absent: s.absentParticipants || [] }))
-            .filter(s => s.absent.length > 0);
+        let sourceResults = sourceAbsences;
+        if (sourceResults === null) {
+          setLoadingMessage('Reading saved absences...');
+          const resultsRes = await authenticatedFetch(`/api/assignments/results/${srcSessionId}`);
+          sourceResults = resultsRes.ok ? await resultsRes.json() : [];
         }
+        sessionsWithAbsences = (sourceResults ?? [])
+          .map(s => ({ sessionNumber: s.session, absent: s.absentParticipants || [] }))
+          .filter(s => s.absent.length > 0);
       }
 
       // Create new session from current roster
