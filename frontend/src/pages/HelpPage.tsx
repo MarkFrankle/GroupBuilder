@@ -184,8 +184,14 @@ function HelpPage() {
             Generating Groups
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            Once your roster is ready, it's time to create your groups. At the bottom
-            of the Roster page, you'll see two dropdowns and a Generate button.
+            Once your roster is ready, it's time to create your groups. Scroll to the
+            bottom of the Roster page to find the generation controls.
+          </p>
+
+          <h3 className="text-xl font-semibold mb-2">First time: Fresh Start</h3>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            If you haven't generated groups yet, you'll see two dropdowns and a{" "}
+            <strong>Generate Assignments</strong> button.
           </p>
 
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">
@@ -213,6 +219,24 @@ function HelpPage() {
             see a progress indicator while it works. When it's done, you'll be taken to
             the results page.
           </p>
+
+          <h3 className="text-xl font-semibold mt-8 mb-2">Already have groups: Regenerate or Fresh Start</h3>
+          <p className="mb-2 text-slate-700 leading-relaxed">
+            If you've generated groups before, the Roster page shows two tabs instead
+            of the flat form:
+          </p>
+          <ul className="list-disc pl-5 space-y-2 text-slate-700 leading-relaxed mb-4">
+            <li>
+              <strong>Regenerate</strong> — Re-runs the solver using your existing table
+              and session counts, and carries over any absences you've recorded in your
+              current version. Use this when you want a different arrangement but don't
+              need to change the structure.
+            </li>
+            <li>
+              <strong>Fresh Start</strong> — Lets you pick new table and session counts
+              and generates from scratch. Use this when your program structure has changed.
+            </li>
+          </ul>
 
           <WarningCallout>
             <p className="font-semibold mb-2">If something goes wrong:</p>
@@ -500,7 +524,11 @@ function HelpPage() {
           <p className="mb-2 text-slate-700 leading-relaxed">
             If you want a completely fresh set of assignments, click the{" "}
             <strong>⋮ menu</strong> and select <strong>"Regenerate All Sessions."</strong>{" "}
-            Regeneration takes up to 2 minutes — you can continue browsing while it runs.
+            A confirmation dialog will appear. If you have absences recorded, you'll see
+            a <strong>"Maintain saved absences"</strong> checkbox (checked by default) — leave
+            it on to carry those absences into the new version, or uncheck it to regenerate
+            with everyone present. Regeneration takes up to 2 minutes — you can continue
+            browsing while it runs.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Your previous version is not lost. Every time you regenerate, the results
