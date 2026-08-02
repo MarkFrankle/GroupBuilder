@@ -65,6 +65,18 @@ export function RosterPage() {
   const [generating, setGenerating] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [maintainAbsences, setMaintainAbsences] = useState(true);
+  const [sourceAbsences, setSourceAbsences] = useState<SessionResult[] | null>(null);
+  const [absencesLoading, setAbsencesLoading] = useState(false);
+
+  useEffect(() => {
+    if (!sourceSession) return;
+    setAbsencesLoading(true);
+    authenticatedFetch(`/api/assignments/results/${sourceSession.session_id}`)
+      .then(res => res.ok ? res.json() : null)
+      .then((results: SessionResult[] | null) => setSourceAbsences(results ?? []))
+      .catch(() => setSourceAbsences([]))
+      .finally(() => setAbsencesLoading(false));
+  }, [sourceSession?.session_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (rosterData) {
@@ -305,7 +317,7 @@ export function RosterPage() {
                   value="update"
                   className="flex-1 rounded-none rounded-tl-md border border-b-0 py-2.5 font-medium text-sm transition-colors data-[state=active]:bg-background data-[state=active]:shadow-none data-[state=active]:border-t-2 data-[state=active]:border-t-primary data-[state=active]:text-foreground data-[state=inactive]:bg-muted data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/70"
                 >
-                  Update Existing
+                  Regenerate
                 </TabsTrigger>
                 <TabsTrigger
                   value="fresh"
@@ -324,13 +336,34 @@ export function RosterPage() {
                     </span>
                   )}
                 </p>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="maintain-absences"
-                    checked={maintainAbsences}
-                    onCheckedChange={(checked: boolean | 'indeterminate') => setMaintainAbsences(checked === true)}
-                  />
-                  <Label htmlFor="maintain-absences">Maintain saved absences</Label>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="maintain-absences"
+                      checked={maintainAbsences}
+                      onCheckedChange={(checked: boolean | 'indeterminate') => setMaintainAbsences(checked === true)}
+                    />
+                    <Label htmlFor="maintain-absences">Maintain saved absences</Label>
+                  </div>
+                  <div className="ml-6 text-xs text-muted-foreground space-y-0.5">
+                    {absencesLoading ? (
+                      <span className="flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Loading absences…</span>
+                    ) : sourceAbsences === null ? null : sourceAbsences.every(s => !s.absentParticipants?.length) ? (
+                      <span>No absences recorded in the most recent session.</span>
+                    ) : (
+                      sourceAbsences
+                        .slice()
+                        .sort((a, b) => a.session - b.session)
+                        .map(s => (
+                          <div key={s.session}>
+                            <span className="font-medium">Session {s.session}:</span>{' '}
+                            {s.absentParticipants?.length
+                              ? s.absentParticipants.map(p => p.name).join(', ')
+                              : 'no absences'}
+                          </div>
+                        ))
+                    )}
+                  </div>
                 </div>
                 {(error || fetchError) && (
                   <Alert variant="destructive">
