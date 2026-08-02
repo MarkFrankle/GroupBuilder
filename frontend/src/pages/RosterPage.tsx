@@ -19,6 +19,7 @@ import {
 } from '@/api/roster';
 import { useRoster, useSessionsList } from '@/hooks/queries';
 import { useProgram } from '@/contexts/ProgramContext';
+import { useQueryClient } from '@tanstack/react-query';
 import { authenticatedFetch } from '@/utils/apiClient';
 import { fetchWithRetry } from '@/utils/fetchWithRetry';
 import { API_BASE_URL } from '@/config/api';
@@ -50,6 +51,7 @@ interface SessionResult {
 export function RosterPage() {
   const navigate = useNavigate();
   const { currentProgram } = useProgram();
+  const queryClient = useQueryClient();
   const { data: rosterData, isLoading: loading, error: fetchError } = useRoster();
   const { data: sessionsData } = useSessionsList(currentProgram?.id ?? null);
   const hasExistingSessions = Array.isArray(sessionsData) && sessionsData.length > 0;
@@ -195,6 +197,7 @@ export function RosterPage() {
         `${API_BASE_URL}/api/assignments/?session_id=${sessionId}&max_time_seconds=120`
       );
       if (!response.ok) throw new Error('Assignment generation failed');
+      queryClient.invalidateQueries({ queryKey: ['sessions', currentProgram?.id] });
       navigate(`/table-assignments?session=${sessionId}`);
     } catch (err: any) {
       setError(err.message || 'Failed to generate assignments');
@@ -264,6 +267,7 @@ export function RosterPage() {
         }
       }
 
+      queryClient.invalidateQueries({ queryKey: ['sessions', currentProgram?.id] });
       navigate(`/table-assignments?session=${newSessionId}`);
     } catch (err: any) {
       setError(err.message || 'Failed to regenerate assignments');
