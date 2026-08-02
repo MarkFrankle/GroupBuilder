@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DEFAULT_SOLVER_TIMEOUT_SECONDS } from '@/constants'
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, LayoutGrid, List, Edit, Undo2, MoreVertical, RotateCw, Check, Link, AlertCircle, Printer } from 'lucide-react'
+import { Loader2, LayoutGrid, List, Edit, Undo2, MoreVertical, RotateCw, Check, Link, AlertCircle, Printer, X } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -239,6 +239,8 @@ const TableAssignmentsPage: React.FC = () => {
   const handleVersionChange = (versionId: string) => {
     setUndoStack([])
     setCurrentVersion(versionId)
+    setRegenerateSuccess(false)
+    setNewVersionId(null)
 
     // Update URL without reload
     const newUrl = versionId !== 'latest'
@@ -702,16 +704,27 @@ const TableAssignmentsPage: React.FC = () => {
 
           {regenerateSuccess && !regenerating && (
             <Alert className="mb-4 bg-green-50 border-green-200">
-              <div className="flex items-start justify-between">
+              <div className="flex items-start justify-between gap-2">
                 <div>
                   <AlertTitle>Regeneration Complete!</AlertTitle>
                   <AlertDescription>
                     New assignments saved as {newVersionId}
                   </AlertDescription>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleViewNewAssignments}>
-                  View New Assignments
-                </Button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button variant="outline" size="sm" onClick={handleViewNewAssignments}>
+                    View New Assignments
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={() => { setRegenerateSuccess(false); setNewVersionId(null); }}
+                    aria-label="Dismiss"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </Alert>
           )}
