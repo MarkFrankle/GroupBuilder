@@ -29,6 +29,14 @@ export function CreateProgramModal({ open, onClose, onSuccess }: CreateProgramMo
   const [success, setSuccess] = useState(false);
   const [inviteLinks, setInviteLinks] = useState<Array<{email: string, invite_link: string, email_sent: boolean, error?: string}>>([]);
   const [partialFailure, setPartialFailure] = useState(false);
+  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
+
+  const handleCopyLink = (email: string, link: string) => {
+    navigator.clipboard.writeText(link).then(() => {
+      setCopiedEmail(email);
+      setTimeout(() => setCopiedEmail(null), 2000);
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,9 +150,9 @@ export function CreateProgramModal({ open, onClose, onSuccess }: CreateProgramMo
                               variant="outline"
                               size="sm"
                               type="button"
-                              onClick={() => navigator.clipboard.writeText(invite.invite_link)}
+                              onClick={() => handleCopyLink(invite.email, invite.invite_link)}
                             >
-                              Copy link
+                              {copiedEmail === invite.email ? 'Copied!' : 'Copy link'}
                             </Button>
                           </div>
                         </div>

@@ -48,7 +48,7 @@ const PreviousGroupsPage: React.FC = () => {
         </p>
       ) : (
         <div className="space-y-3">
-          {sessions.map((session) => (
+          {sessions.map((session, index) => (
             <Card
               key={session.session_id}
               className="cursor-pointer hover:bg-accent/50 transition-colors"
@@ -58,13 +58,18 @@ const PreviousGroupsPage: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <FolderOpen className="h-5 w-5 text-muted-foreground shrink-0" />
                   <div>
-                    <div className="font-medium">
+                    <div className="font-medium flex items-center gap-2">
                       {session.created_at
                         ? new Date(session.created_at * 1000).toLocaleString(undefined, {
                             month: 'short', day: 'numeric', year: 'numeric',
                             hour: 'numeric', minute: '2-digit'
                           })
                         : 'Unknown date'}
+                      {index === 0 && (
+                        <span className="text-xs font-medium text-muted-foreground">
+                          Latest
+                        </span>
+                      )}
                     </div>
                     <div className="text-sm text-muted-foreground">
                       {session.num_participants} participants &middot; {session.num_tables} tables &middot; {session.num_sessions} session{session.num_sessions !== 1 ? 's' : ''}

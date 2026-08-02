@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DEFAULT_SOLVER_TIMEOUT_SECONDS } from '@/constants'
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, LayoutGrid, List, Edit, Undo2, MoreVertical, RotateCw, Check, Link, AlertCircle, Printer } from 'lucide-react'
+import { Loader2, LayoutGrid, List, Edit, Undo2, MoreVertical, RotateCw, Check, Link, AlertCircle, Printer, X } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -31,6 +31,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import { authenticatedFetch } from '@/utils/apiClient'
 import { useResultVersions, useAssignmentResults } from '@/hooks/queries'
 
@@ -84,6 +86,7 @@ const TableAssignmentsPage: React.FC = () => {
   const [selectedParticipantSlot, setSelectedParticipantSlot] = useState<{tableNum: number, participantIndex: number} | null>(null)
   const [clearSelectionKey, setClearSelectionKey] = useState(0)
   const [showRegenerateDialog, setShowRegenerateDialog] = useState<boolean>(false)
+  const [maintainAbsencesOnRegen, setMaintainAbsencesOnRegen] = useState<boolean>(true)
   const [regenerating, setRegenerating] = useState<boolean>(false)
   const [regenerateSuccess, setRegenerateSuccess] = useState<boolean>(false)
   const [newVersionId, setNewVersionId] = useState<string | null>(null)
@@ -236,6 +239,8 @@ const TableAssignmentsPage: React.FC = () => {
   const handleVersionChange = (versionId: string) => {
     setUndoStack([])
     setCurrentVersion(versionId)
+    setRegenerateSuccess(false)
+    setNewVersionId(null)
 
     // Update URL without reload
     const newUrl = versionId !== 'latest'
@@ -265,11 +270,21 @@ const TableAssignmentsPage: React.FC = () => {
         throw new Error('Session ID not found. Please upload a file again.')
       }
 
-      console.log('[Regenerate] Requesting regeneration with max_time_seconds:', DEFAULT_SOLVER_TIMEOUT_SECONDS)
-      const response = await authenticatedFetch(`/api/assignments/regenerate/${sessionId}?max_time_seconds=${DEFAULT_SOLVER_TIMEOUT_SECONDS}`, {
-        method: 'POST',
-        signal: controller.signal,
-      })
+      const perSessionAbsences = maintainAbsencesOnRegen
+        ? assignments
+            .filter(s => s.absentParticipants && s.absentParticipants.length > 0)
+            .map(s => ({ session_number: s.session, absent_participants: s.absentParticipants }))
+        : []
+
+      const response = await authenticatedFetch(
+        `/api/assignments/regenerate/${sessionId}/with_absences?max_time_seconds=${DEFAULT_SOLVER_TIMEOUT_SECONDS}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(perSessionAbsences),
+          signal: controller.signal,
+        }
+      )
 
       if (!response.ok) {
         const errorData = await response.json()
@@ -277,8 +292,10 @@ const TableAssignmentsPage: React.FC = () => {
       }
 
       const result = await response.json()
+      const finalVersionId: string = result.version_id
+
       // Save new version ID but don't auto-switch
-      setNewVersionId(result.version_id)
+      setNewVersionId(finalVersionId)
       setRegenerateSuccess(true)
 
       // Invalidate queries so versions list refreshes
@@ -675,16 +692,27 @@ const TableAssignmentsPage: React.FC = () => {
 
           {regenerateSuccess && !regenerating && (
             <Alert className="mb-4 bg-green-50 border-green-200">
-              <div className="flex items-start justify-between">
+              <div className="flex items-start justify-between gap-2">
                 <div>
                   <AlertTitle>Regeneration Complete!</AlertTitle>
                   <AlertDescription>
                     New assignments saved as {newVersionId}
                   </AlertDescription>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleViewNewAssignments}>
-                  View New Assignments
-                </Button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button variant="outline" size="sm" onClick={handleViewNewAssignments}>
+                    View New Assignments
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={() => { setRegenerateSuccess(false); setNewVersionId(null); }}
+                    aria-label="Dismiss"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </Alert>
           )}
@@ -740,7 +768,6 @@ const TableAssignmentsPage: React.FC = () => {
                 <Select
                   value={currentSession.toString()}
                   onValueChange={(value) => setCurrentSession(parseInt(value))}
-                  disabled={editMode}
                 >
                   <SelectTrigger className="w-[180px]" aria-label="Select session">
                     <SelectValue placeholder="Select session" />
@@ -829,7 +856,7 @@ const TableAssignmentsPage: React.FC = () => {
                 <Button
                   variant="outline"
                   onClick={handlePreviousSession}
-                  disabled={currentSession === 1 || editMode}
+                  disabled={currentSession === 1}
                   size="sm"
                 >
                   ← Prev
@@ -837,7 +864,7 @@ const TableAssignmentsPage: React.FC = () => {
                 <Button
                   variant="outline"
                   onClick={handleNextSession}
-                  disabled={currentSession === assignments.length || editMode}
+                  disabled={currentSession === assignments.length}
                   size="sm"
                 >
                   Next →
@@ -919,6 +946,33 @@ const TableAssignmentsPage: React.FC = () => {
             <p className="text-sm text-muted-foreground">
               Your current version will be saved and you can switch back anytime.
             </p>
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="maintain-absences-regen"
+                  checked={maintainAbsencesOnRegen}
+                  onCheckedChange={(checked: boolean | 'indeterminate') => setMaintainAbsencesOnRegen(checked === true)}
+                />
+                <Label htmlFor="maintain-absences-regen">Maintain saved absences</Label>
+              </div>
+              <div className="ml-6 text-xs text-muted-foreground space-y-0.5">
+                {assignments.every(s => !s.absentParticipants?.length) ? (
+                  <span>No absences recorded in this session.</span>
+                ) : (
+                  assignments
+                    .slice()
+                    .sort((a, b) => a.session - b.session)
+                    .map(s => (
+                      <div key={s.session}>
+                        <span className="font-medium">Session {s.session}:</span>{' '}
+                        {s.absentParticipants?.length
+                          ? s.absentParticipants.map(p => p.name).join(', ')
+                          : 'no absences'}
+                      </div>
+                    ))
+                )}
+              </div>
+            </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowRegenerateDialog(false)}>
                 Cancel

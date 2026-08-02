@@ -596,11 +596,14 @@ class GroupBuilder:
             )
 
     def _run_solver(self, max_time_seconds=120):
+        import random
+
         self.solver = cp_model.CpSolver()
 
         self.solver.parameters.max_time_in_seconds = float(max_time_seconds)
         self.solver.parameters.num_search_workers = self.solver_num_workers
         self.solver.parameters.log_search_progress = False
+        self.solver.parameters.random_seed = random.randint(0, 2**31 - 1)
 
         logger.info(
             f"Starting CP-SAT solver (max time: {max_time_seconds:.1f}s, {self.solver.parameters.num_search_workers} workers)"

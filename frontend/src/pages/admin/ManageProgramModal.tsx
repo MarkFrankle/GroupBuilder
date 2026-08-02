@@ -30,6 +30,15 @@ export function ManageProgramModal({ open, onClose, programId }: ManageProgramMo
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<{ userId: string; email: string } | null>(null);
   const [failedInviteLink, setFailedInviteLink] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const handleCopyFailedLink = () => {
+    if (!failedInviteLink) return;
+    navigator.clipboard.writeText(failedInviteLink).then(() => {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    });
+  };
 
   const { data: programDetails = null, isLoading: loading, error: fetchError } = useProgramDetails(programId, open);
 
@@ -253,11 +262,9 @@ export function ManageProgramModal({ open, onClose, programId }: ManageProgramMo
                       variant="outline"
                       size="sm"
                       type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(failedInviteLink);
-                      }}
+                      onClick={handleCopyFailedLink}
                     >
-                      Copy link
+                      {copiedLink ? 'Copied!' : 'Copy link'}
                     </Button>
                   </div>
                 </div>
