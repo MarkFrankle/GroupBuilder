@@ -326,6 +326,8 @@ class TestGetResultVersions:
         data = response.json()
         assert "versions" in data
         assert len(data["versions"]) == 2
+        # Newest first: every read path in the app depends on this ordering.
+        assert [v["version_id"] for v in data["versions"]] == ["v2", "v1"]
 
     def test_get_versions_not_found(self, client):
         """Test retrieving versions for a program with no assignment set."""
@@ -410,6 +412,121 @@ class TestAssignmentSetMetadata:
         response = client.get(f"/api/assignments/metadata?program_id={OTHER_PROGRAM}")
 
         assert response.status_code == 404
+
+
+class TestRegenerateAllWithAbsences:
+    """Test suite for POST /api/assignments/regenerate/with_absences."""
+
+    @staticmethod
+    def _single_session_result(status):
+        result = {"status": status}
+        if status == "success":
+            result.update(
+                {
+                    "solution_quality": "optimal",
+                    "solve_time": 1.0,
+                    "total_deviation": 0,
+                    "assignments": [
+                        {
+                            "session": 1,
+                            "tables": {
+                                "1": [{"name": "Charlie"}],
+                                "2": [{"name": "Diana"}],
+                            },
+                        }
+                    ],
+                }
+            )
+        return result
+
+    @staticmethod
+    def _latest_version(set_id):
+        from api.services.assignment_set_storage import AssignmentSetStorage
+
+        storage = AssignmentSetStorage()
+        versions = storage.list_versions(PROGRAM, set_id)
+        return storage.get_version(PROGRAM, set_id, versions[0]["version_id"])
+
+    @patch("api.routers.assignments.GroupBuilder")
+    @patch("api.routers.assignments.handle_generate_assignments")
+    def test_absences_recorded_and_stale_metrics_dropped(
+        self,
+        mock_generate,
+        mock_builder_class,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+    ):
+        """A re-solved session records its absences and voids the full-solve metrics."""
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        mock_generate.return_value = sample_assignments_result
+
+        mock_builder = MagicMock()
+        mock_builder_class.return_value = mock_builder
+        mock_builder.generate_assignments.return_value = self._single_session_result(
+            "success"
+        )
+
+        response = client.post(
+            f"/api/assignments/regenerate/with_absences?program_id={PROGRAM}",
+            json=[
+                {
+                    "session_number": 1,
+                    "absent_participants": [{"name": "Alice"}],
+                }
+            ],
+        )
+
+        assert response.status_code == 200
+
+        stored = self._latest_version(set_id)
+        assert stored["assignments"][0]["absentParticipants"] == [{"name": "Alice"}]
+
+        # The full-solve quality numbers describe assignments that no longer
+        # exist, so they must not be reported alongside the saved ones.
+        metadata = stored["metadata"]
+        assert metadata["solution_quality"] is None
+        assert metadata["solve_time"] is None
+        assert metadata["total_deviation"] is None
+        assert metadata["regenerated"] is True
+
+    @patch("api.routers.assignments.GroupBuilder")
+    @patch("api.routers.assignments.handle_generate_assignments")
+    def test_absences_survive_a_failed_resolve(
+        self,
+        mock_generate,
+        mock_builder_class,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+    ):
+        """When the per-session re-solve fails, the absence record is still kept."""
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        mock_generate.return_value = sample_assignments_result
+
+        mock_builder = MagicMock()
+        mock_builder_class.return_value = mock_builder
+        mock_builder.generate_assignments.return_value = self._single_session_result(
+            "infeasible"
+        )
+
+        response = client.post(
+            f"/api/assignments/regenerate/with_absences?program_id={PROGRAM}",
+            json=[
+                {
+                    "session_number": 1,
+                    "absent_participants": [{"name": "Alice"}],
+                }
+            ],
+        )
+
+        assert response.status_code == 200
+
+        # Tables keep the all-present layout, but the absence must not be lost.
+        stored = self._latest_version(set_id)
+        assert stored["assignments"][0]["absentParticipants"] == [{"name": "Alice"}]
 
 
 class TestRegenerateSingleSession:

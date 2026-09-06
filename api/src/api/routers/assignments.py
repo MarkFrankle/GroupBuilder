@@ -20,6 +20,10 @@ limiter = Limiter(key_func=get_remote_address)
 NO_ASSIGNMENT_SET = (
     "This program has no assignments yet. Generate them from Setup first."
 )
+ASSIGNMENT_SET_MISSING = (
+    "Something went wrong loading this program's assignments. "
+    "Please contact support."
+)
 
 
 def _require_current_set_id(storage: AssignmentSetStorage, program_id: str) -> str:
@@ -34,11 +38,16 @@ def _require_current_set_id(storage: AssignmentSetStorage, program_id: str) -> s
 def _require_current_set(
     storage: AssignmentSetStorage, program_id: str
 ) -> tuple[str, Dict[str, Any]]:
-    """Resolve the program's current assignment set id and document, or 404."""
+    """Resolve the program's current assignment set id and document.
+
+    Raises 404 when the program simply has no assignments yet, and 500 when it
+    points at an assignment set that no longer exists — that second case is
+    corrupt data, not a state the user can fix by generating.
+    """
     set_id = _require_current_set_id(storage, program_id)
-    assignment_set = storage.get_current_set(program_id)
+    assignment_set = storage.get_set(program_id, set_id)
     if assignment_set is None:
-        raise HTTPException(status_code=404, detail=NO_ASSIGNMENT_SET)
+        raise HTTPException(status_code=500, detail=ASSIGNMENT_SET_MISSING)
     return set_id, assignment_set
 
 
@@ -146,6 +155,7 @@ def _generate_assignments_internal(
     storage: AssignmentSetStorage,
     program_id: str,
     set_id: str,
+    assignment_set: Dict[str, Any],
     mark_regenerated: bool = False,
     max_time_seconds: int = 120,
 ):
@@ -156,16 +166,13 @@ def _generate_assignments_internal(
         storage: Assignment set storage
         program_id: The program the assignment set belongs to
         set_id: The assignment set to solve and version
+        assignment_set: That set's already-resolved document
         mark_regenerated: Whether to mark results as regenerated
         max_time_seconds: Maximum solver time in seconds (default: 120)
 
     Returns:
         Tuple of (assignments, version_id, metadata)
     """
-    assignment_set = storage.get_current_set(program_id)
-    if assignment_set is None:
-        raise HTTPException(status_code=404, detail=NO_ASSIGNMENT_SET)
-
     participants_dict = assignment_set["participant_data"]
     num_tables = assignment_set["num_tables"]
     num_sessions = assignment_set["num_sessions"]
@@ -238,13 +245,14 @@ def get_assignments(
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
 ):
     """Generate assignments for a program's current assignment set."""
-    set_id = _require_current_set_id(storage, program_id)
+    set_id, assignment_set = _require_current_set(storage, program_id)
 
     try:
         assignments, _, _ = _generate_assignments_internal(
             storage=storage,
             program_id=program_id,
             set_id=set_id,
+            assignment_set=assignment_set,
             mark_regenerated=False,
             max_time_seconds=max_time_seconds,
         )
@@ -270,13 +278,14 @@ async def regenerate_assignments(
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
 ):
     """Regenerate assignments from the current assignment set's roster snapshot."""
-    set_id = _require_current_set_id(storage, program_id)
+    set_id, assignment_set = _require_current_set(storage, program_id)
 
     try:
         assignments, version_id, _ = _generate_assignments_internal(
             storage=storage,
             program_id=program_id,
             set_id=set_id,
+            assignment_set=assignment_set,
             mark_regenerated=True,
             max_time_seconds=max_time_seconds,
         )
@@ -311,101 +320,110 @@ async def regenerate_all_with_absences(
     """
     set_id, assignment_set = _require_current_set(storage, program_id)
 
-    participants = assignment_set["participant_data"]
-    num_tables = assignment_set["num_tables"]
-    num_sessions = assignment_set["num_sessions"]
+    try:
+        participants = assignment_set["participant_data"]
+        num_tables = assignment_set["num_tables"]
+        num_sessions = assignment_set["num_sessions"]
 
-    absence_map: Dict[int, List[Dict[str, Any]]] = {}
-    for entry in per_session_absences:
-        sn = entry.get("session_number")
-        absent = entry.get("absent_participants", [])
-        if sn and absent:
-            absence_map[int(sn)] = absent
+        absence_map: Dict[int, List[Dict[str, Any]]] = {}
+        for entry in per_session_absences:
+            sn = entry.get("session_number")
+            absent = entry.get("absent_participants", [])
+            if sn and absent:
+                absence_map[int(sn)] = absent
 
-    # Full solve — all participants present
-    results = handle_generate_assignments(
-        participants, num_tables, num_sessions, max_time_seconds=max_time_seconds
-    )
-    if results["status"] != "success":
-        raise HTTPException(
-            status_code=400, detail=results.get("error", "Solver failed")
+        # Full solve — all participants present
+        results = handle_generate_assignments(
+            participants, num_tables, num_sessions, max_time_seconds=max_time_seconds
         )
-
-    assignments = results["assignments"]
-    absences_applied = False
-
-    # Re-solve sessions with absences, keeping other sessions' pairings as history
-    for session_number, absent in absence_map.items():
-        if session_number < 1 or session_number > num_sessions:
-            continue
-        active = _get_active_participants(participants, absent)
-        if len(active) < num_tables:
-            logger.warning(
-                f"Skipping absence regen for session {session_number}: "
-                f"only {len(active)} active participants for {num_tables} tables"
+        if results["status"] != "success":
+            raise HTTPException(
+                status_code=400, detail=results.get("error", "Solver failed")
             )
-            # Preserve the absence record so it survives future regenerations,
-            # even though the tables keep the full-solve (everyone-present) layout.
-            assignments[session_number - 1]["absentParticipants"] = absent
-            continue
-        historical = _extract_pairings_from_sessions(
-            assignments, exclude_session=session_number
-        )
-        builder = GroupBuilder(
-            participants=active,
-            num_tables=num_tables,
-            num_sessions=1,
-            historical_pairings=historical,
-            solver_num_workers=4,
-        )
-        single_result = builder.generate_assignments(
-            max_time_seconds=min(60, max_time_seconds)
-        )
-        if single_result["status"] == "success":
-            assignments[session_number - 1] = {
-                "session": session_number,
-                "tables": single_result["assignments"][0]["tables"],
-                "absentParticipants": absent,
-            }
-            absences_applied = True
+
+        assignments = results["assignments"]
+        absences_applied = False
+
+        # Re-solve sessions with absences, keeping other sessions' pairings as history
+        for session_number, absent in absence_map.items():
+            if session_number < 1 or session_number > num_sessions:
+                continue
+            active = _get_active_participants(participants, absent)
+            if len(active) < num_tables:
+                logger.warning(
+                    f"Skipping absence regen for session {session_number}: "
+                    f"only {len(active)} active participants for {num_tables} tables"
+                )
+                # Preserve the absence record so it survives future regenerations,
+                # even though the tables keep the full-solve (everyone-present) layout.
+                assignments[session_number - 1]["absentParticipants"] = absent
+                continue
+            historical = _extract_pairings_from_sessions(
+                assignments, exclude_session=session_number
+            )
+            builder = GroupBuilder(
+                participants=active,
+                num_tables=num_tables,
+                num_sessions=1,
+                historical_pairings=historical,
+                solver_num_workers=4,
+            )
+            single_result = builder.generate_assignments(
+                max_time_seconds=min(60, max_time_seconds)
+            )
+            if single_result["status"] == "success":
+                assignments[session_number - 1] = {
+                    "session": session_number,
+                    "tables": single_result["assignments"][0]["tables"],
+                    "absentParticipants": absent,
+                }
+                absences_applied = True
+            else:
+                logger.warning(
+                    f"Could not apply absences for session {session_number}, keeping full-solve result"
+                )
+                # Preserve the absence record even when the re-solve failed.
+                assignments[session_number - 1]["absentParticipants"] = absent
+
+        # Save exactly one new version
+        version_id = _next_version_id(storage, program_id, set_id)
+
+        # The full-solve quality metrics only describe the all-present solve. Once any
+        # session was re-solved with absences, those aggregate numbers no longer match
+        # the saved assignments, so drop them rather than report stale values.
+        metadata = {
+            "max_time_seconds": max_time_seconds,
+            "regenerated": True,
+        }
+        if absences_applied:
+            metadata["solution_quality"] = None
+            metadata["solve_time"] = None
+            metadata["total_deviation"] = None
         else:
-            logger.warning(
-                f"Could not apply absences for session {session_number}, keeping full-solve result"
-            )
-            # Preserve the absence record even when the re-solve failed.
-            assignments[session_number - 1]["absentParticipants"] = absent
+            metadata["solution_quality"] = results.get("solution_quality")
+            metadata["solve_time"] = results.get("solve_time")
+            metadata["total_deviation"] = results.get("total_deviation")
 
-    # Save exactly one new version
-    version_id = _next_version_id(storage, program_id, set_id)
+        storage.save_version(
+            program_id=program_id,
+            set_id=set_id,
+            version_id=version_id,
+            assignments=assignments,
+            metadata=metadata,
+        )
 
-    # The full-solve quality metrics only describe the all-present solve. Once any
-    # session was re-solved with absences, those aggregate numbers no longer match
-    # the saved assignments, so drop them rather than report stale values.
-    metadata = {
-        "max_time_seconds": max_time_seconds,
-        "regenerated": True,
-    }
-    if absences_applied:
-        metadata["solution_quality"] = None
-        metadata["solve_time"] = None
-        metadata["total_deviation"] = None
-    else:
-        metadata["solution_quality"] = results.get("solution_quality")
-        metadata["solve_time"] = results.get("solve_time")
-        metadata["total_deviation"] = results.get("total_deviation")
-
-    storage.save_version(
-        program_id=program_id,
-        set_id=set_id,
-        version_id=version_id,
-        assignments=assignments,
-        metadata=metadata,
-    )
-
-    logger.info(
-        f"Saved regen-with-absences result as {version_id} for program {program_id}"
-    )
-    return {"version_id": version_id, "assignments": assignments}
+        logger.info(
+            f"Saved regen-with-absences result as {version_id} for program {program_id}"
+        )
+        return {"version_id": version_id, "assignments": assignments}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to regenerate with absences: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while regenerating assignments. Please try again or contact support if the problem persists.",
+        )
 
 
 @router.post("/regenerate/session/{session_number}")
@@ -713,7 +731,10 @@ async def list_assignment_sets(
     program_id: str = Depends(validate_program_access),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
 ):
-    """List all assignment sets for a program, newest first."""
+    """List all assignment sets for a program, newest first.
+
+    Serves the Previous Groups page only; this route goes when that page does.
+    """
     logger.info(f"Listing assignment sets for program: {program_id}")
     return storage.list_sets(program_id)
 

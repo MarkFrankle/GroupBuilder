@@ -27,18 +27,9 @@ def validate_program_access(
     Raises:
         HTTPException: 403 if the user is not a member of the program
     """
-    denied = HTTPException(status_code=403, detail="Not a member of this program")
-
-    program = (
-        firestore_service.db.collection("organizations").document(program_id).get()
-    )
-    # An archived program authorizes nobody. Checking membership alone would
-    # quietly grant access to programs that have been deactivated.
-    if not program.exists or not (program.to_dict() or {}).get("active", True):
-        raise denied
-
-    member = program.reference.collection("members").document(user.user_id).get()
-    if not member.exists:
-        raise denied
+    if not firestore_service.is_active_member(user.user_id, program_id):
+        # One message for every denial: never leak whether the program exists,
+        # is archived, or simply has someone else as a member.
+        raise HTTPException(status_code=403, detail="Not a member of this program")
 
     return program_id

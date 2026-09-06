@@ -44,6 +44,26 @@ class FirestoreService:
         programs.sort(key=lambda p: p.get("created_at", ""), reverse=True)
         return programs
 
+    def is_active_member(self, user_id: str, program_id: str) -> bool:
+        """Check whether a user is a member of an active program.
+
+        Args:
+            user_id: Firebase user ID
+            program_id: Program ID
+
+        Returns:
+            True only if the program exists, is active, and has a membership
+            document for this user. An archived program grants nobody access.
+        """
+        program = self.db.collection("organizations").document(program_id).get()
+        if not program.exists:
+            return False
+        if not (program.to_dict() or {}).get("active", True):
+            return False
+
+        member = program.reference.collection("members").document(user_id).get()
+        return member.exists
+
 
 # Singleton instance for dependency injection
 _firestore_service: Optional[FirestoreService] = None

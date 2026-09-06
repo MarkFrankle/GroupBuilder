@@ -92,6 +92,11 @@ class AssignmentSetStorage:
             return None
         return doc.to_dict()
 
+    def get_set(self, program_id: str, set_id: str) -> Optional[Dict[str, Any]]:
+        """Return one assignment set document by id, or None."""
+        doc = self._set_ref(program_id, set_id).get()
+        return doc.to_dict() if doc.exists else None
+
     def save_version(
         self,
         program_id: str,
@@ -148,8 +153,8 @@ class AssignmentSetStorage:
     def list_sets(self, program_id: str) -> List[Dict[str, Any]]:
         """All assignment sets for a program, newest first.
 
-        Only surviving consumer is the Previous Groups page, which Item 1
-        deletes along with this method.
+        Only surviving consumer is the Previous Groups page; this method goes
+        when that page does.
         """
         sets_ref = self._program_ref(program_id).collection("assignment_sets")
 
