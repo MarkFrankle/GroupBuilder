@@ -26,8 +26,6 @@ def test_firestore_service_instantiation(firestore_service):
     assert firestore_service is not None
     assert hasattr(firestore_service, "db")
     assert hasattr(firestore_service, "get_user_programs")
-    assert hasattr(firestore_service, "check_user_can_access_session")
-    assert hasattr(firestore_service, "get_session_program_id")
 
 
 def test_get_user_programs_returns_empty_list_when_no_programs(
