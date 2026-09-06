@@ -18,6 +18,9 @@
 - **Reinstall `assignment_logic` after changing solver code.** Run `cd api && poetry run pip install -e ../assignment_logic`.
 - **Run `poetry run black src tests` before committing Python changes.**
 - **All buttons use `variant="outline"`.** This is the app's visual style — no filled/default buttons. Use `size="sm"` for toolbars, icon + label for actions.
+- **The solver never runs without an explicit user action.** No auto-resolve, no silent rebalance. The app may flag a problem; changing the plan is always something the user pressed.
+- **Never modify a completed session.** Completion freezes the past — every rebuild is scoped to incomplete sessions only.
+- **Print output (roster + seating) is settled.** Strong user feedback; don't redesign it.
 - **Mock `@/utils/apiClient` in frontend tests** — don't mock Firebase SDK internals. Example: `jest.mock('@/utils/apiClient', () => ({ authenticatedFetch: (...args) => fetch(...args) }))`
 
 ## Build & Dev Commands
@@ -65,6 +68,7 @@ Three independent packages (no monorepo tooling):
 
 | File | Read when... |
 |---|---|
+| `agent_docs/product-model.md` | changing user-facing behavior, UX decisions, who the user is, what's deliberately absent |
 | `agent_docs/deployment.md` | deploying, debugging prod, Cloud Run, Netlify, env vars |
 | `agent_docs/architecture.md` | adding routes, changing auth, data model, stack questions |
 
