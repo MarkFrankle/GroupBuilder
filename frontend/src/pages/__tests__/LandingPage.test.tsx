@@ -37,10 +37,10 @@ describe('Landing Page', () => {
     expect(link).toHaveAttribute('href', '/roster')
   })
 
-  test('renders Groups card linking to /groups', () => {
+  test('renders Assignments card linking to /table-assignments', () => {
     renderWithRouter(<LandingPage />)
-    const link = screen.getByRole('link', { name: /Groups/i })
-    expect(link).toHaveAttribute('href', '/groups')
+    const link = screen.getByRole('link', { name: /Assignments/i })
+    expect(link).toHaveAttribute('href', '/table-assignments')
   })
 
   test('renders Help card linking to /help', () => {
