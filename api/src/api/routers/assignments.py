@@ -10,6 +10,7 @@ from api.services.session_completion_storage import (
     SessionCompletionStorage,
     get_session_completion_storage,
 )
+from api.services.session_completion_guards import refuse_if_any_session_complete
 from api.utils.seating_arrangement import arrange_circular_seating
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -67,35 +68,6 @@ def session_complete_refusal(session_number: int) -> str:
         f"Session {session_number} is marked complete and cannot be changed. "
         "Reopen it first if you need to make changes."
     )
-
-
-def program_rebuild_refusal(session_numbers: List[int]) -> str:
-    """Message refusing a whole-program rebuild because Sessions are complete.
-
-    Requires a non-empty list of session numbers. Reads as a sentence for one
-    Session and for several, and always ends with the two ways out.
-    """
-    numbers = [str(n) for n in session_numbers]
-    if len(numbers) == 1:
-        listed = f"Session {numbers[0]} is"
-        remedy = "reopen the completed session first"
-    else:
-        joined = " and ".join([", ".join(numbers[:-1]), numbers[-1]])
-        listed = f"Sessions {joined} are"
-        remedy = "reopen the completed sessions first"
-    return (
-        f"{listed} already complete, so the whole program cannot be rebuilt. "
-        f"Shuffle a single session instead, or {remedy}."
-    )
-
-
-def _refuse_if_any_session_complete(
-    completion: SessionCompletionStorage, program_id: str
-) -> None:
-    """Full-program rebuilds cannot run once any Session is frozen."""
-    completed = completion.get_completed_sessions(program_id)
-    if completed:
-        raise HTTPException(status_code=409, detail=program_rebuild_refusal(completed))
 
 
 def _validate_session_number(
@@ -403,7 +375,7 @@ async def regenerate_assignments(
     completion: SessionCompletionStorage = Depends(get_session_completion_storage),
 ):
     """Regenerate assignments from the current assignment set's roster snapshot."""
-    _refuse_if_any_session_complete(completion, program_id)
+    refuse_if_any_session_complete(completion, program_id)
 
     set_id, assignment_set = _require_current_set(storage, program_id)
 
@@ -446,7 +418,7 @@ async def regenerate_all_with_absences(
     per_session_absences: [{"session_number": 1, "absent_participants": [...]}, ...]
     Sessions not listed are solved with all participants present.
     """
-    _refuse_if_any_session_complete(completion, program_id)
+    refuse_if_any_session_complete(completion, program_id)
 
     set_id, assignment_set = _require_current_set(storage, program_id)
 
@@ -922,12 +894,14 @@ async def mark_session_complete(
 async def reopen_session(
     session_number: int = Path(..., description="Session number (1-based)", ge=1),
     program_id: str = Depends(validate_program_access),
-    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
     completion: SessionCompletionStorage = Depends(get_session_completion_storage),
 ):
     """Reopen a completed Session. A no-op if it was not complete."""
-    _validate_session_number(storage, program_id, session_number)
-
+    # Deliberately NOT range-checked, unlike the POST. Reopening only ever
+    # removes a constraint, and the number worth reopening most is one the
+    # current set no longer contains — a smaller set became current while a
+    # higher session was still frozen. Range-checking here strands the program
+    # with completion state it can neither honour nor clear.
     completed = completion.mark_incomplete(program_id, session_number)
     logger.info(f"Reopened session {session_number} for program {program_id}")
 

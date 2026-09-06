@@ -13,6 +13,11 @@ from api.services.assignment_set_storage import (
     AssignmentSetStorage,
     get_assignment_set_storage,
 )
+from api.services.session_completion_storage import (
+    SessionCompletionStorage,
+    get_session_completion_storage,
+)
+from api.services.session_completion_guards import refuse_if_any_session_complete
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -98,7 +103,12 @@ async def generate_from_roster(
     program_id: str = Depends(validate_program_access),
     roster_service: RosterService = Depends(get_roster_service),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+    completion: SessionCompletionStorage = Depends(get_session_completion_storage),
 ):
+    # Generating from the roster mints a new set and repoints the program at it,
+    # which is a whole-program rebuild. It must refuse before any work or write.
+    refuse_if_any_session_complete(completion, program_id)
+
     participants = roster_service.get_roster(program_id)
     if not participants:
         raise HTTPException(status_code=400, detail="Roster is empty")

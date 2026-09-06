@@ -93,16 +93,47 @@ class TestSessionCompletionStorage:
         assert storage.is_complete(PROGRAM, 2) is True
         assert storage.is_complete(PROGRAM, 1) is False
 
-    def test_completion_survives_a_new_assignment_set(
+    def test_completed_session_numbers_persist_across_a_new_set(
         self, storage, sample_set_data, add_assignment_set_to_firestore
     ):
-        """The decision this item turns on: minting a new set must not clear the past."""
+        """The decision this item turns on: minting a new set must not clear the past.
+
+        Named for what it asserts — the *numbers* survive. The seating those
+        numbers froze does not; see the test below.
+        """
         add_assignment_set_to_firestore(sample_set_data)
         storage.mark_complete(PROGRAM, 1)
 
         add_assignment_set_to_firestore(sample_set_data)
 
         assert storage.get_completed_sessions(PROGRAM) == [1]
+
+    def test_a_new_set_does_not_carry_the_frozen_seating(
+        self,
+        storage,
+        sample_set_data,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+    ):
+        """Why the API refuses rebuilds instead of relying on this layer.
+
+        Only the current set is ever served, and a new set starts with no
+        versions, so the seating a completed Session froze becomes unreachable.
+        Storage cannot fix that; the routers refuse the rebuild instead
+        (see TestGenerateRefusesCompletedSessions in test_roster.py).
+        """
+        old_set_id = add_assignment_set_to_firestore(sample_set_data)
+        add_version_to_firestore(old_set_id, "v1", [{"session": 1, "tables": {}}])
+        storage.mark_complete(PROGRAM, 1)
+
+        new_set_id = add_assignment_set_to_firestore(sample_set_data)
+
+        from api.services.assignment_set_storage import AssignmentSetStorage
+
+        set_storage = AssignmentSetStorage()
+        assert set_storage.get_current_set_id(PROGRAM) == new_set_id
+        assert set_storage.list_versions(PROGRAM, new_set_id) == []
+        assert set_storage.list_versions(PROGRAM, old_set_id) != []
 
     def test_marking_complete_does_not_clobber_the_program_document(
         self, storage, sample_set_data, add_assignment_set_to_firestore

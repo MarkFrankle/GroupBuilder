@@ -1251,3 +1251,78 @@ class TestSessionCompletion:
 
         assert response.status_code == 500
         assert "contact support" in response.json()["detail"].lower()
+
+    def test_reopen_accepts_a_session_beyond_the_current_set(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """Un-bricking: reopening is never range-checked.
+
+        A set with fewer sessions can become current while a higher session
+        number is still marked complete. Reopening only removes a constraint,
+        so it must work for numbers the current set does not contain.
+        """
+        add_assignment_set_to_firestore({**sample_set_data, "num_sessions": 6})
+        client.post(f"/api/assignments/completion/6?program_id={PROGRAM}")
+        add_assignment_set_to_firestore({**sample_set_data, "num_sessions": 2})
+
+        response = client.delete(f"/api/assignments/completion/6?program_id={PROGRAM}")
+
+        assert response.status_code == 200
+        assert response.json() == {"completed_sessions": []}
+        readback = client.get(f"/api/assignments/completion?program_id={PROGRAM}")
+        assert readback.json() == {"completed_sessions": []}
+
+    def test_marking_complete_is_still_range_checked(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """The asymmetry is deliberate — only the DELETE skips the check."""
+        add_assignment_set_to_firestore({**sample_set_data, "num_sessions": 2})
+
+        response = client.post(f"/api/assignments/completion/6?program_id={PROGRAM}")
+
+        assert response.status_code == 400
+
+    def test_a_completed_program_cannot_be_bricked(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """Regression for the whole finding: complete, rebuild, recover.
+
+        Before the guard, a roster regeneration with fewer sessions left the
+        program with completion state it could neither honour nor clear.
+        """
+        add_assignment_set_to_firestore({**sample_set_data, "num_sessions": 6})
+        client.post(f"/api/assignments/completion/6?program_id={PROGRAM}")
+
+        for i in range(4):
+            client.put(
+                f"/api/roster/p{i}?program_id={PROGRAM}",
+                json={
+                    "name": f"Person{i}",
+                    "religion": ["Christian", "Jewish", "Muslim"][i % 3],
+                    "gender": ["Male", "Female"][i % 2],
+                    "partner_id": None,
+                },
+            )
+
+        # 1. The rebuild that used to strand the program is refused outright.
+        rebuild = client.post(
+            f"/api/roster/generate?program_id={PROGRAM}",
+            json={"num_tables": 1, "num_sessions": 3},
+        )
+        assert rebuild.status_code == 409
+
+        # 2. And if a program is already stranded, reopening frees it.
+        add_assignment_set_to_firestore({**sample_set_data, "num_sessions": 2})
+        assert (
+            client.delete(
+                f"/api/assignments/completion/6?program_id={PROGRAM}"
+            ).status_code
+            == 200
+        )
+
+        # 3. With nothing frozen, rebuilding works again.
+        recovered = client.post(
+            f"/api/roster/generate?program_id={PROGRAM}",
+            json={"num_tables": 1, "num_sessions": 3},
+        )
+        assert recovered.status_code == 200
