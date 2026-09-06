@@ -1,15 +1,10 @@
 """Tests for shared FastAPI dependencies.
 
 ``validate_program_access`` is the app's program-level authorization gate. The
-roster/assignments test clients override it wholesale via
-``app.dependency_overrides``, so it is never actually executed there. These
-tests call it directly as a plain coroutine to exercise the real branches.
-
-The project has no async test plugin configured, so we drive the coroutine with
-``asyncio.run`` rather than adding a test dependency.
+route test clients override it wholesale via ``app.dependency_overrides``, so it
+is never actually executed there. These tests call it directly, bypassing
+FastAPI's dependency injection, to exercise the real allow and deny branches.
 """
-import asyncio
-
 import pytest
 from fastapi import HTTPException
 
@@ -30,12 +25,10 @@ class _StubFirestoreService:
 def _call(program_id, programs):
     """Invoke the dependency directly, bypassing FastAPI injection."""
     user = AuthUser(user_id="test_user", email="test@example.com", email_verified=True)
-    return asyncio.run(
-        validate_program_access(
-            program_id=program_id,
-            user=user,
-            firestore_service=_StubFirestoreService(programs),
-        )
+    return validate_program_access(
+        program_id=program_id,
+        user=user,
+        firestore_service=_StubFirestoreService(programs),
     )
 
 
