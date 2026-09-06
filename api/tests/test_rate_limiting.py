@@ -114,7 +114,7 @@ class TestAssignmentsRateLimiting:
 
         # Make 3 requests (under the 5/minute limit)
         for i in range(3):
-            response = client.get(f"/api/assignments/?session_id={session_id}")
+            response = client.get("/api/assignments/?program_id=test_org_id")
             assert response.status_code == 200, f"Request {i+1} should succeed"
 
     @pytest.mark.skip(reason="Rate limiting disabled in test environment")
@@ -144,7 +144,7 @@ class TestAssignmentsRateLimiting:
         rate_limited = False
 
         for i in range(6):
-            response = client.get(f"/api/assignments/?session_id={session_id}")
+            response = client.get("/api/assignments/?program_id=test_org_id")
 
             if response.status_code == 200:
                 success_count += 1
@@ -184,7 +184,7 @@ class TestRegenerateRateLimiting:
 
         # Make 3 requests (under the 5/minute limit)
         for i in range(3):
-            response = client.post(f"/api/assignments/regenerate/{session_id}")
+            response = client.post("/api/assignments/regenerate?program_id=test_org_id")
             assert response.status_code == 200, f"Request {i+1} should succeed"
 
     @pytest.mark.skip(reason="Rate limiting disabled in test environment")
@@ -214,7 +214,7 @@ class TestRegenerateRateLimiting:
         rate_limited = False
 
         for i in range(6):
-            response = client.post(f"/api/assignments/regenerate/{session_id}")
+            response = client.post("/api/assignments/regenerate?program_id=test_org_id")
 
             if response.status_code == 200:
                 success_count += 1

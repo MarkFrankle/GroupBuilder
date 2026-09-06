@@ -1,8 +1,4 @@
 from api.utils.seating_arrangement import arrange_circular_seating
-from fastapi.testclient import TestClient
-from api.main import app
-
-client = TestClient(app)
 
 
 def test_distributes_religions_evenly():
@@ -69,8 +65,8 @@ def test_handles_empty_table():
     assert arranged == []
 
 
-def test_seating_endpoint_returns_positioned_seats():
-    """POST /api/assignments/seating/{session_id} returns circular arrangements"""
+def test_seating_endpoint_returns_positioned_seats(client):
+    """POST /api/assignments/seating/{session_number} returns circular arrangements"""
     request_body = {
         "assignments": [
             {
@@ -124,7 +120,7 @@ def test_seating_endpoint_returns_positioned_seats():
     }
 
     response = client.post(
-        "/api/assignments/seating/test-session-123?session=1", json=request_body
+        "/api/assignments/seating/1?program_id=test_org_id", json=request_body
     )
 
     assert response.status_code == 200
@@ -151,14 +147,14 @@ def test_seating_endpoint_returns_positioned_seats():
     assert data["absent_participants"][0]["name"] == "Frank"
 
 
-def test_seating_endpoint_handles_missing_session():
+def test_seating_endpoint_handles_missing_session(client):
     """Should return 404 if session not found"""
     request_body = {
         "assignments": [{"session": 1, "tables": {"1": []}, "absentParticipants": []}]
     }
 
     response = client.post(
-        "/api/assignments/seating/test-session-123?session=99", json=request_body
+        "/api/assignments/seating/99?program_id=test_org_id", json=request_body
     )
 
     assert response.status_code == 404

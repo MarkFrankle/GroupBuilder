@@ -3,22 +3,23 @@ Tests for the /api/assignments/ endpoints.
 
 Tests cover:
 - GET /api/assignments/ (generate assignments)
-- POST /api/assignments/regenerate/{session_id}
-- GET /api/assignments/results/{session_id}
-- GET /api/assignments/results/{session_id}/versions
-- GET /api/assignments/sessions/{session_id}/metadata
-- POST /api/assignments/sessions/{session_id}/clone
+- POST /api/assignments/regenerate
+- GET /api/assignments/results
+- GET /api/assignments/results/versions
+- GET /api/assignments/metadata
+
+Every route is program-scoped: the program's current assignment set is the one
+served, so requests carry ``program_id`` and never a lineage UUID.
 """
 
 import pytest
 from unittest.mock import patch, MagicMock
-import uuid
 from datetime import datetime
 
 
 @pytest.fixture
-def sample_session_data():
-    """Sample session data for testing."""
+def sample_set_data():
+    """Sample assignment set data for testing."""
     return {
         "participant_dict": [
             {
@@ -138,6 +139,10 @@ def sample_assignments_result():
     }
 
 
+PROGRAM = "test_org_id"
+OTHER_PROGRAM = "other_org_id"
+
+
 class TestGetAssignments:
     """Test suite for GET /api/assignments/ endpoint."""
 
@@ -146,17 +151,15 @@ class TestGetAssignments:
         self,
         mock_generate,
         client,
-        mock_storage,
-        sample_session_data,
+        sample_set_data,
         sample_assignments_result,
-        add_session_to_firestore,
+        add_assignment_set_to_firestore,
     ):
         """Test successful assignment generation."""
-        session_id = str(uuid.uuid4())
-        add_session_to_firestore(session_id, sample_session_data)
+        add_assignment_set_to_firestore(sample_set_data)
         mock_generate.return_value = sample_assignments_result
 
-        response = client.get(f"/api/assignments/?session_id={session_id}")
+        response = client.get(f"/api/assignments/?program_id={PROGRAM}")
 
         assert response.status_code == 200
         data = response.json()
@@ -164,117 +167,83 @@ class TestGetAssignments:
         assert data[0]["session"] == 1
         assert len(data[0]["tables"]) == 2
 
-        # Verify result was stored
-        # assert f"result:{session_id}:latest" in mock_storage.data
-
-    def test_generate_assignments_session_not_found(self, client, mock_storage):
-        """Test that nonexistent session returns 404."""
-        fake_session_id = str(uuid.uuid4())
-
-        response = client.get(f"/api/assignments/?session_id={fake_session_id}")
+    def test_generate_assignments_no_assignment_set(self, client):
+        """A program with no assignment set returns 404."""
+        response = client.get(f"/api/assignments/?program_id={OTHER_PROGRAM}")
 
         assert response.status_code == 404
-        assert "Session not found" in response.json()["detail"]
-
-    def test_generate_assignments_invalid_session_id(self, client, mock_storage):
-        """Test that invalid session ID format returns 422."""
-        invalid_ids = [
-            "not-a-uuid",
-            "12345",
-            "../../etc/passwd",
-            "x" * 100,
-        ]
-
-        for invalid_id in invalid_ids:
-            response = client.get(f"/api/assignments/?session_id={invalid_id}")
-            assert (
-                response.status_code == 422
-            ), f"Invalid ID '{invalid_id}' should return 422"
+        assert "no assignments yet" in response.json()["detail"]
 
     @patch("api.routers.assignments.handle_generate_assignments")
     def test_generate_assignments_solver_failure(
         self,
         mock_generate,
         client,
-        mock_storage,
-        sample_session_data,
-        add_session_to_firestore,
+        sample_set_data,
+        add_assignment_set_to_firestore,
     ):
         """Test handling of solver failures."""
-        session_id = str(uuid.uuid4())
-        add_session_to_firestore(session_id, sample_session_data)
+        add_assignment_set_to_firestore(sample_set_data)
         mock_generate.return_value = {
             "status": "failure",
             "error": "No feasible solution found",
         }
 
-        response = client.get(f"/api/assignments/?session_id={session_id}")
+        response = client.get(f"/api/assignments/?program_id={PROGRAM}")
 
         assert response.status_code == 400
         assert "No feasible solution" in response.json()["detail"]
 
 
 class TestRegenerateAssignments:
-    """Test suite for POST /api/assignments/regenerate/{session_id} endpoint."""
+    """Test suite for POST /api/assignments/regenerate endpoint."""
 
     @patch("api.routers.assignments.handle_generate_assignments")
     def test_regenerate_success(
         self,
         mock_generate,
         client,
-        mock_storage,
-        sample_session_data,
+        sample_set_data,
         sample_assignments_result,
-        add_session_to_firestore,
+        add_assignment_set_to_firestore,
     ):
         """Test successful regeneration."""
-        session_id = str(uuid.uuid4())
-        add_session_to_firestore(session_id, sample_session_data)
+        add_assignment_set_to_firestore(sample_set_data)
         mock_generate.return_value = sample_assignments_result
 
-        response = client.post(f"/api/assignments/regenerate/{session_id}")
+        response = client.post(f"/api/assignments/regenerate?program_id={PROGRAM}")
 
         assert response.status_code == 200
         data = response.json()
         assert "assignments" in data
         assert "version_id" in data
 
-    def test_regenerate_session_not_found(self, client, mock_storage):
-        """Test regeneration of expired session."""
-        fake_session_id = str(uuid.uuid4())
-
-        response = client.post(f"/api/assignments/regenerate/{fake_session_id}")
+    def test_regenerate_no_assignment_set(self, client):
+        """Regenerating a program with no assignment set returns 404."""
+        response = client.post(
+            f"/api/assignments/regenerate?program_id={OTHER_PROGRAM}"
+        )
 
         assert response.status_code == 404
-        assert "Session not found" in response.json()["detail"]
-
-    def test_regenerate_invalid_session_id(self, client):
-        """Test regeneration with invalid session ID."""
-        response = client.post("/api/assignments/regenerate/not-a-uuid")
-
-        assert response.status_code == 422
+        assert "no assignments yet" in response.json()["detail"]
 
 
 class TestGetCachedResults:
-    """Test suite for GET /api/assignments/results/{session_id} endpoint."""
+    """Test suite for GET /api/assignments/results endpoint."""
 
     def test_get_results_success(
         self,
         client,
-        mock_storage,
         sample_assignments_result,
-        add_results_to_firestore,
-        add_session_to_firestore,
-        sample_session_data,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+        sample_set_data,
     ):
         """Test retrieving cached results."""
-        session_id = str(uuid.uuid4())
-        add_session_to_firestore(session_id, sample_session_data)
-        add_results_to_firestore(
-            session_id, "v1", sample_assignments_result["assignments"]
-        )
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        add_version_to_firestore(set_id, "v1", sample_assignments_result["assignments"])
 
-        response = client.get(f"/api/assignments/results/{session_id}")
+        response = client.get(f"/api/assignments/results?program_id={PROGRAM}")
 
         assert response.status_code == 200
         data = response.json()
@@ -283,236 +252,184 @@ class TestGetCachedResults:
     def test_get_results_specific_version(
         self,
         client,
-        mock_storage,
         sample_assignments_result,
-        add_results_to_firestore,
-        add_session_to_firestore,
-        sample_session_data,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+        sample_set_data,
     ):
         """Test retrieving specific version."""
-        session_id = str(uuid.uuid4())
-        add_session_to_firestore(session_id, sample_session_data)
-        add_results_to_firestore(
-            session_id, "v2", sample_assignments_result["assignments"]
-        )
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        add_version_to_firestore(set_id, "v2", sample_assignments_result["assignments"])
 
-        response = client.get(f"/api/assignments/results/{session_id}?version=v2")
+        response = client.get(
+            f"/api/assignments/results?program_id={PROGRAM}&version=v2"
+        )
 
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 2
 
-    def test_get_results_not_found(self, client, mock_storage):
-        """Test retrieving nonexistent results."""
-        fake_session_id = str(uuid.uuid4())
+    def test_get_results_not_found(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """An assignment set with no versions yet returns 404."""
+        add_assignment_set_to_firestore(sample_set_data)
 
-        response = client.get(f"/api/assignments/results/{fake_session_id}")
+        response = client.get(f"/api/assignments/results?program_id={PROGRAM}")
 
         assert response.status_code == 404
         assert "Results not found" in response.json()["detail"]
 
-    def test_get_results_version_not_found(self, client, mock_storage):
+    def test_get_results_version_not_found(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
         """Test retrieving nonexistent version."""
-        session_id = str(uuid.uuid4())
-        mock_storage.data[f"result:{session_id}:latest"] = "v1"
-        # Don't store v1, so get should fail
+        add_assignment_set_to_firestore(sample_set_data)
 
-        response = client.get(f"/api/assignments/results/{session_id}?version=v99")
+        response = client.get(
+            f"/api/assignments/results?program_id={PROGRAM}&version=v99"
+        )
 
         assert response.status_code == 404
+        assert "Version v99 not found" in response.json()["detail"]
 
 
 class TestGetResultVersions:
-    """Test suite for GET /api/assignments/results/{session_id}/versions endpoint."""
+    """Test suite for GET /api/assignments/results/versions endpoint."""
 
     def test_get_versions_success(
         self,
         client,
-        mock_storage,
-        add_session_to_firestore,
-        add_results_to_firestore,
-        sample_session_data,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+        sample_set_data,
         sample_assignments_result,
     ):
         """Test retrieving version list."""
-        session_id = str(uuid.uuid4())
-        add_session_to_firestore(session_id, sample_session_data)
-        add_results_to_firestore(
-            session_id,
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        add_version_to_firestore(
+            set_id,
             "v1",
             sample_assignments_result["assignments"],
             {"solve_time": 1.5},
         )
-        add_results_to_firestore(
-            session_id,
+        add_version_to_firestore(
+            set_id,
             "v2",
             sample_assignments_result["assignments"],
             {"solve_time": 2.0},
         )
 
-        response = client.get(f"/api/assignments/results/{session_id}/versions")
+        response = client.get(f"/api/assignments/results/versions?program_id={PROGRAM}")
 
         assert response.status_code == 200
         data = response.json()
         assert "versions" in data
         assert len(data["versions"]) == 2
 
-    def test_get_versions_not_found(self, client, mock_storage):
-        """Test retrieving versions for nonexistent session."""
-        fake_session_id = str(uuid.uuid4())
-
-        response = client.get(f"/api/assignments/results/{fake_session_id}/versions")
+    def test_get_versions_not_found(self, client):
+        """Test retrieving versions for a program with no assignment set."""
+        response = client.get(
+            f"/api/assignments/results/versions?program_id={OTHER_PROGRAM}"
+        )
 
         assert response.status_code == 404
 
 
-class TestGetSessionMetadata:
-    """Test suite for GET /api/assignments/sessions/{session_id}/metadata endpoint."""
+class TestSaveEditedAssignments:
+    """Test suite for POST /api/assignments/results/save endpoint."""
 
-    def test_get_metadata_success(
-        self, client, mock_storage, sample_session_data, add_session_to_firestore
+    def test_save_success(
+        self,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
     ):
-        """Test retrieving session metadata."""
-        session_id = str(uuid.uuid4())
-        add_session_to_firestore(session_id, sample_session_data)
+        """Manual edits are stored as a new version."""
+        add_assignment_set_to_firestore(sample_set_data)
 
-        response = client.get(f"/api/assignments/sessions/{session_id}/metadata")
+        response = client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json={"assignments": sample_assignments_result["assignments"]},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["version_id"] == "v1"
+
+    def test_save_requires_assignments(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """An empty payload is rejected."""
+        add_assignment_set_to_firestore(sample_set_data)
+
+        response = client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}", json={}
+        )
+
+        assert response.status_code == 400
+
+
+class TestListAssignmentSets:
+    """Test suite for GET /api/assignments/assignment_sets endpoint."""
+
+    def test_list_sets(self, client, sample_set_data, add_assignment_set_to_firestore):
+        """All assignment sets for the program are listed."""
+        add_assignment_set_to_firestore(sample_set_data)
+
+        response = client.get(f"/api/assignments/assignment_sets?program_id={PROGRAM}")
 
         assert response.status_code == 200
         data = response.json()
-        assert data["session_id"] == session_id
+        assert len(data) == 1
+        assert data[0]["num_participants"] == 4
+
+
+class TestAssignmentSetMetadata:
+    """Test suite for GET /api/assignments/metadata endpoint."""
+
+    def test_get_metadata_success(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """Test retrieving assignment set metadata."""
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+
+        response = client.get(f"/api/assignments/metadata?program_id={PROGRAM}")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["assignment_set_id"] == set_id
         assert data["filename"] == "test.xlsx"
         assert data["num_participants"] == 4
         assert data["num_tables"] == 2
         assert data["num_sessions"] == 2
-        assert "has_results" in data
+        assert data["has_results"] is False
 
-    def test_get_metadata_not_found(self, client, mock_storage):
-        """Test retrieving metadata for nonexistent session."""
-        fake_session_id = str(uuid.uuid4())
-
-        response = client.get(f"/api/assignments/sessions/{fake_session_id}/metadata")
+    def test_get_metadata_not_found(self, client):
+        """Test retrieving metadata for a program with no assignment set."""
+        response = client.get(f"/api/assignments/metadata?program_id={OTHER_PROGRAM}")
 
         assert response.status_code == 404
-
-
-class TestCloneSession:
-    """Test suite for POST /api/assignments/sessions/{session_id}/clone endpoint."""
-
-    def test_clone_session_success(
-        self, client, mock_storage, sample_session_data, add_session_to_firestore
-    ):
-        """Test successful session cloning."""
-        original_session_id = str(uuid.uuid4())
-        add_session_to_firestore(original_session_id, sample_session_data)
-
-        response = client.post(
-            f"/api/assignments/sessions/{original_session_id}/clone?num_tables=3&num_sessions=4"
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "session_id" in data
-        assert data["session_id"] != original_session_id
-
-        # Verify new session was created in Firestore
-        from api.services.session_storage import SessionStorage
-
-        storage = SessionStorage()
-        new_session_id = data["session_id"]
-        new_session = storage.get_session(new_session_id)
-        assert new_session["num_tables"] == 3
-        assert new_session["num_sessions"] == 4
-        assert (
-            new_session["participant_data"] == sample_session_data["participant_dict"]
-        )
-
-    def test_clone_session_not_found(self, client, mock_storage):
-        """Test cloning nonexistent session."""
-        fake_session_id = str(uuid.uuid4())
-
-        response = client.post(
-            f"/api/assignments/sessions/{fake_session_id}/clone?num_tables=3&num_sessions=4"
-        )
-
-        assert response.status_code == 404
-
-    def test_clone_invalid_num_tables(
-        self, client, mock_storage, sample_session_data, add_session_to_firestore
-    ):
-        """Test cloning with invalid num_tables."""
-        session_id = str(uuid.uuid4())
-        add_session_to_firestore(session_id, sample_session_data)
-
-        # Too low
-        response = client.post(
-            f"/api/assignments/sessions/{session_id}/clone?num_tables=0&num_sessions=3"
-        )
-        assert response.status_code == 422
-
-        # Too high
-        response = client.post(
-            f"/api/assignments/sessions/{session_id}/clone?num_tables=11&num_sessions=3"
-        )
-        assert response.status_code == 422
-
-    def test_clone_invalid_num_sessions(
-        self, client, mock_storage, sample_session_data, add_session_to_firestore
-    ):
-        """Test cloning with invalid num_sessions."""
-        session_id = str(uuid.uuid4())
-        add_session_to_firestore(session_id, sample_session_data)
-
-        # Too low
-        response = client.post(
-            f"/api/assignments/sessions/{session_id}/clone?num_tables=2&num_sessions=0"
-        )
-        assert response.status_code == 422
-
-        # Too high
-        response = client.post(
-            f"/api/assignments/sessions/{session_id}/clone?num_tables=2&num_sessions=7"
-        )
-        assert response.status_code == 422
-
-    def test_clone_not_enough_participants(
-        self, client, mock_storage, sample_session_data, add_session_to_firestore
-    ):
-        """Test cloning with more tables than participants."""
-        session_id = str(uuid.uuid4())
-        add_session_to_firestore(session_id, sample_session_data)
-
-        response = client.post(
-            f"/api/assignments/sessions/{session_id}/clone?num_tables=5&num_sessions=2"
-        )
-
-        assert response.status_code == 400
-        assert "Not enough participants" in response.json()["detail"]
 
 
 class TestRegenerateSingleSession:
-    """Test suite for POST /api/assignments/regenerate/{session_id}/session/{session_number} endpoint."""
+    """Test suite for POST /api/assignments/regenerate/session/{session_number}."""
 
     @patch("api.routers.assignments.GroupBuilder")
     def test_regenerate_single_session_success(
         self,
         mock_builder_class,
         client,
-        mock_storage,
-        sample_session_data,
+        sample_set_data,
         sample_assignments_result,
-        add_session_to_firestore,
-        add_results_to_firestore,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
     ):
         """Test successful single-session regeneration."""
-        session_id = str(uuid.uuid4())
-        version_id = "v_test123"
-
-        # Setup: store session and existing results with proper versioning
-        add_session_to_firestore(session_id, sample_session_data)
-        add_results_to_firestore(
-            session_id,
-            version_id,
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        add_version_to_firestore(
+            set_id,
+            "v1",
             sample_assignments_result["assignments"],
             {"solution_quality": "optimal", "solve_time": 1.5, "max_time_seconds": 120},
         )
@@ -562,9 +479,9 @@ class TestRegenerateSingleSession:
             ],
         }
 
-        # Regenerate session 1
         response = client.post(
-            f"/api/assignments/regenerate/{session_id}/session/1?max_time_seconds=60",
+            f"/api/assignments/regenerate/session/1"
+            f"?program_id={PROGRAM}&max_time_seconds=60",
             json=[],  # No absent participants
         )
 
@@ -574,7 +491,6 @@ class TestRegenerateSingleSession:
         # Verify response structure
         assert "assignments" in data
         assert "version_id" in data
-        assert "session" in data
         assert data["session"] == 1
         assert "solve_time" in data
         assert "quality" in data
@@ -588,7 +504,7 @@ class TestRegenerateSingleSession:
         # Verify GroupBuilder was called with require_different_assignments=True
         mock_builder_class.assert_called()
         call_kwargs = mock_builder_class.call_args[1]
-        assert call_kwargs["require_different_assignments"] == True
+        assert call_kwargs["require_different_assignments"] is True
         assert call_kwargs["num_sessions"] == 1
         assert call_kwargs["current_table_assignments"] is not None
 
@@ -597,20 +513,16 @@ class TestRegenerateSingleSession:
         self,
         mock_builder_class,
         client,
-        mock_storage,
-        sample_session_data,
+        sample_set_data,
         sample_assignments_result,
-        add_session_to_firestore,
-        add_results_to_firestore,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
     ):
         """Test single-session regeneration with absent participants."""
-        session_id = str(uuid.uuid4())
-        version_id = "v_test456"
-
-        add_session_to_firestore(session_id, sample_session_data)
-        add_results_to_firestore(
-            session_id,
-            version_id,
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        add_version_to_firestore(
+            set_id,
+            "v1",
             sample_assignments_result["assignments"],
             {"solution_quality": "optimal"},
         )
@@ -659,7 +571,7 @@ class TestRegenerateSingleSession:
         ]
 
         response = client.post(
-            f"/api/assignments/regenerate/{session_id}/session/1",
+            f"/api/assignments/regenerate/session/1?program_id={PROGRAM}",
             json=absent_participants,
         )
 
@@ -680,20 +592,16 @@ class TestRegenerateSingleSession:
         self,
         mock_builder_class,
         client,
-        mock_storage,
-        sample_session_data,
+        sample_set_data,
         sample_assignments_result,
-        add_session_to_firestore,
-        add_results_to_firestore,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
     ):
         """Test that fallback occurs when hard constraint makes problem infeasible."""
-        session_id = str(uuid.uuid4())
-        version_id = "v_test789"
-
-        add_session_to_firestore(session_id, sample_session_data)
-        add_results_to_firestore(
-            session_id,
-            version_id,
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        add_version_to_firestore(
+            set_id,
+            "v1",
             sample_assignments_result["assignments"],
             {"solution_quality": "optimal"},
         )
@@ -717,87 +625,59 @@ class TestRegenerateSingleSession:
         }
 
         response = client.post(
-            f"/api/assignments/regenerate/{session_id}/session/1", json=[]
+            f"/api/assignments/regenerate/session/1?program_id={PROGRAM}", json=[]
         )
 
         assert response.status_code == 200
         data = response.json()
 
         # Verify assignments_unchanged flag is set
-        assert data["assignments_unchanged"] == True
+        assert data["assignments_unchanged"] is True
 
         # Verify GroupBuilder was called twice (hard then soft)
         assert mock_builder_class.call_count == 2
 
-    def test_regenerate_single_session_not_found(self, client, mock_storage):
-        """Test regeneration of expired session."""
-        fake_session_id = str(uuid.uuid4())
-
+    def test_regenerate_single_session_no_assignment_set(self, client):
+        """Regenerating in a program with no assignment set returns 404."""
         response = client.post(
-            f"/api/assignments/regenerate/{fake_session_id}/session/1", json=[]
+            f"/api/assignments/regenerate/session/1?program_id={OTHER_PROGRAM}", json=[]
         )
 
         assert response.status_code == 404
-        assert "Session not found" in response.json()["detail"]
+        assert "no assignments yet" in response.json()["detail"]
 
     def test_regenerate_single_session_invalid_session_number(
-        self,
-        client,
-        mock_storage,
-        sample_session_data,
-        sample_assignments_result,
-        add_session_to_firestore,
+        self, client, sample_set_data, add_assignment_set_to_firestore
     ):
-        """Test regeneration with invalid session number."""
-        session_id = str(uuid.uuid4())
-        version_id = "v_testABC"
-
-        add_session_to_firestore(session_id, sample_session_data)
-        mock_storage.data[f"result:{session_id}:latest"] = version_id
-        mock_storage.data[f"result:{session_id}:{version_id}"] = {
-            "assignments": sample_assignments_result["assignments"],
-            "metadata": {},
-            "created_at": datetime.now().isoformat(),
-        }
+        """Test regeneration with an out-of-range session number."""
+        add_assignment_set_to_firestore(sample_set_data)
 
         # Try to regenerate session 5 when only 2 sessions exist
         response = client.post(
-            f"/api/assignments/regenerate/{session_id}/session/5", json=[]
+            f"/api/assignments/regenerate/session/5?program_id={PROGRAM}", json=[]
         )
 
         assert response.status_code == 400
         assert "Invalid session number" in response.json()["detail"]
 
     def test_regenerate_single_session_max_time_validation(
-        self,
-        client,
-        mock_storage,
-        sample_session_data,
-        sample_assignments_result,
-        add_session_to_firestore,
+        self, client, sample_set_data, add_assignment_set_to_firestore
     ):
         """Test that max_time_seconds is validated (30-240 range)."""
-        session_id = str(uuid.uuid4())
-        version_id = "v_testDEF"
-
-        add_session_to_firestore(session_id, sample_session_data)
-        mock_storage.data[f"result:{session_id}:latest"] = version_id
-        mock_storage.data[f"result:{session_id}:{version_id}"] = {
-            "assignments": sample_assignments_result["assignments"],
-            "metadata": {},
-            "created_at": datetime.now().isoformat(),
-        }
+        add_assignment_set_to_firestore(sample_set_data)
 
         # Too low
         response = client.post(
-            f"/api/assignments/regenerate/{session_id}/session/1?max_time_seconds=10",
+            f"/api/assignments/regenerate/session/1"
+            f"?program_id={PROGRAM}&max_time_seconds=10",
             json=[],
         )
         assert response.status_code == 422  # Validation error
 
         # Too high
         response = client.post(
-            f"/api/assignments/regenerate/{session_id}/session/1?max_time_seconds=300",
+            f"/api/assignments/regenerate/session/1"
+            f"?program_id={PROGRAM}&max_time_seconds=300",
             json=[],
         )
         assert response.status_code == 422
@@ -807,20 +687,16 @@ class TestRegenerateSingleSession:
         self,
         mock_builder_class,
         client,
-        mock_storage,
-        sample_session_data,
+        sample_set_data,
         sample_assignments_result,
-        add_session_to_firestore,
-        add_results_to_firestore,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
     ):
         """Test that max_time_seconds and regenerated metadata are persisted correctly."""
-        session_id = str(uuid.uuid4())
-        version_id = "v_testGHI"
-
-        add_session_to_firestore(session_id, sample_session_data)
-        add_results_to_firestore(
-            session_id,
-            version_id,
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        add_version_to_firestore(
+            set_id,
+            "v1",
             sample_assignments_result["assignments"],
             metadata={"max_time_seconds": 120},
         )
@@ -836,79 +712,75 @@ class TestRegenerateSingleSession:
         }
 
         response = client.post(
-            f"/api/assignments/regenerate/{session_id}/session/1?max_time_seconds=60",
+            f"/api/assignments/regenerate/session/1"
+            f"?program_id={PROGRAM}&max_time_seconds=60",
             json=[],
         )
 
         assert response.status_code == 200
 
         # Verify metadata was stored with correct max_time_seconds
-        from api.services.session_storage import SessionStorage
+        from api.services.assignment_set_storage import AssignmentSetStorage
 
-        storage = SessionStorage()
+        storage = AssignmentSetStorage()
 
-        # Get latest result version
-        versions = storage.get_result_versions(session_id)
+        versions = storage.list_versions(PROGRAM, set_id)
         assert len(versions) >= 2  # Original + regenerated
         latest_version = versions[0]  # Sorted newest first
 
-        # Get the stored result
-        stored_result = storage.get_results(session_id, latest_version["version_id"])
+        stored_result = storage.get_version(
+            PROGRAM, set_id, latest_version["version_id"]
+        )
         assert stored_result["metadata"]["max_time_seconds"] == 60
-        assert stored_result["metadata"]["regenerated"] == True
+        assert stored_result["metadata"]["regenerated"] is True
         assert stored_result["metadata"]["regenerated_session"] == 1
 
 
 class TestAuthProtection:
     """Tests for authentication and authorization on protected endpoints."""
 
-    # Valid UUID format for path validation (doesn't need to exist)
-    VALID_SESSION_ID = "12345678-1234-1234-1234-123456789012"
-
     def test_get_results_requires_auth(self, client_with_auth):
         """Should return 401 if no auth token provided."""
         response = client_with_auth.get(
-            f"/api/assignments/results/{self.VALID_SESSION_ID}"
+            f"/api/assignments/results?program_id={PROGRAM}"
         )
         assert response.status_code == 401
         assert "Authorization header missing" in response.json()["detail"]
 
-    def test_get_results_requires_session_access(self, client_with_auth):
-        """Should return 403 if user doesn't have access to session."""
-        from api.main import app
-        from api.middleware.auth import (
-            get_current_user,
-            get_firestore_service,
-            AuthUser,
-        )
+    def test_get_results_requires_program_membership(self, client, client_with_auth):
+        """Should return 403 if the user is not a member of the program.
 
-        # Mock authenticated user
+        Uses the ``client`` fixture only to seed the mock Firestore program and
+        membership; the request itself goes through ``client_with_auth`` so the
+        real ``validate_program_access`` runs.
+        """
+        from api.main import app
+        from api.dependencies import validate_program_access
+        from api.middleware.auth import get_current_user, AuthUser
+
         async def mock_user():
             return AuthUser(
-                user_id="user123", email="test@test.com", email_verified=True
+                user_id="stranger", email="stranger@test.com", email_verified=True
             )
 
-        # Mock FirestoreService to deny access
-        class MockFirestoreService:
-            def check_user_can_access_session(self, user_id, session_id):
-                return False
-
+        # The ``client`` fixture overrides the authorization gate app-wide; drop
+        # that override so the real membership check runs for this request.
+        app.dependency_overrides.pop(validate_program_access, None)
         app.dependency_overrides[get_current_user] = mock_user
-        app.dependency_overrides[get_firestore_service] = lambda: MockFirestoreService()
 
         try:
             response = client_with_auth.get(
-                f"/api/assignments/results/{self.VALID_SESSION_ID}"
+                f"/api/assignments/results?program_id={PROGRAM}"
             )
             assert response.status_code == 403
-            assert "Access denied" in response.json()["detail"]
+            assert response.json()["detail"] == "Not a member of this program"
         finally:
-            app.dependency_overrides.clear()
+            app.dependency_overrides.pop(get_current_user, None)
 
     def test_generate_requires_auth(self, client_with_auth):
         """Should return 401 if no auth token for generate."""
         response = client_with_auth.get(
-            "/api/assignments/", params={"session_id": self.VALID_SESSION_ID}
+            "/api/assignments/", params={"program_id": PROGRAM}
         )
         assert response.status_code == 401
         assert "Authorization header missing" in response.json()["detail"]

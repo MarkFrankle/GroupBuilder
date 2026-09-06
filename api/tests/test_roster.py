@@ -65,13 +65,13 @@ class TestRosterToParticipantList:
 
 class TestGetRoster:
     def test_returns_empty_roster(self, client):
-        response = client.get("/api/roster/")
+        response = client.get("/api/roster/?program_id=test_org_id")
         assert response.status_code == 200
         assert response.json() == {"participants": []}
 
     def test_returns_participants(self, client):
         client.put(
-            "/api/roster/p1",
+            "/api/roster/p1?program_id=test_org_id",
             json={
                 "name": "Alice",
                 "religion": "Christian",
@@ -79,7 +79,7 @@ class TestGetRoster:
                 "partner_id": None,
             },
         )
-        response = client.get("/api/roster/")
+        response = client.get("/api/roster/?program_id=test_org_id")
         assert response.status_code == 200
         data = response.json()
         assert len(data["participants"]) == 1
@@ -89,7 +89,7 @@ class TestGetRoster:
 class TestUpsertParticipant:
     def test_creates_participant(self, client):
         response = client.put(
-            "/api/roster/p1",
+            "/api/roster/p1?program_id=test_org_id",
             json={
                 "name": "Alice",
                 "religion": "Christian",
@@ -102,7 +102,7 @@ class TestUpsertParticipant:
 
     def test_updates_participant(self, client):
         client.put(
-            "/api/roster/p1",
+            "/api/roster/p1?program_id=test_org_id",
             json={
                 "name": "Alice",
                 "religion": "Christian",
@@ -111,7 +111,7 @@ class TestUpsertParticipant:
             },
         )
         response = client.put(
-            "/api/roster/p1",
+            "/api/roster/p1?program_id=test_org_id",
             json={
                 "name": "Alice Updated",
                 "religion": "Jewish",
@@ -124,7 +124,7 @@ class TestUpsertParticipant:
 
     def test_rejects_invalid_data(self, client):
         response = client.put(
-            "/api/roster/p1",
+            "/api/roster/p1?program_id=test_org_id",
             json={
                 "name": "",
                 "religion": "Christian",
@@ -138,7 +138,7 @@ class TestUpsertParticipant:
 class TestDeleteParticipant:
     def test_deletes_participant(self, client):
         client.put(
-            "/api/roster/p1",
+            "/api/roster/p1?program_id=test_org_id",
             json={
                 "name": "Alice",
                 "religion": "Christian",
@@ -146,14 +146,14 @@ class TestDeleteParticipant:
                 "partner_id": None,
             },
         )
-        response = client.delete("/api/roster/p1")
+        response = client.delete("/api/roster/p1?program_id=test_org_id")
         assert response.status_code == 200
-        roster = client.get("/api/roster/")
+        roster = client.get("/api/roster/?program_id=test_org_id")
         assert len(roster.json()["participants"]) == 0
 
     def test_clears_partner_on_delete(self, client):
         client.put(
-            "/api/roster/p1",
+            "/api/roster/p1?program_id=test_org_id",
             json={
                 "name": "Alice",
                 "religion": "Christian",
@@ -162,7 +162,7 @@ class TestDeleteParticipant:
             },
         )
         client.put(
-            "/api/roster/p2",
+            "/api/roster/p2?program_id=test_org_id",
             json={
                 "name": "Bob",
                 "religion": "Christian",
@@ -170,8 +170,8 @@ class TestDeleteParticipant:
                 "partner_id": "p1",
             },
         )
-        client.delete("/api/roster/p1")
-        roster = client.get("/api/roster/")
+        client.delete("/api/roster/p1?program_id=test_org_id")
+        roster = client.get("/api/roster/?program_id=test_org_id")
         bob = [p for p in roster.json()["participants"] if p["name"] == "Bob"][0]
         assert bob["partner_id"] is None
 
@@ -179,7 +179,7 @@ class TestDeleteParticipant:
 class TestCreateAssignmentSetFromRoster:
     def test_creates_assignment_set(self, client):
         client.put(
-            "/api/roster/p1",
+            "/api/roster/p1?program_id=test_org_id",
             json={
                 "name": "Alice",
                 "religion": "Christian",
@@ -188,7 +188,7 @@ class TestCreateAssignmentSetFromRoster:
             },
         )
         client.put(
-            "/api/roster/p2",
+            "/api/roster/p2?program_id=test_org_id",
             json={
                 "name": "Bob",
                 "religion": "Jewish",
@@ -197,7 +197,7 @@ class TestCreateAssignmentSetFromRoster:
             },
         )
         response = client.post(
-            "/api/roster/generate",
+            "/api/roster/generate?program_id=test_org_id",
             json={
                 "num_tables": 1,
                 "num_sessions": 1,
@@ -210,7 +210,7 @@ class TestCreateAssignmentSetFromRoster:
     def test_points_program_at_the_new_set(self, client):
         """Generating from a roster mints a set and makes it the current one."""
         client.put(
-            "/api/roster/p1",
+            "/api/roster/p1?program_id=test_org_id",
             json={
                 "name": "Alice",
                 "religion": "Christian",
@@ -219,7 +219,7 @@ class TestCreateAssignmentSetFromRoster:
             },
         )
         response = client.post(
-            "/api/roster/generate",
+            "/api/roster/generate?program_id=test_org_id",
             json={"num_tables": 1, "num_sessions": 1},
         )
 
@@ -237,7 +237,7 @@ class TestCreateAssignmentSetFromRoster:
 
     def test_rejects_empty_roster(self, client):
         response = client.post(
-            "/api/roster/generate",
+            "/api/roster/generate?program_id=test_org_id",
             json={
                 "num_tables": 1,
                 "num_sessions": 1,
@@ -247,7 +247,7 @@ class TestCreateAssignmentSetFromRoster:
 
     def test_rejects_too_few_participants(self, client):
         client.put(
-            "/api/roster/p1",
+            "/api/roster/p1?program_id=test_org_id",
             json={
                 "name": "Alice",
                 "religion": "Christian",
@@ -256,7 +256,7 @@ class TestCreateAssignmentSetFromRoster:
             },
         )
         response = client.post(
-            "/api/roster/generate",
+            "/api/roster/generate?program_id=test_org_id",
             json={
                 "num_tables": 3,
                 "num_sessions": 1,
@@ -268,7 +268,7 @@ class TestCreateAssignmentSetFromRoster:
 class TestFacilitatorField:
     def test_upsert_with_facilitator_flag(self, client):
         response = client.put(
-            "/api/roster/p1",
+            "/api/roster/p1?program_id=test_org_id",
             json={
                 "name": "Alice",
                 "religion": "Christian",
@@ -277,13 +277,13 @@ class TestFacilitatorField:
             },
         )
         assert response.status_code == 200
-        get_resp = client.get("/api/roster/")
+        get_resp = client.get("/api/roster/?program_id=test_org_id")
         participant = get_resp.json()["participants"][0]
         assert participant["is_facilitator"] is True
 
     def test_upsert_defaults_facilitator_false(self, client):
         response = client.put(
-            "/api/roster/p1",
+            "/api/roster/p1?program_id=test_org_id",
             json={
                 "name": "Alice",
                 "religion": "Christian",
@@ -291,14 +291,14 @@ class TestFacilitatorField:
             },
         )
         assert response.status_code == 200
-        get_resp = client.get("/api/roster/")
+        get_resp = client.get("/api/roster/?program_id=test_org_id")
         participant = get_resp.json()["participants"][0]
         assert participant["is_facilitator"] is False
 
     def test_generate_rejects_too_few_facilitators(self, client):
         # 2 participants, 1 facilitator, 2 tables → need 2 facilitators
         client.put(
-            "/api/roster/p1",
+            "/api/roster/p1?program_id=test_org_id",
             json={
                 "name": "Alice",
                 "religion": "Christian",
@@ -307,7 +307,7 @@ class TestFacilitatorField:
             },
         )
         client.put(
-            "/api/roster/p2",
+            "/api/roster/p2?program_id=test_org_id",
             json={
                 "name": "Bob",
                 "religion": "Jewish",
@@ -316,7 +316,8 @@ class TestFacilitatorField:
             },
         )
         response = client.post(
-            "/api/roster/generate", json={"num_tables": 2, "num_sessions": 1}
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 2, "num_sessions": 1},
         )
         assert response.status_code == 400
         assert "facilitator" in response.json()["detail"].lower()
@@ -327,7 +328,7 @@ class TestFullFlow:
         """Create participants via API, then generate assignments."""
         for i in range(6):
             response = client.put(
-                f"/api/roster/p{i}",
+                f"/api/roster/p{i}?program_id=test_org_id",
                 json={
                     "name": f"Person{i}",
                     "religion": ["Christian", "Jewish", "Muslim"][i % 3],
@@ -337,11 +338,11 @@ class TestFullFlow:
             )
             assert response.status_code == 200
 
-        roster = client.get("/api/roster/")
+        roster = client.get("/api/roster/?program_id=test_org_id")
         assert len(roster.json()["participants"]) == 6
 
         response = client.post(
-            "/api/roster/generate",
+            "/api/roster/generate?program_id=test_org_id",
             json={
                 "num_tables": 2,
                 "num_sessions": 2,

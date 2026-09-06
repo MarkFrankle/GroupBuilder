@@ -294,7 +294,7 @@ def client():
     # Override both auth dependencies
     app.dependency_overrides[require_session_access] = mock_auth
     app.dependency_overrides[get_current_user] = mock_auth
-    app.dependency_overrides[validate_program_access] = lambda: "test_org_id"
+    app.dependency_overrides[validate_program_access] = lambda program_id: program_id
 
     # Set up test organization in mock Firestore
     _mock_firestore_client._collections.clear()  # Clear any existing data
@@ -403,73 +403,73 @@ def huge_file():
 
 
 @pytest.fixture
-def add_session_to_firestore():
-    """Fixture that returns a function to add sessions to mock Firestore."""
+def add_assignment_set_to_firestore():
+    """Fixture that returns a function to add assignment sets to mock Firestore."""
 
-    def _add_session(session_id: str, session_data: dict, org_id: str = "test_org_id"):
-        """Helper to add a session to mock Firestore.
+    def _add_assignment_set(set_data: dict, org_id: str = "test_org_id"):
+        """Helper to create an assignment set and make it the program's current one.
 
         Args:
-            session_id: Session UUID
-            session_data: Dict with keys: participant_dict/participant_data, num_tables, num_sessions, filename
-            org_id: Organization ID (default: test_org_id)
+            set_data: Dict with keys: participant_dict/participant_data, num_tables,
+                num_sessions, filename
+            org_id: Program ID (default: test_org_id)
+
+        Returns:
+            The new assignment set id.
         """
-        from api.services.session_storage import SessionStorage
+        from api.services.assignment_set_storage import AssignmentSetStorage
 
-        storage = SessionStorage()
+        storage = AssignmentSetStorage()
 
-        # Convert participant_dict to participant_data if needed (test fixture compatibility)
-        participant_data = session_data.get("participant_data") or session_data.get(
+        participant_data = set_data.get("participant_data") or set_data.get(
             "participant_dict"
         )
 
-        storage.save_session(
-            org_id=org_id,
-            session_id=session_id,
+        return storage.create_set(
+            program_id=org_id,
             user_id="test_user",
             participant_data=participant_data,
-            filename=session_data.get("filename", "test.xlsx"),
-            num_tables=session_data["num_tables"],
-            num_sessions=session_data["num_sessions"],
+            filename=set_data.get("filename", "test.xlsx"),
+            num_tables=set_data["num_tables"],
+            num_sessions=set_data["num_sessions"],
         )
 
-    return _add_session
+    return _add_assignment_set
 
 
 @pytest.fixture
-def add_results_to_firestore():
-    """Fixture that returns a function to add results to mock Firestore."""
+def add_version_to_firestore():
+    """Fixture that returns a function to add result versions to mock Firestore."""
 
-    def _add_results(
-        session_id: str,
+    def _add_version(
+        set_id: str,
         version_id: str,
-        assignments: dict,
+        assignments: list,
         metadata: dict = None,
         org_id: str = "test_org_id",
     ):
-        """Helper to add results to mock Firestore.
+        """Helper to add one version under an assignment set.
 
         Args:
-            session_id: Session UUID
+            set_id: Assignment set UUID
             version_id: Version identifier (e.g., "v1")
             assignments: Assignment data
             metadata: Result metadata
-            org_id: Organization ID (default: test_org_id)
+            org_id: Program ID (default: test_org_id)
         """
-        from api.services.session_storage import SessionStorage
-        from datetime import datetime, timezone
+        from api.services.assignment_set_storage import AssignmentSetStorage
 
-        storage = SessionStorage()
+        storage = AssignmentSetStorage()
 
         if metadata is None:
             metadata = {"solution_quality": "optimal", "solve_time": 1.5}
 
-        storage.save_results(
-            session_id=session_id,
+        storage.save_version(
+            program_id=org_id,
+            set_id=set_id,
             version_id=version_id,
             assignments=assignments,
             metadata=metadata,
-            org_id=org_id,
         )
 
-    return _add_results
+    return _add_version

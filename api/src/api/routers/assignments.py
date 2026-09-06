@@ -1,32 +1,52 @@
 from fastapi import APIRouter, HTTPException, Query, Path, Request, Body, Depends
 from assignment_logic.api_handler import handle_generate_assignments
 from assignment_logic.group_builder import GroupBuilder
-from api.services.session_storage import SessionStorage
+from api.dependencies import validate_program_access
+from api.services.assignment_set_storage import (
+    AssignmentSetStorage,
+    get_assignment_set_storage,
+)
 from api.utils.seating_arrangement import arrange_circular_seating
-from api.middleware.auth import require_session_access, get_current_user, AuthUser
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 import logging
-import uuid
-import os
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
-# Lazy-initialize session storage (created when first used, not at import time)
-_session_storage = None
+NO_ASSIGNMENT_SET = (
+    "This program has no assignments yet. Generate them from Setup first."
+)
 
 
-def get_session_storage() -> SessionStorage:
-    """Get or create SessionStorage instance."""
-    global _session_storage
-    if _session_storage is None:
-        _session_storage = SessionStorage()
-    return _session_storage
+def _require_current_set_id(storage: AssignmentSetStorage, program_id: str) -> str:
+    """Resolve the program's current assignment set, or 404."""
+    set_id = storage.get_current_set_id(program_id)
+    if not set_id:
+        logger.warning(f"No assignment set for program: {program_id}")
+        raise HTTPException(status_code=404, detail=NO_ASSIGNMENT_SET)
+    return set_id
+
+
+def _require_current_set(
+    storage: AssignmentSetStorage, program_id: str
+) -> tuple[str, Dict[str, Any]]:
+    """Resolve the program's current assignment set id and document, or 404."""
+    set_id = _require_current_set_id(storage, program_id)
+    assignment_set = storage.get_current_set(program_id)
+    if assignment_set is None:
+        raise HTTPException(status_code=404, detail=NO_ASSIGNMENT_SET)
+    return set_id, assignment_set
+
+
+def _next_version_id(
+    storage: AssignmentSetStorage, program_id: str, set_id: str
+) -> str:
+    """Next sequential version id for an assignment set."""
+    return f"v{len(storage.list_versions(program_id, set_id)) + 1}"
 
 
 def _extract_pairings_from_sessions(
@@ -123,29 +143,35 @@ def _extract_current_table_assignments(
 
 
 def _generate_assignments_internal(
-    session_id: str, mark_regenerated: bool = False, max_time_seconds: int = 120
+    storage: AssignmentSetStorage,
+    program_id: str,
+    set_id: str,
+    mark_regenerated: bool = False,
+    max_time_seconds: int = 120,
 ):
     """
     Internal helper to generate assignments (shared by get_assignments and regenerate_assignments).
 
     Args:
-        session_id: The session ID
+        storage: Assignment set storage
+        program_id: The program the assignment set belongs to
+        set_id: The assignment set to solve and version
         mark_regenerated: Whether to mark results as regenerated
         max_time_seconds: Maximum solver time in seconds (default: 120)
 
     Returns:
         Tuple of (assignments, version_id, metadata)
     """
-    session_storage = get_session_storage()
-    session_data = session_storage.get_session(session_id)
-    participants_dict = session_data[
-        "participant_data"
-    ]  # Note: key is "participant_data" in Firestore
-    num_tables = session_data["num_tables"]
-    num_sessions = session_data["num_sessions"]
+    assignment_set = storage.get_current_set(program_id)
+    if assignment_set is None:
+        raise HTTPException(status_code=404, detail=NO_ASSIGNMENT_SET)
+
+    participants_dict = assignment_set["participant_data"]
+    num_tables = assignment_set["num_tables"]
+    num_sessions = assignment_set["num_sessions"]
 
     logger.info(
-        f"{'Regenerating' if mark_regenerated else 'Generating'} assignments for session {session_id}: "
+        f"{'Regenerating' if mark_regenerated else 'Generating'} assignments for program {program_id}: "
         f"{len(participants_dict)} participants, {num_tables} tables, {num_sessions} sessions, "
         f"max_time={max_time_seconds}s"
     )
@@ -188,14 +214,11 @@ def _generate_assignments_internal(
     if mark_regenerated:
         result_metadata["regenerated"] = True
 
-    # Store results - generate version ID
-    # Get existing versions to determine next version number
-    existing_versions = session_storage.get_result_versions(session_id)
-    version_num = len(existing_versions) + 1
-    version_id = f"v{version_num}"
+    version_id = _next_version_id(storage, program_id, set_id)
 
-    session_storage.save_results(
-        session_id=session_id,
+    storage.save_version(
+        program_id=program_id,
+        set_id=set_id,
         version_id=version_id,
         assignments=results["assignments"],
         metadata=result_metadata,
@@ -208,29 +231,20 @@ def _generate_assignments_internal(
 @limiter.limit("5/minute")  # Limit expensive solver operations
 def get_assignments(
     request: Request,
-    session_id: str = Query(
-        ...,
-        description="Session ID",
-        min_length=36,
-        max_length=36,
-        pattern="^[a-f0-9-]{36}$",
-    ),
+    program_id: str = Depends(validate_program_access),
     max_time_seconds: int = Query(
         120, ge=30, le=240, description="Maximum solver time in seconds (30-240)"
     ),
-    user: AuthUser = Depends(get_current_user),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
 ):
-    """Generate assignments for a session."""
-    session_storage = get_session_storage()
-    if not session_storage.session_exists(session_id):
-        logger.warning(f"Session not found: {session_id}")
-        raise HTTPException(
-            status_code=404, detail="Session not found. Please upload a file first."
-        )
+    """Generate assignments for a program's current assignment set."""
+    set_id = _require_current_set_id(storage, program_id)
 
     try:
         assignments, _, _ = _generate_assignments_internal(
-            session_id=session_id,
+            storage=storage,
+            program_id=program_id,
+            set_id=set_id,
             mark_regenerated=False,
             max_time_seconds=max_time_seconds,
         )
@@ -245,32 +259,24 @@ def get_assignments(
         )
 
 
-@router.post("/regenerate/{session_id}")
+@router.post("/regenerate")
 @limiter.limit("5/minute")  # Limit expensive solver operations
 async def regenerate_assignments(
     request: Request,
-    session_id: str = Path(
-        ...,
-        description="Session ID",
-        min_length=36,
-        max_length=36,
-        pattern="^[a-f0-9-]{36}$",
-    ),
+    program_id: str = Depends(validate_program_access),
     max_time_seconds: int = Query(
         120, ge=30, le=240, description="Maximum solver time in seconds (30-240)"
     ),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
 ):
-    """Regenerate assignments using the same upload data"""
-    session_storage = get_session_storage()
-    if not session_storage.session_exists(session_id):
-        logger.warning(f"Session not found: {session_id}")
-        raise HTTPException(
-            status_code=404, detail="Session not found. Please upload a file first."
-        )
+    """Regenerate assignments from the current assignment set's roster snapshot."""
+    set_id = _require_current_set_id(storage, program_id)
 
     try:
         assignments, version_id, _ = _generate_assignments_internal(
-            session_id=session_id,
+            storage=storage,
+            program_id=program_id,
+            set_id=set_id,
             mark_regenerated=True,
             max_time_seconds=max_time_seconds,
         )
@@ -288,16 +294,14 @@ async def regenerate_assignments(
         )
 
 
-@router.post("/regenerate/{session_id}/with_absences")
+@router.post("/regenerate/with_absences")
 @limiter.limit("5/minute")
 async def regenerate_all_with_absences(
     request: Request,
-    session_id: str = Path(
-        ..., min_length=36, max_length=36, pattern="^[a-f0-9-]{36}$"
-    ),
+    program_id: str = Depends(validate_program_access),
     max_time_seconds: int = Query(120, ge=30, le=240),
     per_session_absences: List[Dict[str, Any]] = Body(default=[]),
-    user: AuthUser = Depends(get_current_user),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
 ):
     """
     Regenerate all sessions with per-session absences, saving exactly one new version.
@@ -305,14 +309,11 @@ async def regenerate_all_with_absences(
     per_session_absences: [{"session_number": 1, "absent_participants": [...]}, ...]
     Sessions not listed are solved with all participants present.
     """
-    session_storage = get_session_storage()
-    if not session_storage.session_exists(session_id):
-        raise HTTPException(status_code=404, detail="Session not found.")
+    set_id, assignment_set = _require_current_set(storage, program_id)
 
-    session_data = session_storage.get_session(session_id)
-    participants = session_data["participant_data"]
-    num_tables = session_data["num_tables"]
-    num_sessions = session_data["num_sessions"]
+    participants = assignment_set["participant_data"]
+    num_tables = assignment_set["num_tables"]
+    num_sessions = assignment_set["num_sessions"]
 
     absence_map: Dict[int, List[Dict[str, Any]]] = {}
     for entry in per_session_absences:
@@ -375,9 +376,7 @@ async def regenerate_all_with_absences(
             assignments[session_number - 1]["absentParticipants"] = absent
 
     # Save exactly one new version
-    existing_versions = session_storage.get_result_versions(session_id)
-    version_num = len(existing_versions) + 1
-    version_id = f"v{version_num}"
+    version_id = _next_version_id(storage, program_id, set_id)
 
     # The full-solve quality metrics only describe the all-present solve. Once any
     # session was re-solved with absences, those aggregate numbers no longer match
@@ -395,35 +394,30 @@ async def regenerate_all_with_absences(
         metadata["solve_time"] = results.get("solve_time")
         metadata["total_deviation"] = results.get("total_deviation")
 
-    session_storage.save_results(
-        session_id=session_id,
+    storage.save_version(
+        program_id=program_id,
+        set_id=set_id,
         version_id=version_id,
         assignments=assignments,
         metadata=metadata,
     )
 
     logger.info(
-        f"Saved regen-with-absences result as {version_id} for session {session_id}"
+        f"Saved regen-with-absences result as {version_id} for program {program_id}"
     )
     return {"version_id": version_id, "assignments": assignments}
 
 
-@router.post("/regenerate/{session_id}/session/{session_number}")
+@router.post("/regenerate/session/{session_number}")
 @limiter.limit(
     "20/minute"
 )  # More lenient for single session (much cheaper than full regeneration)
 async def regenerate_single_session(
     request: Request,
-    session_id: str = Path(
-        ...,
-        description="Session ID",
-        min_length=36,
-        max_length=36,
-        pattern="^[a-f0-9-]{36}$",
-    ),
     session_number: int = Path(
         ..., description="Session number to regenerate (1-based)", ge=1, le=6
     ),
+    program_id: str = Depends(validate_program_access),
     max_time_seconds: int = Query(
         120, ge=30, le=240, description="Maximum solver time in seconds (30-240)"
     ),
@@ -431,6 +425,7 @@ async def regenerate_single_session(
         None, description="Version ID to base regeneration on (defaults to latest)"
     ),
     absent_participants: List[Dict[str, Any]] = Body(default=[]),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
 ):
     """
     Regenerate a single session while keeping other sessions unchanged.
@@ -440,8 +435,8 @@ async def regenerate_single_session(
     pairing participants who sat together in other sessions.
 
     Args:
-        session_id: The session ID
-        session_number: Which session to regenerate (1-based index)
+        session_number: Which session (meeting night) to regenerate (1-based index)
+        program_id: The program whose current assignment set is being edited
         max_time_seconds: Solver time limit
         version_id: Which version to base regeneration on (default: latest)
         absent_participants: List of participants to mark absent for this session
@@ -449,31 +444,22 @@ async def regenerate_single_session(
     Returns:
         New version with the regenerated session merged in
     """
-    session_storage = get_session_storage()
-    if not session_storage.session_exists(session_id):
-        logger.warning(f"Session not found: {session_id}")
-        raise HTTPException(
-            status_code=404, detail="Session not found. Please upload a file first."
-        )
+    set_id, assignment_set = _require_current_set(storage, program_id)
 
     try:
-        # 1. Get existing session data
-        session_data = session_storage.get_session(session_id)
-        num_tables = session_data["num_tables"]
-        num_sessions = session_data["num_sessions"]
-        all_participants = session_data[
-            "participant_data"
-        ]  # Note: key is "participant_data" in Firestore
+        num_tables = assignment_set["num_tables"]
+        num_sessions = assignment_set["num_sessions"]
+        all_participants = assignment_set["participant_data"]
 
         # Validate session number
         if session_number > num_sessions:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid session number {session_number}. This session only has {num_sessions} sessions.",
+                detail=f"Invalid session number {session_number}. This program only has {num_sessions} sessions.",
             )
 
         # 2. Get current assignments (from specified version or latest)
-        current_result = session_storage.get_results(session_id, version_id=version_id)
+        current_result = storage.get_version(program_id, set_id, version_id=version_id)
         if current_result is None:
             raise HTTPException(
                 status_code=404,
@@ -507,7 +493,7 @@ async def regenerate_single_session(
             )
 
         logger.info(
-            f"Regenerating session {session_number} for session_id {session_id}: "
+            f"Regenerating session {session_number} for program {program_id}: "
             f"{len(active_participants)} active participants, {num_tables} tables, "
             f"{len(historical_pairings)} historical pairings to avoid, "
             f"{len(current_table_assignments)} current assignments to FORBID (hard constraint), "
@@ -524,7 +510,7 @@ async def regenerate_single_session(
             num_sessions=1,  # Only regenerating one session
             historical_pairings=historical_pairings,  # Pass existing pairings
             current_table_assignments=current_table_assignments,  # FORBID same assignments
-            pairing_window_size=session_data.get("pairing_window_size"),
+            pairing_window_size=assignment_set.get("pairing_window_size"),
             solver_num_workers=4,
             require_different_assignments=True,  # HARD CONSTRAINT
         )
@@ -549,7 +535,7 @@ async def regenerate_single_session(
                 num_sessions=1,
                 historical_pairings=historical_pairings,
                 current_table_assignments=current_table_assignments,  # Soft penalty, not forbidden
-                pairing_window_size=session_data.get("pairing_window_size"),
+                pairing_window_size=assignment_set.get("pairing_window_size"),
                 solver_num_workers=4,
                 require_different_assignments=False,  # SOFT CONSTRAINT (allow same assignments)
             )
@@ -577,7 +563,7 @@ async def regenerate_single_session(
             f"Unchanged: {assignments_unchanged}"
         )
 
-        # 6. Merge regenerated session back into full assignments
+        # 7. Merge regenerated session back into full assignments
         new_assignments = existing_assignments.copy()
         new_assignments[session_number - 1] = {
             "session": session_number,
@@ -585,7 +571,7 @@ async def regenerate_single_session(
             "absentParticipants": absent_participants,
         }
 
-        # 7. Store as new version
+        # 8. Store as new version
         result_metadata = {
             "solution_quality": result.get("solution_quality"),
             "solve_time": result.get("solve_time"),
@@ -596,25 +582,23 @@ async def regenerate_single_session(
             "assignments_unchanged": assignments_unchanged,  # Flag if same assignments returned
         }
 
-        # Generate next version ID
-        existing_versions = session_storage.get_result_versions(session_id)
-        version_num = len(existing_versions) + 1
-        version_id = f"v{version_num}"
+        new_version_id = _next_version_id(storage, program_id, set_id)
 
-        session_storage.save_results(
-            session_id=session_id,
-            version_id=version_id,
+        storage.save_version(
+            program_id=program_id,
+            set_id=set_id,
+            version_id=new_version_id,
             assignments=new_assignments,
             metadata=result_metadata,
         )
 
         logger.info(
-            f"Stored regenerated session {session_number} as version {version_id} (unchanged: {assignments_unchanged})"
+            f"Stored regenerated session {session_number} as version {new_version_id} (unchanged: {assignments_unchanged})"
         )
 
         return {
             "assignments": new_assignments,
-            "version_id": version_id,
+            "version_id": new_version_id,
             "session": session_number,
             "solve_time": result.get("solve_time"),
             "quality": result.get("solution_quality"),
@@ -631,81 +615,64 @@ async def regenerate_single_session(
         )
 
 
-@router.get("/results/{session_id}")
+@router.get("/results")
 async def get_cached_results(
-    session_id: str = Path(
-        ...,
-        description="Session ID",
-        min_length=36,
-        max_length=36,
-        pattern="^[a-f0-9-]{36}$",
-    ),
+    program_id: str = Depends(validate_program_access),
     version: Optional[str] = Query(
         None, description="Version ID (e.g., 'v1'). Defaults to latest.", max_length=10
     ),
-    user: AuthUser = Depends(require_session_access),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
 ):
-    """Get assignment results for a session.
+    """Get assignment results for a program's current assignment set."""
+    set_id = _require_current_set_id(storage, program_id)
 
-    Now requires authentication and org membership.
-    """
-    session_storage = get_session_storage()
     logger.info(
-        f"Retrieving cached results for session: {session_id}, version: {version or 'latest'}"
+        f"Retrieving cached results for program: {program_id}, version: {version or 'latest'}"
     )
 
-    if not session_storage.result_exists(session_id):
-        logger.warning(f"No cached results for session: {session_id}")
-        raise HTTPException(status_code=404, detail="Results not found.")
-
-    result_data = session_storage.get_results(session_id, version_id=version)
+    result_data = storage.get_version(program_id, set_id, version_id=version)
 
     if result_data is None:
-        logger.warning(f"Version {version} not found for session: {session_id}")
-        raise HTTPException(status_code=404, detail=f"Version {version} not found.")
+        if version:
+            logger.warning(f"Version {version} not found for program: {program_id}")
+            raise HTTPException(status_code=404, detail=f"Version {version} not found.")
+        logger.warning(f"No cached results for program: {program_id}")
+        raise HTTPException(status_code=404, detail="Results not found.")
 
     return result_data["assignments"]
 
 
-@router.get("/results/{session_id}/versions")
+@router.get("/results/versions")
 async def get_result_version_list(
-    session_id: str = Path(
-        ...,
-        description="Session ID",
-        min_length=36,
-        max_length=36,
-        pattern="^[a-f0-9-]{36}$",
-    )
+    program_id: str = Depends(validate_program_access),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
 ):
-    """Get list of all result versions for a session"""
-    session_storage = get_session_storage()
-    logger.info(f"Retrieving version list for session: {session_id}")
+    """Get list of all result versions for the current assignment set."""
+    set_id = _require_current_set_id(storage, program_id)
 
-    versions = session_storage.get_result_versions(session_id)
+    logger.info(f"Retrieving version list for program: {program_id}")
+
+    versions = storage.list_versions(program_id, set_id)
 
     if not versions:
-        logger.warning(f"No versions found for session: {session_id}")
+        logger.warning(f"No versions found for program: {program_id}")
         raise HTTPException(
-            status_code=404, detail="No results found for this session."
+            status_code=404, detail="No results found for this program."
         )
 
     return {"versions": versions}
 
 
-@router.post("/results/{session_id}/save")
+@router.post("/results/save")
 async def save_edited_assignments(
     request: Request,
-    session_id: str = Path(
-        ...,
-        description="Session ID",
-        min_length=36,
-        max_length=36,
-        pattern="^[a-f0-9-]{36}$",
-    ),
+    program_id: str = Depends(validate_program_access),
     body: Dict[str, Any] = Body(...),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
 ):
     """Save manually edited assignments as a new version."""
-    session_storage = get_session_storage()
+    set_id = _require_current_set_id(storage, program_id)
+
     assignments = body.get("assignments")
     based_on_version = body.get("based_on_version")
 
@@ -713,24 +680,23 @@ async def save_edited_assignments(
         raise HTTPException(status_code=400, detail="assignments is required")
 
     try:
-        existing_versions = session_storage.get_result_versions(session_id)
-        version_num = len(existing_versions) + 1
-        version_id = f"v{version_num}"
+        version_id = _next_version_id(storage, program_id, set_id)
 
         metadata = {
             "source": "manual_edit",
             "based_on": based_on_version,
         }
 
-        session_storage.save_results(
-            session_id=session_id,
+        storage.save_version(
+            program_id=program_id,
+            set_id=set_id,
             version_id=version_id,
             assignments=assignments,
             metadata=metadata,
         )
 
         logger.info(
-            f"Saved manual edits as version {version_id} for session {session_id}"
+            f"Saved manual edits as version {version_id} for program {program_id}"
         )
 
         return {"version_id": version_id}
@@ -742,129 +708,64 @@ async def save_edited_assignments(
         raise HTTPException(status_code=500, detail="Failed to save edited assignments")
 
 
-@router.get("/sessions")
-async def list_sessions(
-    program_id: str = Query(..., description="Program ID"),
-    user: AuthUser = Depends(get_current_user),
+@router.get("/assignment_sets")
+async def list_assignment_sets(
+    program_id: str = Depends(validate_program_access),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
 ):
-    """List all sessions for a program, sorted by most recent."""
-    session_storage = get_session_storage()
-    logger.info(f"Listing sessions for program: {program_id}")
-    return session_storage.get_sessions_for_program(program_id)
+    """List all assignment sets for a program, newest first."""
+    logger.info(f"Listing assignment sets for program: {program_id}")
+    return storage.list_sets(program_id)
 
 
-@router.get("/sessions/{session_id}/metadata")
-async def get_session_metadata(
-    session_id: str = Path(
-        ...,
-        description="Session ID",
-        min_length=36,
-        max_length=36,
-        pattern="^[a-f0-9-]{36}$",
-    )
+@router.get("/metadata")
+async def get_assignment_set_metadata(
+    program_id: str = Depends(validate_program_access),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
 ):
-    """Get metadata about a session for displaying in Recent Uploads"""
-    session_storage = get_session_storage()
-    logger.info(f"Retrieving metadata for session: {session_id}")
+    """Get metadata about the program's current assignment set."""
+    set_id, assignment_set = _require_current_set(storage, program_id)
 
-    if not session_storage.session_exists(session_id):
-        logger.warning(f"Session not found: {session_id}")
-        raise HTTPException(status_code=404, detail="Session not found.")
+    logger.info(f"Retrieving assignment set metadata for program: {program_id}")
 
-    session_data = session_storage.get_session(session_id)
-
-    # Convert Firestore timestamp to Unix timestamp
-    created_at = session_data.get("created_at")
+    created_at = assignment_set.get("created_at")
     created_at_unix = created_at.timestamp() if created_at else None
 
     return {
-        "session_id": session_id,
-        "filename": session_data.get("filename", "Unknown"),
-        "num_participants": len(session_data.get("participant_data", [])),
-        "num_tables": session_data.get("num_tables"),
-        "num_sessions": session_data.get("num_sessions"),
+        "assignment_set_id": set_id,
+        "filename": assignment_set.get("filename", "Unknown"),
+        "num_participants": len(assignment_set.get("participant_data", [])),
+        "num_tables": assignment_set.get("num_tables"),
+        "num_sessions": assignment_set.get("num_sessions"),
         "created_at": created_at_unix,
-        "has_results": session_storage.result_exists(session_id),
+        "has_results": storage.get_version(program_id, set_id) is not None,
     }
-
-
-@router.post("/sessions/{session_id}/clone")
-async def clone_session_with_params(
-    session_id: str = Path(
-        ...,
-        description="Session ID",
-        min_length=36,
-        max_length=36,
-        pattern="^[a-f0-9-]{36}$",
-    ),
-    num_tables: int = Query(..., ge=1, le=10, description="Number of tables (1-10)"),
-    num_sessions: int = Query(..., ge=1, le=6, description="Number of sessions (1-6)"),
-    user: AuthUser = Depends(get_current_user),
-):
-    """Clone a session with new table/session parameters (reuses participant data)"""
-    session_storage = get_session_storage()
-    logger.info(
-        f"Cloning session {session_id} with new params: tables={num_tables}, sessions={num_sessions}"
-    )
-
-    if not session_storage.session_exists(session_id):
-        logger.warning(f"Source session not found: {session_id}")
-        raise HTTPException(status_code=404, detail="Source session not found.")
-
-    # Get original session data (includes program_id)
-    original_session = session_storage.get_session(session_id)
-    participant_dict = original_session.get("participant_data", [])
-
-    # Validate participant count vs tables
-    num_participants = len(participant_dict)
-    if num_participants < num_tables:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Not enough participants ({num_participants}) for {num_tables} tables. "
-            f"Need at least {num_tables} participants.",
-        )
-
-    # Create new session with same participant data but new parameters
-    new_session_id = str(uuid.uuid4())
-    program_id = original_session.get("org_id")
-
-    session_storage.save_session(
-        org_id=program_id,
-        session_id=new_session_id,
-        user_id=user.user_id,
-        participant_data=participant_dict,
-        filename=original_session.get("filename", "Unknown"),
-        num_tables=num_tables,
-        num_sessions=num_sessions,
-    )
-
-    logger.info(
-        f"Successfully cloned session. New session ID: {new_session_id} in program {program_id}"
-    )
-
-    return {"message": "Session cloned successfully", "session_id": new_session_id}
 
 
 class SeatingRequest(BaseModel):
     assignments: List[Dict[str, Any]]
 
 
-@router.post("/seating/{session_id}")
+@router.post("/seating/{session_number}")
 async def generate_seating_chart(
-    session_id: str, session: int, request: SeatingRequest
+    request: SeatingRequest,
+    session_number: int = Path(..., description="Session number (1-based)", ge=1),
+    program_id: str = Depends(validate_program_access),
 ):
     """
-    Generate circular seating arrangements for a session.
+    Generate circular seating arrangements for one session (meeting night).
 
     Distributes religions evenly around each table.
     """
     # Find the requested session
     session_data = next(
-        (a for a in request.assignments if a["session"] == session), None
+        (a for a in request.assignments if a["session"] == session_number), None
     )
 
     if not session_data:
-        raise HTTPException(status_code=404, detail=f"Session {session} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Session {session_number} not found"
+        )
 
     # Arrange each table
     tables = []
@@ -883,7 +784,7 @@ async def generate_seating_chart(
     tables.sort(key=lambda t: t["table_number"])
 
     return {
-        "session": session,
+        "session": session_number,
         "tables": tables,
         "absent_participants": session_data.get("absentParticipants", []),
     }
