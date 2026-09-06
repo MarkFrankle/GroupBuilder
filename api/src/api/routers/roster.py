@@ -1,5 +1,3 @@
-import uuid
-
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -9,7 +7,7 @@ from slowapi.util import get_remote_address
 from api.dependencies import validate_program_access
 from api.middleware.auth import get_current_user, AuthUser
 from api.services.roster_service import RosterService, get_roster_service
-from api.services.session_storage import SessionStorage
+from api.services.assignment_set_storage import AssignmentSetStorage
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
@@ -115,19 +113,20 @@ async def generate_from_roster(
             detail=f"Need at least {data.num_tables} facilitators for {data.num_tables} tables (have {facilitator_count})",
         )
 
-    session_id = str(uuid.uuid4())
-    storage = SessionStorage()
-    storage.save_session(
-        org_id=program_id,
-        session_id=session_id,
+    storage = AssignmentSetStorage()
+    set_id = storage.create_set(
+        program_id=program_id,
         user_id=user.user_id,
         participant_data=participant_list,
+        filename="roster",
         num_tables=data.num_tables,
         num_sessions=data.num_sessions,
-        filename="roster",
     )
 
-    return {"session_id": session_id, "message": "Session created from roster"}
+    return {
+        "assignment_set_id": set_id,
+        "message": "Assignment set created from roster",
+    }
 
 
 @router.put("/{participant_id}")

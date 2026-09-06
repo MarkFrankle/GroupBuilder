@@ -176,8 +176,8 @@ class TestDeleteParticipant:
         assert bob["partner_id"] is None
 
 
-class TestCreateSessionFromRoster:
-    def test_creates_session(self, client):
+class TestCreateAssignmentSetFromRoster:
+    def test_creates_assignment_set(self, client):
         client.put(
             "/api/roster/p1",
             json={
@@ -205,7 +205,30 @@ class TestCreateSessionFromRoster:
         )
         assert response.status_code == 200
         data = response.json()
-        assert "session_id" in data
+        assert "assignment_set_id" in data
+
+    def test_points_program_at_the_new_set(self, client):
+        """Generating from a roster mints a set and makes it the current one."""
+        client.put(
+            "/api/roster/p1",
+            json={
+                "name": "Alice",
+                "religion": "Christian",
+                "gender": "Female",
+                "partner_id": None,
+            },
+        )
+        response = client.post(
+            "/api/roster/generate",
+            json={"num_tables": 1, "num_sessions": 1},
+        )
+
+        assert response.status_code == 200
+        set_id = response.json()["assignment_set_id"]
+
+        from api.services.assignment_set_storage import AssignmentSetStorage
+
+        assert AssignmentSetStorage().get_current_set_id("test_org_id") == set_id
 
     def test_rejects_empty_roster(self, client):
         response = client.post(
@@ -320,4 +343,4 @@ class TestFullFlow:
             },
         )
         assert response.status_code == 200
-        assert "session_id" in response.json()
+        assert "assignment_set_id" in response.json()
