@@ -103,3 +103,18 @@ class TestSessionCompletionStorage:
         add_assignment_set_to_firestore(sample_set_data)
 
         assert storage.get_completed_sessions(PROGRAM) == [1]
+
+    def test_marking_complete_does_not_clobber_the_program_document(
+        self, storage, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """Completion must merge into the Program doc, not replace it."""
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+
+        storage.mark_complete(PROGRAM, 1)
+
+        from api.services.assignment_set_storage import AssignmentSetStorage
+
+        program = AssignmentSetStorage()._program_ref(PROGRAM).get().to_dict()
+        assert program["current_assignment_set_id"] == set_id
+        assert program["name"] == "Test Organization"
+        assert program["active"] is True
