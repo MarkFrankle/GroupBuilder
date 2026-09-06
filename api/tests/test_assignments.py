@@ -174,6 +174,33 @@ class TestGetAssignments:
         assert response.status_code == 404
         assert "no assignments yet" in response.json()["detail"]
 
+    def test_dangling_assignment_set_pointer_is_a_500(
+        self, client, sample_set_data, add_assignment_set_to_firestore, caplog
+    ):
+        """A program pointing at a deleted assignment set is corrupt data, not a 404.
+
+        The user cannot fix this by generating, so it must return 500 *and* leave
+        the program and set ids in the logs for whoever answers the support call.
+        """
+        import logging
+
+        from api.firebase_admin import get_firestore_client
+
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+
+        # Delete the set document but leave current_assignment_set_id pointing at it.
+        get_firestore_client().collection("organizations").document(PROGRAM).collection(
+            "assignment_sets"
+        ).document(set_id).delete()
+
+        with caplog.at_level(logging.ERROR, logger="api.routers.assignments"):
+            response = client.get(f"/api/assignments/?program_id={PROGRAM}")
+
+        assert response.status_code == 500
+        assert "contact support" in response.json()["detail"]
+        assert PROGRAM in caplog.text
+        assert set_id in caplog.text
+
     @patch("api.routers.assignments.handle_generate_assignments")
     def test_generate_assignments_solver_failure(
         self,

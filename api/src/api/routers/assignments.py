@@ -47,6 +47,9 @@ def _require_current_set(
     set_id = _require_current_set_id(storage, program_id)
     assignment_set = storage.get_set(program_id, set_id)
     if assignment_set is None:
+        logger.error(
+            "Program %s points at missing assignment set %s", program_id, set_id
+        )
         raise HTTPException(status_code=500, detail=ASSIGNMENT_SET_MISSING)
     return set_id, assignment_set
 
