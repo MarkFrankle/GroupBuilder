@@ -19,7 +19,7 @@ interface AssignmentSetSummary {
 const PreviousGroupsPage: React.FC = () => {
   const { currentProgram } = useProgram()
   const navigate = useNavigate()
-  const { data: sessions = [], isLoading, error } = useAssignmentSetsList(currentProgram?.id ?? null) as {
+  const { data: assignmentSets = [], isLoading, error } = useAssignmentSetsList(currentProgram?.id ?? null) as {
     data: AssignmentSetSummary[] | undefined; isLoading: boolean; error: Error | null
   }
 
@@ -42,15 +42,15 @@ const PreviousGroupsPage: React.FC = () => {
   return (
     <div className="max-w-2xl mx-auto p-6">
       <h1 className="text-2xl font-bold mb-6">Previous Groups</h1>
-      {sessions.length === 0 ? (
+      {assignmentSets.length === 0 ? (
         <p className="text-muted-foreground text-center py-12">
           No groups created yet. Upload a roster from the Home page to get started.
         </p>
       ) : (
         <div className="space-y-3">
-          {sessions.map((session, index) => (
+          {assignmentSets.map((set, index) => (
             <Card
-              key={session.assignment_set_id}
+              key={set.assignment_set_id}
               className="cursor-pointer hover:bg-accent/50 transition-colors"
               onClick={() => navigate(`/table-assignments?program=${currentProgram?.id}`)}
             >
@@ -59,8 +59,8 @@ const PreviousGroupsPage: React.FC = () => {
                   <FolderOpen className="h-5 w-5 text-muted-foreground shrink-0" />
                   <div>
                     <div className="font-medium flex items-center gap-2">
-                      {session.created_at
-                        ? new Date(session.created_at * 1000).toLocaleString(undefined, {
+                      {set.created_at
+                        ? new Date(set.created_at * 1000).toLocaleString(undefined, {
                             month: 'short', day: 'numeric', year: 'numeric',
                             hour: 'numeric', minute: '2-digit'
                           })
@@ -72,12 +72,12 @@ const PreviousGroupsPage: React.FC = () => {
                       )}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {session.num_participants} participants &middot; {session.num_tables} tables &middot; {session.num_sessions} session{session.num_sessions !== 1 ? 's' : ''}
+                      {set.num_participants} participants &middot; {set.num_tables} tables &middot; {set.num_sessions} session{set.num_sessions !== 1 ? 's' : ''}
                     </div>
                   </div>
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  {session.num_versions} version{session.num_versions !== 1 ? 's' : ''}
+                  {set.num_versions} version{set.num_versions !== 1 ? 's' : ''}
                 </div>
               </CardContent>
             </Card>

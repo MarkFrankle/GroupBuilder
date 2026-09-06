@@ -15,15 +15,24 @@ Object.assign(navigator, {
 const mockAuthenticatedFetch = authenticatedFetch as jest.MockedFunction<typeof authenticatedFetch>
 
 const mockSetCurrentProgram = jest.fn()
+const RESOLVED_PROGRAM = { id: 'test-program-id', name: 'Test' }
+// Mutable so individual tests can put the context into its still-loading or
+// non-member states.
+const mockProgramContext: any = {
+  currentProgram: RESOLVED_PROGRAM,
+  programs: [RESOLVED_PROGRAM],
+  loading: false,
+  needsProgramSelection: false,
+  setCurrentProgram: mockSetCurrentProgram,
+  refreshPrograms: jest.fn(),
+}
+const resetProgramContext = () => {
+  mockProgramContext.currentProgram = RESOLVED_PROGRAM
+  mockProgramContext.programs = [RESOLVED_PROGRAM]
+  mockProgramContext.loading = false
+}
 jest.mock('@/contexts/ProgramContext', () => ({
-  useProgram: () => ({
-    currentProgram: { id: 'test-program-id', name: 'Test' },
-    programs: [{ id: 'test-program-id', name: 'Test' }],
-    loading: false,
-    needsProgramSelection: false,
-    setCurrentProgram: mockSetCurrentProgram,
-    refreshPrograms: jest.fn(),
-  }),
+  useProgram: () => mockProgramContext,
 }))
 
 const mockAssignmentsData = [
@@ -50,6 +59,7 @@ describe('TableAssignmentsPage copy link functionality', () => {
     } as any
 
     // Clear clipboard mock
+    resetProgramContext()
     ;(navigator.clipboard.writeText as jest.Mock).mockClear()
 
     // Mock authenticatedFetch responses (PR #35 uses authenticated API calls)
@@ -340,6 +350,79 @@ describe('TableAssignmentsPage unified control bar', () => {
     // Should be in compact view by default
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: /print seating/i })).not.toBeInTheDocument()
+    })
+  })
+})
+
+
+describe('TableAssignmentsPage program resolution', () => {
+  const renderPage = () => {
+    const QueryWrapper = createQueryWrapper()
+    return render(
+      <BrowserRouter>
+        <QueryWrapper>
+          <TableAssignmentsPage />
+        </QueryWrapper>
+      </BrowserRouter>
+    )
+  }
+
+  beforeEach(() => {
+    delete (window as any).location
+    window.location = {
+      href: 'http://localhost:3000/results?program=test-program-id',
+      origin: 'http://localhost:3000',
+      pathname: '/results',
+      search: '?program=test-program-id',
+    } as any
+    resetProgramContext()
+    mockAuthenticatedFetch.mockImplementation((url: string) => {
+      if (url.includes('/api/assignments/results/versions')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ versions: [] }) } as Response)
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(mockAssignmentsData),
+      } as Response)
+    })
+  })
+
+  it('shows a spinner, not an error, while ProgramContext is still loading', async () => {
+    // Programs are still in flight: no current program yet, but nothing is wrong.
+    mockProgramContext.currentProgram = null
+    mockProgramContext.programs = []
+    mockProgramContext.loading = true
+
+    renderPage()
+
+    expect(screen.getByRole('status', { name: /loading assignments/i })).toBeInTheDocument()
+    expect(screen.queryByText(/no assignments for this program/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /go to roster/i })).not.toBeInTheDocument()
+  })
+
+  it('reports denied access when the link names a program the user is not in', async () => {
+    window.location = {
+      ...window.location,
+      search: '?program=someone-elses-program',
+    } as any
+    mockProgramContext.currentProgram = RESOLVED_PROGRAM
+    mockProgramContext.programs = [RESOLVED_PROGRAM]
+
+    renderPage()
+
+    expect(await screen.findByText(/don't have access to that program/i)).toBeInTheDocument()
+    expect(mockSetCurrentProgram).not.toHaveBeenCalled()
+  })
+
+  it('adopts a linked program the user is a member of', async () => {
+    const other = { id: 'other-program', name: 'Other' }
+    window.location = { ...window.location, search: '?program=other-program' } as any
+    mockProgramContext.programs = [RESOLVED_PROGRAM, other]
+
+    renderPage()
+
+    await waitFor(() => {
+      expect(mockSetCurrentProgram).toHaveBeenCalledWith(other)
     })
   })
 })

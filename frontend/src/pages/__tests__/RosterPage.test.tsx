@@ -92,3 +92,52 @@ describe('RosterPage', () => {
     });
   });
 });
+
+describe('RosterPage with an existing assignment set', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('/api/assignments/metadata')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ assignment_set_id: 's1', num_tables: 4, num_sessions: 2 }),
+        } as Response);
+      }
+      if (url.includes('/api/assignments/results')) {
+        return Promise.resolve({ ok: true, json: async () => [] } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          participants: [
+            { id: 'p1', name: 'Alice', religion: 'Christian', gender: 'Female', partner_id: null },
+            { id: 'p2', name: 'Bob', religion: 'Jewish', gender: 'Male', partner_id: null },
+            { id: 'p3', name: 'Cara', religion: 'Muslim', gender: 'Female', partner_id: null },
+            { id: 'p4', name: 'Dan', religion: 'None', gender: 'Male', partner_id: null },
+          ],
+        }),
+      } as Response);
+    });
+  });
+
+  test('shows both regeneration tabs', async () => {
+    renderPage();
+    expect(await screen.findByRole('tab', { name: /Regenerate/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Fresh Start/i })).toBeInTheDocument();
+  });
+
+  test('describes the layout the existing set will preserve', async () => {
+    renderPage();
+    expect(
+      await screen.findByText(/Keeps the existing layout: 4 tables × 2 sessions\./)
+    ).toBeInTheDocument();
+  });
+
+  test('enables the regenerate button when there are enough participants', async () => {
+    renderPage();
+    await screen.findByDisplayValue('Alice');
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Regenerate All Sessions/i })).toBeEnabled();
+    });
+  });
+});

@@ -68,7 +68,7 @@ const TableAssignmentsPage: React.FC = () => {
 
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const { currentProgram, programs, setCurrentProgram } = useProgram()
+  const { currentProgram, programs, loading: programLoading, setCurrentProgram } = useProgram()
   const programId = currentProgram?.id ?? null
 
   // A shared link can carry ?program=<id>. Adopt it, but only if the user is
@@ -78,6 +78,18 @@ const TableAssignmentsPage: React.FC = () => {
     const match = programs.find(p => p.id === programParam)
     if (match) setCurrentProgram(match)
   }, [programParam, currentProgram?.id, programs, setCurrentProgram])
+
+  // Which program we're showing resolves in three distinct ways, and they must
+  // not collapse into one another: still resolving (spinner), the link names a
+  // program the user isn't in (access message), or resolved (show assignments,
+  // or the empty-state prompt if there are none yet).
+  const programStatus: 'resolving' | 'denied' | 'none' | 'ready' = programLoading
+    ? 'resolving'
+    : programParam && programParam !== currentProgram?.id
+      ? (programs.some(p => p.id === programParam) ? 'resolving' : 'denied')
+      : programId
+        ? 'ready'
+        : 'none'
 
   const { data: versionsData } = useResultVersions(programId)
   const [currentVersion, setCurrentVersion] = useState<string>(versionParam ?? 'latest')
@@ -587,11 +599,16 @@ const TableAssignmentsPage: React.FC = () => {
     setEditMode(!editMode)
   }
 
-  const displayError = !programId ? 'No assignments for this program yet. Generate them from the Roster page.' : fetchError?.message || error
+  const displayError =
+    programStatus === 'denied'
+      ? "You don't have access to that program."
+      : programStatus === 'none'
+        ? 'Select a program to view its assignments.'
+        : fetchError?.message || error
 
-  if (loading) {
+  if (programStatus === 'resolving' || loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
+      <div className="flex justify-center items-center h-screen" role="status" aria-label="Loading assignments">
         <Loader2 className="h-32 w-32 animate-spin" />
       </div>
     )
@@ -605,8 +622,8 @@ const TableAssignmentsPage: React.FC = () => {
           <AlertDescription>{displayError}</AlertDescription>
         </Alert>
         <div className="flex justify-center mt-6">
-          <Button onClick={() => navigate('/')} variant="outline">
-            Back to Home
+          <Button onClick={() => navigate('/roster')} variant="outline">
+            Go to Roster
           </Button>
         </div>
       </div>
