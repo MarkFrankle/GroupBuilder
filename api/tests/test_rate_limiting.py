@@ -9,7 +9,6 @@ Tests cover:
 
 import pytest
 from unittest.mock import patch
-import uuid
 
 
 class TestUploadRateLimiting:
@@ -96,13 +95,9 @@ class TestAssignmentsRateLimiting:
         self,
         mock_generate,
         client_with_rate_limiting,
-        mock_storage,
-        sample_session_data,
     ):
         """Test that requests within rate limit succeed."""
         client = client_with_rate_limiting
-        session_id = str(uuid.uuid4())
-        mock_storage.data[f"session:{session_id}"] = sample_session_data
 
         mock_generate.return_value = {
             "status": "success",
@@ -114,7 +109,7 @@ class TestAssignmentsRateLimiting:
 
         # Make 3 requests (under the 5/minute limit)
         for i in range(3):
-            response = client.get(f"/api/assignments/?session_id={session_id}")
+            response = client.get("/api/assignments/?program_id=test_org_id")
             assert response.status_code == 200, f"Request {i+1} should succeed"
 
     @pytest.mark.skip(reason="Rate limiting disabled in test environment")
@@ -123,13 +118,9 @@ class TestAssignmentsRateLimiting:
         self,
         mock_generate,
         client_with_rate_limiting,
-        mock_storage,
-        sample_session_data,
     ):
         """Test that exceeding rate limit returns 429."""
         client = client_with_rate_limiting
-        session_id = str(uuid.uuid4())
-        mock_storage.data[f"session:{session_id}"] = sample_session_data
 
         mock_generate.return_value = {
             "status": "success",
@@ -144,7 +135,7 @@ class TestAssignmentsRateLimiting:
         rate_limited = False
 
         for i in range(6):
-            response = client.get(f"/api/assignments/?session_id={session_id}")
+            response = client.get("/api/assignments/?program_id=test_org_id")
 
             if response.status_code == 200:
                 success_count += 1
@@ -166,13 +157,9 @@ class TestRegenerateRateLimiting:
         self,
         mock_generate,
         client_with_rate_limiting,
-        mock_storage,
-        sample_session_data,
     ):
         """Test that requests within rate limit succeed."""
         client = client_with_rate_limiting
-        session_id = str(uuid.uuid4())
-        mock_storage.data[f"session:{session_id}"] = sample_session_data
 
         mock_generate.return_value = {
             "status": "success",
@@ -184,7 +171,7 @@ class TestRegenerateRateLimiting:
 
         # Make 3 requests (under the 5/minute limit)
         for i in range(3):
-            response = client.post(f"/api/assignments/regenerate/{session_id}")
+            response = client.post("/api/assignments/regenerate?program_id=test_org_id")
             assert response.status_code == 200, f"Request {i+1} should succeed"
 
     @pytest.mark.skip(reason="Rate limiting disabled in test environment")
@@ -193,13 +180,9 @@ class TestRegenerateRateLimiting:
         self,
         mock_generate,
         client_with_rate_limiting,
-        mock_storage,
-        sample_session_data,
     ):
         """Test that exceeding rate limit returns 429."""
         client = client_with_rate_limiting
-        session_id = str(uuid.uuid4())
-        mock_storage.data[f"session:{session_id}"] = sample_session_data
 
         mock_generate.return_value = {
             "status": "success",
@@ -214,7 +197,7 @@ class TestRegenerateRateLimiting:
         rate_limited = False
 
         for i in range(6):
-            response = client.post(f"/api/assignments/regenerate/{session_id}")
+            response = client.post("/api/assignments/regenerate?program_id=test_org_id")
 
             if response.status_code == 200:
                 success_count += 1
@@ -225,46 +208,3 @@ class TestRegenerateRateLimiting:
         # Should get rate limited before completing all 6 requests
         assert rate_limited, "Should have been rate limited after 5 requests"
         assert success_count <= 5, "Should not succeed more than 5 times"
-
-
-@pytest.fixture
-def sample_session_data():
-    """Sample session data for testing."""
-    from datetime import datetime
-
-    return {
-        "participant_dict": [
-            {
-                "id": 1,
-                "name": "Alice",
-                "religion": "Christian",
-                "gender": "Female",
-                "couple_id": None,
-            },
-            {
-                "id": 2,
-                "name": "Bob",
-                "religion": "Jewish",
-                "gender": "Male",
-                "couple_id": None,
-            },
-            {
-                "id": 3,
-                "name": "Charlie",
-                "religion": "Muslim",
-                "gender": "Male",
-                "couple_id": None,
-            },
-            {
-                "id": 4,
-                "name": "Diana",
-                "religion": "Christian",
-                "gender": "Female",
-                "couple_id": None,
-            },
-        ],
-        "num_tables": 2,
-        "num_sessions": 2,
-        "filename": "test.xlsx",
-        "created_at": datetime.now().isoformat(),
-    }

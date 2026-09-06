@@ -38,7 +38,7 @@ Env vars live in three places, each serving a different build/runtime system:
 - `GCP_PROJECT_ID`, `GCP_SA_KEY` — for gcloud auth during deploy
 - `FIREBASE_PROJECT_ID` — passed to Cloud Run as env var
 - `RESEND_API_KEY`, `FROM_EMAIL`, `FRONTEND_URL` — email service config (Resend)
-- `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` — rate limiting
+- `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` — the KV backend picked by `api/src/api/storage.py`. **Not** rate limiting: all three `Limiter(...)` constructions (`main.py`, `routers/assignments.py`, `routers/roster.py`) omit `storage_uri`, so slowapi rate limits in process memory. Since the assignment-set rename, `storage.py`'s only consumer is the `/health` check. See `BACKLOG.md` for the proposal to delete the whole unit.
 - `CORS_ORIGINS` — allowed frontend origins
 - `REQUIRE_PERSISTENT_STORAGE` — feature flag
 

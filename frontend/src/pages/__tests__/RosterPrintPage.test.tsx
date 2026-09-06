@@ -51,20 +51,20 @@ describe('RosterPrintPage', () => {
   })
 
   test('groups participants by table', () => {
-    renderWithState({ assignments: mockAssignments, sessionId: 'test-session' })
+    renderWithState({ assignments: mockAssignments, programId: 'test-program-id' })
     expect(screen.getByText('Table 1')).toBeInTheDocument()
     expect(screen.getByText('Table 2')).toBeInTheDocument()
   })
 
   test('shows participants sorted by last name within each table', () => {
-    renderWithState({ assignments: mockAssignments, sessionId: 'test-session' })
+    renderWithState({ assignments: mockAssignments, programId: 'test-program-id' })
     // Table 1: Adams before Kim
     expect(screen.getByText('Sarah Adams')).toBeInTheDocument()
     expect(screen.getByText('David Kim')).toBeInTheDocument()
   })
 
   test('separates facilitators into their own section per table', () => {
-    renderWithState({ assignments: mockAssignments, sessionId: 'test-session' })
+    renderWithState({ assignments: mockAssignments, programId: 'test-program-id' })
     // Table 2 has Mark Frank as facilitator
     const facilitatorHeadings = screen.getAllByText('Facilitators')
     expect(facilitatorHeadings.length).toBe(1) // only table 2 has facilitators
@@ -72,13 +72,13 @@ describe('RosterPrintPage', () => {
   })
 
   test('shows absent participants', () => {
-    renderWithState({ assignments: mockAssignments, sessionId: 'test-session' })
+    renderWithState({ assignments: mockAssignments, programId: 'test-program-id' })
     expect(screen.getByText(/Absent:/)).toBeInTheDocument()
     expect(screen.getByText(/Bob Smith/)).toBeInTheDocument()
   })
 
   test('omits Session N prefix when only one session', () => {
-    renderWithState({ assignments: mockAssignments, sessionId: 'test-session' })
+    renderWithState({ assignments: mockAssignments, programId: 'test-program-id' })
     expect(screen.getByText('Roster')).toBeInTheDocument()
     expect(screen.queryByText(/Session 1 Roster/)).not.toBeInTheDocument()
   })
@@ -92,7 +92,7 @@ describe('RosterPrintPage', () => {
       }),
     })
 
-    renderWithState({ assignments: mockAssignments, sessionId: 'test-session' })
+    renderWithState({ assignments: mockAssignments, programId: 'test-program-id' })
     const chart = await screen.findByTestId('circular-table-1')
     expect(chart).toBeInTheDocument()
   })
@@ -109,7 +109,7 @@ describe('RosterPrintPage', () => {
         },
       },
     ]
-    renderWithState({ assignments: multiSession, sessionId: 'test-session' })
+    renderWithState({ assignments: multiSession, programId: 'test-program-id' })
     expect(screen.getByText('Session 1 Roster')).toBeInTheDocument()
     expect(screen.getByText('Session 2 Roster')).toBeInTheDocument()
   })

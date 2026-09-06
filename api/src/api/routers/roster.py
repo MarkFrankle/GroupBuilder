@@ -1,4 +1,4 @@
-import uuid
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -6,11 +6,15 @@ from typing import Optional
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from api.dependencies import validate_program_access
 from api.middleware.auth import get_current_user, AuthUser
 from api.services.roster_service import RosterService, get_roster_service
-from api.services.firestore_service import FirestoreService, get_firestore_service
-from api.services.session_storage import SessionStorage
+from api.services.assignment_set_storage import (
+    AssignmentSetStorage,
+    get_assignment_set_storage,
+)
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
@@ -24,23 +28,11 @@ class ParticipantData(BaseModel):
     keep_together: bool = False
 
 
-async def _validate_program_access(
-    program_id: str,
-    user: AuthUser = Depends(get_current_user),
-    firestore_service: FirestoreService = Depends(get_firestore_service),
-) -> str:
-    """Validate user has access to the given program. Returns program_id."""
-    programs = firestore_service.get_user_programs(user.user_id)
-    if not any(p["id"] == program_id for p in programs):
-        raise HTTPException(status_code=403, detail="Not a member of this program")
-    return program_id
-
-
 @router.get("/")
 @limiter.limit("30/minute")
 async def get_roster(
     request: Request,
-    program_id: str = Depends(_validate_program_access),
+    program_id: str = Depends(validate_program_access),
     roster_service: RosterService = Depends(get_roster_service),
 ):
     participants = roster_service.get_roster(program_id)
@@ -103,8 +95,9 @@ async def generate_from_roster(
     request: Request,
     data: GenerateRequest,
     user: AuthUser = Depends(get_current_user),
-    program_id: str = Depends(_validate_program_access),
+    program_id: str = Depends(validate_program_access),
     roster_service: RosterService = Depends(get_roster_service),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
 ):
     participants = roster_service.get_roster(program_id)
     if not participants:
@@ -127,19 +120,26 @@ async def generate_from_roster(
             detail=f"Need at least {data.num_tables} facilitators for {data.num_tables} tables (have {facilitator_count})",
         )
 
-    session_id = str(uuid.uuid4())
-    storage = SessionStorage()
-    storage.save_session(
-        org_id=program_id,
-        session_id=session_id,
-        user_id=user.user_id,
-        participant_data=participant_list,
-        num_tables=data.num_tables,
-        num_sessions=data.num_sessions,
-        filename="roster",
-    )
+    try:
+        set_id = storage.create_set(
+            program_id=program_id,
+            user_id=user.user_id,
+            participant_data=participant_list,
+            filename="roster",
+            num_tables=data.num_tables,
+            num_sessions=data.num_sessions,
+        )
+    except Exception as e:
+        logger.error(f"Failed to create assignment set: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Couldn't save the new group set. Please try again.",
+        )
 
-    return {"session_id": session_id, "message": "Session created from roster"}
+    return {
+        "assignment_set_id": set_id,
+        "message": "Assignment set created from roster",
+    }
 
 
 @router.put("/{participant_id}")
@@ -148,7 +148,7 @@ async def upsert_participant(
     request: Request,
     participant_id: str,
     data: ParticipantData,
-    program_id: str = Depends(_validate_program_access),
+    program_id: str = Depends(validate_program_access),
     roster_service: RosterService = Depends(get_roster_service),
 ):
     try:
@@ -165,7 +165,7 @@ async def upsert_participant(
 async def delete_participant(
     request: Request,
     participant_id: str,
-    program_id: str = Depends(_validate_program_access),
+    program_id: str = Depends(validate_program_access),
     roster_service: RosterService = Depends(get_roster_service),
 ):
     participant = roster_service.get_participant(program_id, participant_id)

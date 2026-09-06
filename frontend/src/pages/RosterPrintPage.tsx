@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button'
 import { ArrowLeft, Printer } from 'lucide-react'
 import { Assignment, Participant } from './TableAssignmentsPage'
 import CircularTable from '@/components/SeatingChart/CircularTable'
-import { API_BASE_URL } from '@/config/api'
 import { authenticatedFetch } from '@/utils/apiClient'
 
 interface SeatingTable {
@@ -20,7 +19,7 @@ interface SeatingData {
 
 interface LocationState {
   assignments: Assignment[]
-  sessionId: string
+  programId: string
 }
 
 function getLastName(name: string): string {
@@ -45,7 +44,7 @@ const RosterPrintPage: React.FC = () => {
   const handlePrint = () => window.print()
 
   useEffect(() => {
-    if (!state?.assignments || !state?.sessionId) return
+    if (!state?.assignments || !state?.programId) return
 
     const fetchSeating = async () => {
       const results: Record<number, SeatingData> = {}
@@ -53,7 +52,7 @@ const RosterPrintPage: React.FC = () => {
         state.assignments.map(async (assignment) => {
           try {
             const resp = await authenticatedFetch(
-              `${API_BASE_URL}/api/assignments/seating/${state.sessionId}?session=${assignment.session}`,
+              `/api/assignments/seating/${assignment.session}?program_id=${state.programId}`,
               {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
