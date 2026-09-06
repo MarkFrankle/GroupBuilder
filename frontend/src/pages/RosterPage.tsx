@@ -17,7 +17,7 @@ import {
   upsertParticipant, deleteParticipant as apiDeleteParticipant,
   generateFromRoster,
 } from '@/api/roster';
-import { useRoster, useSessionsList } from '@/hooks/queries';
+import { useRoster, useAssignmentSetMetadata } from '@/hooks/queries';
 import { useProgram } from '@/contexts/ProgramContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { authenticatedFetch } from '@/utils/apiClient';
@@ -29,8 +29,8 @@ import { movePartnerAdjacent, sortPartnersAdjacent } from '@/utils/sortWithPartn
 
 type SaveStatus = 'saved' | 'saving' | 'error';
 
-interface SessionSummary {
-  session_id: string;
+interface AssignmentSetSummary {
+  assignment_set_id: string;
   num_tables: number;
   num_sessions: number;
 }
@@ -53,11 +53,9 @@ export function RosterPage() {
   const { currentProgram } = useProgram();
   const queryClient = useQueryClient();
   const { data: rosterData, isLoading: loading, error: fetchError } = useRoster();
-  const { data: sessionsData } = useSessionsList(currentProgram?.id ?? null);
-  const hasExistingSessions = Array.isArray(sessionsData) && sessionsData.length > 0;
-  const sourceSession: SessionSummary | null = hasExistingSessions
-    ? (sessionsData as SessionSummary[])[0]
-    : null;
+  const { data: metadata } = useAssignmentSetMetadata(currentProgram?.id ?? null);
+  const currentSet: AssignmentSetSummary | null =
+    (metadata as AssignmentSetSummary | undefined) ?? null;
 
   const [participants, setParticipants] = useState<RosterParticipant[]>([]);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
@@ -71,14 +69,14 @@ export function RosterPage() {
   const [absencesLoading, setAbsencesLoading] = useState(false);
 
   useEffect(() => {
-    if (!sourceSession) return;
+    if (!currentSet || !currentProgram) return;
     setAbsencesLoading(true);
-    authenticatedFetch(`/api/assignments/results/${sourceSession.session_id}`)
+    authenticatedFetch(`/api/assignments/results?program_id=${currentProgram.id}`)
       .then(res => res.ok ? res.json() : null)
       .then((results: SessionResult[] | null) => setSourceAbsences(results ?? []))
       .catch(() => setSourceAbsences([]))
       .finally(() => setAbsencesLoading(false));
-  }, [sourceSession?.session_id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentSet?.assignment_set_id, currentProgram?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (rosterData) {
@@ -179,6 +177,14 @@ export function RosterPage() {
     }
   }, [participants, currentProgram]);
 
+  const invalidateAssignmentQueries = () => {
+    const programId = currentProgram?.id;
+    queryClient.invalidateQueries({ queryKey: ['assignment-sets', programId] });
+    queryClient.invalidateQueries({ queryKey: ['assignment-set-metadata', programId] });
+    queryClient.invalidateQueries({ queryKey: ['versions', programId] });
+    queryClient.invalidateQueries({ queryKey: ['results', programId] });
+  };
+
   const handleGenerate = async () => {
     setError(null);
     const facilitatorCount = participants.filter(p => p.is_facilitator).length;
@@ -189,16 +195,16 @@ export function RosterPage() {
     setGenerating(true);
     setLoadingMessage('Creating session from roster...');
     try {
-      const sessionId = await generateFromRoster(
+      await generateFromRoster(
         currentProgram!.id, parseInt(numTables), parseInt(numSessions)
       );
       setLoadingMessage('Generating assignments...');
       const response = await fetchWithRetry(
-        `${API_BASE_URL}/api/assignments/?session_id=${sessionId}&max_time_seconds=120`
+        `${API_BASE_URL}/api/assignments/?program_id=${currentProgram!.id}&max_time_seconds=120`
       );
       if (!response.ok) throw new Error('Assignment generation failed');
-      queryClient.invalidateQueries({ queryKey: ['sessions', currentProgram?.id] });
-      navigate(`/table-assignments?session=${sessionId}`);
+      invalidateAssignmentQueries();
+      navigate(`/table-assignments?program=${currentProgram!.id}`);
     } catch (err: any) {
       setError(err.message || 'Failed to generate assignments');
       setGenerating(false);
@@ -207,10 +213,10 @@ export function RosterPage() {
   };
 
   const handleRegenerateExisting = async () => {
-    if (!sourceSession) return;
+    if (!currentSet) return;
     setError(null);
 
-    const { num_tables: srcTables, num_sessions: srcSessions, session_id: srcSessionId } = sourceSession;
+    const { num_tables: srcTables, num_sessions: srcSessions } = currentSet;
 
     const facilitatorCount = participants.filter(p => p.is_facilitator).length;
     if (facilitatorCount > 0 && facilitatorCount < srcTables) {
@@ -232,7 +238,7 @@ export function RosterPage() {
         let sourceResults = sourceAbsences;
         if (sourceResults === null) {
           setLoadingMessage('Reading saved absences...');
-          const resultsRes = await authenticatedFetch(`/api/assignments/results/${srcSessionId}`);
+          const resultsRes = await authenticatedFetch(`/api/assignments/results?program_id=${currentProgram!.id}`);
           sourceResults = resultsRes.ok ? await resultsRes.json() : [];
         }
         sessionsWithAbsences = (sourceResults ?? [])
@@ -242,7 +248,7 @@ export function RosterPage() {
 
       // Create new session from current roster
       setLoadingMessage('Creating session from roster...');
-      const newSessionId = await generateFromRoster(currentProgram!.id, srcTables, srcSessions);
+      await generateFromRoster(currentProgram!.id, srcTables, srcSessions);
 
       // Solve all sessions, applying absences, in a single backend call
       setLoadingMessage('Generating assignments...');
@@ -251,7 +257,7 @@ export function RosterPage() {
         absent_participants: s.absent,
       }));
       const solveRes = await authenticatedFetch(
-        `/api/assignments/regenerate/${newSessionId}/with_absences?max_time_seconds=120`,
+        `/api/assignments/regenerate/with_absences?program_id=${currentProgram!.id}&max_time_seconds=120`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -260,8 +266,8 @@ export function RosterPage() {
       );
       if (!solveRes.ok) throw new Error('Assignment generation failed');
 
-      queryClient.invalidateQueries({ queryKey: ['sessions', currentProgram?.id] });
-      navigate(`/table-assignments?session=${newSessionId}`);
+      invalidateAssignmentQueries();
+      navigate(`/table-assignments?program=${currentProgram!.id}`);
     } catch (err: any) {
       setError(err.message || 'Failed to regenerate assignments');
       setGenerating(false);
@@ -270,8 +276,8 @@ export function RosterPage() {
   };
 
   const canGenerate = participants.length >= parseInt(numTables) && participants.length > 0;
-  const canRegenerateExisting = sourceSession
-    ? participants.length >= sourceSession.num_tables && participants.length > 0
+  const canRegenerateExisting = currentSet
+    ? participants.length >= currentSet.num_tables && participants.length > 0
     : false;
 
   if (loading) {
@@ -307,7 +313,7 @@ export function RosterPage() {
             onKeepTogetherToggle={handleKeepTogetherToggle}
           />
 
-          {hasExistingSessions ? (
+          {currentSet ? (
             <Tabs defaultValue="update">
               <TabsList className="w-full h-auto p-0 bg-transparent border-b rounded-none gap-0">
                 <TabsTrigger
@@ -327,9 +333,9 @@ export function RosterPage() {
               <TabsContent value="update" className="space-y-4 border border-t-0 rounded-b-md p-4 mt-0">
                 <p className="text-sm text-muted-foreground">
                   Regenerate all sessions using your current roster and constraints.
-                  {sourceSession && (
+                  {currentSet && (
                     <span className="ml-1">
-                      Keeps the existing layout: {sourceSession.num_tables} tables &times; {sourceSession.num_sessions} sessions.
+                      Keeps the existing layout: {currentSet.num_tables} tables &times; {currentSet.num_sessions} sessions.
                     </span>
                   )}
                 </p>

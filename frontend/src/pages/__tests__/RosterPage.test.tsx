@@ -36,10 +36,16 @@ const renderPage = () => {
 describe('RosterPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({ participants: [] }),
-    } as Response);
+    mockFetch.mockImplementation((url: string) => {
+      // No assignment set yet for this program
+      if (url.includes('/api/assignments/metadata')) {
+        return Promise.resolve({ ok: false, status: 404, json: async () => ({}) } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ participants: [] }),
+      } as Response);
+    });
   });
 
   test('renders page title', async () => {

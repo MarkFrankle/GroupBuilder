@@ -2,12 +2,12 @@ import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent } from "@/components/ui/card"
 import { Loader2, FolderOpen } from 'lucide-react'
-import { useSessionsList } from '@/hooks/queries'
+import { useAssignmentSetsList } from '@/hooks/queries'
 
 import { useProgram } from '@/contexts/ProgramContext'
 
-interface SessionSummary {
-  session_id: string
+interface AssignmentSetSummary {
+  assignment_set_id: string
   filename: string
   num_participants: number
   num_tables: number
@@ -19,8 +19,8 @@ interface SessionSummary {
 const PreviousGroupsPage: React.FC = () => {
   const { currentProgram } = useProgram()
   const navigate = useNavigate()
-  const { data: sessions = [], isLoading, error } = useSessionsList(currentProgram?.id ?? null) as {
-    data: SessionSummary[] | undefined; isLoading: boolean; error: Error | null
+  const { data: sessions = [], isLoading, error } = useAssignmentSetsList(currentProgram?.id ?? null) as {
+    data: AssignmentSetSummary[] | undefined; isLoading: boolean; error: Error | null
   }
 
   if (isLoading) {
@@ -50,9 +50,9 @@ const PreviousGroupsPage: React.FC = () => {
         <div className="space-y-3">
           {sessions.map((session, index) => (
             <Card
-              key={session.session_id}
+              key={session.assignment_set_id}
               className="cursor-pointer hover:bg-accent/50 transition-colors"
-              onClick={() => navigate(`/table-assignments?session=${session.session_id}`)}
+              onClick={() => navigate(`/table-assignments?program=${currentProgram?.id}`)}
             >
               <CardContent className="flex items-center justify-between py-4">
                 <div className="flex items-center gap-3">
