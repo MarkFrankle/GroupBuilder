@@ -14,6 +14,18 @@ Object.assign(navigator, {
 // Get the mocked authenticatedFetch (already mocked in setupTests.ts)
 const mockAuthenticatedFetch = authenticatedFetch as jest.MockedFunction<typeof authenticatedFetch>
 
+const mockSetCurrentProgram = jest.fn()
+jest.mock('@/contexts/ProgramContext', () => ({
+  useProgram: () => ({
+    currentProgram: { id: 'test-program-id', name: 'Test' },
+    programs: [{ id: 'test-program-id', name: 'Test' }],
+    loading: false,
+    needsProgramSelection: false,
+    setCurrentProgram: mockSetCurrentProgram,
+    refreshPrograms: jest.fn(),
+  }),
+}))
+
 const mockAssignmentsData = [
   {
     session: 1,
@@ -31,10 +43,10 @@ describe('TableAssignmentsPage copy link functionality', () => {
     // Mock window.location
     delete (window as any).location
     window.location = {
-      href: 'http://localhost:3000/results?session=test-123',
+      href: 'http://localhost:3000/results?program=test-program-id',
       origin: 'http://localhost:3000',
       pathname: '/results',
-      search: '?session=test-123',
+      search: '?program=test-program-id',
     } as any
 
     // Clear clipboard mock
@@ -42,7 +54,7 @@ describe('TableAssignmentsPage copy link functionality', () => {
 
     // Mock authenticatedFetch responses (PR #35 uses authenticated API calls)
     mockAuthenticatedFetch.mockImplementation((url: string) => {
-      if (url.includes('/api/assignments/results/') && url.includes('/versions')) {
+      if (url.includes('/api/assignments/results/versions')) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({ versions: [] }),
@@ -93,7 +105,7 @@ describe('TableAssignmentsPage copy link functionality', () => {
 
     await waitFor(() => {
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-        'http://localhost:3000/results?session=test-123'
+        'http://localhost:3000/results?program=test-program-id'
       )
     })
   })
@@ -129,15 +141,15 @@ describe('TableAssignmentsPage session dropdown', () => {
   beforeEach(() => {
     delete (window as any).location
     window.location = {
-      href: 'http://localhost:3000/results?session=test-123',
+      href: 'http://localhost:3000/results?program=test-program-id',
       origin: 'http://localhost:3000',
       pathname: '/results',
-      search: '?session=test-123',
+      search: '?program=test-program-id',
     } as any
 
     // Mock authenticatedFetch responses (PR #35 uses authenticated API calls)
     mockAuthenticatedFetch.mockImplementation((url: string) => {
-      if (url.includes('/api/assignments/results/') && url.includes('/versions')) {
+      if (url.includes('/api/assignments/results/versions')) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({ versions: [] }),
@@ -195,10 +207,10 @@ describe('TableAssignmentsPage unified control bar', () => {
   beforeEach(() => {
     delete (window as any).location
     window.location = {
-      href: 'http://localhost:3000/results?session=test-123',
+      href: 'http://localhost:3000/results?program=test-program-id',
       origin: 'http://localhost:3000',
       pathname: '/results',
-      search: '?session=test-123',
+      search: '?program=test-program-id',
     } as any
 
     // Mock authenticatedFetch responses (PR #35 uses authenticated API calls)

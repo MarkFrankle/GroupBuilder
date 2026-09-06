@@ -35,6 +35,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { authenticatedFetch } from '@/utils/apiClient'
 import { useResultVersions, useAssignmentResults } from '@/hooks/queries'
+import { useProgram } from '@/contexts/ProgramContext'
 
 interface ResultVersion {
   version_id: string
@@ -62,15 +63,25 @@ export interface Assignment {
 
 const TableAssignmentsPage: React.FC = () => {
   const urlParams = new URLSearchParams(window.location.search)
-  const sessionId = urlParams.get('session') || (window.history.state?.usr as any)?.sessionId || null
+  const programParam = urlParams.get('program')
   const versionParam = urlParams.get('version') || undefined
 
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const { currentProgram, programs, setCurrentProgram } = useProgram()
+  const programId = currentProgram?.id ?? null
 
-  const { data: versionsData } = useResultVersions(sessionId)
+  // A shared link can carry ?program=<id>. Adopt it, but only if the user is
+  // actually a member of that program.
+  useEffect(() => {
+    if (!programParam || programParam === currentProgram?.id) return
+    const match = programs.find(p => p.id === programParam)
+    if (match) setCurrentProgram(match)
+  }, [programParam, currentProgram?.id, programs, setCurrentProgram])
+
+  const { data: versionsData } = useResultVersions(programId)
   const [currentVersion, setCurrentVersion] = useState<string>(versionParam ?? 'latest')
-  const { data: fetchedAssignments, isLoading: loading, error: fetchError } = useAssignmentResults(sessionId, currentVersion !== 'latest' ? currentVersion : undefined)
+  const { data: fetchedAssignments, isLoading: loading, error: fetchError } = useAssignmentResults(programId, currentVersion !== 'latest' ? currentVersion : undefined)
 
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -154,8 +165,8 @@ const TableAssignmentsPage: React.FC = () => {
 
   const handleCopyLink = async () => {
     try {
-      if (!sessionId) {
-        console.error('No session ID available to copy')
+      if (!programId) {
+        console.error('No program available to copy')
         setCopyError(true)
         setTimeout(() => {
           setCopyError(false)
@@ -165,7 +176,7 @@ const TableAssignmentsPage: React.FC = () => {
 
       // Construct URL with session and version
       const baseUrl = `${window.location.origin}${window.location.pathname}`
-      const params = new URLSearchParams({ session: sessionId })
+      const params = new URLSearchParams({ program: programId })
       
       // Only include version if it's not 'latest'
       if (currentVersion !== 'latest') {
@@ -192,14 +203,14 @@ const TableAssignmentsPage: React.FC = () => {
 
   const handlePrintRoster = () => {
     navigate('/table-assignments/roster-print', {
-      state: { assignments, sessionId }
+      state: { assignments, programId }
     })
   }
 
   const handlePrintSeating = async () => {
     try {
-      if (!sessionId) {
-        throw new Error('Session ID not found. Please upload a file again.')
+      if (!programId) {
+        throw new Error('No program selected.')
       }
 
       // Find the current session assignment
@@ -210,7 +221,7 @@ const TableAssignmentsPage: React.FC = () => {
 
       // POST to backend seating API endpoint
       const response = await authenticatedFetch(
-        `/api/assignments/seating/${sessionId}?session=${currentSession}`,
+        `/api/assignments/seating/${currentSession}?program_id=${programId}`,
         {
           method: 'POST',
           headers: {
@@ -228,7 +239,7 @@ const TableAssignmentsPage: React.FC = () => {
       const seatingData = await response.json()
 
       // Navigate to seating chart page with the data
-      navigate(`/table-assignments/seating?session=${sessionId}&sessionNum=${currentSession}`, {
+      navigate(`/table-assignments/seating?program=${programId}&sessionNum=${currentSession}`, {
         state: { seatingData }
       })
     } catch (err) {
@@ -244,8 +255,8 @@ const TableAssignmentsPage: React.FC = () => {
 
     // Update URL without reload
     const newUrl = versionId !== 'latest'
-      ? `${window.location.pathname}?session=${sessionId}&version=${versionId}`
-      : `${window.location.pathname}?session=${sessionId}`
+      ? `${window.location.pathname}?program=${programId}&version=${versionId}`
+      : `${window.location.pathname}?program=${programId}`
     window.history.replaceState({}, '', newUrl)
   }
 
@@ -266,8 +277,8 @@ const TableAssignmentsPage: React.FC = () => {
     setAbortController(controller)
 
     try {
-      if (!sessionId) {
-        throw new Error('Session ID not found. Please upload a file again.')
+      if (!programId) {
+        throw new Error('No program selected.')
       }
 
       const perSessionAbsences = maintainAbsencesOnRegen
@@ -277,7 +288,7 @@ const TableAssignmentsPage: React.FC = () => {
         : []
 
       const response = await authenticatedFetch(
-        `/api/assignments/regenerate/${sessionId}/with_absences?max_time_seconds=${DEFAULT_SOLVER_TIMEOUT_SECONDS}`,
+        `/api/assignments/regenerate/with_absences?program_id=${programId}&max_time_seconds=${DEFAULT_SOLVER_TIMEOUT_SECONDS}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -299,8 +310,8 @@ const TableAssignmentsPage: React.FC = () => {
       setRegenerateSuccess(true)
 
       // Invalidate queries so versions list refreshes
-      queryClient.invalidateQueries({ queryKey: ['versions', sessionId] })
-      queryClient.invalidateQueries({ queryKey: ['results', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['versions', programId] })
+      queryClient.invalidateQueries({ queryKey: ['results', programId] })
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         // Regeneration was cancelled
@@ -331,8 +342,8 @@ const TableAssignmentsPage: React.FC = () => {
     setError(null)
 
     try {
-      if (!sessionId) {
-        throw new Error('Session ID not found. Please upload a file again.')
+      if (!programId) {
+        throw new Error('No program selected.')
       }
 
       const sessionAssignment = assignments.find(a => a.session === sessionNumber)
@@ -351,6 +362,7 @@ const TableAssignmentsPage: React.FC = () => {
       })
 
       const queryParams = new URLSearchParams({
+        program_id: programId,
         max_time_seconds: '30'  // Fast 30-second timeout for single session
       })
 
@@ -359,7 +371,7 @@ const TableAssignmentsPage: React.FC = () => {
       }
 
       const response = await authenticatedFetch(
-        `/api/assignments/regenerate/${sessionId}/session/${sessionNumber}?${queryParams}`,
+        `/api/assignments/regenerate/session/${sessionNumber}?${queryParams}`,
         {
           method: 'POST',
           headers: {
@@ -534,7 +546,7 @@ const TableAssignmentsPage: React.FC = () => {
       // Save edits as a new version if actual changes were made
       if (undoStack.length > 0) {
         try {
-          const response = await authenticatedFetch(`/api/assignments/results/${sessionId}/save`, {
+          const response = await authenticatedFetch(`/api/assignments/results/save?program_id=${programId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -553,10 +565,11 @@ const TableAssignmentsPage: React.FC = () => {
           setCurrentVersion(result.version_id)
 
           // Invalidate versions query to refresh the list
-          queryClient.invalidateQueries({ queryKey: ['versions', sessionId] })
+          queryClient.invalidateQueries({ queryKey: ['versions', programId] })
+          queryClient.invalidateQueries({ queryKey: ['results', programId] })
 
           // Update URL to reflect new version
-          const newUrl = `${window.location.pathname}?session=${sessionId}&version=${result.version_id}`
+          const newUrl = `${window.location.pathname}?program=${programId}&version=${result.version_id}`
           window.history.replaceState({}, '', newUrl)
 
           // Clear undo stack — saved state is now the baseline
@@ -574,7 +587,7 @@ const TableAssignmentsPage: React.FC = () => {
     setEditMode(!editMode)
   }
 
-  const displayError = !sessionId ? 'Session expired. Please upload a file again.' : fetchError?.message || error
+  const displayError = !programId ? 'No assignments for this program yet. Generate them from the Roster page.' : fetchError?.message || error
 
   if (loading) {
     return (
