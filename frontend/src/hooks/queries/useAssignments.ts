@@ -1,43 +1,43 @@
 import { useQuery } from '@tanstack/react-query'
 import { authenticatedFetch } from '@/utils/apiClient'
 
-export function useResultVersions(sessionId: string | null) {
+export function useResultVersions(programId: string | null) {
   return useQuery({
-    queryKey: ['versions', sessionId],
+    queryKey: ['versions', programId],
     queryFn: async () => {
-      const response = await authenticatedFetch(`/api/assignments/results/${sessionId}/versions`)
+      const response = await authenticatedFetch(`/api/assignments/results/versions?program_id=${programId}`)
       if (!response.ok) throw new Error('Failed to fetch versions')
       const data = await response.json()
       return data.versions || []
     },
-    enabled: !!sessionId,
+    enabled: !!programId,
   })
 }
 
-export function useAssignmentResults(sessionId: string | null, version?: string) {
+export function useAssignmentResults(programId: string | null, version?: string) {
   return useQuery({
-    queryKey: ['results', sessionId, version ?? 'latest'],
+    queryKey: ['results', programId, version ?? 'latest'],
     queryFn: async () => {
-      const versionQuery = version ? `?version=${version}` : ''
-      const response = await authenticatedFetch(`/api/assignments/results/${sessionId}${versionQuery}`)
+      const versionQuery = version ? `&version=${version}` : ''
+      const response = await authenticatedFetch(`/api/assignments/results?program_id=${programId}${versionQuery}`)
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.detail || 'Failed to fetch assignments')
       }
       return response.json()
     },
-    enabled: !!sessionId,
+    enabled: !!programId,
   })
 }
 
-export function useSessionMetadata(sessionId: string | null) {
+export function useAssignmentSetMetadata(programId: string | null) {
   return useQuery({
-    queryKey: ['session-metadata', sessionId],
+    queryKey: ['assignment-set-metadata', programId],
     queryFn: async () => {
-      const response = await authenticatedFetch(`/api/assignments/sessions/${sessionId}/metadata`)
+      const response = await authenticatedFetch(`/api/assignments/metadata?program_id=${programId}`)
       if (!response.ok) throw new Error('Failed to fetch metadata')
       return response.json()
     },
-    enabled: !!sessionId,
+    enabled: !!programId,
   })
 }

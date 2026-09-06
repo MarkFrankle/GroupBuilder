@@ -49,5 +49,5 @@ export async function generateFromRoster(
     throw new Error(`Failed to generate: ${response.status}`);
   }
   const data = await response.json();
-  return data.session_id;
+  return data.assignment_set_id;
 }
