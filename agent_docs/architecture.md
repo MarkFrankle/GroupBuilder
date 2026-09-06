@@ -81,7 +81,6 @@ Every route below takes `?program_id=<id>` and is gated by `validate_program_acc
 | GET | `/api/assignments/results` (optional `&version=<v>`) |
 | GET | `/api/assignments/results/versions` |
 | POST | `/api/assignments/results/save` |
-| GET | `/api/assignments/assignment_sets` |
 | GET | `/api/assignments/metadata` |
 | POST | `/api/assignments/seating/{session_number}` |
 | GET | `/api/roster/` |
@@ -101,18 +100,21 @@ Every route below takes `?program_id=<id>` and is gated by `validate_program_acc
 | `/select-program` | ProgramSelectorPage | Yes |
 | `/` | LandingPage | Yes + Program |
 | `/roster` | RosterPage | Yes + Program |
-| `/groups` | PreviousGroupsPage | Yes + Program |
 | `/table-assignments` | TableAssignmentsPage | Yes + Program |
 | `/table-assignments/seating` | SeatingChartPage | Yes + Program |
 | `/table-assignments/roster-print` | RosterPrintPage | Yes + Program |
 | `/admin` | AdminDashboard | Yes |
 | `/admin/help` | AdminHelpPage | Yes |
+| `*` | NotFoundPage | No |
 
 Assignment-bearing pages carry `?program=<id>` in the URL (previously `?session=<uuid>`).
 A shared link is adopted only if the recipient is a member of that program.
 
 ## Frontend Data Hooks
 
-`useAssignmentSetsList` (`hooks/queries/useAssignmentSets.ts`) and
-`useAssignmentSetMetadata` (`hooks/queries/useAssignments.ts`), both re-exported from
+`useAssignmentSetMetadata` (`hooks/queries/useAssignments.ts`), re-exported from
 `hooks/queries/index.ts`. Query keys are scoped to `programId`, not to a lineage id.
+
+There is no route or hook that lists a program's assignment sets. A Program has exactly
+one reachable set — the one its `current_assignment_set_id` points at — and older sets
+have no route and appear in no URL.

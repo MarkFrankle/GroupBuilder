@@ -400,18 +400,13 @@ class TestSaveEditedAssignments:
 
 
 class TestListAssignmentSets:
-    """Test suite for GET /api/assignments/assignment_sets endpoint."""
+    """The Previous Groups shim is gone; the route must 404."""
 
-    def test_list_sets(self, client, sample_set_data, add_assignment_set_to_firestore):
-        """All assignment sets for the program are listed."""
-        add_assignment_set_to_firestore(sample_set_data)
-
+    def test_route_is_gone(self, client):
+        """GET /assignment_sets no longer exists."""
         response = client.get(f"/api/assignments/assignment_sets?program_id={PROGRAM}")
 
-        assert response.status_code == 200
-        data = response.json()
-        assert len(data) == 1
-        assert data[0]["num_participants"] == 4
+        assert response.status_code == 404
 
 
 class TestAssignmentSetMetadata:

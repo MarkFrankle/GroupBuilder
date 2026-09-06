@@ -18,7 +18,7 @@ import ProgramSelectorPage from "./pages/ProgramSelectorPage"
 import RosterPrintPage from "./pages/RosterPrintPage"
 import HelpPage from "./pages/HelpPage"
 import LegalPage from "./pages/LegalPage"
-import PreviousGroupsPage from "./pages/PreviousGroupsPage"
+import NotFoundPage from "./pages/NotFoundPage"
 import ProtectedRoute from "./components/ProtectedRoute"
 
 function useShowChrome() {
@@ -43,7 +43,7 @@ function NavBar() {
       {(hasProgram || isAdminPage || isHelpPage) && <>
         <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
         <Link to="/roster" className="text-muted-foreground hover:text-foreground transition-colors">Roster</Link>
-        <Link to="/groups" className="text-muted-foreground hover:text-foreground transition-colors">Groups</Link>
+        <Link to="/table-assignments" className="text-muted-foreground hover:text-foreground transition-colors">Assignments</Link>
         <Link to="/help" className="text-muted-foreground hover:text-foreground transition-colors">Help</Link>
       </>}
       <div className="ml-auto flex gap-4 items-center">
@@ -131,14 +131,6 @@ const App: React.FC = () => {
                 }
               />
               <Route
-                path="/groups"
-                element={
-                  <ProtectedRoute>
-                    <PreviousGroupsPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
                 path="/admin"
                 element={
                   <ProtectedRoute>
@@ -178,6 +170,7 @@ const App: React.FC = () => {
                   </ProtectedRoute>
                 }
               />
+              <Route path="*" element={<NotFoundPage />} />
             </Routes>
             </div>
             <Footer />

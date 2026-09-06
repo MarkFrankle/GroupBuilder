@@ -179,7 +179,6 @@ export function RosterPage() {
 
   const invalidateAssignmentQueries = () => {
     const programId = currentProgram?.id;
-    queryClient.invalidateQueries({ queryKey: ['assignment-sets', programId] });
     queryClient.invalidateQueries({ queryKey: ['assignment-set-metadata', programId] });
     queryClient.invalidateQueries({ queryKey: ['versions', programId] });
     queryClient.invalidateQueries({ queryKey: ['results', programId] });
