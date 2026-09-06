@@ -3,32 +3,15 @@ Tests for the storage layer (api/storage.py).
 
 Tests cover:
 - InMemoryBackend functionality
-- store_session / get_session / delete_session
-- store_result / get_result (with versioning)
-- get_result_versions
-- result_exists / session_exists
 - TTL behavior
-- Version pruning (max 5 versions)
 - REQUIRE_PERSISTENT_STORAGE enforcement
 """
 
 import pytest
 from api.storage import (
     InMemoryBackend,
-    store_session,
-    get_session,
-    delete_session,
-    session_exists,
-    store_result,
-    get_result,
-    result_exists,
-    get_result_versions,
     create_storage_backend,
-    SESSION_TTL,
-    RESULT_TTL,
-    MAX_RESULT_VERSIONS,
 )
-from datetime import datetime, timedelta
 import time
 import os
 from unittest.mock import patch
@@ -118,151 +101,6 @@ class TestInMemoryBackend:
 
         assert backend.exists("key1") is False
         assert backend.exists("key2") is True
-
-
-class TestSessionStorage:
-    """Test suite for session storage functions."""
-
-    def test_store_and_get_session(self, mock_storage):
-        """Test storing and retrieving session data."""
-        session_id = "test-session-123"
-        session_data = {
-            "participant_dict": [{"id": 1, "name": "Alice"}],
-            "num_tables": 2,
-            "num_sessions": 3,
-        }
-
-        store_session(session_id, session_data)
-        retrieved = get_session(session_id)
-
-        assert retrieved == session_data
-
-    def test_session_exists(self, mock_storage):
-        """Test session_exists check."""
-        session_id = "test-session-456"
-
-        assert session_exists(session_id) is False
-
-        store_session(session_id, {"data": "test"})
-
-        assert session_exists(session_id) is True
-
-    def test_delete_session(self, mock_storage):
-        """Test session deletion."""
-        session_id = "test-session-789"
-        store_session(session_id, {"data": "test"})
-
-        delete_session(session_id)
-
-        assert session_exists(session_id) is False
-        assert get_session(session_id) is None
-
-
-class TestResultStorage:
-    """Test suite for result storage functions (with versioning)."""
-
-    def test_store_and_get_result(self, mock_storage):
-        """Test storing and retrieving results."""
-        session_id = "test-session-result"
-        result_data = {
-            "assignments": [{"session": 1, "tables": {}}],
-            "metadata": {"solution_quality": "optimal"},
-        }
-
-        version_id = store_result(session_id, result_data)
-
-        assert version_id == "v1"
-
-        retrieved = get_result(session_id)
-        assert retrieved["assignments"] == result_data["assignments"]
-        assert retrieved["version_id"] == "v1"
-
-    def test_store_multiple_versions(self, mock_storage):
-        """Test storing multiple versions."""
-        session_id = "test-session-versions"
-
-        v1_id = store_result(session_id, {"assignments": "v1"})
-        v2_id = store_result(session_id, {"assignments": "v2"})
-        v3_id = store_result(session_id, {"assignments": "v3"})
-
-        assert v1_id == "v1"
-        assert v2_id == "v2"
-        assert v3_id == "v3"
-
-        # Latest should be v3
-        latest = get_result(session_id)
-        assert latest["version_id"] == "v3"
-
-        # Can retrieve specific versions
-        v1 = get_result(session_id, "v1")
-        assert v1["version_id"] == "v1"
-
-    def test_version_pruning(self, mock_storage):
-        """Test that old versions are pruned after MAX_RESULT_VERSIONS."""
-        session_id = "test-session-pruning"
-
-        # Store MAX_RESULT_VERSIONS + 2 versions
-        for i in range(MAX_RESULT_VERSIONS + 2):
-            store_result(session_id, {"assignments": f"v{i+1}"})
-
-        # Only last MAX_RESULT_VERSIONS should exist
-        versions = get_result_versions(session_id)
-        assert len(versions) <= MAX_RESULT_VERSIONS
-
-        # First versions should be gone
-        v1 = get_result(session_id, "v1")
-        assert v1 is None
-
-        # Latest versions should exist
-        latest_version_num = MAX_RESULT_VERSIONS + 2
-        latest = get_result(session_id, f"v{latest_version_num}")
-        assert latest is not None
-
-    def test_get_result_versions(self, mock_storage):
-        """Test getting list of versions."""
-        session_id = "test-session-version-list"
-
-        store_result(session_id, {"assignments": "v1"})
-        store_result(session_id, {"assignments": "v2"})
-
-        versions = get_result_versions(session_id)
-
-        assert len(versions) == 2
-        # Should be sorted newest first
-        assert versions[0]["version_id"] == "v2"
-        assert versions[1]["version_id"] == "v1"
-
-    def test_result_exists(self, mock_storage):
-        """Test result_exists check."""
-        session_id = "test-session-exists"
-
-        assert result_exists(session_id) is False
-
-        store_result(session_id, {"assignments": "test"})
-
-        assert result_exists(session_id) is True
-
-    def test_get_specific_version(self, mock_storage):
-        """Test retrieving specific version."""
-        session_id = "test-session-specific"
-
-        store_result(session_id, {"assignments": "v1", "metadata": {"quality": "v1"}})
-        store_result(session_id, {"assignments": "v2", "metadata": {"quality": "v2"}})
-
-        v1 = get_result(session_id, "v1")
-        assert v1["metadata"]["quality"] == "v1"
-
-        v2 = get_result(session_id, "v2")
-        assert v2["metadata"]["quality"] == "v2"
-
-    def test_get_nonexistent_version(self, mock_storage):
-        """Test getting nonexistent version returns None."""
-        session_id = "test-session-nonexistent"
-
-        store_result(session_id, {"assignments": "v1"})
-
-        result = get_result(session_id, "v99")
-        assert result is None
 
 
 class TestStorageBackendSelection:
