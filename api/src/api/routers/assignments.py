@@ -6,6 +6,10 @@ from api.services.assignment_set_storage import (
     AssignmentSetStorage,
     get_assignment_set_storage,
 )
+from api.services.session_completion_storage import (
+    SessionCompletionStorage,
+    get_session_completion_storage,
+)
 from api.utils.seating_arrangement import arrange_circular_seating
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -52,6 +56,28 @@ def _require_current_set(
         )
         raise HTTPException(status_code=500, detail=ASSIGNMENT_SET_MISSING)
     return set_id, assignment_set
+
+
+SESSION_COMPLETE_REFUSAL = (
+    "Session {n} is marked complete and cannot be changed. "
+    "Reopen it first if you need to make changes."
+)
+
+
+def _validate_session_number(
+    storage: AssignmentSetStorage, program_id: str, session_number: int
+) -> None:
+    """Refuse a session number the current assignment set does not contain."""
+    _, assignment_set = _require_current_set(storage, program_id)
+    num_sessions = assignment_set.get("num_sessions") or 0
+    if session_number > num_sessions:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"There is no session {session_number}. "
+                f"This program only has {num_sessions} sessions."
+            ),
+        )
 
 
 def _next_version_id(
@@ -751,6 +777,50 @@ async def get_assignment_set_metadata(
         "created_at": created_at_unix,
         "has_results": storage.get_version(program_id, set_id) is not None,
     }
+
+
+@router.get("/completion")
+async def get_session_completion(
+    program_id: str = Depends(validate_program_access),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+    completion: SessionCompletionStorage = Depends(get_session_completion_storage),
+):
+    """Which Sessions (meeting nights) are marked complete."""
+    _require_current_set_id(storage, program_id)
+
+    return {"completed_sessions": completion.get_completed_sessions(program_id)}
+
+
+@router.post("/completion/{session_number}")
+async def mark_session_complete(
+    session_number: int = Path(..., description="Session number (1-based)", ge=1),
+    program_id: str = Depends(validate_program_access),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+    completion: SessionCompletionStorage = Depends(get_session_completion_storage),
+):
+    """Mark one Session complete. Idempotent."""
+    _validate_session_number(storage, program_id, session_number)
+
+    completed = completion.mark_complete(program_id, session_number)
+    logger.info(f"Marked session {session_number} complete for program {program_id}")
+
+    return {"completed_sessions": completed}
+
+
+@router.delete("/completion/{session_number}")
+async def reopen_session(
+    session_number: int = Path(..., description="Session number (1-based)", ge=1),
+    program_id: str = Depends(validate_program_access),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+    completion: SessionCompletionStorage = Depends(get_session_completion_storage),
+):
+    """Reopen a completed Session. A no-op if it was not complete."""
+    _validate_session_number(storage, program_id, session_number)
+
+    completed = completion.mark_incomplete(program_id, session_number)
+    logger.info(f"Reopened session {session_number} for program {program_id}")
+
+    return {"completed_sessions": completed}
 
 
 class SeatingRequest(BaseModel):
