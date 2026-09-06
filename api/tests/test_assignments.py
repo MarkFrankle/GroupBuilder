@@ -941,12 +941,17 @@ class TestSessionCompletion:
     def test_mark_complete(
         self, client, sample_set_data, add_assignment_set_to_firestore
     ):
+        """Session 2 is the last valid session, so this covers the boundary too."""
         add_assignment_set_to_firestore(sample_set_data)
 
-        response = client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+        response = client.post(f"/api/assignments/completion/2?program_id={PROGRAM}")
 
         assert response.status_code == 200
-        assert response.json() == {"completed_sessions": [1]}
+        assert response.json() == {"completed_sessions": [2]}
+
+        # The completion must actually persist, not just come back in the response.
+        readback = client.get(f"/api/assignments/completion?program_id={PROGRAM}")
+        assert readback.json() == {"completed_sessions": [2]}
 
     def test_mark_complete_is_idempotent(
         self, client, sample_set_data, add_assignment_set_to_firestore
@@ -958,6 +963,16 @@ class TestSessionCompletion:
 
         assert response.status_code == 200
         assert response.json() == {"completed_sessions": [1]}
+
+    def test_reopen_when_not_complete_is_a_no_op(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        add_assignment_set_to_firestore(sample_set_data)
+
+        response = client.delete(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        assert response.status_code == 200
+        assert response.json() == {"completed_sessions": []}
 
     def test_reopen(self, client, sample_set_data, add_assignment_set_to_firestore):
         add_assignment_set_to_firestore(sample_set_data)
@@ -977,7 +992,7 @@ class TestSessionCompletion:
         response = client.post(f"/api/assignments/completion/5?program_id={PROGRAM}")
 
         assert response.status_code == 400
-        assert "only has 2 sessions" in response.json()["detail"]
+        assert "sessions 1 through 2" in response.json()["detail"]
 
     def test_requires_an_assignment_set(self, client):
         response = client.get(f"/api/assignments/completion?program_id={OTHER_PROGRAM}")

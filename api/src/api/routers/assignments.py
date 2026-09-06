@@ -58,10 +58,12 @@ def _require_current_set(
     return set_id, assignment_set
 
 
-SESSION_COMPLETE_REFUSAL = (
-    "Session {n} is marked complete and cannot be changed. "
-    "Reopen it first if you need to make changes."
-)
+def session_complete_refusal(session_number: int) -> str:
+    """Message refusing a change to a Session the user has marked complete."""
+    return (
+        f"Session {session_number} is marked complete and cannot be changed. "
+        "Reopen it first if you need to make changes."
+    )
 
 
 def _validate_session_number(
@@ -75,7 +77,7 @@ def _validate_session_number(
             status_code=400,
             detail=(
                 f"There is no session {session_number}. "
-                f"This program only has {num_sessions} sessions."
+                f"This program has sessions 1 through {num_sessions}."
             ),
         )
 
