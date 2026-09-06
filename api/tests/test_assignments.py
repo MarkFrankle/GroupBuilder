@@ -998,3 +998,29 @@ class TestSessionCompletion:
         response = client.get(f"/api/assignments/completion?program_id={OTHER_PROGRAM}")
 
         assert response.status_code == 404
+
+    def test_shuffle_refuses_on_a_completed_session(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        add_assignment_set_to_firestore(sample_set_data)
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        response = client.post(
+            f"/api/assignments/regenerate/session/1?program_id={PROGRAM}", json=[]
+        )
+
+        assert response.status_code == 409
+        assert "Session 1 is marked complete" in response.json()["detail"]
+
+    def test_shuffle_allowed_on_an_open_session(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """A completed session 1 must not freeze session 2."""
+        add_assignment_set_to_firestore(sample_set_data)
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        response = client.post(
+            f"/api/assignments/regenerate/session/2?program_id={PROGRAM}", json=[]
+        )
+
+        assert response.status_code != 409

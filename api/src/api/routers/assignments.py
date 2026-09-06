@@ -475,6 +475,7 @@ async def regenerate_single_session(
     ),
     absent_participants: List[Dict[str, Any]] = Body(default=[]),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+    completion: SessionCompletionStorage = Depends(get_session_completion_storage),
 ):
     """
     Regenerate a single session while keeping other sessions unchanged.
@@ -493,6 +494,12 @@ async def regenerate_single_session(
     Returns:
         New version with the regenerated session merged in
     """
+    if completion.is_complete(program_id, session_number):
+        raise HTTPException(
+            status_code=409,
+            detail=session_complete_refusal(session_number),
+        )
+
     set_id, assignment_set = _require_current_set(storage, program_id)
 
     try:
