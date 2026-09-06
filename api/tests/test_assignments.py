@@ -797,7 +797,8 @@ class TestRegenerateSingleSession:
         )
 
         assert response.status_code == 400
-        assert "Invalid session number" in response.json()["detail"]
+        assert "There is no session 5" in response.json()["detail"]
+        assert "sessions 1 through 2" in response.json()["detail"]
 
     def test_regenerate_single_session_max_time_validation(
         self, client, sample_set_data, add_assignment_set_to_firestore
@@ -1015,7 +1016,11 @@ class TestSessionCompletion:
     def test_shuffle_allowed_on_an_open_session(
         self, client, sample_set_data, add_assignment_set_to_firestore
     ):
-        """A completed session 1 must not freeze session 2."""
+        """A completed session 1 must not freeze session 2.
+
+        The proof is a 404, not a 200: the freeze did not fire, so the handler
+        ran on to look for a stored version, which this fixture has never saved.
+        """
         add_assignment_set_to_firestore(sample_set_data)
         client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
 
@@ -1023,4 +1028,60 @@ class TestSessionCompletion:
             f"/api/assignments/regenerate/session/2?program_id={PROGRAM}", json=[]
         )
 
-        assert response.status_code != 409
+        assert response.status_code == 404
+
+    def test_full_regeneration_refuses_when_a_session_is_complete(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        add_assignment_set_to_firestore(sample_set_data)
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        response = client.post(f"/api/assignments/regenerate?program_id={PROGRAM}")
+
+        assert response.status_code == 409
+        assert "Session 1" in response.json()["detail"]
+
+    def test_regenerate_with_absences_refuses_when_a_session_is_complete(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        add_assignment_set_to_firestore(sample_set_data)
+        client.post(f"/api/assignments/completion/2?program_id={PROGRAM}")
+
+        response = client.post(
+            f"/api/assignments/regenerate/with_absences?program_id={PROGRAM}", json=[]
+        )
+
+        assert response.status_code == 409
+
+    def test_refusal_names_several_completed_sessions_readably(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """Two completed sessions must read as a plural sentence, not a list glued
+        onto a singular verb."""
+        add_assignment_set_to_firestore(sample_set_data)
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+        client.post(f"/api/assignments/completion/2?program_id={PROGRAM}")
+
+        response = client.post(f"/api/assignments/regenerate?program_id={PROGRAM}")
+
+        assert response.status_code == 409
+        detail = response.json()["detail"]
+        assert "Sessions 1 and 2 are already complete" in detail
+        assert "reopen" in detail.lower()
+
+    @patch("api.routers.assignments.handle_generate_assignments")
+    def test_full_regeneration_still_runs_when_nothing_is_complete(
+        self,
+        mock_generate,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+    ):
+        """The guard must block only frozen programs, never every rebuild."""
+        add_assignment_set_to_firestore(sample_set_data)
+        mock_generate.return_value = sample_assignments_result
+
+        response = client.post(f"/api/assignments/regenerate?program_id={PROGRAM}")
+
+        assert response.status_code == 200

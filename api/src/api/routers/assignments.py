@@ -66,6 +66,37 @@ def session_complete_refusal(session_number: int) -> str:
     )
 
 
+def sessions_complete_refusal(session_numbers: List[int]) -> str:
+    """Message refusing a whole-program rebuild because Sessions are complete.
+
+    Reads as a sentence for one Session and for several, and always ends with
+    the two ways out.
+    """
+    numbers = [str(n) for n in session_numbers]
+    if len(numbers) == 1:
+        listed = f"Session {numbers[0]} is"
+        remedy = "reopen the completed session first"
+    else:
+        joined = " and ".join([", ".join(numbers[:-1]), numbers[-1]])
+        listed = f"Sessions {joined} are"
+        remedy = "reopen the completed sessions first"
+    return (
+        f"{listed} already complete, so the whole program cannot be rebuilt. "
+        f"Shuffle a single session instead, or {remedy}."
+    )
+
+
+def _refuse_if_any_session_complete(
+    completion: SessionCompletionStorage, program_id: str
+) -> None:
+    """Full-program rebuilds cannot run once any Session is frozen."""
+    completed = completion.get_completed_sessions(program_id)
+    if completed:
+        raise HTTPException(
+            status_code=409, detail=sessions_complete_refusal(completed)
+        )
+
+
 def _validate_session_number(
     storage: AssignmentSetStorage, program_id: str, session_number: int
 ) -> None:
@@ -307,8 +338,11 @@ async def regenerate_assignments(
         120, ge=30, le=240, description="Maximum solver time in seconds (30-240)"
     ),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+    completion: SessionCompletionStorage = Depends(get_session_completion_storage),
 ):
     """Regenerate assignments from the current assignment set's roster snapshot."""
+    _refuse_if_any_session_complete(completion, program_id)
+
     set_id, assignment_set = _require_current_set(storage, program_id)
 
     try:
@@ -342,6 +376,7 @@ async def regenerate_all_with_absences(
     max_time_seconds: int = Query(120, ge=30, le=240),
     per_session_absences: List[Dict[str, Any]] = Body(default=[]),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+    completion: SessionCompletionStorage = Depends(get_session_completion_storage),
 ):
     """
     Regenerate all sessions with per-session absences, saving exactly one new version.
@@ -349,6 +384,8 @@ async def regenerate_all_with_absences(
     per_session_absences: [{"session_number": 1, "absent_participants": [...]}, ...]
     Sessions not listed are solved with all participants present.
     """
+    _refuse_if_any_session_complete(completion, program_id)
+
     set_id, assignment_set = _require_current_set(storage, program_id)
 
     try:
@@ -500,19 +537,13 @@ async def regenerate_single_session(
             detail=session_complete_refusal(session_number),
         )
 
+    _validate_session_number(storage, program_id, session_number)
+
     set_id, assignment_set = _require_current_set(storage, program_id)
 
     try:
         num_tables = assignment_set["num_tables"]
-        num_sessions = assignment_set["num_sessions"]
         all_participants = assignment_set["participant_data"]
-
-        # Validate session number
-        if session_number > num_sessions:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid session number {session_number}. This program only has {num_sessions} sessions.",
-            )
 
         # 2. Get current assignments (from specified version or latest)
         current_result = storage.get_version(program_id, set_id, version_id=version_id)
