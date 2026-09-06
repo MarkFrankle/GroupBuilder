@@ -18,6 +18,7 @@ import ProgramSelectorPage from "./pages/ProgramSelectorPage"
 import RosterPrintPage from "./pages/RosterPrintPage"
 import HelpPage from "./pages/HelpPage"
 import LegalPage from "./pages/LegalPage"
+import NotFoundPage from "./pages/NotFoundPage"
 import ProtectedRoute from "./components/ProtectedRoute"
 
 function useShowChrome() {
@@ -169,6 +170,7 @@ const App: React.FC = () => {
                   </ProtectedRoute>
                 }
               />
+              <Route path="*" element={<NotFoundPage />} />
             </Routes>
             </div>
             <Footer />
