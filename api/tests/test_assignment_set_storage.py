@@ -55,6 +55,13 @@ def test_program_with_no_set_returns_none(storage):
     assert storage.get_current_set_id(PROGRAM) is None
 
 
+def test_program_document_that_does_not_exist_returns_none(storage):
+    """PROGRAM is pre-created by the client fixture; this covers a brand-new
+    program whose document has not been written at all."""
+    assert storage.get_current_set_id("program_that_does_not_exist") is None
+    assert storage.get_current_set("program_that_does_not_exist") is None
+
+
 def test_save_and_get_version(storage):
     set_id = _make_set(storage)
 
