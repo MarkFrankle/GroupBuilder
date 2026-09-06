@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -7,8 +9,12 @@ from slowapi.util import get_remote_address
 from api.dependencies import validate_program_access
 from api.middleware.auth import get_current_user, AuthUser
 from api.services.roster_service import RosterService, get_roster_service
-from api.services.assignment_set_storage import AssignmentSetStorage
+from api.services.assignment_set_storage import (
+    AssignmentSetStorage,
+    get_assignment_set_storage,
+)
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
@@ -91,6 +97,7 @@ async def generate_from_roster(
     user: AuthUser = Depends(get_current_user),
     program_id: str = Depends(validate_program_access),
     roster_service: RosterService = Depends(get_roster_service),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
 ):
     participants = roster_service.get_roster(program_id)
     if not participants:
@@ -113,15 +120,21 @@ async def generate_from_roster(
             detail=f"Need at least {data.num_tables} facilitators for {data.num_tables} tables (have {facilitator_count})",
         )
 
-    storage = AssignmentSetStorage()
-    set_id = storage.create_set(
-        program_id=program_id,
-        user_id=user.user_id,
-        participant_data=participant_list,
-        filename="roster",
-        num_tables=data.num_tables,
-        num_sessions=data.num_sessions,
-    )
+    try:
+        set_id = storage.create_set(
+            program_id=program_id,
+            user_id=user.user_id,
+            participant_data=participant_list,
+            filename="roster",
+            num_tables=data.num_tables,
+            num_sessions=data.num_sessions,
+        )
+    except Exception as e:
+        logger.error(f"Failed to create assignment set: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Couldn't save the new group set. Please try again.",
+        )
 
     return {
         "assignment_set_id": set_id,

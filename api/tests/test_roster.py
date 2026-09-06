@@ -228,7 +228,12 @@ class TestCreateAssignmentSetFromRoster:
 
         from api.services.assignment_set_storage import AssignmentSetStorage
 
-        assert AssignmentSetStorage().get_current_set_id("test_org_id") == set_id
+        storage = AssignmentSetStorage()
+        assert storage.get_current_set_id("test_org_id") == set_id
+
+        stored = storage.get_current_set("test_org_id")
+        assert [p["name"] for p in stored["participant_data"]] == ["Alice"]
+        assert stored["num_tables"] == 1
 
     def test_rejects_empty_roster(self, client):
         response = client.post(

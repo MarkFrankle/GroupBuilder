@@ -171,3 +171,18 @@ class AssignmentSetStorage:
                 }
             )
         return result
+
+
+# Singleton instance for dependency injection
+_assignment_set_storage: Optional[AssignmentSetStorage] = None
+
+
+def get_assignment_set_storage() -> AssignmentSetStorage:
+    """FastAPI dependency for AssignmentSetStorage.
+
+    Returns a singleton instance to avoid creating new connections per request.
+    """
+    global _assignment_set_storage
+    if _assignment_set_storage is None:
+        _assignment_set_storage = AssignmentSetStorage()
+    return _assignment_set_storage

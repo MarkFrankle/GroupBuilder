@@ -44,7 +44,7 @@ describe('roster API', () => {
   test('generateFromRoster calls POST /api/roster/generate', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ session_id: 'abc' }),
+      json: async () => ({ assignment_set_id: 'abc' }),
     } as Response);
 
     const result = await generateFromRoster('test-program-id', 3, 2);
