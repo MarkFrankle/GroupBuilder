@@ -66,11 +66,11 @@ def session_complete_refusal(session_number: int) -> str:
     )
 
 
-def sessions_complete_refusal(session_numbers: List[int]) -> str:
+def program_rebuild_refusal(session_numbers: List[int]) -> str:
     """Message refusing a whole-program rebuild because Sessions are complete.
 
-    Reads as a sentence for one Session and for several, and always ends with
-    the two ways out.
+    Requires a non-empty list of session numbers. Reads as a sentence for one
+    Session and for several, and always ends with the two ways out.
     """
     numbers = [str(n) for n in session_numbers]
     if len(numbers) == 1:
@@ -92,9 +92,7 @@ def _refuse_if_any_session_complete(
     """Full-program rebuilds cannot run once any Session is frozen."""
     completed = completion.get_completed_sessions(program_id)
     if completed:
-        raise HTTPException(
-            status_code=409, detail=sessions_complete_refusal(completed)
-        )
+        raise HTTPException(status_code=409, detail=program_rebuild_refusal(completed))
 
 
 def _validate_session_number(
@@ -103,6 +101,9 @@ def _validate_session_number(
     """Refuse a session number the current assignment set does not contain."""
     _, assignment_set = _require_current_set(storage, program_id)
     num_sessions = assignment_set.get("num_sessions") or 0
+    if num_sessions < 1:
+        logger.error("Assignment set for program %s has no session count", program_id)
+        raise HTTPException(status_code=500, detail=ASSIGNMENT_SET_MISSING)
     if session_number > num_sessions:
         raise HTTPException(
             status_code=400,
@@ -111,6 +112,48 @@ def _validate_session_number(
                 f"This program has sessions 1 through {num_sessions}."
             ),
         )
+
+
+def _session_by_number(assignments: Any) -> Dict[int, Any]:
+    """Index an assignments array by session number, skipping malformed entries."""
+    indexed = {}
+    for entry in assignments or []:
+        number = entry.get("session") if isinstance(entry, dict) else None
+        if isinstance(number, int):
+            indexed[number] = entry
+    return indexed
+
+
+def _refuse_if_completed_sessions_changed(
+    completion: SessionCompletionStorage,
+    program_id: str,
+    stored_assignments: Any,
+    submitted_assignments: Any,
+) -> None:
+    """Refuse a save that would alter a frozen Session.
+
+    ``/results/save`` is program-scoped, so the only truthful check is a
+    comparison against what is stored. A dropped Session counts as a change: an
+    omission still changes what the program says happened that night.
+
+    Sessions completed before any version exists are skipped — there is nothing
+    frozen to protect yet, and refusing would strand the program.
+    """
+    completed = completion.get_completed_sessions(program_id)
+    if not completed:
+        return
+
+    stored = _session_by_number(stored_assignments)
+    submitted = _session_by_number(submitted_assignments)
+
+    for number in completed:
+        if number not in stored:
+            continue
+        if stored[number] != submitted.get(number):
+            raise HTTPException(
+                status_code=409,
+                detail=session_complete_refusal(number),
+            )
 
 
 def _next_version_id(
@@ -756,6 +799,7 @@ async def save_edited_assignments(
     program_id: str = Depends(validate_program_access),
     body: Dict[str, Any] = Body(...),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+    completion: SessionCompletionStorage = Depends(get_session_completion_storage),
 ):
     """Save manually edited assignments as a new version."""
     set_id = _require_current_set_id(storage, program_id)
@@ -765,6 +809,12 @@ async def save_edited_assignments(
 
     if not assignments:
         raise HTTPException(status_code=400, detail="assignments is required")
+
+    current = storage.get_version(program_id, set_id)
+    if current is not None:
+        _refuse_if_completed_sessions_changed(
+            completion, program_id, current.get("assignments"), assignments
+        )
 
     try:
         version_id = _next_version_id(storage, program_id, set_id)

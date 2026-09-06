@@ -12,6 +12,8 @@ Every route is program-scoped: the program's current assignment set is the one
 served, so requests carry ``program_id`` and never a lineage UUID.
 """
 
+import copy
+
 import pytest
 from unittest.mock import patch, MagicMock
 from datetime import datetime
@@ -1083,5 +1085,105 @@ class TestSessionCompletion:
         mock_generate.return_value = sample_assignments_result
 
         response = client.post(f"/api/assignments/regenerate?program_id={PROGRAM}")
+
+        assert response.status_code == 200
+        assert mock_generate.called
+
+    def _save_body(self, assignments):
+        return {"assignments": assignments, "based_on_version": "v1"}
+
+    @staticmethod
+    def _with_swapped_tables(assignments, session_number):
+        """Copy the array with one session's two tables swapped."""
+        modified = copy.deepcopy(assignments)
+        for entry in modified:
+            if entry["session"] == session_number:
+                entry["tables"]["1"], entry["tables"]["2"] = (
+                    entry["tables"]["2"],
+                    entry["tables"]["1"],
+                )
+        return modified
+
+    def test_save_refuses_when_a_completed_session_changed(
+        self,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+    ):
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        stored = sample_assignments_result["assignments"]
+        add_version_to_firestore(set_id, "v1", stored)
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        response = client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json=self._save_body(self._with_swapped_tables(stored, 1)),
+        )
+
+        assert response.status_code == 409
+        assert "Session 1" in response.json()["detail"]
+
+    def test_save_allowed_when_only_open_sessions_changed(
+        self,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+    ):
+        """An untouched completed session must survive the Firestore round trip."""
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        stored = sample_assignments_result["assignments"]
+        add_version_to_firestore(set_id, "v1", stored)
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        response = client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json=self._save_body(self._with_swapped_tables(stored, 2)),
+        )
+
+        assert response.status_code == 200
+
+    def test_save_refuses_when_a_completed_session_is_dropped(
+        self,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+    ):
+        """An omission still changes what the program says happened that night."""
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        stored = sample_assignments_result["assignments"]
+        add_version_to_firestore(set_id, "v1", stored)
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        without_session_1 = [e for e in copy.deepcopy(stored) if e["session"] != 1]
+        response = client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json=self._save_body(without_session_1),
+        )
+
+        assert response.status_code == 409
+        assert "Session 1" in response.json()["detail"]
+
+    def test_save_unaffected_when_nothing_is_complete(
+        self,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+    ):
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        stored = sample_assignments_result["assignments"]
+        add_version_to_firestore(set_id, "v1", stored)
+
+        response = client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json=self._save_body(self._with_swapped_tables(stored, 1)),
+        )
 
         assert response.status_code == 200
