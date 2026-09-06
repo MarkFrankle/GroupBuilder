@@ -1,5 +1,5 @@
 import React from "react"
-import { BrowserRouter as Router, Route, Routes, Navigate, useLocation, Link } from "react-router-dom"
+import { BrowserRouter as Router, Route, Routes, useLocation, Link } from "react-router-dom"
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { AuthProvider, useAuth } from "./contexts/AuthContext"
@@ -19,54 +19,7 @@ import RosterPrintPage from "./pages/RosterPrintPage"
 import HelpPage from "./pages/HelpPage"
 import LegalPage from "./pages/LegalPage"
 import PreviousGroupsPage from "./pages/PreviousGroupsPage"
-
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading: authLoading } = useAuth();
-  const { currentProgram, needsProgramSelection, loading: programLoading, programs } = useProgram();
-  const location = useLocation();
-
-  // Wait for both auth and program data to load
-  if (authLoading || programLoading) {
-    return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
-  }
-
-  // Redirect to login if not authenticated, preserving return URL
-  if (!user) {
-    return <Navigate to={`/login?returnTo=${encodeURIComponent(location.pathname)}`} />;
-  }
-
-  // Allow admin page access without program membership
-  if (programs.length === 0 && !location.pathname.startsWith('/admin')) {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <h2>No Program Access</h2>
-        <p>You are not a member of any program. Please contact your administrator to receive an invitation.</p>
-      </div>
-    );
-  }
-
-  // Admin pages don't require program selection
-  if (location.pathname.startsWith('/admin')) {
-    return <>{children}</>;
-  }
-
-  // Redirect to program selector if needed (and not already there)
-  if (needsProgramSelection && location.pathname !== '/select-program') {
-    return <Navigate to="/select-program" />;
-  }
-
-  // Don't require program selection for the selector page itself
-  if (location.pathname === '/select-program') {
-    return <>{children}</>;
-  }
-
-  // Ensure program is selected before accessing protected routes
-  if (!currentProgram) {
-    return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading program...</div>;
-  }
-
-  return <>{children}</>;
-}
+import ProtectedRoute from "./components/ProtectedRoute"
 
 function useShowChrome() {
   const { user } = useAuth();

@@ -2,16 +2,22 @@
  * Program selector page for users who belong to multiple programs
  */
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useProgram } from '../contexts/ProgramContext';
+import { locationToPath } from '../utils/safeRedirect';
 
 export default function ProgramSelectorPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { programs, setCurrentProgram } = useProgram();
+
+  // ProtectedRoute stashes the location it redirected away from. Send the user
+  // back there (query string included) so shared links survive the detour.
+  const from = locationToPath((location.state as { from?: unknown } | null)?.from) ?? '/';
 
   const handleSelectProgram = (program: any) => {
     setCurrentProgram(program);
-    navigate('/');
+    navigate(from, { replace: true });
   };
 
   return (

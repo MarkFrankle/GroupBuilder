@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { sendMagicLink } from '../services/firebase';
+import { safeInternalPath } from '../utils/safeRedirect';
 
 // Email validation regex
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -29,7 +30,7 @@ export function LoginPage() {
 
   // Redirect if already logged in (after all hooks)
   if (!authLoading && user) {
-    const returnTo = searchParams.get('returnTo') || '/';
+    const returnTo = safeInternalPath(searchParams.get('returnTo')) || '/';
     return <Navigate to={returnTo} replace />;
   }
 
@@ -50,7 +51,7 @@ export function LoginPage() {
     setLoading(true);
 
     try {
-      await sendMagicLink(email, searchParams.get('returnTo') || undefined);
+      await sendMagicLink(email, safeInternalPath(searchParams.get('returnTo')) || undefined);
       setSent(true);
     } catch (err: any) {
       setError(err.message || 'Failed to send magic link');
