@@ -169,10 +169,15 @@ cython_debug/
 .worktrees/
 
 firebase-service-account.json
-.claude/settings.local.json
 .firebase/
 emulator-data/
 .firebaserc
 .serena/
 .specify/
 docs/plans/
+.claude/
+.agents/
+.design/
+docs/product/
+skills-lock.json
+GroupBuilder.code-workspace
