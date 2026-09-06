@@ -1,13 +1,10 @@
 """Assignment set storage — one generation lineage per document, versions nested."""
 import json
-import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from ..firebase_admin import get_firestore_client
-
-logger = logging.getLogger(__name__)
 
 
 def _serialize_for_firestore(data: Any) -> Any:
@@ -78,19 +75,6 @@ class AssignmentSetStorage:
         if not doc.exists:
             return None
         return (doc.to_dict() or {}).get("current_assignment_set_id")
-
-    def get_current_set(self, program_id: str) -> Optional[Dict[str, Any]]:
-        """Return the program's current assignment set document, or None."""
-        set_id = self.get_current_set_id(program_id)
-        if not set_id:
-            return None
-        doc = self._set_ref(program_id, set_id).get()
-        if not doc.exists:
-            logger.warning(
-                "Program %s points at missing assignment set %s", program_id, set_id
-            )
-            return None
-        return doc.to_dict()
 
     def get_set(self, program_id: str, set_id: str) -> Optional[Dict[str, Any]]:
         """Return one assignment set document by id, or None."""

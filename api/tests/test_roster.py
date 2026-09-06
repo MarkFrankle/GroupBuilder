@@ -231,7 +231,7 @@ class TestCreateAssignmentSetFromRoster:
         storage = AssignmentSetStorage()
         assert storage.get_current_set_id("test_org_id") == set_id
 
-        stored = storage.get_current_set("test_org_id")
+        stored = storage.get_set("test_org_id", set_id)
         assert [p["name"] for p in stored["participant_data"]] == ["Alice"]
         assert stored["num_tables"] == 1
 

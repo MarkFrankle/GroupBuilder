@@ -34,7 +34,7 @@ def test_create_set_returns_id_and_points_program_at_it(storage):
 def test_get_current_set_returns_the_frozen_roster(storage):
     _make_set(storage)
 
-    data = storage.get_current_set(PROGRAM)
+    data = storage.get_set(PROGRAM, storage.get_current_set_id(PROGRAM))
 
     assert data["num_tables"] == 2
     assert data["num_sessions"] == 3
@@ -47,11 +47,10 @@ def test_creating_a_second_set_moves_the_pointer(storage):
 
     assert first != second
     assert storage.get_current_set_id(PROGRAM) == second
-    assert storage.get_current_set(PROGRAM)["filename"] == "new"
+    assert storage.get_set(PROGRAM, second)["filename"] == "new"
 
 
 def test_program_with_no_set_returns_none(storage):
-    assert storage.get_current_set(PROGRAM) is None
     assert storage.get_current_set_id(PROGRAM) is None
 
 
@@ -59,7 +58,6 @@ def test_program_document_that_does_not_exist_returns_none(storage):
     """PROGRAM is pre-created by the client fixture; this covers a brand-new
     program whose document has not been written at all."""
     assert storage.get_current_set_id("program_that_does_not_exist") is None
-    assert storage.get_current_set("program_that_does_not_exist") is None
 
 
 def test_save_and_get_version(storage):
