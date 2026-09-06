@@ -28,6 +28,9 @@ ASSIGNMENT_SET_MISSING = (
     "Something went wrong loading this program's assignments. "
     "Please contact support."
 )
+ASSIGNMENTS_MALFORMED = (
+    "These assignments could not be saved. Reload the page and try your edit again."
+)
 
 
 def _require_current_set_id(storage: AssignmentSetStorage, program_id: str) -> str:
@@ -114,9 +117,25 @@ def _validate_session_number(
         )
 
 
-def _session_by_number(assignments: Any) -> Dict[int, Any]:
+def _require_wellformed_assignments(assignments: Any) -> None:
+    """Reject a submitted array that cannot be diffed session by session.
+
+    Every entry must name an integer session, and no session may appear twice:
+    a duplicate would let a tampered entry hide behind a matching one while
+    still being the entry the program shows.
+    """
+    numbers = []
+    for entry in assignments:
+        if not isinstance(entry, dict) or not isinstance(entry.get("session"), int):
+            raise HTTPException(status_code=400, detail=ASSIGNMENTS_MALFORMED)
+        numbers.append(entry["session"])
+    if len(numbers) != len(set(numbers)):
+        raise HTTPException(status_code=400, detail=ASSIGNMENTS_MALFORMED)
+
+
+def _session_by_number(assignments: Any) -> Dict[int, Dict[str, Any]]:
     """Index an assignments array by session number, skipping malformed entries."""
-    indexed = {}
+    indexed: Dict[int, Dict[str, Any]] = {}
     for entry in assignments or []:
         number = entry.get("session") if isinstance(entry, dict) else None
         if isinstance(number, int):
@@ -809,6 +828,8 @@ async def save_edited_assignments(
 
     if not assignments:
         raise HTTPException(status_code=400, detail="assignments is required")
+
+    _require_wellformed_assignments(assignments)
 
     current = storage.get_version(program_id, set_id)
     if current is not None:

@@ -1187,3 +1187,67 @@ class TestSessionCompletion:
         )
 
         assert response.status_code == 200
+
+    def test_save_refuses_a_duplicated_completed_session_entry(
+        self,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+    ):
+        """A tampered entry cannot hide behind a second, matching one.
+
+        The array is written verbatim and rendered in order, so a duplicate
+        session number would otherwise let the altered past be the one shown.
+        """
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        stored = sample_assignments_result["assignments"]
+        add_version_to_firestore(set_id, "v1", stored)
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        tampered = self._with_swapped_tables(stored, 1)
+        unchanged_session_1 = copy.deepcopy([e for e in stored if e["session"] == 1][0])
+        body = [e for e in tampered if e["session"] == 1]
+        body.append(unchanged_session_1)
+        body += [copy.deepcopy(e) for e in stored if e["session"] != 1]
+
+        response = client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json=self._save_body(body),
+        )
+
+        assert response.status_code == 400
+        assert "Reload the page" in response.json()["detail"]
+
+    def test_save_refuses_a_malformed_entry(
+        self,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+    ):
+        """A session-less entry must never reach storage."""
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        stored = sample_assignments_result["assignments"]
+        add_version_to_firestore(set_id, "v1", stored)
+
+        body = copy.deepcopy(stored) + [{"tables": {}}]
+        response = client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json=self._save_body(body),
+        )
+
+        assert response.status_code == 400
+
+    def test_session_count_of_zero_is_corrupt_data(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """ "Sessions 1 through 0" is not something a coordinator can act on."""
+        add_assignment_set_to_firestore({**sample_set_data, "num_sessions": 0})
+
+        response = client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        assert response.status_code == 500
+        assert "contact support" in response.json()["detail"].lower()
