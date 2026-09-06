@@ -289,12 +289,12 @@ def client():
             user_id="test_user", email="test@example.com", email_verified=True
         )
 
-    from api.routers.roster import _validate_program_access
+    from api.dependencies import validate_program_access
 
     # Override both auth dependencies
     app.dependency_overrides[require_session_access] = mock_auth
     app.dependency_overrides[get_current_user] = mock_auth
-    app.dependency_overrides[_validate_program_access] = lambda: "test_org_id"
+    app.dependency_overrides[validate_program_access] = lambda: "test_org_id"
 
     # Set up test organization in mock Firestore
     _mock_firestore_client._collections.clear()  # Clear any existing data
