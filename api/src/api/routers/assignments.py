@@ -729,19 +729,6 @@ async def save_edited_assignments(
         raise HTTPException(status_code=500, detail="Failed to save edited assignments")
 
 
-@router.get("/assignment_sets")
-async def list_assignment_sets(
-    program_id: str = Depends(validate_program_access),
-    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
-):
-    """List all assignment sets for a program, newest first.
-
-    Serves the Previous Groups page only; this route goes when that page does.
-    """
-    logger.info(f"Listing assignment sets for program: {program_id}")
-    return storage.list_sets(program_id)
-
-
 @router.get("/metadata")
 async def get_assignment_set_metadata(
     program_id: str = Depends(validate_program_access),

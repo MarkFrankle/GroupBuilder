@@ -134,33 +134,6 @@ class AssignmentSetStorage:
             )
         return versions
 
-    def list_sets(self, program_id: str) -> List[Dict[str, Any]]:
-        """All assignment sets for a program, newest first.
-
-        Only surviving consumer is the Previous Groups page; this method goes
-        when that page does.
-        """
-        sets_ref = self._program_ref(program_id).collection("assignment_sets")
-
-        result = []
-        for doc in sets_ref.order_by("created_at", direction="DESCENDING").stream():
-            data = doc.to_dict()
-            created_at = data.get("created_at")
-            result.append(
-                {
-                    "assignment_set_id": doc.id,
-                    "filename": data.get("filename", "Unknown"),
-                    "num_participants": len(data.get("participant_data", [])),
-                    "num_tables": data.get("num_tables"),
-                    "num_sessions": data.get("num_sessions"),
-                    "created_at": created_at.timestamp() if created_at else None,
-                    "num_versions": sum(
-                        1 for _ in doc.reference.collection("versions").stream()
-                    ),
-                }
-            )
-        return result
-
 
 # Singleton instance for dependency injection
 _assignment_set_storage: Optional[AssignmentSetStorage] = None
