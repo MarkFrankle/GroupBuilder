@@ -9,6 +9,7 @@ import LoginPage from "./pages/LoginPage"
 import AuthVerifyPage from "./pages/AuthVerifyPage"
 import LandingPage from "./pages/LandingPage"
 import TableAssignmentsPage from "./pages/TableAssignmentsPage"
+import AssignmentsPage from "./pages/AssignmentsPage"
 import SeatingChartPage from "./pages/SeatingChartPage"
 import { RosterPage } from "./pages/RosterPage"
 import { AdminDashboard } from "./pages/admin/AdminDashboard"
@@ -151,6 +152,16 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <TableAssignmentsPage />
+                  </ProtectedRoute>
+                }
+              />
+              {/* Temporary: the new overview lives here until Phase C swaps
+                  the route and deletes the page it replaces. */}
+              <Route
+                path="/assignments-preview"
+                element={
+                  <ProtectedRoute>
+                    <AssignmentsPage />
                   </ProtectedRoute>
                 }
               />

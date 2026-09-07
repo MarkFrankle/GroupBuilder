@@ -72,7 +72,10 @@ const SessionCard: React.FC<SessionCardProps> = ({
 
   if (completed && !expanded) {
     return (
-      <div className="flex items-center gap-3 rounded-lg border bg-white px-4 py-2">
+      <section
+        aria-label={`Session ${assignment.session}`}
+        className="flex items-center gap-3 rounded-lg border bg-white px-4 py-2"
+      >
         <button
           type="button"
           aria-label={`Expand session ${assignment.session}`}
@@ -87,12 +90,15 @@ const SessionCard: React.FC<SessionCardProps> = ({
           · {seatedCount(assignment)} seated
         </span>
         <div className="ml-auto">{reopenButton}</div>
-      </div>
+      </section>
     )
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-black bg-white">
+    <section
+      aria-label={`Session ${assignment.session}`}
+      className="overflow-hidden rounded-lg border border-black bg-white"
+    >
       <div className="flex items-center justify-between border-b border-black bg-[#f3f4f6] px-4 py-2.5">
         <div className="flex items-center gap-2">
           {completed && (
@@ -143,7 +149,7 @@ const SessionCard: React.FC<SessionCardProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </section>
   )
 }
 
