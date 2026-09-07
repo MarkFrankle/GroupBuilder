@@ -76,4 +76,18 @@ describe('ProgramHeader', () => {
 
     expect(screen.getByTestId('program-header')).toHaveClass('sticky')
   })
+
+  it('does not pluralise a single-session program', () => {
+    render(
+      <ProgramHeader
+        programName="Spring"
+        facts={{ participants: 1, tables: 1, sessions: 1, uniqueTablemates: 0 }}
+        linkedPairs={0}
+      />
+    )
+
+    expect(
+      screen.getByText('1 participant · 1 table · 1 session · avg 0 unique tablemates')
+    ).toBeInTheDocument()
+  })
 })

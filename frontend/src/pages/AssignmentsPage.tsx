@@ -343,7 +343,11 @@ const AssignmentsPage: React.FC = () => {
         ))}
 
         {live.length === 0 && (
-          <p className="text-sm font-medium">All {totalSessions} sessions complete.</p>
+          <p className="text-sm font-medium">
+            {totalSessions === 1
+              ? 'This session is complete.'
+              : `All ${totalSessions} sessions complete.`}
+          </p>
         )}
 
         {completed.length > 0 && (

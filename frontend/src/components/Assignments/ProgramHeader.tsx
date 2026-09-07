@@ -24,11 +24,15 @@ interface ProgramHeaderProps {
   history?: React.ReactNode
 }
 
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`
+}
+
 function factsLine(facts: ProgramFacts): string {
   return [
-    `${facts.participants} participants`,
-    `${facts.tables} tables`,
-    `${facts.sessions} sessions`,
+    plural(facts.participants, 'participant'),
+    plural(facts.tables, 'table'),
+    plural(facts.sessions, 'session'),
     `avg ${facts.uniqueTablemates} unique tablemates`,
   ].join(' · ')
 }
