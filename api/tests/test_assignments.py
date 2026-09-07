@@ -1297,16 +1297,19 @@ class TestSessionCompletion:
 
         assert response.status_code == 400
 
-    def test_a_completed_program_cannot_be_bricked(
+    def test_session_count_cannot_drop_below_the_completed_prefix(
         self, client, sample_set_data, add_assignment_set_to_firestore
     ):
-        """Regression for the whole finding: complete, rebuild, recover.
+        """The floor that makes a stranded completed Session unreachable.
 
-        Before the guard, a roster regeneration with fewer sessions left the
-        program with completion state it could neither honour nor clear.
+        Completion is a prefix on the Program document and deliberately survives
+        a new assignment set. Letting the session count fall below it would leave
+        a completed Session with no card to reopen from — the bricking this
+        replaces. Refusing the reduction removes the state rather than handling it.
         """
         add_assignment_set_to_firestore({**sample_set_data, "num_sessions": 6})
-        client.post(f"/api/assignments/completion/6?program_id={PROGRAM}")
+        for number in (1, 2, 3):
+            client.post(f"/api/assignments/completion/{number}?program_id={PROGRAM}")
 
         for i in range(4):
             client.put(
@@ -1319,25 +1322,10 @@ class TestSessionCompletion:
                 },
             )
 
-        # 1. The rebuild that used to strand the program is refused outright.
-        rebuild = client.post(
+        response = client.post(
             f"/api/roster/generate?program_id={PROGRAM}",
-            json={"num_tables": 1, "num_sessions": 3},
-        )
-        assert rebuild.status_code == 409
-
-        # 2. And if a program is already stranded, reopening frees it.
-        add_assignment_set_to_firestore({**sample_set_data, "num_sessions": 2})
-        assert (
-            client.delete(
-                f"/api/assignments/completion/6?program_id={PROGRAM}"
-            ).status_code
-            == 200
+            json={"num_tables": 1, "num_sessions": 2},
         )
 
-        # 3. With nothing frozen, rebuilding works again.
-        recovered = client.post(
-            f"/api/roster/generate?program_id={PROGRAM}",
-            json={"num_tables": 1, "num_sessions": 3},
-        )
-        assert recovered.status_code == 200
+        assert response.status_code == 409
+        assert "below 3 sessions" in response.json()["detail"]
