@@ -375,7 +375,7 @@ class TestGenerateRefusesCompletedSessions:
         )
         assert (
             client.post(
-                "/api/assignments/completion/6?program_id=test_org_id"
+                "/api/assignments/completion/1?program_id=test_org_id"
             ).status_code
             == 200
         )
@@ -386,7 +386,7 @@ class TestGenerateRefusesCompletedSessions:
         )
 
         assert response.status_code == 409
-        assert "Session 6 is already complete" in response.json()["detail"]
+        assert "Session 1 is already complete" in response.json()["detail"]
 
     def test_generate_still_works_when_nothing_is_complete(self, client):
         self._add_participants(client)
@@ -405,7 +405,7 @@ class TestGenerateRefusesCompletedSessions:
             "/api/roster/generate?program_id=test_org_id",
             json={"num_tables": 1, "num_sessions": 6},
         ).json()["assignment_set_id"]
-        client.post("/api/assignments/completion/6?program_id=test_org_id")
+        client.post("/api/assignments/completion/1?program_id=test_org_id")
 
         client.post(
             "/api/roster/generate?program_id=test_org_id",

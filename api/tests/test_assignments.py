@@ -939,22 +939,21 @@ class TestSessionCompletion:
         response = client.get(f"/api/assignments/completion?program_id={PROGRAM}")
 
         assert response.status_code == 200
-        assert response.json() == {"completed_sessions": []}
+        assert response.json() == {"completed_through": 0}
 
     def test_mark_complete(
         self, client, sample_set_data, add_assignment_set_to_firestore
     ):
-        """Session 2 is the last valid session, so this covers the boundary too."""
         add_assignment_set_to_firestore(sample_set_data)
 
-        response = client.post(f"/api/assignments/completion/2?program_id={PROGRAM}")
+        response = client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
 
         assert response.status_code == 200
-        assert response.json() == {"completed_sessions": [2]}
+        assert response.json() == {"completed_through": 1}
 
         # The completion must actually persist, not just come back in the response.
         readback = client.get(f"/api/assignments/completion?program_id={PROGRAM}")
-        assert readback.json() == {"completed_sessions": [2]}
+        assert readback.json() == {"completed_through": 1}
 
     def test_mark_complete_is_idempotent(
         self, client, sample_set_data, add_assignment_set_to_firestore
@@ -965,7 +964,30 @@ class TestSessionCompletion:
         response = client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
 
         assert response.status_code == 200
-        assert response.json() == {"completed_sessions": [1]}
+        assert response.json() == {"completed_through": 1}
+
+    def test_completing_in_order_succeeds(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """sample_set_data has num_sessions == 2, so this is the boundary too."""
+        add_assignment_set_to_firestore(sample_set_data)
+
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+        response = client.post(f"/api/assignments/completion/2?program_id={PROGRAM}")
+
+        assert response.status_code == 200
+        assert response.json() == {"completed_through": 2}
+
+    def test_completing_out_of_order_is_refused(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """Time is linear: session 2 cannot finish before session 1 has."""
+        add_assignment_set_to_firestore(sample_set_data)
+
+        response = client.post(f"/api/assignments/completion/2?program_id={PROGRAM}")
+
+        assert response.status_code == 400
+        assert "Session 1 is still open" in response.json()["detail"]
 
     def test_reopen_when_not_complete_is_a_no_op(
         self, client, sample_set_data, add_assignment_set_to_firestore
@@ -975,7 +997,7 @@ class TestSessionCompletion:
         response = client.delete(f"/api/assignments/completion/1?program_id={PROGRAM}")
 
         assert response.status_code == 200
-        assert response.json() == {"completed_sessions": []}
+        assert response.json() == {"completed_through": 0}
 
     def test_reopen(self, client, sample_set_data, add_assignment_set_to_firestore):
         add_assignment_set_to_firestore(sample_set_data)
@@ -984,7 +1006,20 @@ class TestSessionCompletion:
         response = client.delete(f"/api/assignments/completion/1?program_id={PROGRAM}")
 
         assert response.status_code == 200
-        assert response.json() == {"completed_sessions": []}
+        assert response.json() == {"completed_through": 0}
+
+    def test_reopening_out_of_order_is_refused(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """Reopening below the latest completed Session would leave a gap."""
+        add_assignment_set_to_firestore(sample_set_data)
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+        client.post(f"/api/assignments/completion/2?program_id={PROGRAM}")
+
+        response = client.delete(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        assert response.status_code == 400
+        assert "Reopen Session 2 first" in response.json()["detail"]
 
     def test_session_beyond_the_program_is_rejected(
         self, client, sample_set_data, add_assignment_set_to_firestore
@@ -1047,7 +1082,7 @@ class TestSessionCompletion:
         self, client, sample_set_data, add_assignment_set_to_firestore
     ):
         add_assignment_set_to_firestore(sample_set_data)
-        client.post(f"/api/assignments/completion/2?program_id={PROGRAM}")
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
 
         response = client.post(
             f"/api/assignments/regenerate/with_absences?program_id={PROGRAM}", json=[]
@@ -1251,26 +1286,6 @@ class TestSessionCompletion:
 
         assert response.status_code == 500
         assert "contact support" in response.json()["detail"].lower()
-
-    def test_reopen_accepts_a_session_beyond_the_current_set(
-        self, client, sample_set_data, add_assignment_set_to_firestore
-    ):
-        """Un-bricking: reopening is never range-checked.
-
-        A set with fewer sessions can become current while a higher session
-        number is still marked complete. Reopening only removes a constraint,
-        so it must work for numbers the current set does not contain.
-        """
-        add_assignment_set_to_firestore({**sample_set_data, "num_sessions": 6})
-        client.post(f"/api/assignments/completion/6?program_id={PROGRAM}")
-        add_assignment_set_to_firestore({**sample_set_data, "num_sessions": 2})
-
-        response = client.delete(f"/api/assignments/completion/6?program_id={PROGRAM}")
-
-        assert response.status_code == 200
-        assert response.json() == {"completed_sessions": []}
-        readback = client.get(f"/api/assignments/completion?program_id={PROGRAM}")
-        assert readback.json() == {"completed_sessions": []}
 
     def test_marking_complete_is_still_range_checked(
         self, client, sample_set_data, add_assignment_set_to_firestore

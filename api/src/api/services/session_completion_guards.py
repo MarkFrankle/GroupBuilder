@@ -37,6 +37,9 @@ def refuse_if_any_session_complete(
     completion: SessionCompletionStorage, program_id: str
 ) -> None:
     """Full-program rebuilds cannot run once any Session is frozen."""
-    completed = completion.get_completed_sessions(program_id)
-    if completed:
-        raise HTTPException(status_code=409, detail=program_rebuild_refusal(completed))
+    completed_through = completion.get_completed_through(program_id)
+    if completed_through:
+        raise HTTPException(
+            status_code=409,
+            detail=program_rebuild_refusal(list(range(1, completed_through + 1))),
+        )
