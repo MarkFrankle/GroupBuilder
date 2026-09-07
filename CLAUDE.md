@@ -21,6 +21,14 @@
 - **The solver never runs without an explicit user action.** No auto-resolve, no silent rebalance. The app may flag a problem; changing the plan is always something the user pressed.
 - **Never modify a completed session.** Completion freezes the past — every rebuild is scoped to incomplete sessions only.
 - **Print output (roster + seating) is settled.** Strong user feedback; don't redesign it.
+- **Radix menus need jsdom stubs to open in tests.** `user-event` is v13 and emits no pointer
+  events, so `userEvent.click` never opens a `DropdownMenu`. `setupTests.ts` stubs
+  `hasPointerCapture` and `ResizeObserver`; drive the trigger with
+  `fireEvent.keyDown(trigger, { key: 'Enter' })`.
+- **The shadcn colour tokens are mostly undefined.** `tailwind.config.js` maps `popover`,
+  `card`, `border`, `muted-foreground` to `hsl(var(--…))`, but only `--popover` and `--card`
+  exist (`src/styles/index.css`). Anything else built on a token renders as an invalid colour.
+  Define what you need; filling in the whole set would restyle every existing page.
 - **Mock `@/utils/apiClient` in frontend tests** — don't mock Firebase SDK internals. Example: `jest.mock('@/utils/apiClient', () => ({ authenticatedFetch: (...args) => fetch(...args) }))`
 
 ## Build & Dev Commands
