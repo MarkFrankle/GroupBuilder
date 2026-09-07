@@ -5,9 +5,9 @@ const tocItems = [
   { id: "getting-started", label: "Getting Started" },
   { id: "creating-your-roster", label: "Creating Your Roster" },
   { id: "generating-groups", label: "Generating Groups" },
-  { id: "viewing-your-groups", label: "Viewing Your Groups" },
+  { id: "viewing-your-groups", label: "Viewing Your Assignments" },
   { id: "printing-and-sharing", label: "Printing & Sharing" },
-  { id: "editing-sessions", label: "Editing Sessions" },
+  { id: "editing-sessions", label: "Changing a Session" },
   { id: "troubleshooting", label: "Troubleshooting" },
 ];
 
@@ -255,205 +255,57 @@ function HelpPage() {
           </WarningCallout>
         </section>
 
-        {/* ===================== Section 4: Viewing Your Groups ===================== */}
+        {/* ===================== Section 4: Viewing Your Assignments ===================== */}
         <section className="mb-12">
           <h2 id="viewing-your-groups" className="text-2xl font-bold mb-4 scroll-mt-8">
-            Viewing Your Groups
+            Viewing Your Assignments
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            After generating assignments, you'll land on the results page. There are
-            two ways to view your groups. You'll see two buttons below the quality
-            summary — <strong>Compact</strong> and <strong>Detailed</strong> — that switch between views.
+            After generating, you land on the Assignments page. Every session is on
+            this one page, stacked from Session 1 downward — there is no view to
+            switch to and no session to navigate to. Scroll and you see the whole
+            program.
           </p>
 
-          {/* Compact View */}
-          <h3 className="text-xl font-semibold mb-2">Compact View</h3>
-          <p className="mb-2 text-slate-700 leading-relaxed">
-            This is the default. It shows all sessions side by side in a grid, giving
-            you a bird's-eye view of the entire program at once. Each person appears
-            as a small colored chip with their name. Chips are color-coded by
-            religion — blue for Jewish, red for Christian, green for Muslim, and
-            yellow for Other — so you can see the religious mix at each table at a
-            glance. A legend at the top shows which color maps to which religion.
-          </p>
-          <p className="mb-2 text-slate-700 leading-relaxed">
-            A few things you can do here:
-          </p>
-          <ul className="list-disc pl-5 space-y-2 text-slate-700 leading-relaxed mb-4">
-            <li>
-              <strong>Track someone across sessions:</strong> Click any person's name.
-              Their chip will highlight in every session so you can trace their path
-              through the program — who they sit with each week. Click again to
-              deselect.
-            </li>
-            <li>
-              <strong>See someone's details:</strong> Hover over any name to see a
-              tooltip with their religion, gender, partner (if any), and whether
-              they're a facilitator.
-            </li>
-            <li>
-              <strong>Spot facilitators:</strong> Facilitators have a gold ring
-              around their chip and bold text. Each table also lists its
-              facilitators by name just above the chips (e.g. "Facilitators: Omar
-              Hassan, Sarah Cohen").
-            </li>
-          </ul>
-
-          <Screenshot
-            src="/images/help/compact-view.png"
-            alt="Compact view showing all sessions side by side, with David Cohen highlighted across every session"
-            caption="Compact view — click any name to track them across sessions (here, David Cohen is highlighted)"
-          />
-
-          {/* Detailed View */}
-          <h3 className="text-xl font-semibold mt-8 mb-2">Detailed View</h3>
-          <p className="mb-2 text-slate-700 leading-relaxed">
-            Click the list icon to switch to detailed view. This shows one session
-            at a time, with a full card for each table. It's the view you'll use
-            when you want to inspect a specific session closely, or when you want
-            to make manual edits.
-          </p>
-          <p className="mb-2 text-slate-700 leading-relaxed">
-            Each table card shows several pieces of information at a glance:
-          </p>
-          <ul className="list-disc pl-5 space-y-2 text-slate-700 leading-relaxed mb-4">
-            <li>
-              <strong>Table header</strong> — Shows the table name on the left (e.g.
-              "Table 1") and a summary on the right: total people, facilitator count,
-              gender split (e.g. 3F/3M), and number of religions represented.
-            </li>
-            <li>
-              <strong>Participant rows</strong> — Each person gets their own row showing
-              their name in bold, color-coded religion and gender badges, and (if they
-              have a partner) a heart icon with their partner's name. Keep-together
-              partners show a link icon instead.
-            </li>
-            <li>
-              <strong>Partner warning</strong> — If separated partners end up at the same
-              table (a constraint violation), the table header shows a{" "}
-              <span className="text-red-600 font-medium">red warning triangle</span> and
-              the heart icons next to their names turn red. This does not apply to
-              keep-together partners, who are supposed to be at the same table.
-            </li>
-            <li>
-              <strong>Facilitator section</strong> — Facilitators are listed in their
-              own "FACILITATORS" section at the bottom of each table card, with a
-              green "Facilitator" badge alongside their religion and gender badges.
-            </li>
-          </ul>
+          <h3 className="text-xl font-semibold mb-2">Reading the page</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            To move between sessions, use the <strong>Previous</strong> and{" "}
-            <strong>Next</strong> buttons, or pick a session from the dropdown.
+            At the top is your program name and its facts: how many participants,
+            tables and sessions, and the average number of different people each
+            participant sits with across the program. Below that, a{" "}
+            <strong>Rules</strong> line lists the linked pairs you have set up.
           </p>
-
-          <Screenshot
-            src="/images/help/detail-view-with-issue.png"
-            alt="Detailed view of a single table card showing participant rows, religion and gender badges, partner hearts, a couple warning, and the facilitator section"
-            caption="Detailed view — a table card showing participant details, partner links, a couple warning (red triangle), and the facilitator section at the bottom"
-          />
-
-          {/* Quality Summary */}
-          <h3 className="text-xl font-semibold mt-8 mb-2">Understanding the Quality Summary</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            At the top of the results page, you'll always see a summary card that tells
-            you how good the assignments are. This is the most important thing to check
-            after generating groups. Here's what each line means:
+            Each session is a card. Inside it, each table lists its facilitators
+            first, then everyone else, with a summary on the right: how many people
+            are seated, the gender split, and how many religions are represented.
+            Name colours show religion.
           </p>
 
-          <div className="space-y-4 mb-4">
-            <div className="pl-4 border-l-2 border-slate-200">
-              <p className="font-medium text-slate-800">Couples Separated</p>
-              <p className="text-slate-700 text-sm leading-relaxed">
-                A green checkmark means no separated partners were placed at the same
-                table. Keep-together partners are expected to be together and are not
-                flagged here.
-              </p>
-            </div>
-            <div className="pl-4 border-l-2 border-slate-200">
-              <p className="font-medium text-slate-800">Religion: Good / Suboptimal</p>
-              <p className="text-slate-700 text-sm leading-relaxed">
-                Shows whether religion is as evenly spread as the roster allows.
-                "Good" means every table's mix is as balanced as it can be given
-                how many people of each religion are in the group. "Suboptimal"
-                means at least one table is more imbalanced than necessary — hover
-                the label to see exactly which table(s). Individual tables also
-                show their religion count in red when flagged.
-              </p>
-            </div>
-            <div className="pl-4 border-l-2 border-slate-200">
-              <p className="font-medium text-slate-800">Gender: Good / Suboptimal</p>
-              <p className="text-slate-700 text-sm leading-relaxed">
-                Same idea as religion balance, but for gender. If your roster has
-                unequal gender counts, some imbalance per table is unavoidable —
-                "Good" means the solver distributed genders as evenly as
-                mathematically possible. Hover the label when Suboptimal to see
-                which tables are off.
-              </p>
-            </div>
-            <div className="pl-4 border-l-2 border-slate-200">
-              <p className="font-medium text-slate-800">Facilitator Coverage</p>
-              <p className="text-slate-700 text-sm leading-relaxed">
-                Confirms every table has at least one facilitator to lead the discussion.
-                If you designated extra facilitators (e.g. 6 facilitators for 4 tables),
-                some tables will have more than one — that's fine.
-              </p>
-            </div>
-            <div className="pl-4 border-l-2 border-slate-200">
-              <p className="font-medium text-slate-800">Average Unique Tablemates</p>
-              <p className="text-slate-700 text-sm leading-relaxed">
-                This tells you, on average, how many <em>different</em> people each
-                participant sits with across all sessions. Higher is better. For example,
-                if someone sits with 4 people per session over 5 sessions and never
-                repeats, they'd have 20 unique tablemates — the maximum. In practice,
-                some repetition is unavoidable, so this number will be lower.
-              </p>
-            </div>
-            <div className="pl-4 border-l-2 border-slate-200">
-              <p className="font-medium text-slate-800">Repeated Pairs</p>
-              <p className="text-slate-700 text-sm leading-relaxed">
-                How many pairs of people end up at the same table more than once. Lower
-                is better. This will never be zero — with a fixed number of tables,
-                some repetition is mathematically unavoidable.
-              </p>
-            </div>
-          </div>
-
-          <p className="mb-2 text-slate-700 leading-relaxed">
-            Overall, the summary shows either a green <strong>"Looks Good"</strong> or
-            a yellow <strong>"Has Issues."</strong>
+          <h3 className="text-xl font-semibold mt-8 mb-2">Marking a session complete</h3>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            When a meeting night has happened, press <strong>Mark complete</strong> in
+            that session's header. The session collapses to a single line and moves
+            below the sessions still ahead of you, under a <strong>Completed</strong>{" "}
+            heading — so the next night to run is always the first thing on the page.
+            Press the arrow on a completed line to look at who sat where.
           </p>
-          <ul className="list-disc pl-5 space-y-2 text-slate-700 leading-relaxed mb-4">
-            <li>
-              <strong>Green</strong> means all hard constraints are satisfied (couples
-              separated, linked partners together, facilitators at every table)
-              and both religion and gender are rated "Good" across all tables.
-            </li>
-            <li>
-              <strong>Yellow</strong> means something needs attention. Check which line
-              has the issue — it might be that one table ended up with no facilitator,
-              or two partners got placed together.
-            </li>
-          </ul>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            A completed session cannot be changed. Shuffling it, editing it, or
+            rebuilding the program are all refused — the past stays as it happened.
+            If you marked one complete by mistake, press <strong>Reopen</strong> on
+            it.
+          </p>
 
-          <Screenshot
-            src="/images/help/validation-summary-looks-good.png"
-            alt="Validation summary showing all green checkmarks: couples separated, religion balanced, gender balanced, all tables have facilitators, with Looks Good overall status"
-            caption="The quality summary when everything looks good — all constraints satisfied"
-          />
-          <Screenshot
-            src="/images/help/validation-summary-issues.png"
-            alt="Validation summary showing a couple violation warning, with yellow Has Issues overall status"
-            caption="The quality summary when there's a problem — here, one couple ended up at the same table"
-          />
-
-          <TipCallout>
-            If the quality isn't great, don't worry — you have options. You can{" "}
-            <strong>Regenerate All</strong> to get a completely fresh set of assignments,
-            regenerate just one problematic session, or make manual edits. All of these
-            are covered in the <a href="#editing-sessions" className="text-blue-700 underline">Editing Sessions</a>{" "}
-            section below.
-          </TipCallout>
+          <InfoCallout>
+            <p>
+              Sessions are completed in order, because time runs in order. You can
+              only complete the next session that is still open, and only reopen the
+              most recently completed one. If you try to skip ahead, the app tells you
+              which session is still open.
+            </p>
+          </InfoCallout>
         </section>
+
 
         {/* ===================== Section 5: Printing & Sharing ===================== */}
         <section className="mb-12">
@@ -487,9 +339,9 @@ function HelpPage() {
           <h3 className="text-xl font-semibold mb-2">Print Seating Charts</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
             If you only need seating charts for a single session (for example, to put
-            one on each table), switch to detailed view, navigate to the session you
-            want, and click <strong>"Print Seating."</strong> This shows just the
-            circular seating charts for that session's tables.
+            one on each table), press <strong>"Print"</strong> in that session's
+            header. This shows just the circular seating charts for that session's
+            tables.
           </p>
 
           <h3 className="text-xl font-semibold mb-2">Copy Link</h3>
@@ -502,105 +354,51 @@ function HelpPage() {
             don't have Group Builder accounts, use the PDF method above instead.
           </p>
 
-          <Screenshot
-            src="/images/help/print-roster-copy-link-print-seating.png"
-            alt="The results page toolbar showing Print Roster, Copy Link, and version picker at the top, with Edit and Print Seating controls below"
-            caption="The results page controls — Print Roster and Copy Link in the top toolbar, with session-specific actions (Edit, Print Seating) below. Regenerate Session appears inside edit mode."
-          />
         </section>
 
-        {/* ===================== Section 6: Editing Sessions ===================== */}
+        {/* ===================== Section 6: Changing a Session ===================== */}
         <section className="mb-12">
           <h2 id="editing-sessions" className="text-2xl font-bold mb-4 scroll-mt-8">
-            Editing Sessions
+            Changing a Session
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            The generated assignments are a starting point. You can regenerate them
-            entirely, redo a single session, or make fine-grained manual changes.
+            The generated assignments are a starting point. Nothing changes unless you
+            press something — the app never re-runs the solver on its own.
           </p>
 
-          {/* Regenerate All */}
-          <h3 className="text-xl font-semibold mb-2">Starting Over: Regenerate All</h3>
-          <p className="mb-2 text-slate-700 leading-relaxed">
-            If you want a completely fresh set of assignments, click the{" "}
-            <strong>⋮ menu</strong> and select <strong>"Regenerate All Sessions."</strong>{" "}
-            A confirmation dialog will appear. If you have absences recorded, you'll see
-            a <strong>"Maintain saved absences"</strong> checkbox (checked by default) — leave
-            it on to carry those absences into the new version, or uncheck it to regenerate
-            with everyone present. Regeneration takes up to 2 minutes — you can continue
-            browsing while it runs.
+          <h3 className="text-xl font-semibold mb-2">Shuffle one session</h3>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            Press <strong>Shuffle</strong> in a session's header to redo just that
+            night. The solver still knows about every other session, so it avoids
+            pairings people have already had — and it changes only the session you
+            pressed. Anyone you have marked absent for that session stays absent.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            Your previous version is not lost. Every time you regenerate, the results
-            are saved as a new version. You can switch between versions using the{" "}
-            <strong>version dropdown</strong> in the toolbar — so if the new version is
-            worse, you can always go back.
+            Afterwards a line appears at the top telling you what happened: how many
+            people moved, which sessions were left alone, and how many pairs now sit
+            together more than once. If barely anyone moved, the arrangement you had
+            was already close to the best one — shuffle again if you want a bigger
+            change.
           </p>
 
-          {/* Regenerate One Session */}
-          <h3 className="text-xl font-semibold mt-8 mb-2">Fixing One Session: Regenerate Session</h3>
+          <h3 className="text-xl font-semibold mt-8 mb-2">Earlier versions</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            Sometimes most sessions look great but one is off — maybe Session 3 has a
-            separated couple at the same table, or the gender balance is uneven. In detailed view,
-            navigate to the problem session, click <strong>"Edit,"</strong> then click{" "}
-            <strong>"Regenerate Session."</strong>{" "}
-            This re-runs the solver for just that one session (it's nearly instant)
-            while keeping all other sessions exactly as they are. Any participants
-            you've marked as absent will stay absent in the regenerated session.
-            Click <strong>"Done Editing"</strong> to save the result.
+            Every change is saved as a new version, and nothing is overwritten. Press{" "}
+            <strong>History</strong> at the top of the page to look at an earlier one.
+            While you are looking at an older version the page is read-only — Shuffle
+            and Mark complete disappear, and a line at the top offers{" "}
+            <strong>Back to current</strong>. Printing still works.
           </p>
 
-          {/* Edit Mode */}
-          <h3 className="text-xl font-semibold mt-8 mb-2">Fine-Tuning: Edit Mode</h3>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            For precise control, you can manually move people between tables. In detailed
-            view, navigate to the session you want to edit and click{" "}
-            <strong>"Edit"</strong> in the toolbar.
-          </p>
-
-          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Swapping two people:</p>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            Click on the person you want to move — they'll get a blue highlight. Then
-            click on the person you want to swap them with. The two switch places
-            instantly. You'll see the quality summary and table indicators update
-            in real time, so you can tell whether the swap improved things or made
-            them worse.
-          </p>
-
-          <InfoCallout>
-            Facilitators can only be swapped with other facilitators, and regular
-            participants can only be swapped with other regular participants. This
-            ensures every table keeps its facilitator coverage.
-          </InfoCallout>
-
-          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Marking someone absent:</p>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            If someone can't make it to a particular session, click their name to select
-            them, then click <strong>"Mark Absent."</strong> They'll be moved to an
-            Absent section below the tables. If they can make it after all, click their
-            name in the Absent section and then click any empty slot at a table to place
-            them back.
-          </p>
-
-          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Undoing changes:</p>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            Made a swap you didn't like? Click <strong>Undo</strong> to step back. You
-            can undo up to 10 changes. Each click undoes one action.
-          </p>
-
-          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Saving your edits:</p>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            When you're done, click <strong>"Done Editing."</strong> If you made any
-            changes, they're saved as a new version automatically. You can switch back
-            to any previous version using the version picker at the top of the page.
-          </p>
-
-          <Screenshot
-            src="/images/help/edit-mode.png"
-            alt="Edit mode showing a selected participant with green highlight, an absent participant section, empty slots at tables, and the Undo and Mark Absent buttons in the toolbar"
-            caption="Edit mode — Raj Patel is marked absent, Carlos Rodriguez is selected (green border), and empty slots show where absent participants can be placed back"
-          />
+          <WarningCallout>
+            <p>
+              Shuffling a session replaces what was there. That is what the version
+              history is for — if you preferred the previous arrangement, open History
+              and look at it.
+            </p>
+          </WarningCallout>
         </section>
+
 
         {/* ===================== Section 7: Troubleshooting ===================== */}
         <section className="mb-12">

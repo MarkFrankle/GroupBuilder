@@ -76,6 +76,19 @@ redesign.
    means "everything up to here." This is the property that makes every rebuild safe, and it
    is why full regeneration could be removed entirely.
 
+   **Completion is contiguous, and enforced as such.** Time runs in order, so only the next
+   open session may be completed and only the most recently completed one may be reopened.
+   Stored as `completed_through: int` on the Program document rather than a list, which makes
+   a gap unrepresentable instead of merely refused. A program may never have fewer sessions
+   than it has completed — the reduction is refused, so a completed session can never be
+   stranded with nothing on screen to reopen it from. Confirmed 2026-09-07.
+
+   **The overview puts completed sessions last.** Live sessions ascending, then a Completed
+   label, then the completed prefix collapsed to one line each. The next meeting night is the
+   first thing on the page. Rejected: strict numeric order with completed rows in place —
+   collapsing a card reflows the page either way, so the two cost the same and arrival-state
+   won.
+
    **A completed session is a snapshot, so later roster edits never reach it.** Deleting a
    participant who sat at a table on a finished night does not remove them from that night —
    the session still shows them, because they were there. Assignments store fully materialized

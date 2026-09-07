@@ -16,9 +16,9 @@ describe('HelpPage', () => {
       'Getting Started',
       'Creating Your Roster',
       'Generating Groups',
-      'Viewing Your Groups',
+      'Viewing Your Assignments',
       'Printing & Sharing',
-      'Editing Sessions',
+      'Changing a Session',
       'Troubleshooting',
     ];
     for (const name of sectionNames) {
@@ -32,9 +32,9 @@ describe('HelpPage', () => {
       'Getting Started',
       'Creating Your Roster',
       'Generating Groups',
-      'Viewing Your Groups',
+      'Viewing Your Assignments',
       'Printing & Sharing',
-      'Editing Sessions',
+      'Changing a Session',
       'Troubleshooting',
     ];
     for (const heading of headings) {
@@ -45,13 +45,12 @@ describe('HelpPage', () => {
   test('renders screenshots with captions', () => {
     renderPage();
     expect(screen.getByAltText(/roster manager/i)).toBeInTheDocument();
-    expect(screen.getByAltText(/edit mode/i)).toBeInTheDocument();
   });
 
   test('renders callout boxes', () => {
     renderPage();
-    // Tip callout in quality section
-    expect(screen.getAllByText(/completely fresh set of assignments/).length).toBeGreaterThan(0);
+    // Info callout explaining that completion runs in order
+    expect(screen.getAllByText(/only complete the next session/).length).toBeGreaterThan(0);
     // Warning callout in generating section
     expect(screen.getAllByText(/Need at least N facilitators/).length).toBeGreaterThan(0);
   });
