@@ -1,19 +1,45 @@
 import React, { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Loader2 } from 'lucide-react'
+import { History, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import SessionCard from '@/components/Assignments/SessionCard'
 import NoticeStrip, { Notice } from '@/components/Assignments/NoticeStrip'
+import ProgramHeader from '@/components/Assignments/ProgramHeader'
 import { authenticatedFetch } from '@/utils/apiClient'
-import { shuffleReceipt } from '@/utils/assignmentStats'
+import {
+  linkedPairCount,
+  shuffleReceipt,
+  uniqueTablematesAverage,
+} from '@/utils/assignmentStats'
 import {
   useAssignmentResults,
   useAssignmentSetMetadata,
+  useResultVersions,
   useSessionCompletion,
 } from '@/hooks/queries'
 import { useProgram } from '@/contexts/ProgramContext'
 import type { Assignment } from '@/types/assignments'
+
+interface ResultVersion {
+  version_id: string
+  created_at: number
+}
+
+function formatVersionDate(createdAt: number): string {
+  return new Date(createdAt * 1000).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
 
 /**
  * Reads the user-facing `detail` an API refusal carries.
@@ -37,9 +63,18 @@ const AssignmentsPage: React.FC = () => {
   const { currentProgram, loading: programLoading } = useProgram()
   const programId = currentProgram?.id ?? null
 
+  // 'latest' is the current plan; anything else is a look at the past, and
+  // looking is free while acting is not — see readOnly below.
+  const [currentVersion, setCurrentVersion] = useState<string>('latest')
+  const readOnly = currentVersion !== 'latest'
+
   const { data: metadata } = useAssignmentSetMetadata(programId)
-  const { data: fetchedAssignments, isLoading } = useAssignmentResults(programId)
+  const { data: fetchedAssignments, isLoading } = useAssignmentResults(
+    programId,
+    readOnly ? currentVersion : undefined
+  )
   const { data: completedThrough = 0 } = useSessionCompletion(programId)
+  const { data: versions = [] } = useResultVersions(programId)
 
   const [notice, setNotice] = useState<Notice | null>(null)
   const [shufflingSession, setShufflingSession] = useState<number | null>(null)
@@ -136,6 +171,43 @@ const AssignmentsPage: React.FC = () => {
     },
   })
 
+  const handlePrintRoster = () => {
+    navigate('/table-assignments/roster-print', {
+      state: { assignments: sorted, programId },
+    })
+  }
+
+  /**
+   * Copy Link is program-scoped by construction: item 0 took the generation id
+   * out of the URL, so a shared link always resolves to the current plan and
+   * there is no version for it to carry.
+   */
+  const handleCopyLink = async () => {
+    if (!programId) return
+    const link = `${window.location.origin}${window.location.pathname}?program=${programId}`
+    try {
+      await navigator.clipboard.writeText(link)
+      setNotice({ tone: 'info', message: 'Link copied.' })
+    } catch {
+      setNotice({ tone: 'error', message: 'Could not copy the link. Copy it from the address bar instead.' })
+    }
+  }
+
+  const viewVersion = (version: ResultVersion) => {
+    setCurrentVersion(version.version_id)
+    setNotice({
+      tone: 'info',
+      message: `You're viewing an older version from ${formatVersionDate(version.created_at)}.`,
+      action: {
+        label: 'Back to current',
+        onClick: () => {
+          setCurrentVersion('latest')
+          setNotice(null)
+        },
+      },
+    })
+  }
+
   const handlePrintSession = async (sessionNumber: number) => {
     const sessionAssignment = sorted.find(a => a.session === sessionNumber)
     if (!sessionAssignment || !programId) return
@@ -195,8 +267,60 @@ const AssignmentsPage: React.FC = () => {
 
   const totalSessions = metadata?.num_sessions ?? sorted.length
 
+  const historyMenu = versions.length > 0 && (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm">
+          <History className="mr-1.5 h-3.5 w-3.5" />
+          History
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem
+          disabled={!readOnly}
+          onSelect={() => {
+            setCurrentVersion('latest')
+            setNotice(null)
+          }}
+        >
+          Latest
+        </DropdownMenuItem>
+        {/*
+          Versions read by timestamp, not by raw id. Action-derived labels
+          ("Session 3 Shuffle") and promotion are item 7; viewing is free.
+        */}
+        {[...versions]
+          .sort((a: ResultVersion, b: ResultVersion) => b.created_at - a.created_at)
+          .map((version: ResultVersion) => (
+            <DropdownMenuItem
+              key={version.version_id}
+              disabled={version.version_id === currentVersion}
+              onSelect={() => viewVersion(version)}
+            >
+              {formatVersionDate(version.created_at)}
+            </DropdownMenuItem>
+          ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+
   return (
-    <div className="flex flex-col gap-4 px-8 pb-10">
+    <div className="flex flex-col pb-10">
+      <ProgramHeader
+        programName={currentProgram?.name ?? 'Assignments'}
+        facts={{
+          participants: metadata?.num_participants ?? 0,
+          tables: metadata?.num_tables ?? 0,
+          sessions: totalSessions,
+          uniqueTablemates: uniqueTablematesAverage(sorted),
+        }}
+        linkedPairs={linkedPairCount(sorted)}
+        onPrintRoster={handlePrintRoster}
+        onCopyLink={handleCopyLink}
+        history={historyMenu}
+      />
+
+      <div className="flex flex-col gap-4 px-8">
       <NoticeStrip notice={notice} onDismiss={() => setNotice(null)} />
 
       <div className="flex flex-col gap-5">
@@ -204,6 +328,7 @@ const AssignmentsPage: React.FC = () => {
           <div key={assignment.session} ref={index === 0 ? firstLiveRef : undefined}>
             <SessionCard
               assignment={assignment}
+              readOnly={readOnly}
               isShuffling={shufflingSession === assignment.session}
               onShuffle={() => shuffleMutation.mutate(assignment.session)}
               onPrint={() => handlePrintSession(assignment.session)}
@@ -231,6 +356,7 @@ const AssignmentsPage: React.FC = () => {
                 key={assignment.session}
                 assignment={assignment}
                 completed
+                readOnly={readOnly}
                 onPrint={() => handlePrintSession(assignment.session)}
                 onReopen={
                   assignment.session === completedThrough
@@ -245,6 +371,7 @@ const AssignmentsPage: React.FC = () => {
             ))}
           </>
         )}
+      </div>
       </div>
     </div>
   )

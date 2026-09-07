@@ -54,3 +54,21 @@ jest.mock('@/services/firebase', () => ({
     },
   },
 }));
+
+// Radix menus and selects call pointer-capture APIs that jsdom does not
+// implement, so without these stubs a dropdown never opens under test.
+if (!Element.prototype.hasPointerCapture) {
+  Element.prototype.hasPointerCapture = () => false;
+  Element.prototype.setPointerCapture = () => {};
+  Element.prototype.releasePointerCapture = () => {};
+}
+
+// Radix's popper measures its trigger, which jsdom cannot do; without this the
+// menu content never mounts.
+if (typeof global.ResizeObserver === 'undefined') {
+  (global as any).ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import AssignmentsPage from '../AssignmentsPage'
@@ -93,7 +93,13 @@ function mockApi() {
       return Promise.resolve({
         ok: true,
         status: 200,
-        json: () => Promise.resolve({ versions: [] }),
+        json: () =>
+          Promise.resolve({
+            versions: [
+              { version_id: 'v1', created_at: 1740000000 },
+              { version_id: 'v2', created_at: 1740086400 },
+            ],
+          }),
       } as Response)
     }
 
@@ -150,6 +156,7 @@ beforeEach(() => {
   api = { completedThrough: 0 }
   mockApi()
   window.HTMLElement.prototype.scrollIntoView = jest.fn()
+  Object.assign(navigator, { clipboard: { writeText: jest.fn(() => Promise.resolve()) } })
 })
 
 describe('AssignmentsPage', () => {
@@ -238,5 +245,41 @@ describe('AssignmentsPage', () => {
     renderPage()
 
     expect(await screen.findByText('All 3 sessions complete.')).toBeInTheDocument()
+  })
+
+  it('states the program facts in the header', async () => {
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'Spring 2026 Series' })).toBeInTheDocument()
+    expect(
+      screen.getByText('4 participants · 2 tables · 3 sessions · avg 1 unique tablemates')
+    ).toBeInTheDocument()
+  })
+
+  it('copies a program-scoped link, never a version-scoped one', async () => {
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: /copy link/i }))
+
+    const copied = (navigator.clipboard.writeText as jest.Mock).mock.calls[0][0]
+    expect(copied).toContain('program=test-program-id')
+    expect(copied).not.toContain('version')
+  })
+
+  it('goes read-only when an older version is selected', async () => {
+    renderPage()
+
+    // user-event v13 emits no pointer events, so the Radix trigger is opened
+    // the way a keyboard user would.
+    fireEvent.keyDown(await screen.findByRole('button', { name: /history/i }), {
+      key: 'Enter',
+    })
+    const versions = await screen.findAllByRole('menuitem', { name: /Feb/ })
+    fireEvent.click(versions[versions.length - 1])
+
+    expect(await screen.findByText(/viewing an older version/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /shuffle/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /mark complete/i })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /^print$/i }).length).toBeGreaterThan(0)
   })
 })
