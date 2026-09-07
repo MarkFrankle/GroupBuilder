@@ -54,59 +54,68 @@ def storage(client):
 
 
 class TestSessionCompletionStorage:
-    def test_no_completed_sessions_by_default(self, storage):
-        assert storage.get_completed_sessions(PROGRAM) == []
+    def test_nothing_complete_by_default(self, storage):
+        assert storage.get_completed_through(PROGRAM) == 0
 
     def test_mark_complete_persists(self, storage):
-        storage.mark_complete(PROGRAM, 2)
+        storage.mark_complete(PROGRAM, 1)
 
-        assert storage.get_completed_sessions(PROGRAM) == [2]
+        assert storage.get_completed_through(PROGRAM) == 1
 
     def test_marking_is_idempotent(self, storage):
-        storage.mark_complete(PROGRAM, 2)
-        storage.mark_complete(PROGRAM, 2)
-
-        assert storage.get_completed_sessions(PROGRAM) == [2]
-
-    def test_completed_sessions_come_back_sorted(self, storage):
-        storage.mark_complete(PROGRAM, 3)
+        storage.mark_complete(PROGRAM, 1)
         storage.mark_complete(PROGRAM, 1)
 
-        assert storage.get_completed_sessions(PROGRAM) == [1, 3]
+        assert storage.get_completed_through(PROGRAM) == 1
 
-    def test_mark_incomplete_removes_one(self, storage):
+    def test_marking_an_already_complete_session_does_not_regress(self, storage):
+        """Completion only ever moves forward at this layer.
+
+        Ordering is the router's job; storage must not turn a stale repeat of an
+        earlier mark into a silent reopen of the sessions above it.
+        """
         storage.mark_complete(PROGRAM, 1)
         storage.mark_complete(PROGRAM, 2)
 
-        storage.mark_incomplete(PROGRAM, 1)
+        storage.mark_complete(PROGRAM, 1)
 
-        assert storage.get_completed_sessions(PROGRAM) == [2]
+        assert storage.get_completed_through(PROGRAM) == 2
 
-    def test_mark_incomplete_on_an_open_session_is_a_no_op(self, storage):
-        storage.mark_incomplete(PROGRAM, 1)
-
-        assert storage.get_completed_sessions(PROGRAM) == []
-
-    def test_is_complete(self, storage):
+    def test_reopening_the_latest_decrements(self, storage):
+        storage.mark_complete(PROGRAM, 1)
         storage.mark_complete(PROGRAM, 2)
 
+        storage.mark_incomplete(PROGRAM, 2)
+
+        assert storage.get_completed_through(PROGRAM) == 1
+
+    def test_reopening_an_open_session_is_a_no_op(self, storage):
+        storage.mark_incomplete(PROGRAM, 1)
+
+        assert storage.get_completed_through(PROGRAM) == 0
+
+    def test_is_complete_is_a_prefix_test(self, storage):
+        storage.mark_complete(PROGRAM, 1)
+        storage.mark_complete(PROGRAM, 2)
+
+        assert storage.is_complete(PROGRAM, 1) is True
         assert storage.is_complete(PROGRAM, 2) is True
-        assert storage.is_complete(PROGRAM, 1) is False
+        assert storage.is_complete(PROGRAM, 3) is False
 
-    def test_completed_session_numbers_persist_across_a_new_set(
+    def test_the_completed_prefix_persists_across_a_new_set(
         self, storage, sample_set_data, add_assignment_set_to_firestore
     ):
         """The decision this item turns on: minting a new set must not clear the past.
 
-        Named for what it asserts — the *numbers* survive. The seating those
-        numbers froze does not; see the test below.
+        Named for what it asserts — the completed prefix survives. The seating
+        those Sessions froze does not; see the test below.
         """
         add_assignment_set_to_firestore(sample_set_data)
         storage.mark_complete(PROGRAM, 1)
 
         add_assignment_set_to_firestore(sample_set_data)
 
-        assert storage.get_completed_sessions(PROGRAM) == [1]
+        assert storage.get_completed_through(PROGRAM) == 1
 
     def test_a_new_set_does_not_carry_the_frozen_seating(
         self,
