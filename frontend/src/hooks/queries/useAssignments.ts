@@ -46,3 +46,18 @@ export function useAssignmentSetMetadata(programId: string | null) {
     enabled: !!programId,
   })
 }
+
+export function useSessionCompletion(programId: string | null) {
+  return useQuery({
+    queryKey: ['completion', programId],
+    queryFn: async (): Promise<number> => {
+      const response = await authenticatedFetch(`/api/assignments/completion?program_id=${programId}`)
+      // No assignment set yet is a normal state, not an error.
+      if (response.status === 404) return 0
+      if (!response.ok) throw new Error('Failed to fetch session completion')
+      const data = await response.json()
+      return data.completed_through ?? 0
+    },
+    enabled: !!programId,
+  })
+}
