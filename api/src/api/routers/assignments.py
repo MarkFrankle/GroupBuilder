@@ -6,6 +6,11 @@ from api.services.assignment_set_storage import (
     AssignmentSetStorage,
     get_assignment_set_storage,
 )
+from api.services.session_completion_storage import (
+    SessionCompletionStorage,
+    get_session_completion_storage,
+)
+from api.services.session_completion_guards import refuse_if_any_session_complete
 from api.utils.seating_arrangement import arrange_circular_seating
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -23,6 +28,9 @@ NO_ASSIGNMENT_SET = (
 ASSIGNMENT_SET_MISSING = (
     "Something went wrong loading this program's assignments. "
     "Please contact support."
+)
+ASSIGNMENTS_MALFORMED = (
+    "These assignments could not be saved. Reload the page and try your edit again."
 )
 
 
@@ -52,6 +60,91 @@ def _require_current_set(
         )
         raise HTTPException(status_code=500, detail=ASSIGNMENT_SET_MISSING)
     return set_id, assignment_set
+
+
+def session_complete_refusal(session_number: int) -> str:
+    """Message refusing a change to a Session the user has marked complete."""
+    return (
+        f"Session {session_number} is marked complete and cannot be changed. "
+        "Reopen it first if you need to make changes."
+    )
+
+
+def _validate_session_number(
+    storage: AssignmentSetStorage, program_id: str, session_number: int
+) -> None:
+    """Refuse a session number the current assignment set does not contain."""
+    _, assignment_set = _require_current_set(storage, program_id)
+    num_sessions = assignment_set.get("num_sessions") or 0
+    if num_sessions < 1:
+        logger.error("Assignment set for program %s has no session count", program_id)
+        raise HTTPException(status_code=500, detail=ASSIGNMENT_SET_MISSING)
+    if session_number > num_sessions:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"There is no session {session_number}. "
+                f"This program has sessions 1 through {num_sessions}."
+            ),
+        )
+
+
+def _require_wellformed_assignments(assignments: Any) -> None:
+    """Reject a submitted array that cannot be diffed session by session.
+
+    Every entry must name an integer session, and no session may appear twice:
+    a duplicate would let a tampered entry hide behind a matching one while
+    still being the entry the program shows.
+    """
+    numbers = []
+    for entry in assignments:
+        if not isinstance(entry, dict) or not isinstance(entry.get("session"), int):
+            raise HTTPException(status_code=400, detail=ASSIGNMENTS_MALFORMED)
+        numbers.append(entry["session"])
+    if len(numbers) != len(set(numbers)):
+        raise HTTPException(status_code=400, detail=ASSIGNMENTS_MALFORMED)
+
+
+def _session_by_number(assignments: Any) -> Dict[int, Dict[str, Any]]:
+    """Index an assignments array by session number, skipping malformed entries."""
+    indexed: Dict[int, Dict[str, Any]] = {}
+    for entry in assignments or []:
+        number = entry.get("session") if isinstance(entry, dict) else None
+        if isinstance(number, int):
+            indexed[number] = entry
+    return indexed
+
+
+def _refuse_if_completed_sessions_changed(
+    completion: SessionCompletionStorage,
+    program_id: str,
+    stored_assignments: Any,
+    submitted_assignments: Any,
+) -> None:
+    """Refuse a save that would alter a frozen Session.
+
+    ``/results/save`` is program-scoped, so the only truthful check is a
+    comparison against what is stored. A dropped Session counts as a change: an
+    omission still changes what the program says happened that night.
+
+    Sessions completed before any version exists are skipped — there is nothing
+    frozen to protect yet, and refusing would strand the program.
+    """
+    completed = completion.get_completed_sessions(program_id)
+    if not completed:
+        return
+
+    stored = _session_by_number(stored_assignments)
+    submitted = _session_by_number(submitted_assignments)
+
+    for number in completed:
+        if number not in stored:
+            continue
+        if stored[number] != submitted.get(number):
+            raise HTTPException(
+                status_code=409,
+                detail=session_complete_refusal(number),
+            )
 
 
 def _next_version_id(
@@ -279,8 +372,11 @@ async def regenerate_assignments(
         120, ge=30, le=240, description="Maximum solver time in seconds (30-240)"
     ),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+    completion: SessionCompletionStorage = Depends(get_session_completion_storage),
 ):
     """Regenerate assignments from the current assignment set's roster snapshot."""
+    refuse_if_any_session_complete(completion, program_id)
+
     set_id, assignment_set = _require_current_set(storage, program_id)
 
     try:
@@ -314,6 +410,7 @@ async def regenerate_all_with_absences(
     max_time_seconds: int = Query(120, ge=30, le=240),
     per_session_absences: List[Dict[str, Any]] = Body(default=[]),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+    completion: SessionCompletionStorage = Depends(get_session_completion_storage),
 ):
     """
     Regenerate all sessions with per-session absences, saving exactly one new version.
@@ -321,6 +418,8 @@ async def regenerate_all_with_absences(
     per_session_absences: [{"session_number": 1, "absent_participants": [...]}, ...]
     Sessions not listed are solved with all participants present.
     """
+    refuse_if_any_session_complete(completion, program_id)
+
     set_id, assignment_set = _require_current_set(storage, program_id)
 
     try:
@@ -447,6 +546,7 @@ async def regenerate_single_session(
     ),
     absent_participants: List[Dict[str, Any]] = Body(default=[]),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+    completion: SessionCompletionStorage = Depends(get_session_completion_storage),
 ):
     """
     Regenerate a single session while keeping other sessions unchanged.
@@ -465,19 +565,19 @@ async def regenerate_single_session(
     Returns:
         New version with the regenerated session merged in
     """
+    if completion.is_complete(program_id, session_number):
+        raise HTTPException(
+            status_code=409,
+            detail=session_complete_refusal(session_number),
+        )
+
+    _validate_session_number(storage, program_id, session_number)
+
     set_id, assignment_set = _require_current_set(storage, program_id)
 
     try:
         num_tables = assignment_set["num_tables"]
-        num_sessions = assignment_set["num_sessions"]
         all_participants = assignment_set["participant_data"]
-
-        # Validate session number
-        if session_number > num_sessions:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid session number {session_number}. This program only has {num_sessions} sessions.",
-            )
 
         # 2. Get current assignments (from specified version or latest)
         current_result = storage.get_version(program_id, set_id, version_id=version_id)
@@ -690,6 +790,7 @@ async def save_edited_assignments(
     program_id: str = Depends(validate_program_access),
     body: Dict[str, Any] = Body(...),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+    completion: SessionCompletionStorage = Depends(get_session_completion_storage),
 ):
     """Save manually edited assignments as a new version."""
     set_id = _require_current_set_id(storage, program_id)
@@ -699,6 +800,14 @@ async def save_edited_assignments(
 
     if not assignments:
         raise HTTPException(status_code=400, detail="assignments is required")
+
+    _require_wellformed_assignments(assignments)
+
+    current = storage.get_version(program_id, set_id)
+    if current is not None:
+        _refuse_if_completed_sessions_changed(
+            completion, program_id, current.get("assignments"), assignments
+        )
 
     try:
         version_id = _next_version_id(storage, program_id, set_id)
@@ -751,6 +860,52 @@ async def get_assignment_set_metadata(
         "created_at": created_at_unix,
         "has_results": storage.get_version(program_id, set_id) is not None,
     }
+
+
+@router.get("/completion")
+async def get_session_completion(
+    program_id: str = Depends(validate_program_access),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+    completion: SessionCompletionStorage = Depends(get_session_completion_storage),
+):
+    """Which Sessions (meeting nights) are marked complete."""
+    _require_current_set_id(storage, program_id)
+
+    return {"completed_sessions": completion.get_completed_sessions(program_id)}
+
+
+@router.post("/completion/{session_number}")
+async def mark_session_complete(
+    session_number: int = Path(..., description="Session number (1-based)", ge=1),
+    program_id: str = Depends(validate_program_access),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+    completion: SessionCompletionStorage = Depends(get_session_completion_storage),
+):
+    """Mark one Session complete. Idempotent."""
+    _validate_session_number(storage, program_id, session_number)
+
+    completed = completion.mark_complete(program_id, session_number)
+    logger.info(f"Marked session {session_number} complete for program {program_id}")
+
+    return {"completed_sessions": completed}
+
+
+@router.delete("/completion/{session_number}")
+async def reopen_session(
+    session_number: int = Path(..., description="Session number (1-based)", ge=1),
+    program_id: str = Depends(validate_program_access),
+    completion: SessionCompletionStorage = Depends(get_session_completion_storage),
+):
+    """Reopen a completed Session. A no-op if it was not complete."""
+    # Deliberately NOT range-checked, unlike the POST. Reopening only ever
+    # removes a constraint, and the number worth reopening most is one the
+    # current set no longer contains — a smaller set became current while a
+    # higher session was still frozen. Range-checking here strands the program
+    # with completion state it can neither honour nor clear.
+    completed = completion.mark_incomplete(program_id, session_number)
+    logger.info(f"Reopened session {session_number} for program {program_id}")
+
+    return {"completed_sessions": completed}
 
 
 class SeatingRequest(BaseModel):

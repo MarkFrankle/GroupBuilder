@@ -76,6 +76,16 @@ redesign.
    means "everything up to here." This is the property that makes every rebuild safe, and it
    is why full regeneration could be removed entirely.
 
+   **A completed session is a snapshot, so later roster edits never reach it.** Deleting a
+   participant who sat at a table on a finished night does not remove them from that night —
+   the session still shows them, because they were there. Assignments store fully materialized
+   people; the roster is never joined back in at read time. Removing a participant also clears
+   their partner's `partner_id`, and that too leaves completed sessions untouched.
+
+   This is the intended behavior, not an implementation accident. Roster edits therefore
+   accumulate a deliberate drift against what completed sessions display, and that drift is the
+   invariant working. Confirmed 2026-09-06.
+
 3. **Flag contradictions; stay quiet about quality.** A plan that violates a stated rule is
    always flagged, attributed to the specific sessions involved, with a rebuild offered. A
    plan that is merely suboptimal (a table of 5 after an absence) is never flagged. This keeps

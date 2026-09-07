@@ -350,3 +350,68 @@ class TestFullFlow:
         )
         assert response.status_code == 200
         assert "assignment_set_id" in response.json()
+
+
+class TestGenerateRefusesCompletedSessions:
+    """A whole-program rebuild cannot run once a Session is frozen."""
+
+    def _add_participants(self, client, count=2):
+        for i in range(count):
+            client.put(
+                f"/api/roster/p{i}?program_id=test_org_id",
+                json={
+                    "name": f"Person{i}",
+                    "religion": ["Christian", "Jewish", "Muslim"][i % 3],
+                    "gender": ["Male", "Female"][i % 2],
+                    "partner_id": None,
+                },
+            )
+
+    def test_generate_is_refused_when_a_session_is_complete(self, client):
+        self._add_participants(client)
+        client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 1, "num_sessions": 6},
+        )
+        assert (
+            client.post(
+                "/api/assignments/completion/6?program_id=test_org_id"
+            ).status_code
+            == 200
+        )
+
+        response = client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 1, "num_sessions": 3},
+        )
+
+        assert response.status_code == 409
+        assert "Session 6 is already complete" in response.json()["detail"]
+
+    def test_generate_still_works_when_nothing_is_complete(self, client):
+        self._add_participants(client)
+
+        response = client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 1, "num_sessions": 3},
+        )
+
+        assert response.status_code == 200
+
+    def test_refusal_does_not_repoint_the_program(self, client):
+        """The guard must run before the Firestore write, not after."""
+        self._add_participants(client)
+        first = client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 1, "num_sessions": 6},
+        ).json()["assignment_set_id"]
+        client.post("/api/assignments/completion/6?program_id=test_org_id")
+
+        client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 1, "num_sessions": 3},
+        )
+
+        from api.services.assignment_set_storage import AssignmentSetStorage
+
+        assert AssignmentSetStorage().get_current_set_id("test_org_id") == first

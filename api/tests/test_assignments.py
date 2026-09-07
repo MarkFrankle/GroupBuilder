@@ -12,6 +12,8 @@ Every route is program-scoped: the program's current assignment set is the one
 served, so requests carry ``program_id`` and never a lineage UUID.
 """
 
+import copy
+
 import pytest
 from unittest.mock import patch, MagicMock
 from datetime import datetime
@@ -797,7 +799,8 @@ class TestRegenerateSingleSession:
         )
 
         assert response.status_code == 400
-        assert "Invalid session number" in response.json()["detail"]
+        assert "There is no session 5" in response.json()["detail"]
+        assert "sessions 1 through 2" in response.json()["detail"]
 
     def test_regenerate_single_session_max_time_validation(
         self, client, sample_set_data, add_assignment_set_to_firestore
@@ -923,3 +926,403 @@ class TestAuthProtection:
         )
         assert response.status_code == 401
         assert "Authorization header missing" in response.json()["detail"]
+
+
+class TestSessionCompletion:
+    """Test suite for the /api/assignments/completion routes."""
+
+    def test_starts_empty(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        add_assignment_set_to_firestore(sample_set_data)
+
+        response = client.get(f"/api/assignments/completion?program_id={PROGRAM}")
+
+        assert response.status_code == 200
+        assert response.json() == {"completed_sessions": []}
+
+    def test_mark_complete(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """Session 2 is the last valid session, so this covers the boundary too."""
+        add_assignment_set_to_firestore(sample_set_data)
+
+        response = client.post(f"/api/assignments/completion/2?program_id={PROGRAM}")
+
+        assert response.status_code == 200
+        assert response.json() == {"completed_sessions": [2]}
+
+        # The completion must actually persist, not just come back in the response.
+        readback = client.get(f"/api/assignments/completion?program_id={PROGRAM}")
+        assert readback.json() == {"completed_sessions": [2]}
+
+    def test_mark_complete_is_idempotent(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        add_assignment_set_to_firestore(sample_set_data)
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        response = client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        assert response.status_code == 200
+        assert response.json() == {"completed_sessions": [1]}
+
+    def test_reopen_when_not_complete_is_a_no_op(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        add_assignment_set_to_firestore(sample_set_data)
+
+        response = client.delete(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        assert response.status_code == 200
+        assert response.json() == {"completed_sessions": []}
+
+    def test_reopen(self, client, sample_set_data, add_assignment_set_to_firestore):
+        add_assignment_set_to_firestore(sample_set_data)
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        response = client.delete(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        assert response.status_code == 200
+        assert response.json() == {"completed_sessions": []}
+
+    def test_session_beyond_the_program_is_rejected(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """sample_set_data has num_sessions == 2."""
+        add_assignment_set_to_firestore(sample_set_data)
+
+        response = client.post(f"/api/assignments/completion/5?program_id={PROGRAM}")
+
+        assert response.status_code == 400
+        assert "sessions 1 through 2" in response.json()["detail"]
+
+    def test_requires_an_assignment_set(self, client):
+        response = client.get(f"/api/assignments/completion?program_id={OTHER_PROGRAM}")
+
+        assert response.status_code == 404
+
+    def test_shuffle_refuses_on_a_completed_session(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        add_assignment_set_to_firestore(sample_set_data)
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        response = client.post(
+            f"/api/assignments/regenerate/session/1?program_id={PROGRAM}", json=[]
+        )
+
+        assert response.status_code == 409
+        assert "Session 1 is marked complete" in response.json()["detail"]
+
+    def test_shuffle_allowed_on_an_open_session(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """A completed session 1 must not freeze session 2.
+
+        The proof is a 404, not a 200: the freeze did not fire, so the handler
+        ran on to look for a stored version, which this fixture has never saved.
+        """
+        add_assignment_set_to_firestore(sample_set_data)
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        response = client.post(
+            f"/api/assignments/regenerate/session/2?program_id={PROGRAM}", json=[]
+        )
+
+        assert response.status_code == 404
+
+    def test_full_regeneration_refuses_when_a_session_is_complete(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        add_assignment_set_to_firestore(sample_set_data)
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        response = client.post(f"/api/assignments/regenerate?program_id={PROGRAM}")
+
+        assert response.status_code == 409
+        assert "Session 1" in response.json()["detail"]
+
+    def test_regenerate_with_absences_refuses_when_a_session_is_complete(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        add_assignment_set_to_firestore(sample_set_data)
+        client.post(f"/api/assignments/completion/2?program_id={PROGRAM}")
+
+        response = client.post(
+            f"/api/assignments/regenerate/with_absences?program_id={PROGRAM}", json=[]
+        )
+
+        assert response.status_code == 409
+
+    def test_refusal_names_several_completed_sessions_readably(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """Two completed sessions must read as a plural sentence, not a list glued
+        onto a singular verb."""
+        add_assignment_set_to_firestore(sample_set_data)
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+        client.post(f"/api/assignments/completion/2?program_id={PROGRAM}")
+
+        response = client.post(f"/api/assignments/regenerate?program_id={PROGRAM}")
+
+        assert response.status_code == 409
+        detail = response.json()["detail"]
+        assert "Sessions 1 and 2 are already complete" in detail
+        assert "reopen" in detail.lower()
+
+    @patch("api.routers.assignments.handle_generate_assignments")
+    def test_full_regeneration_still_runs_when_nothing_is_complete(
+        self,
+        mock_generate,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+    ):
+        """The guard must block only frozen programs, never every rebuild."""
+        add_assignment_set_to_firestore(sample_set_data)
+        mock_generate.return_value = sample_assignments_result
+
+        response = client.post(f"/api/assignments/regenerate?program_id={PROGRAM}")
+
+        assert response.status_code == 200
+        assert mock_generate.called
+
+    def _save_body(self, assignments):
+        return {"assignments": assignments, "based_on_version": "v1"}
+
+    @staticmethod
+    def _with_swapped_tables(assignments, session_number):
+        """Copy the array with one session's two tables swapped."""
+        modified = copy.deepcopy(assignments)
+        for entry in modified:
+            if entry["session"] == session_number:
+                entry["tables"]["1"], entry["tables"]["2"] = (
+                    entry["tables"]["2"],
+                    entry["tables"]["1"],
+                )
+        return modified
+
+    def test_save_refuses_when_a_completed_session_changed(
+        self,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+    ):
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        stored = sample_assignments_result["assignments"]
+        add_version_to_firestore(set_id, "v1", stored)
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        response = client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json=self._save_body(self._with_swapped_tables(stored, 1)),
+        )
+
+        assert response.status_code == 409
+        assert "Session 1" in response.json()["detail"]
+
+    def test_save_allowed_when_only_open_sessions_changed(
+        self,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+    ):
+        """An untouched completed session must survive the Firestore round trip."""
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        stored = sample_assignments_result["assignments"]
+        add_version_to_firestore(set_id, "v1", stored)
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        response = client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json=self._save_body(self._with_swapped_tables(stored, 2)),
+        )
+
+        assert response.status_code == 200
+
+    def test_save_refuses_when_a_completed_session_is_dropped(
+        self,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+    ):
+        """An omission still changes what the program says happened that night."""
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        stored = sample_assignments_result["assignments"]
+        add_version_to_firestore(set_id, "v1", stored)
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        without_session_1 = [e for e in copy.deepcopy(stored) if e["session"] != 1]
+        response = client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json=self._save_body(without_session_1),
+        )
+
+        assert response.status_code == 409
+        assert "Session 1" in response.json()["detail"]
+
+    def test_save_unaffected_when_nothing_is_complete(
+        self,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+    ):
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        stored = sample_assignments_result["assignments"]
+        add_version_to_firestore(set_id, "v1", stored)
+
+        response = client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json=self._save_body(self._with_swapped_tables(stored, 1)),
+        )
+
+        assert response.status_code == 200
+
+    def test_save_refuses_a_duplicated_completed_session_entry(
+        self,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+    ):
+        """A tampered entry cannot hide behind a second, matching one.
+
+        The array is written verbatim and rendered in order, so a duplicate
+        session number would otherwise let the altered past be the one shown.
+        """
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        stored = sample_assignments_result["assignments"]
+        add_version_to_firestore(set_id, "v1", stored)
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        tampered = self._with_swapped_tables(stored, 1)
+        unchanged_session_1 = copy.deepcopy([e for e in stored if e["session"] == 1][0])
+        body = [e for e in tampered if e["session"] == 1]
+        body.append(unchanged_session_1)
+        body += [copy.deepcopy(e) for e in stored if e["session"] != 1]
+
+        response = client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json=self._save_body(body),
+        )
+
+        assert response.status_code == 400
+        assert "Reload the page" in response.json()["detail"]
+
+    def test_save_refuses_a_malformed_entry(
+        self,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+    ):
+        """A session-less entry must never reach storage."""
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        stored = sample_assignments_result["assignments"]
+        add_version_to_firestore(set_id, "v1", stored)
+
+        body = copy.deepcopy(stored) + [{"tables": {}}]
+        response = client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json=self._save_body(body),
+        )
+
+        assert response.status_code == 400
+
+    def test_session_count_of_zero_is_corrupt_data(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """ "Sessions 1 through 0" is not something a coordinator can act on."""
+        add_assignment_set_to_firestore({**sample_set_data, "num_sessions": 0})
+
+        response = client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        assert response.status_code == 500
+        assert "contact support" in response.json()["detail"].lower()
+
+    def test_reopen_accepts_a_session_beyond_the_current_set(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """Un-bricking: reopening is never range-checked.
+
+        A set with fewer sessions can become current while a higher session
+        number is still marked complete. Reopening only removes a constraint,
+        so it must work for numbers the current set does not contain.
+        """
+        add_assignment_set_to_firestore({**sample_set_data, "num_sessions": 6})
+        client.post(f"/api/assignments/completion/6?program_id={PROGRAM}")
+        add_assignment_set_to_firestore({**sample_set_data, "num_sessions": 2})
+
+        response = client.delete(f"/api/assignments/completion/6?program_id={PROGRAM}")
+
+        assert response.status_code == 200
+        assert response.json() == {"completed_sessions": []}
+        readback = client.get(f"/api/assignments/completion?program_id={PROGRAM}")
+        assert readback.json() == {"completed_sessions": []}
+
+    def test_marking_complete_is_still_range_checked(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """The asymmetry is deliberate — only the DELETE skips the check."""
+        add_assignment_set_to_firestore({**sample_set_data, "num_sessions": 2})
+
+        response = client.post(f"/api/assignments/completion/6?program_id={PROGRAM}")
+
+        assert response.status_code == 400
+
+    def test_a_completed_program_cannot_be_bricked(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """Regression for the whole finding: complete, rebuild, recover.
+
+        Before the guard, a roster regeneration with fewer sessions left the
+        program with completion state it could neither honour nor clear.
+        """
+        add_assignment_set_to_firestore({**sample_set_data, "num_sessions": 6})
+        client.post(f"/api/assignments/completion/6?program_id={PROGRAM}")
+
+        for i in range(4):
+            client.put(
+                f"/api/roster/p{i}?program_id={PROGRAM}",
+                json={
+                    "name": f"Person{i}",
+                    "religion": ["Christian", "Jewish", "Muslim"][i % 3],
+                    "gender": ["Male", "Female"][i % 2],
+                    "partner_id": None,
+                },
+            )
+
+        # 1. The rebuild that used to strand the program is refused outright.
+        rebuild = client.post(
+            f"/api/roster/generate?program_id={PROGRAM}",
+            json={"num_tables": 1, "num_sessions": 3},
+        )
+        assert rebuild.status_code == 409
+
+        # 2. And if a program is already stranded, reopening frees it.
+        add_assignment_set_to_firestore({**sample_set_data, "num_sessions": 2})
+        assert (
+            client.delete(
+                f"/api/assignments/completion/6?program_id={PROGRAM}"
+            ).status_code
+            == 200
+        )
+
+        # 3. With nothing frozen, rebuilding works again.
+        recovered = client.post(
+            f"/api/roster/generate?program_id={PROGRAM}",
+            json={"num_tables": 1, "num_sessions": 3},
+        )
+        assert recovered.status_code == 200
