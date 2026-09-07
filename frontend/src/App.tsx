@@ -8,7 +8,6 @@ import { ProgramProvider, useProgram } from "./contexts/ProgramContext"
 import LoginPage from "./pages/LoginPage"
 import AuthVerifyPage from "./pages/AuthVerifyPage"
 import LandingPage from "./pages/LandingPage"
-import TableAssignmentsPage from "./pages/TableAssignmentsPage"
 import AssignmentsPage from "./pages/AssignmentsPage"
 import SeatingChartPage from "./pages/SeatingChartPage"
 import { RosterPage } from "./pages/RosterPage"
@@ -43,7 +42,7 @@ function NavBar() {
     <nav className="no-print border-b px-4 py-2 flex gap-4 text-sm items-center">
       {(hasProgram || isAdminPage || isHelpPage) && <>
         <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
-        <Link to="/roster" className="text-muted-foreground hover:text-foreground transition-colors">Roster</Link>
+        <Link to="/roster" className="text-muted-foreground hover:text-foreground transition-colors">Setup</Link>
         <Link to="/table-assignments" className="text-muted-foreground hover:text-foreground transition-colors">Assignments</Link>
         <Link to="/help" className="text-muted-foreground hover:text-foreground transition-colors">Help</Link>
       </>}
@@ -149,16 +148,6 @@ const App: React.FC = () => {
               />
               <Route
                 path="/table-assignments"
-                element={
-                  <ProtectedRoute>
-                    <TableAssignmentsPage />
-                  </ProtectedRoute>
-                }
-              />
-              {/* Temporary: the new overview lives here until Phase C swaps
-                  the route and deletes the page it replaces. */}
-              <Route
-                path="/assignments-preview"
                 element={
                   <ProtectedRoute>
                     <AssignmentsPage />
