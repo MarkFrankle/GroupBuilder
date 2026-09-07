@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Printer } from 'lucide-react'
-import { Assignment, Participant } from './TableAssignmentsPage'
+import type { Assignment, Participant } from '@/types/assignments'
 import CircularTable from '@/components/SeatingChart/CircularTable'
 import { authenticatedFetch } from '@/utils/apiClient'
 

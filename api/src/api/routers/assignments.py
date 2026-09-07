@@ -70,6 +70,28 @@ def session_complete_refusal(session_number: int) -> str:
     )
 
 
+def out_of_order_completion_refusal(session_number: int, completed_through: int) -> str:
+    """Message refusing a completion that would leave a gap.
+
+    Completion is contiguous — time is linear — so the only Session that can be
+    completed is the one after the last completed one.
+    """
+    return (
+        f"Session {session_number} can't be completed yet — "
+        f"Session {completed_through + 1} is still open. "
+        "Complete your sessions in order."
+    )
+
+
+def out_of_order_reopen_refusal(session_number: int, completed_through: int) -> str:
+    """Message refusing a reopen below the last completed Session."""
+    return (
+        f"Session {session_number} can't be reopened while Session "
+        f"{completed_through} is still complete. "
+        f"Reopen Session {completed_through} first."
+    )
+
+
 def _validate_session_number(
     storage: AssignmentSetStorage, program_id: str, session_number: int
 ) -> None:
@@ -130,14 +152,14 @@ def _refuse_if_completed_sessions_changed(
     Sessions completed before any version exists are skipped — there is nothing
     frozen to protect yet, and refusing would strand the program.
     """
-    completed = completion.get_completed_sessions(program_id)
-    if not completed:
+    completed_through = completion.get_completed_through(program_id)
+    if not completed_through:
         return
 
     stored = _session_by_number(stored_assignments)
     submitted = _session_by_number(submitted_assignments)
 
-    for number in completed:
+    for number in range(1, completed_through + 1):
         if number not in stored:
             continue
         if stored[number] != submitted.get(number):
@@ -868,10 +890,10 @@ async def get_session_completion(
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
     completion: SessionCompletionStorage = Depends(get_session_completion_storage),
 ):
-    """Which Sessions (meeting nights) are marked complete."""
+    """How many leading Sessions (meeting nights) are complete."""
     _require_current_set_id(storage, program_id)
 
-    return {"completed_sessions": completion.get_completed_sessions(program_id)}
+    return {"completed_through": completion.get_completed_through(program_id)}
 
 
 @router.post("/completion/{session_number}")
@@ -881,13 +903,20 @@ async def mark_session_complete(
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
     completion: SessionCompletionStorage = Depends(get_session_completion_storage),
 ):
-    """Mark one Session complete. Idempotent."""
+    """Mark one Session complete. Idempotent, and only ever the next one."""
     _validate_session_number(storage, program_id, session_number)
+
+    completed_through = completion.get_completed_through(program_id)
+    if session_number > completed_through + 1:
+        raise HTTPException(
+            status_code=400,
+            detail=out_of_order_completion_refusal(session_number, completed_through),
+        )
 
     completed = completion.mark_complete(program_id, session_number)
     logger.info(f"Marked session {session_number} complete for program {program_id}")
 
-    return {"completed_sessions": completed}
+    return {"completed_through": completed}
 
 
 @router.delete("/completion/{session_number}")
@@ -896,16 +925,24 @@ async def reopen_session(
     program_id: str = Depends(validate_program_access),
     completion: SessionCompletionStorage = Depends(get_session_completion_storage),
 ):
-    """Reopen a completed Session. A no-op if it was not complete."""
-    # Deliberately NOT range-checked, unlike the POST. Reopening only ever
-    # removes a constraint, and the number worth reopening most is one the
-    # current set no longer contains — a smaller set became current while a
-    # higher session was still frozen. Range-checking here strands the program
-    # with completion state it can neither honour nor clear.
+    """Reopen the most recently completed Session.
+
+    Only the latest may be reopened: completion is a prefix, so reopening below
+    the last completed Session would leave a gap. Nothing needs range-checking
+    here — a session number the program does not contain is necessarily above
+    ``completed_through``, which is a no-op.
+    """
+    completed_through = completion.get_completed_through(program_id)
+    if 0 < session_number < completed_through:
+        raise HTTPException(
+            status_code=400,
+            detail=out_of_order_reopen_refusal(session_number, completed_through),
+        )
+
     completed = completion.mark_incomplete(program_id, session_number)
     logger.info(f"Reopened session {session_number} for program {program_id}")
 
-    return {"completed_sessions": completed}
+    return {"completed_through": completed}
 
 
 class SeatingRequest(BaseModel):

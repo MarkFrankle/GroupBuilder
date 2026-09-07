@@ -17,7 +17,10 @@ from api.services.session_completion_storage import (
     SessionCompletionStorage,
     get_session_completion_storage,
 )
-from api.services.session_completion_guards import refuse_if_any_session_complete
+from api.services.session_completion_guards import (
+    refuse_if_any_session_complete,
+    refuse_if_below_completed_prefix,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -107,6 +110,10 @@ async def generate_from_roster(
 ):
     # Generating from the roster mints a new set and repoints the program at it,
     # which is a whole-program rebuild. It must refuse before any work or write.
+    # Checked before the general refusal so the more specific message wins: a
+    # coordinator shrinking the program needs to hear about the floor, not just
+    # that a rebuild is impossible.
+    refuse_if_below_completed_prefix(completion, program_id, data.num_sessions)
     refuse_if_any_session_complete(completion, program_id)
 
     participants = roster_service.get_roster(program_id)

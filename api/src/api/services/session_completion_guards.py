@@ -37,6 +37,34 @@ def refuse_if_any_session_complete(
     completion: SessionCompletionStorage, program_id: str
 ) -> None:
     """Full-program rebuilds cannot run once any Session is frozen."""
-    completed = completion.get_completed_sessions(program_id)
-    if completed:
-        raise HTTPException(status_code=409, detail=program_rebuild_refusal(completed))
+    completed_through = completion.get_completed_through(program_id)
+    if completed_through:
+        raise HTTPException(
+            status_code=409,
+            detail=program_rebuild_refusal(list(range(1, completed_through + 1))),
+        )
+
+
+def session_count_floor_refusal(completed_through: int) -> str:
+    """Message refusing a session count below the completed prefix."""
+    return (
+        f"Session {completed_through} is marked complete, so this program "
+        f"cannot drop below {completed_through} sessions. "
+        f"Reopen Session {completed_through} first."
+    )
+
+
+def refuse_if_below_completed_prefix(
+    completion: SessionCompletionStorage, program_id: str, num_sessions: int
+) -> None:
+    """A program may never have fewer Sessions than it has already completed.
+
+    Completion lives on the Program document and survives a new assignment set,
+    so a shrinking session count would otherwise strand a completed Session with
+    nothing on screen to reopen it from. The floor makes that state unreachable.
+    """
+    completed_through = completion.get_completed_through(program_id)
+    if num_sessions < completed_through:
+        raise HTTPException(
+            status_code=409, detail=session_count_floor_refusal(completed_through)
+        )
