@@ -322,15 +322,12 @@ describe('AssignmentsPage', () => {
   it('goes read-only when an older version is selected', async () => {
     renderPage()
 
-    // user-event v13 emits no pointer events, so the Radix trigger is opened
-    // the way a keyboard user would.
-    fireEvent.keyDown(await screen.findByRole('button', { name: /history/i }), {
-      key: 'Enter',
-    })
-    const versions = await screen.findAllByRole('menuitem', { name: /Feb/ })
-    fireEvent.click(versions[versions.length - 1])
+    // A version from the current set: the one that still offers Promote, so
+    // read-only is proved against the version most likely to tempt an edit.
+    await openVersion(/Session 3 shuffled/)
 
-    expect(await screen.findByText(/you're viewing/i)).toBeInTheDocument()
+    expect(await screen.findByText(/You're viewing "Session 3 shuffled"/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /promote/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /shuffle/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /mark complete/i })).not.toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /^print$/i }).length).toBeGreaterThan(0)
@@ -387,7 +384,8 @@ describe('AssignmentsPage', () => {
       status: 409,
       body: {
         detail:
-          'Session 1 is marked complete and cannot be changed. Reopen it first to restore this version.',
+          'Session 1 is marked complete and cannot be changed. ' +
+          'Reopen it first if you need to make changes.',
       },
     }
     renderPage()

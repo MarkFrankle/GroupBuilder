@@ -101,6 +101,8 @@ const AssignmentsPage: React.FC = () => {
   }
 
   const invalidateAll = () => {
+    // A prefix, deliberately not resultsQueryKey: this must match every
+    // results query for the program, versioned ones included.
     queryClient.invalidateQueries({ queryKey: ['results', programId] })
     queryClient.invalidateQueries({ queryKey: ['versions', programId] })
     queryClient.invalidateQueries({ queryKey: ['completion', programId] })
