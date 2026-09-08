@@ -51,6 +51,33 @@ def _require_current_set_id(storage: AssignmentSetStorage, program_id: str) -> s
     return set_id
 
 
+SET_OUT_OF_WINDOW = (
+    "That version is no longer available. History goes back to your last setup change."
+)
+
+
+def _resolve_readable_set_id(
+    storage: AssignmentSetStorage, program_id: str, assignment_set_id: Optional[str]
+) -> str:
+    """The set a read may target: the current one, or the one before it.
+
+    Enforced here rather than left to what History happens to offer, so the
+    two-set window is a property of the API and not of one menu.
+    """
+    current_set_id = _require_current_set_id(storage, program_id)
+    if not assignment_set_id or assignment_set_id == current_set_id:
+        return current_set_id
+
+    readable = {
+        s.get("assignment_set_id")
+        for s in storage.list_recent_sets(program_id, limit=2)
+    }
+    if assignment_set_id not in readable:
+        raise HTTPException(status_code=409, detail=SET_OUT_OF_WINDOW)
+
+    return assignment_set_id
+
+
 def _require_current_set(
     storage: AssignmentSetStorage, program_id: str
 ) -> tuple[str, Dict[str, Any]]:
@@ -785,10 +812,15 @@ async def get_cached_results(
     version: Optional[str] = Query(
         None, description="Version ID (e.g., 'v1'). Defaults to latest.", max_length=10
     ),
+    assignment_set_id: Optional[str] = Query(
+        None,
+        description="Assignment set the version belongs to. Defaults to current.",
+        max_length=64,
+    ),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
 ):
     """Get assignment results for a program's current assignment set."""
-    set_id = _require_current_set_id(storage, program_id)
+    set_id = _resolve_readable_set_id(storage, program_id, assignment_set_id)
 
     logger.info(
         f"Retrieving cached results for program: {program_id}, version: {version or 'latest'}"

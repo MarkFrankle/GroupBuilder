@@ -1518,3 +1518,77 @@ class TestVersionLabels:
 
         assert response.status_code == 200
         assert self._labels()[0] == "Sessions generated"
+
+
+class TestReadingAnOlderSetsVersion:
+    def _save_a_version(self, client, sample_assignments_result):
+        return client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json={"assignments": sample_assignments_result["assignments"]},
+        )
+
+    def test_previous_sets_version_is_readable_with_its_set_id(
+        self,
+        client,
+        sample_set_data,
+        add_assignment_set_to_firestore,
+        sample_assignments_result,
+    ):
+        add_assignment_set_to_firestore(sample_set_data)
+        self._save_a_version(client, sample_assignments_result)
+        add_assignment_set_to_firestore(sample_set_data)
+
+        versions = client.get(
+            f"/api/assignments/results/versions?program_id={PROGRAM}"
+        ).json()["versions"]
+        old = [v for v in versions if not v["promotable"]][0]
+
+        response = client.get(
+            f"/api/assignments/results?program_id={PROGRAM}"
+            f"&version={old['version_id']}"
+            f"&assignment_set_id={old['assignment_set_id']}"
+        )
+
+        assert response.status_code == 200
+        assert len(response.json()) == 2
+
+    def test_a_set_outside_the_window_is_refused(
+        self,
+        client,
+        sample_set_data,
+        add_assignment_set_to_firestore,
+    ):
+        add_assignment_set_to_firestore(sample_set_data)
+
+        response = client.get(
+            f"/api/assignments/results?program_id={PROGRAM}"
+            f"&version=v1&assignment_set_id=definitely-not-a-real-set"
+        )
+
+        assert response.status_code == 409
+
+    def test_the_oldest_of_three_sets_is_refused(
+        self,
+        client,
+        sample_set_data,
+        add_assignment_set_to_firestore,
+        sample_assignments_result,
+    ):
+        oldest_set_id = add_assignment_set_to_firestore(sample_set_data)
+        self._save_a_version(client, sample_assignments_result)
+        add_assignment_set_to_firestore(sample_set_data)
+        self._save_a_version(client, sample_assignments_result)
+        add_assignment_set_to_firestore(sample_set_data)
+        self._save_a_version(client, sample_assignments_result)
+
+        versions = client.get(
+            f"/api/assignments/results/versions?program_id={PROGRAM}"
+        ).json()["versions"]
+        assert oldest_set_id not in {v["assignment_set_id"] for v in versions}
+
+        response = client.get(
+            f"/api/assignments/results?program_id={PROGRAM}"
+            f"&version=v1&assignment_set_id={oldest_set_id}"
+        )
+
+        assert response.status_code == 409
