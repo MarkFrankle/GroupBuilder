@@ -741,5 +741,62 @@ def test_facilitator_output_includes_flag():
     assert non_fac["is_facilitator"] is False
 
 
+def _count_meetings(result):
+    """Map each pair of names to how many sessions they shared a table in."""
+    from collections import Counter
+    import itertools
+
+    meetings = Counter()
+    for session in result["assignments"]:
+        for people in session["tables"].values():
+            names = sorted(p["name"] for p in people)
+            for pair in itertools.combinations(names, 2):
+                meetings[pair] += 1
+    return meetings
+
+
+def _nine_participants():
+    """Nine people who are alike in every way the solver constrains on.
+
+    Religion and gender spread are *hard* constraints, so a mixed roster pins
+    down most of the legal partitions and leaves the repeat penalty nothing to
+    say. Making everyone identical isolates the behaviour under test.
+    """
+    return [
+        {
+            "id": f"p{i}",
+            "name": f"P{i}",
+            "religion": "Jewish",
+            "gender": "F",
+            "couple_id": None,
+            "linked_id": None,
+        }
+        for i in range(9)
+    ]
+
+
+def test_repeat_pairings_are_penalised_beyond_the_rolling_window():
+    """A pair meeting in sessions 1 and 3 is free under the rolling window alone.
+
+    Nine people at three tables of three over four sessions is the one size where
+    a perfect answer provably exists: 4 sessions x 3 tables x 3 pairs = 36 = every
+    one of the 36 pairs meeting exactly once. The window is narrowed to 1 so it
+    only charges for back-to-back sessions, which leaves "sessions 1 and 3"
+    costing nothing at all. Only the global penalty rules that out.
+    """
+    builder = GroupBuilder(
+        _nine_participants(),
+        num_tables=3,
+        num_sessions=4,
+        pairing_window_size=1,
+    )
+    result = builder.generate_assignments(max_time_seconds=30)
+
+    assert result["status"] == "success"
+    meetings = _count_meetings(result)
+    worst = max(meetings.values())
+    assert worst == 1, f"a pair met {worst} times when every pair could meet once"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
