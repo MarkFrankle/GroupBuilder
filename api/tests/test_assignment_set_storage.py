@@ -119,9 +119,13 @@ def test_list_recent_sets_stops_at_the_limit(storage):
     middle = _make_set(storage, filename="middle")
     newest = _make_set(storage, filename="newest")
 
-    sets = storage.list_recent_sets(PROGRAM, limit=2)
-
-    assert [s["assignment_set_id"] for s in sets] == [newest, middle]
+    assert [s["assignment_set_id"] for s in storage.list_recent_sets(PROGRAM)] == [
+        newest,
+        middle,
+    ]
+    assert [
+        s["assignment_set_id"] for s in storage.list_recent_sets(PROGRAM, limit=1)
+    ] == [newest]
 
 
 def test_list_recent_sets_puts_the_pointer_first_even_if_it_is_not_newest(storage):
@@ -137,3 +141,21 @@ def test_list_recent_sets_puts_the_pointer_first_even_if_it_is_not_newest(storag
 
 def test_list_recent_sets_on_a_program_with_no_sets(storage):
     assert storage.list_recent_sets("program_that_does_not_exist") == []
+
+
+def test_list_recent_sets_when_a_program_has_only_one_set(storage):
+    only = _make_set(storage)
+
+    assert [s["assignment_set_id"] for s in storage.list_recent_sets(PROGRAM)] == [only]
+
+
+def test_list_recent_sets_survives_a_pointer_at_a_missing_set(storage):
+    """A dangling pointer degrades to newest-first rather than raising."""
+    newest = _make_set(storage)
+    storage._program_ref(PROGRAM).set(
+        {"current_assignment_set_id": "set_that_was_deleted"}, merge=True
+    )
+
+    assert [s["assignment_set_id"] for s in storage.list_recent_sets(PROGRAM)] == [
+        newest
+    ]

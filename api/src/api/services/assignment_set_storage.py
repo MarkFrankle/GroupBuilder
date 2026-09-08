@@ -22,8 +22,9 @@ class AssignmentSetStorage:
     organizations/{program_id}/assignment_sets/{set_id}/versions/{version_id}
 
     The program document holds ``current_assignment_set_id``. That pointer is
-    the authority on which set is current; older sets are kept and can be
-    enumerated, newest first, by ``list_recent_sets``.
+    the authority on which set is current; older sets are kept, and
+    ``list_recent_sets`` returns the current one followed by the rest,
+    newest first.
     """
 
     def __init__(self):
@@ -88,7 +89,8 @@ class AssignmentSetStorage:
         History reaches back exactly one set, so the default limit is two. The
         program pointer decides which set is current — creation order does not,
         because the pointer is the authority on "current" everywhere else in
-        this service.
+        this service. If the pointer names a set that no longer exists, the
+        result is simply the newest sets, with no current one to lead it.
         """
         current_id = self.get_current_set_id(program_id)
         if not current_id:
