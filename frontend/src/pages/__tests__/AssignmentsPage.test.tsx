@@ -50,6 +50,8 @@ interface ApiState {
   completedThrough: number
   completionResponse?: { status: number; body: any }
   shuffled?: boolean
+  promoted?: string
+  promoteResponse?: { status: number; body: any }
 }
 
 let api: ApiState
@@ -90,6 +92,24 @@ function mockApi() {
       } as Response)
     }
 
+    if (url.includes('/api/assignments/results/promote/')) {
+      api.promoted = url
+      if (api.promoteResponse) {
+        const { status, body } = api.promoteResponse
+        return Promise.resolve({
+          ok: status < 400,
+          status,
+          json: () => Promise.resolve(body),
+        } as Response)
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({ version_id: 'v3', label: 'Restored "Session 3 shuffled"' }),
+      } as Response)
+    }
+
     if (url.includes('/api/assignments/results/versions')) {
       return Promise.resolve({
         ok: true,
@@ -119,7 +139,9 @@ function mockApi() {
                 assignment_set_id: 'set-previous',
                 label: 'Original plan',
                 promotable: false,
-                not_promotable_reason: 'The roster has changed since this version.',
+                not_promotable_reason:
+                  'This version predates your roster change on Feb 19, 2025 — ' +
+                  'it seats 3 of your 4 participants, and 1 person who has since left.',
               },
             ],
           }),
@@ -300,10 +322,74 @@ describe('AssignmentsPage', () => {
     const versions = await screen.findAllByRole('menuitem', { name: /Feb/ })
     fireEvent.click(versions[versions.length - 1])
 
-    expect(await screen.findByText(/viewing an older version/i)).toBeInTheDocument()
+    expect(await screen.findByText(/you're viewing/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /shuffle/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /mark complete/i })).not.toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /^print$/i }).length).toBeGreaterThan(0)
+  })
+
+  /** Opens History and picks a version by its menu label. */
+  async function openVersion(label: string | RegExp) {
+    fireEvent.keyDown(await screen.findByRole('button', { name: /history/i }), {
+      key: 'Enter',
+    })
+    fireEvent.click(await screen.findByRole('menuitem', { name: label }))
+  }
+
+  it('offers Promote when viewing a version from the current set', async () => {
+    renderPage()
+
+    await openVersion(/Session 3 shuffled/)
+
+    expect(await screen.findByRole('button', { name: /promote/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /back to current/i })).toBeInTheDocument()
+  })
+
+  it('states the reason and offers no Promote for a version from an older set', async () => {
+    renderPage()
+
+    await openVersion(/Original plan/)
+
+    expect(await screen.findByText(/predates your roster change/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /promote/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /back to current/i })).toBeInTheDocument()
+  })
+
+  it('returns to the current plan after promoting', async () => {
+    renderPage()
+
+    await openVersion(/Session 3 shuffled/)
+    fireEvent.click(await screen.findByRole('button', { name: /promote/i }))
+
+    expect(
+      await screen.findByText(/Restored "Session 3 shuffled" is now the current plan\./)
+    ).toBeInTheDocument()
+    expect(api.promoted).toContain('/api/assignments/results/promote/v2')
+    expect(api.promoted).toContain('program_id=test-program-id')
+    expect(api.promoted).toContain('assignment_set_id=set-current')
+
+    // Promotion writes a new version at the head, so the page is live again.
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: /shuffle/i }).length).toBeGreaterThan(0)
+    )
+  })
+
+  it('surfaces the API refusal when a promotion is rejected', async () => {
+    api.promoteResponse = {
+      status: 409,
+      body: {
+        detail:
+          'Session 1 is marked complete and cannot be changed. Reopen it first to restore this version.',
+      },
+    }
+    renderPage()
+
+    await openVersion(/Session 3 shuffled/)
+    fireEvent.click(await screen.findByRole('button', { name: /promote/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /Session 1 is marked complete and cannot be changed/
+    )
   })
 
   it('labels versions and divides them at the setup change', async () => {

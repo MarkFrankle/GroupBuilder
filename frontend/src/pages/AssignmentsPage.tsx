@@ -172,6 +172,31 @@ const AssignmentsPage: React.FC = () => {
     },
   })
 
+  /**
+   * Promotion is not a rewind: the server writes the old content as a new
+   * version at the head, so a success lands us back on the current plan rather
+   * than deeper into the past.
+   */
+  const promoteMutation = useMutation({
+    mutationFn: async (version: ResultVersion) => {
+      const response = await authenticatedFetch(
+        `/api/assignments/results/promote/${version.version_id}` +
+          `?program_id=${programId}&assignment_set_id=${version.assignment_set_id}`,
+        { method: 'POST' }
+      )
+      if (!response.ok) {
+        throw new Error(await refusalDetail(response, 'Could not restore this version.'))
+      }
+      return response.json()
+    },
+    onSuccess: (data: { label: string }) => {
+      setViewing(null)
+      invalidateAll()
+      setNotice({ tone: 'info', message: `${data.label} is now the current plan.` })
+    },
+    onError: (error: Error) => setNotice({ tone: 'error', message: error.message }),
+  })
+
   const handlePrintRoster = () => {
     navigate('/table-assignments/roster-print', {
       state: { assignments: sorted, programId },
@@ -194,20 +219,31 @@ const AssignmentsPage: React.FC = () => {
     }
   }
 
+  /**
+   * A version from an earlier set cannot be promoted — it was built against a
+   * different roster. The strip states that as a fact rather than offering a
+   * disabled Promote button, which is how the rest of the app refuses things.
+   */
   const viewVersion = (version: ResultVersion) => {
     setViewing(version)
+    const name = version.label ?? formatVersionDate(version.created_at)
+    const backToCurrent = {
+      label: 'Back to current',
+      onClick: () => {
+        setViewing(null)
+        setNotice(null)
+      },
+    }
+
     setNotice({
       tone: 'info',
-      message: `You're viewing an older version from ${formatVersionDate(version.created_at)}.`,
-      actions: [
-        {
-          label: 'Back to current',
-          onClick: () => {
-            setViewing(null)
-            setNotice(null)
-          },
-        },
-      ],
+      message: version.promotable
+        ? `You're viewing "${name}" from ${formatVersionDate(version.created_at)}.`
+        : `You're viewing "${name}" from ${formatVersionDate(version.created_at)}. ` +
+          `${version.not_promotable_reason}`,
+      actions: version.promotable
+        ? [{ label: 'Promote', onClick: () => promoteMutation.mutate(version) }, backToCurrent]
+        : [backToCurrent],
     })
   }
 
