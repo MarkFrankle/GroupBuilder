@@ -27,6 +27,13 @@ import {
 import { useProgram } from '@/contexts/ProgramContext'
 import type { Assignment, ResultVersion } from '@/types/assignments'
 
+/**
+ * The key useAssignmentResults registers for the current plan. Shared so the
+ * queryFn-less fetchQuery below reads that query rather than missing it.
+ */
+const LATEST_RESULTS_KEY = (programId: string | null) =>
+  ['results', programId, 'latest', 'current'] as const
+
 function formatVersionDate(createdAt: number): string {
   return new Date(createdAt * 1000).toLocaleString(undefined, {
     month: 'short',
@@ -58,15 +65,18 @@ const AssignmentsPage: React.FC = () => {
   const { currentProgram, loading: programLoading } = useProgram()
   const programId = currentProgram?.id ?? null
 
-  // 'latest' is the current plan; anything else is a look at the past, and
-  // looking is free while acting is not — see readOnly below.
-  const [currentVersion, setCurrentVersion] = useState<string>('latest')
-  const readOnly = currentVersion !== 'latest'
+  // null is the current plan; anything else is a look at the past, and looking
+  // is free while acting is not — see readOnly below. The whole version is held
+  // rather than its id, because ids are minted per set and so `v1` exists in
+  // every set: an id alone no longer names one version.
+  const [viewing, setViewing] = useState<ResultVersion | null>(null)
+  const readOnly = viewing !== null
 
   const { data: metadata } = useAssignmentSetMetadata(programId)
   const { data: fetchedAssignments, isLoading } = useAssignmentResults(
     programId,
-    readOnly ? currentVersion : undefined
+    viewing?.version_id,
+    viewing?.assignment_set_id
   )
   const { data: completedThrough = 0 } = useSessionCompletion(programId)
   const { data: versions = [] } = useResultVersions(programId)
@@ -153,8 +163,12 @@ const AssignmentsPage: React.FC = () => {
     onSettled: () => setShufflingSession(null),
     onSuccess: async (sessionNumber: number) => {
       invalidateAll()
+      // No queryFn: this reads the results query the hook already registered,
+      // so the key must match useAssignmentResults(programId) — its default
+      // ['results', programId, 'latest', 'current'] — exactly. Change one and
+      // the other must follow; a mismatch fails silently with an empty result.
       const fresh = await queryClient.fetchQuery<Assignment[]>({
-        queryKey: ['results', programId, 'latest', 'current'],
+        queryKey: LATEST_RESULTS_KEY(programId),
       })
       setNotice({
         tone: 'info',
@@ -189,14 +203,14 @@ const AssignmentsPage: React.FC = () => {
   }
 
   const viewVersion = (version: ResultVersion) => {
-    setCurrentVersion(version.version_id)
+    setViewing(version)
     setNotice({
       tone: 'info',
       message: `You're viewing an older version from ${formatVersionDate(version.created_at)}.`,
       action: {
         label: 'Back to current',
         onClick: () => {
-          setCurrentVersion('latest')
+          setViewing(null)
           setNotice(null)
         },
       },
@@ -262,6 +276,12 @@ const AssignmentsPage: React.FC = () => {
 
   const totalSessions = metadata?.num_sessions ?? sorted.length
 
+  // The moment the current set was minted is the moment the setup changed, so
+  // it is the date the divider carries.
+  const setChangeDate = metadata?.created_at
+    ? formatVersionDate(metadata.created_at)
+    : null
+
   const historyMenu = versions.length > 0 && (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -274,27 +294,52 @@ const AssignmentsPage: React.FC = () => {
         <DropdownMenuItem
           disabled={!readOnly}
           onSelect={() => {
-            setCurrentVersion('latest')
+            setViewing(null)
             setNotice(null)
           }}
         >
           Latest
         </DropdownMenuItem>
         {/*
-          Versions read by timestamp, not by raw id. Action-derived labels
-          ("Session 3 Shuffle") and promotion are item 7; viewing is free.
+          Left in server order — current set first, newest first within each
+          set. Re-sorting by timestamp would scramble the grouping the divider
+          depends on.
         */}
-        {[...versions]
-          .sort((a: ResultVersion, b: ResultVersion) => b.created_at - a.created_at)
-          .map((version: ResultVersion) => (
-            <DropdownMenuItem
-              key={version.version_id}
-              disabled={version.version_id === currentVersion}
-              onSelect={() => viewVersion(version)}
+        {versions.map((version: ResultVersion, index: number) => {
+          const startsNewSet =
+            index > 0 &&
+            version.assignment_set_id !== versions[index - 1].assignment_set_id
+
+          return (
+            <React.Fragment
+              key={`${version.assignment_set_id}:${version.version_id}`}
             >
-              {formatVersionDate(version.created_at)}
-            </DropdownMenuItem>
-          ))}
+              {startsNewSet && (
+                <div className="border-t px-2 py-1.5 text-xs text-muted-foreground">
+                  {setChangeDate
+                    ? `Before your roster change on ${setChangeDate}`
+                    : 'Before your roster change'}
+                </div>
+              )}
+              <DropdownMenuItem
+                disabled={
+                  viewing?.version_id === version.version_id &&
+                  viewing?.assignment_set_id === version.assignment_set_id
+                }
+                onSelect={() => viewVersion(version)}
+              >
+                <div className="flex flex-col items-start">
+                  <span>
+                    {version.label ?? formatVersionDate(version.created_at)}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatVersionDate(version.created_at)}
+                  </span>
+                </div>
+              </DropdownMenuItem>
+            </React.Fragment>
+          )
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   )

@@ -39,6 +39,7 @@ const assignments = [1, 2, 3].map(session => ({
 }))
 
 const metadata = {
+  created_at: 1740000000,
   num_participants: 4,
   num_tables: 2,
   num_sessions: 3,
@@ -96,8 +97,30 @@ function mockApi() {
         json: () =>
           Promise.resolve({
             versions: [
-              { version_id: 'v1', created_at: 1740000000 },
-              { version_id: 'v2', created_at: 1740086400 },
+              {
+                version_id: 'v2',
+                created_at: 1740086400,
+                assignment_set_id: 'set-current',
+                label: 'Session 3 shuffled',
+                promotable: true,
+                not_promotable_reason: null,
+              },
+              {
+                version_id: 'v1',
+                created_at: 1740000000,
+                assignment_set_id: 'set-current',
+                label: null,
+                promotable: true,
+                not_promotable_reason: null,
+              },
+              {
+                version_id: 'v1',
+                created_at: 1739000000,
+                assignment_set_id: 'set-previous',
+                label: 'Original plan',
+                promotable: false,
+                not_promotable_reason: 'The roster has changed since this version.',
+              },
             ],
           }),
       } as Response)
@@ -281,5 +304,29 @@ describe('AssignmentsPage', () => {
     expect(screen.queryByRole('button', { name: /shuffle/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /mark complete/i })).not.toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /^print$/i }).length).toBeGreaterThan(0)
+  })
+
+  it('labels versions and divides them at the setup change', async () => {
+    renderPage()
+
+    fireEvent.keyDown(await screen.findByRole('button', { name: /history/i }), {
+      key: 'Enter',
+    })
+
+    expect(await screen.findByText('Session 3 shuffled')).toBeInTheDocument()
+    expect(screen.getByText('Original plan')).toBeInTheDocument()
+    expect(screen.getByText(/before your roster change/i)).toBeInTheDocument()
+  })
+
+  it('falls back to the timestamp for a version saved before labelling', async () => {
+    renderPage()
+
+    fireEvent.keyDown(await screen.findByRole('button', { name: /history/i }), {
+      key: 'Enter',
+    })
+
+    const unlabelled = await screen.findByRole('menuitem', { name: /Feb 19/ })
+    expect(unlabelled).toHaveTextContent(/Feb 19/)
+    expect(unlabelled).not.toHaveTextContent(/null/)
   })
 })
