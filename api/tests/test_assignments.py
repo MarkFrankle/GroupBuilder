@@ -444,6 +444,23 @@ class TestVersionListSpansTwoSets:
 
         assert len({v["assignment_set_id"] for v in versions}) == 2
 
+    def test_a_dangling_set_pointer_is_a_500_here_too(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """The version list needs the current set's roster, so a dangling
+        pointer is the same corrupt-data 500 the other routes return, not a 404
+        telling the user to generate."""
+        from api.firebase_admin import get_firestore_client
+
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        get_firestore_client().collection("organizations").document(PROGRAM).collection(
+            "assignment_sets"
+        ).document(set_id).delete()
+
+        response = client.get(f"/api/assignments/results/versions?program_id={PROGRAM}")
+
+        assert response.status_code == 500
+
     def test_each_entry_carries_its_label(
         self,
         client,

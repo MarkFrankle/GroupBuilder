@@ -819,7 +819,11 @@ async def get_cached_results(
     ),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
 ):
-    """Get assignment results for a program's current assignment set."""
+    """Get assignment results for one version of a readable assignment set.
+
+    Defaults to the current set. A previous set may be named explicitly, which
+    is how History reads a version minted before the last setup change.
+    """
     set_id = _resolve_readable_set_id(storage, program_id, assignment_set_id)
 
     logger.info(
