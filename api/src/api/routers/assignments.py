@@ -33,6 +33,13 @@ ASSIGNMENTS_MALFORMED = (
     "These assignments could not be saved. Reload the page and try your edit again."
 )
 
+# A version is the state after something happened, so every label is a completed
+# action in the past tense.
+LABEL_GENERATED = "Sessions generated"
+LABEL_REBUILT = "Sessions rebuilt"
+LABEL_REBUILT_WITH_ABSENCES = "Sessions rebuilt with absences"
+LABEL_MANUAL_EDIT = "Manual edit"
+
 
 def _require_current_set_id(storage: AssignmentSetStorage, program_id: str) -> str:
     """Resolve the program's current assignment set, or 404."""
@@ -334,6 +341,7 @@ def _generate_assignments_internal(
         "solve_time": results.get("solve_time"),
         "total_deviation": results.get("total_deviation"),
         "max_time_seconds": max_time_seconds,
+        "label": LABEL_REBUILT if mark_regenerated else LABEL_GENERATED,
     }
 
     if mark_regenerated:
@@ -518,6 +526,9 @@ async def regenerate_all_with_absences(
         metadata = {
             "max_time_seconds": max_time_seconds,
             "regenerated": True,
+            "label": (
+                LABEL_REBUILT_WITH_ABSENCES if absences_applied else LABEL_REBUILT
+            ),
         }
         if absences_applied:
             metadata["solution_quality"] = None
@@ -722,6 +733,7 @@ async def regenerate_single_session(
             "max_time_seconds": max_time_seconds,
             "regenerated": True,
             "regenerated_session": session_number,
+            "label": f"Session {session_number} shuffled",
             "assignments_unchanged": assignments_unchanged,  # Flag if same assignments returned
         }
 
@@ -837,6 +849,7 @@ async def save_edited_assignments(
         metadata = {
             "source": "manual_edit",
             "based_on": based_on_version,
+            "label": LABEL_MANUAL_EDIT,
         }
 
         storage.save_version(

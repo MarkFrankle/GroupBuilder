@@ -1329,3 +1329,75 @@ class TestSessionCompletion:
 
         assert response.status_code == 409
         assert "below 3 sessions" in response.json()["detail"]
+
+
+class TestVersionLabels:
+    """Every version records the action that produced it, in the past tense."""
+
+    def _labels(self):
+        from api.services.assignment_set_storage import AssignmentSetStorage
+
+        storage = AssignmentSetStorage()
+        set_id = storage.get_current_set_id(PROGRAM)
+        return [
+            (v["metadata"] or {}).get("label")
+            for v in storage.list_versions(PROGRAM, set_id)
+        ]
+
+    def test_manual_save_labels_the_version(
+        self,
+        client,
+        sample_set_data,
+        add_assignment_set_to_firestore,
+        sample_assignments_result,
+    ):
+        add_assignment_set_to_firestore(sample_set_data)
+
+        response = client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json={"assignments": sample_assignments_result["assignments"]},
+        )
+
+        assert response.status_code == 200
+        assert self._labels()[0] == "Manual edit"
+
+    @patch("api.routers.assignments.GroupBuilder")
+    def test_single_session_shuffle_labels_the_version(
+        self,
+        mock_builder_class,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+    ):
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        add_version_to_firestore(
+            set_id,
+            "v1",
+            sample_assignments_result["assignments"],
+            {"solution_quality": "optimal"},
+        )
+
+        mock_builder = MagicMock()
+        mock_builder_class.return_value = mock_builder
+        mock_builder.generate_assignments.return_value = {
+            "status": "success",
+            "solution_quality": "optimal",
+            "solve_time": 1.0,
+            "total_deviation": 0,
+            "assignments": [
+                {
+                    "session": 1,
+                    "tables": sample_assignments_result["assignments"][0]["tables"],
+                }
+            ],
+        }
+
+        response = client.post(
+            f"/api/assignments/regenerate/session/1?program_id={PROGRAM}",
+            json=[],
+        )
+
+        assert response.status_code == 200
+        assert self._labels()[0] == "Session 1 shuffled"
