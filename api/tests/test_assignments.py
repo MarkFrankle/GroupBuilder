@@ -1401,3 +1401,23 @@ class TestVersionLabels:
 
         assert response.status_code == 200
         assert self._labels()[0] == "Session 1 shuffled"
+
+    @patch("api.routers.assignments.GroupBuilder")
+    def test_first_generate_labels_the_version(
+        self,
+        mock_builder_class,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+    ):
+        add_assignment_set_to_firestore(sample_set_data)
+
+        mock_builder = MagicMock()
+        mock_builder_class.return_value = mock_builder
+        mock_builder.generate_assignments.return_value = sample_assignments_result
+
+        response = client.get(f"/api/assignments/?program_id={PROGRAM}")
+
+        assert response.status_code == 200
+        assert self._labels()[0] == "Sessions generated"
