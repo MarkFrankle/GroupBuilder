@@ -5,7 +5,7 @@ import { X } from 'lucide-react'
 export interface Notice {
   tone: 'info' | 'error'
   message: string
-  action?: { label: string; onClick: () => void }
+  actions?: { label: string; onClick: () => void }[]
 }
 
 interface NoticeStripProps {
@@ -37,11 +37,11 @@ const NoticeStrip: React.FC<NoticeStripProps> = ({ notice, onDismiss }) => {
     >
       <div className="text-sm font-medium">{notice.message}</div>
       <div className="flex items-center gap-2">
-        {notice.action && (
-          <Button variant="outline" size="sm" onClick={notice.action.onClick}>
-            {notice.action.label}
+        {notice.actions?.map(action => (
+          <Button key={action.label} variant="outline" size="sm" onClick={action.onClick}>
+            {action.label}
           </Button>
-        )}
+        ))}
         {onDismiss && (
           <Button variant="outline" size="sm" aria-label="Dismiss" onClick={onDismiss}>
             <X className="h-3.5 w-3.5" />

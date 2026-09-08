@@ -19,6 +19,7 @@ import {
   uniqueTablematesAverage,
 } from '@/utils/assignmentStats'
 import {
+  resultsQueryKey,
   useAssignmentResults,
   useAssignmentSetMetadata,
   useResultVersions,
@@ -26,13 +27,6 @@ import {
 } from '@/hooks/queries'
 import { useProgram } from '@/contexts/ProgramContext'
 import type { Assignment, ResultVersion } from '@/types/assignments'
-
-/**
- * The key useAssignmentResults registers for the current plan. Shared so the
- * queryFn-less fetchQuery below reads that query rather than missing it.
- */
-const LATEST_RESULTS_KEY = (programId: string | null) =>
-  ['results', programId, 'latest', 'current'] as const
 
 function formatVersionDate(createdAt: number): string {
   return new Date(createdAt * 1000).toLocaleString(undefined, {
@@ -163,12 +157,10 @@ const AssignmentsPage: React.FC = () => {
     onSettled: () => setShufflingSession(null),
     onSuccess: async (sessionNumber: number) => {
       invalidateAll()
-      // No queryFn: this reads the results query the hook already registered,
-      // so the key must match useAssignmentResults(programId) — its default
-      // ['results', programId, 'latest', 'current'] — exactly. Change one and
-      // the other must follow; a mismatch fails silently with an empty result.
+      // No queryFn: this reads the results query useAssignmentResults already
+      // registered, which is why both sides build the key from the same helper.
       const fresh = await queryClient.fetchQuery<Assignment[]>({
-        queryKey: LATEST_RESULTS_KEY(programId),
+        queryKey: resultsQueryKey(programId),
       })
       setNotice({
         tone: 'info',
@@ -207,13 +199,15 @@ const AssignmentsPage: React.FC = () => {
     setNotice({
       tone: 'info',
       message: `You're viewing an older version from ${formatVersionDate(version.created_at)}.`,
-      action: {
-        label: 'Back to current',
-        onClick: () => {
-          setViewing(null)
-          setNotice(null)
+      actions: [
+        {
+          label: 'Back to current',
+          onClick: () => {
+            setViewing(null)
+            setNotice(null)
+          },
         },
-      },
+      ],
     })
   }
 

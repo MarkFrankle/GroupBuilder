@@ -2,6 +2,19 @@ import { useQuery } from '@tanstack/react-query'
 import { authenticatedFetch } from '@/utils/apiClient'
 import type { ResultVersion } from '@/types/assignments'
 
+/**
+ * The one definition of the results query key. useAssignmentResults registers
+ * a query under it, and AssignmentsPage reads that query back with a
+ * queryFn-less fetchQuery — so the two must agree exactly. A drift here fails
+ * silently with an empty result rather than a type or lint error, which is why
+ * neither side is allowed to spell the key out by hand.
+ */
+export const resultsQueryKey = (
+  programId: string | null,
+  version?: string,
+  assignmentSetId?: string
+) => ['results', programId, version ?? 'latest', assignmentSetId ?? 'current'] as const
+
 export function useResultVersions(programId: string | null) {
   return useQuery({
     queryKey: ['versions', programId],
@@ -21,7 +34,7 @@ export function useAssignmentResults(
   assignmentSetId?: string
 ) {
   return useQuery({
-    queryKey: ['results', programId, version ?? 'latest', assignmentSetId ?? 'current'],
+    queryKey: resultsQueryKey(programId, version, assignmentSetId),
     queryFn: async () => {
       const params = new URLSearchParams({ program_id: programId as string })
       if (version) params.set('version', version)
