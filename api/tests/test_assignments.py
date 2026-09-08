@@ -367,6 +367,103 @@ class TestGetResultVersions:
         assert response.status_code == 404
 
 
+class TestVersionListSpansTwoSets:
+    """History reaches back exactly one assignment set — no further."""
+
+    def _two_sets(
+        self,
+        client,
+        sample_set_data,
+        add_assignment_set_to_firestore,
+        sample_assignments_result,
+    ):
+        """An old set with one version, then a current set with one version."""
+        add_assignment_set_to_firestore(sample_set_data)
+        client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json={"assignments": sample_assignments_result["assignments"]},
+        )
+        newer = copy.deepcopy(sample_set_data)
+        newer["participant_dict"] = newer["participant_dict"] + [
+            {
+                "id": 5,
+                "name": "Erin",
+                "religion": "Jewish",
+                "gender": "Female",
+                "couple_id": None,
+            }
+        ]
+        add_assignment_set_to_firestore(newer)
+        client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json={"assignments": sample_assignments_result["assignments"]},
+        )
+
+    def test_current_set_versions_come_first_and_are_promotable(
+        self,
+        client,
+        sample_set_data,
+        add_assignment_set_to_firestore,
+        sample_assignments_result,
+    ):
+        self._two_sets(
+            client,
+            sample_set_data,
+            add_assignment_set_to_firestore,
+            sample_assignments_result,
+        )
+
+        versions = client.get(
+            f"/api/assignments/results/versions?program_id={PROGRAM}"
+        ).json()["versions"]
+
+        assert len(versions) == 2
+        assert versions[0]["promotable"] is True
+        assert versions[0]["not_promotable_reason"] is None
+        assert versions[1]["promotable"] is False
+        assert "predates your roster change" in versions[1]["not_promotable_reason"]
+        assert versions[0]["assignment_set_id"] != versions[1]["assignment_set_id"]
+
+    def test_a_third_older_set_is_not_listed(
+        self,
+        client,
+        sample_set_data,
+        add_assignment_set_to_firestore,
+        sample_assignments_result,
+    ):
+        for _ in range(3):
+            add_assignment_set_to_firestore(sample_set_data)
+            client.post(
+                f"/api/assignments/results/save?program_id={PROGRAM}",
+                json={"assignments": sample_assignments_result["assignments"]},
+            )
+
+        versions = client.get(
+            f"/api/assignments/results/versions?program_id={PROGRAM}"
+        ).json()["versions"]
+
+        assert len({v["assignment_set_id"] for v in versions}) == 2
+
+    def test_each_entry_carries_its_label(
+        self,
+        client,
+        sample_set_data,
+        add_assignment_set_to_firestore,
+        sample_assignments_result,
+    ):
+        add_assignment_set_to_firestore(sample_set_data)
+        client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json={"assignments": sample_assignments_result["assignments"]},
+        )
+
+        versions = client.get(
+            f"/api/assignments/results/versions?program_id={PROGRAM}"
+        ).json()["versions"]
+
+        assert versions[0]["label"] == "Manual edit"
+
+
 class TestSaveEditedAssignments:
     """Test suite for POST /api/assignments/results/save endpoint."""
 

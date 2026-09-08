@@ -11,6 +11,7 @@ from api.services.session_completion_storage import (
     get_session_completion_storage,
 )
 from api.services.session_completion_guards import refuse_if_any_session_complete
+from api.services.version_promotion import roster_change_reason
 from api.utils.seating_arrangement import arrange_circular_seating
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -67,6 +68,14 @@ def _require_current_set(
         )
         raise HTTPException(status_code=500, detail=ASSIGNMENT_SET_MISSING)
     return set_id, assignment_set
+
+
+def _format_set_date(created_at: Any) -> str:
+    """The date a setup change was committed, for the not-promotable sentence."""
+    try:
+        return created_at.strftime("%b %-d")
+    except (AttributeError, ValueError):
+        return "an earlier date"
 
 
 def session_complete_refusal(session_number: int) -> str:
@@ -802,20 +811,49 @@ async def get_result_version_list(
     program_id: str = Depends(validate_program_access),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
 ):
-    """Get list of all result versions for the current assignment set."""
-    set_id = _require_current_set_id(storage, program_id)
+    """Versions for the current assignment set, then the one before it.
+
+    History reaches back exactly one set. Further back would be the browsable
+    archive this redesign deleted; no further back leaves the divider at the
+    setup change with nothing to draw.
+    """
+    current_set_id, current_set = _require_current_set(storage, program_id)
 
     logger.info(f"Retrieving version list for program: {program_id}")
 
-    versions = storage.list_versions(program_id, set_id)
+    recent_sets = storage.list_recent_sets(program_id, limit=2)
 
-    if not versions:
+    entries: List[Dict[str, Any]] = []
+    for assignment_set in recent_sets:
+        set_id = assignment_set.get("assignment_set_id")
+        is_current = set_id == current_set_id
+
+        reason = None
+        if not is_current:
+            reason = roster_change_reason(
+                old_participants=assignment_set.get("participant_data", []),
+                current_participants=current_set.get("participant_data", []),
+                change_date=_format_set_date(current_set.get("created_at")),
+            )
+
+        for version in storage.list_versions(program_id, set_id):
+            entries.append(
+                {
+                    **version,
+                    "assignment_set_id": set_id,
+                    "label": (version.get("metadata") or {}).get("label"),
+                    "promotable": is_current,
+                    "not_promotable_reason": reason,
+                }
+            )
+
+    if not entries:
         logger.warning(f"No versions found for program: {program_id}")
         raise HTTPException(
             status_code=404, detail="No results found for this program."
         )
 
-    return {"versions": versions}
+    return {"versions": entries}
 
 
 @router.post("/results/save")
