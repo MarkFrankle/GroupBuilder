@@ -1609,3 +1609,137 @@ class TestReadingAnOlderSetsVersion:
         )
 
         assert response.status_code == 409
+
+
+class TestPromotion:
+    """Test suite for POST /api/assignments/results/promote/{version_id}."""
+
+    def _promote(self, client, version_id, set_id=None):
+        query = f"?program_id={PROGRAM}"
+        if set_id:
+            query += f"&assignment_set_id={set_id}"
+        return client.post(f"/api/assignments/results/promote/{version_id}{query}")
+
+    def test_promoting_writes_a_new_head_version_with_the_same_assignments(
+        self,
+        client,
+        sample_set_data,
+        add_assignment_set_to_firestore,
+        sample_assignments_result,
+    ):
+        add_assignment_set_to_firestore(sample_set_data)
+        first = sample_assignments_result["assignments"]
+        client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json={"assignments": first},
+        )
+        swapped = copy.deepcopy(first)
+        swapped[0]["tables"]["1"], swapped[0]["tables"]["2"] = (
+            swapped[0]["tables"]["2"],
+            swapped[0]["tables"]["1"],
+        )
+        client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json={"assignments": swapped},
+        )
+
+        response = self._promote(client, "v1")
+
+        assert response.status_code == 200
+        assert response.json()["version_id"] == "v3"
+        assert response.json()["label"] == 'Restored "Manual edit"'
+        current = client.get(f"/api/assignments/results?program_id={PROGRAM}").json()
+        assert current[0]["tables"]["1"] == first[0]["tables"]["1"]
+
+    def test_promoting_a_previous_sets_version_is_refused(
+        self,
+        client,
+        sample_set_data,
+        add_assignment_set_to_firestore,
+        sample_assignments_result,
+    ):
+        add_assignment_set_to_firestore(sample_set_data)
+        client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json={"assignments": sample_assignments_result["assignments"]},
+        )
+        newer = copy.deepcopy(sample_set_data)
+        newer["participant_dict"] = newer["participant_dict"][:3]
+        add_assignment_set_to_firestore(newer)
+
+        versions = client.get(
+            f"/api/assignments/results/versions?program_id={PROGRAM}"
+        ).json()["versions"]
+        old = [v for v in versions if not v["promotable"]][0]
+
+        response = self._promote(client, old["version_id"], old["assignment_set_id"])
+
+        assert response.status_code == 409
+        assert "predates your roster change" in response.json()["detail"]
+
+    def test_promoting_over_a_completed_session_is_refused(
+        self,
+        client,
+        sample_set_data,
+        add_assignment_set_to_firestore,
+        sample_assignments_result,
+    ):
+        """Reuses the manual-save freeze — same function, same 409."""
+        add_assignment_set_to_firestore(sample_set_data)
+        first = sample_assignments_result["assignments"]
+        client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json={"assignments": first},
+        )
+        swapped = copy.deepcopy(first)
+        swapped[0]["tables"]["1"], swapped[0]["tables"]["2"] = (
+            swapped[0]["tables"]["2"],
+            swapped[0]["tables"]["1"],
+        )
+        client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json={"assignments": swapped},
+        )
+        client.post(f"/api/assignments/completion/1?program_id={PROGRAM}")
+
+        response = self._promote(client, "v1")
+
+        assert response.status_code == 409
+        assert "complete" in response.json()["detail"].lower()
+
+    def test_promoting_a_version_that_does_not_exist(
+        self,
+        client,
+        sample_set_data,
+        add_assignment_set_to_firestore,
+    ):
+        add_assignment_set_to_firestore(sample_set_data)
+
+        assert self._promote(client, "v99").status_code == 404
+
+    def test_promoting_an_unlabelled_version_names_the_version(
+        self,
+        client,
+        sample_set_data,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+        sample_assignments_result,
+    ):
+        """A legacy version with no label is restored by its id, never "None"."""
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        first = sample_assignments_result["assignments"]
+        add_version_to_firestore(set_id, "v1", first, metadata={"source": "generated"})
+        swapped = copy.deepcopy(first)
+        swapped[0]["tables"]["1"], swapped[0]["tables"]["2"] = (
+            swapped[0]["tables"]["2"],
+            swapped[0]["tables"]["1"],
+        )
+        client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json={"assignments": swapped},
+        )
+
+        response = self._promote(client, "v1")
+
+        assert response.status_code == 200
+        assert response.json()["label"] == 'Restored "v1"'

@@ -947,6 +947,69 @@ async def save_edited_assignments(
         raise HTTPException(status_code=500, detail="Failed to save edited assignments")
 
 
+@router.post("/results/promote/{version_id}")
+async def promote_version(
+    version_id: str = Path(..., max_length=10),
+    program_id: str = Depends(validate_program_access),
+    assignment_set_id: Optional[str] = Query(None, max_length=64),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+    completion: SessionCompletionStorage = Depends(get_session_completion_storage),
+):
+    """Make an older version current again, by writing it as a new version.
+
+    Promotion is not a rewind — the chain only ever grows, so undoing a shuffle
+    leaves you at a new version whose content equals an old one. History stays
+    honest about what happened and when.
+    """
+    current_set_id, current_set = _require_current_set(storage, program_id)
+
+    if assignment_set_id and assignment_set_id != current_set_id:
+        older = storage.get_set(program_id, assignment_set_id)
+        if older is None:
+            raise HTTPException(status_code=404, detail=SET_OUT_OF_WINDOW)
+        raise HTTPException(
+            status_code=409,
+            detail=roster_change_reason(
+                old_participants=older.get("participant_data", []),
+                current_participants=current_set.get("participant_data", []),
+                change_date=_format_set_date(current_set.get("created_at")),
+            ),
+        )
+
+    promoted = storage.get_version(program_id, current_set_id, version_id=version_id)
+    if promoted is None:
+        raise HTTPException(status_code=404, detail=f"Version {version_id} not found.")
+
+    assignments = promoted.get("assignments")
+    _require_wellformed_assignments(assignments)
+
+    current = storage.get_version(program_id, current_set_id)
+    if current is not None:
+        _refuse_if_completed_sessions_changed(
+            completion, program_id, current.get("assignments"), assignments
+        )
+
+    promoted_label = (promoted.get("metadata") or {}).get("label") or version_id
+    label = f'Restored "{promoted_label}"'
+
+    new_version_id = _next_version_id(storage, program_id, current_set_id)
+    storage.save_version(
+        program_id=program_id,
+        set_id=current_set_id,
+        version_id=new_version_id,
+        assignments=assignments,
+        metadata={
+            "source": "promotion",
+            "based_on": version_id,
+            "label": label,
+        },
+    )
+
+    logger.info(f"Promoted {version_id} as {new_version_id} for program {program_id}")
+
+    return {"version_id": new_version_id, "label": label}
+
+
 @router.get("/metadata")
 async def get_assignment_set_metadata(
     program_id: str = Depends(validate_program_access),
