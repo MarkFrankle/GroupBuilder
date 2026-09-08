@@ -174,14 +174,24 @@ Words carry guardrails here. The safe actions must never share a verb with a dan
   the product **refuses rather than absorbing** — it never quietly produces a plan that breaks
   a rule the user typed. Counting checks catch only the obvious shortfalls; there is
   deliberately no feasibility pre-check.
-- Repeat pairings are penalized over a **rolling window** (`pairing_window_size`, default 3)
-  in `assignment_logic/src/assignment_logic/group_builder.py`. Nothing counts total meetings
-  per pair, so a pair meeting in sessions 1, 4 and 5 is barely penalized. A superlinear
-  **global** repeat penalty is planned to close that gap.
-- **The rolling window stays when the global penalty lands.** The two measure different things:
-  the window encodes *spacing* (sitting together two weeks running is worse than sessions 1 and
-  5), the global term encodes *total exposure*. A global count cannot express spacing, so
-  deleting the window would lose it. Weight the global term to dominate — superlinear growth
-  means it swamps the window by the third meeting regardless of exact values.
+- Repeat pairings are penalized **twice over**, in
+  `assignment_logic/src/assignment_logic/group_builder.py`. A **rolling window**
+  (`pairing_window_size`, default 3) charges for pairs meeting close together, and a
+  **global** term charges for a pair's total meetings across the program, superlinearly.
+- **Both stay, because they measure different things.** The window encodes *spacing* — sitting
+  together two weeks running is worse than sessions 1 and 5 — which a global count cannot
+  express. The global term encodes *total exposure*, which the window cannot see at all: before
+  it landed, sessions 1 and 5 cost nothing, and 11 pairs out of 24 participants sat together
+  three times over five sessions.
+- **The global term is two convex rungs, not a full ladder** (`repeat_penalty_weight`,
+  default 5, env `SOLVER_REPEAT_PENALTY_WEIGHT`). `max(0, total − 1)` charges for a second
+  meeting at any distance — this is the rung that closes the gap — and `max(0, total − 2)`
+  at the configured weight makes the growth superlinear. Both are needed: charging only from
+  the third meeting leaves "sessions 1 and 5" free, which was the whole complaint.
+  Running `k` up to the session count is smoother but costs `(sessions − 1)` variables per
+  pair, and at 24 participants that starved the search badly enough to return *worse* plans
+  than no global penalty at all. The model spends its full time budget without proving
+  optimality, so variables come straight out of solution quality.
+- A hard cap on meetings was rejected — it can make a program infeasible.
 - General keep-apart is new solver work. Couples separation already exists, so the mechanism
   is close at hand.
