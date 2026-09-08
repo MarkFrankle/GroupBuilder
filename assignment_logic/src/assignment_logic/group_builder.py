@@ -17,6 +17,7 @@ class GroupBuilder:
         current_table_assignments=None,
         pairing_window_size=None,
         solver_num_workers=None,
+        repeat_penalty_weight=None,
         require_different_assignments=False,
     ):
         """
@@ -32,6 +33,9 @@ class GroupBuilder:
                                        Used to require different table assignments when regenerating
             pairing_window_size: Window size for penalizing repeat pairings (default: 3 sessions)
             solver_num_workers: Number of parallel search workers for solver (default: 4)
+            repeat_penalty_weight: Extra cost charged for a pair's third and later
+                                   meetings, on top of the flat per-meeting cost.
+                                   Higher means repeats are spread harder (default: 5)
             require_different_assignments: If True, enforces hard constraint that participants CANNOT be assigned
                                           to their previous tables (fails if impossible)
         """
@@ -62,6 +66,9 @@ class GroupBuilder:
         )
         self.solver_num_workers = solver_num_workers or int(
             os.getenv("SOLVER_NUM_WORKERS", "4")
+        )
+        self.repeat_penalty_weight = repeat_penalty_weight or int(
+            os.getenv("SOLVER_REPEAT_PENALTY_WEIGHT", "5")
         )
 
     def generate_assignments(self, max_time_seconds=120) -> dict:
@@ -525,6 +532,41 @@ class GroupBuilder:
                             [pair_meets_session[s1], pair_meets_session[s2]],
                         )
                         penalty_count += both_sessions
+
+                # TOTAL EXPOSURE: the window above encodes *spacing* - meeting in
+                # sessions 1 and 2 is worse than 1 and 5 - but it cannot see how many
+                # times a pair meets overall, so sessions 1 and 5 cost nothing at all.
+                # Penalize the total superlinearly, so a third meeting costs far more
+                # than a second. A hard cap would risk making a program infeasible.
+                total_meetings = self.model.NewIntVar(
+                    0, len(self.sessions), f'meetings_{p1["id"]}_{p2["id"]}'
+                )
+                self.model.Add(
+                    total_meetings == sum(pair_meets_session[s] for s in self.sessions)
+                )
+
+                # Two rungs, not a full ladder. Each rung is max(0, total - k),
+                # so the pair's cost runs 0, 0, 1, 2 + W, 3 + 2W ... for 0, 1, 2,
+                # 3, 4 meetings - convex, and the jump at the third meeting is as
+                # large as W is.
+                #
+                # The k=1 rung is the one that fixes the reported bug: it is what
+                # charges for a second meeting *at any distance*, which is exactly
+                # what the rolling window cannot see. The k=2 rung is what makes
+                # the growth superlinear.
+                #
+                # Deliberately stopping at two rungs rather than running k up to
+                # the session count. The full ladder is a smoother curve but costs
+                # (sessions - 1) variables per pair, and at 24 participants that
+                # measurably starved the search - the solver stopped proving
+                # optimality and returned worse plans than it did with no global
+                # penalty at all.
+                for k, weight in ((1, 1), (2, self.repeat_penalty_weight)):
+                    excess = self.model.NewIntVar(
+                        0, len(self.sessions), f'excess_{p1["id"]}_{p2["id"]}_{k}'
+                    )
+                    self.model.AddMaxEquality(excess, [total_meetings - k, 0])
+                    penalty_count += weight * excess
 
         # VARIETY-SEEKING: Prevent or penalize same table assignments as current (when regenerating)
         if self.current_table_assignments:
