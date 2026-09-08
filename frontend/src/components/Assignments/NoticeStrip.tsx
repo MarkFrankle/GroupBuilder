@@ -6,6 +6,12 @@ export interface Notice {
   tone: 'info' | 'error'
   message: string
   actions?: { label: string; onClick: () => void }[]
+  /**
+   * Run when this notice leaves the strip by any route — dismissed, acted on,
+   * or displaced by the next one. The nudge uses it to record that it has been
+   * seen, so being overruled by a receipt does not bring it back on reload.
+   */
+  onDismiss?: () => void
 }
 
 interface NoticeStripProps {

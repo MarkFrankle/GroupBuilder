@@ -22,6 +22,12 @@ jest.mock('@/contexts/ProgramContext', () => ({
   useProgram: () => mockProgramContext,
 }))
 
+jest.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { uid: 'test-uid' }, loading: false }),
+}))
+
+const NUDGE_KEY = 'groupbuilder_assignments_nudge_seen_test-uid'
+
 const person = (name: string, gender = 'Female') => ({
   name,
   religion: 'Christian',
@@ -209,6 +215,9 @@ beforeEach(() => {
   api = { completedThrough: 0 }
   mockApi()
   window.HTMLElement.prototype.scrollIntoView = jest.fn()
+  // The nudge is once-per-user and would otherwise occupy the strip in every
+  // test that asserts on a receipt.
+  localStorage.setItem(NUDGE_KEY, 'true')
   Object.assign(navigator, { clipboard: { writeText: jest.fn(() => Promise.resolve()) } })
 })
 
@@ -473,6 +482,97 @@ describe('AssignmentsPage', () => {
     expect(await screen.findByText('Session 3 shuffled')).toBeInTheDocument()
     expect(screen.getByText('Original plan')).toBeInTheDocument()
     expect(screen.getByText(/before your roster change/i)).toBeInTheDocument()
+  })
+
+
+  it('states what the freeze costs when a session is marked complete', async () => {
+    renderPage()
+
+    const session1 = await screen.findByRole('region', { name: 'Session 1' })
+    await userEvent.click(
+      within(session1).getByRole('button', { name: /mark complete/i })
+    )
+
+    const receipt = await screen.findByText(/Session 1 marked complete/)
+    expect(receipt).toHaveTextContent('4 seated')
+    expect(receipt).toHaveTextContent('Session 1 can no longer be changed')
+  })
+
+  it('says what reopening does and does not free', async () => {
+    api.completedThrough = 2
+    renderPage()
+
+    const session2 = await screen.findByRole('region', { name: 'Session 2' })
+    await userEvent.click(
+      within(session2).getByRole('button', { name: /reopen/i })
+    )
+
+    const receipt = await screen.findByText(/Session 2 reopened/)
+    expect(receipt).toHaveTextContent('shuffled and edited again')
+    expect(receipt).toHaveTextContent('Session 1 stays complete')
+  })
+
+  describe('undo', () => {
+    /** Shuffles session 2 and returns the receipt strip. */
+    async function shuffleSession2() {
+      const session2 = await screen.findByRole('region', { name: 'Session 2' })
+      await userEvent.click(within(session2).getByRole('button', { name: /shuffle/i }))
+      return screen.findByText(/Session 2 shuffled\./)
+    }
+
+    it('promotes the version that was current before the shuffle', async () => {
+      renderPage()
+      await shuffleSession2()
+
+      fireEvent.click(await screen.findByRole('button', { name: /^undo$/i }))
+
+      // v2 was the head when Shuffle was pressed. Reading the list afterwards
+      // would find the shuffle's own version there instead.
+      await waitFor(() => expect(api.promoted).toContain('/promote/v2'))
+      expect(
+        await screen.findByText(/Session 2 shuffle undone/)
+      ).toBeInTheDocument()
+    })
+
+    it('is not offered for a promotion, only for a shuffle', async () => {
+      renderPage()
+
+      await openVersion(/Session 3 shuffled/)
+      fireEvent.click(await screen.findByRole('button', { name: /promote/i }))
+
+      await screen.findByText(/is now the current plan/)
+      expect(screen.queryByRole('button', { name: /^undo$/i })).not.toBeInTheDocument()
+    })
+  })
+
+  describe('the first-generate nudge', () => {
+    beforeEach(() => localStorage.removeItem(NUDGE_KEY))
+
+    it('points a new facilitator at Help', async () => {
+      renderPage()
+
+      expect(
+        await screen.findByText(/how session management works/i)
+      ).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /show me/i })).toBeInTheDocument()
+    })
+
+    it('stays gone once a receipt has displaced it', async () => {
+      const { unmount } = renderPage()
+
+      await screen.findByText(/how session management works/i)
+      const session2 = await screen.findByRole('region', { name: 'Session 2' })
+      await userEvent.click(within(session2).getByRole('button', { name: /shuffle/i }))
+      await screen.findByText(/Session 2 shuffled\./)
+
+      unmount()
+      renderPage()
+
+      await screen.findAllByText('Session 1')
+      expect(
+        screen.queryByText(/how session management works/i)
+      ).not.toBeInTheDocument()
+    })
   })
 
   it('falls back to the timestamp for a version saved before labelling', async () => {

@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { History, Loader2 } from 'lucide-react'
@@ -15,6 +15,7 @@ import ProgramHeader from '@/components/Assignments/ProgramHeader'
 import { authenticatedFetch } from '@/utils/apiClient'
 import {
   linkedPairCount,
+  seatedCount,
   shuffleReceipt,
   uniqueTablematesAverage,
 } from '@/utils/assignmentStats'
@@ -26,6 +27,7 @@ import {
   useSessionCompletion,
 } from '@/hooks/queries'
 import { useProgram } from '@/contexts/ProgramContext'
+import { useAuth } from '@/contexts/AuthContext'
 import type { Assignment, ResultVersion } from '@/types/assignments'
 
 function formatVersionDate(createdAt: number): string {
@@ -53,10 +55,41 @@ async function refusalDetail(response: Response, fallback: string): Promise<stri
   }
 }
 
+function nudgeKey(uid: string): string {
+  return `groupbuilder_assignments_nudge_seen_${uid}`
+}
+
+/** "Session 1" or "Sessions 1–3", for a prefix that always starts at one. */
+function prefix(through: number): string {
+  return through === 1 ? 'Session 1' : `Sessions 1–${through}`
+}
+
+/**
+ * Completion's receipts state the consequence, not just the fact. The freeze is
+ * invisible otherwise — a coordinator meets it later as a refusal and has to
+ * work out what caused it. Naming it as it is created costs one clause.
+ */
+function completionReceipt(sessionNumber: number, seated: number): string {
+  return (
+    `Session ${sessionNumber} marked complete · ${seated} seated · ` +
+    `${prefix(sessionNumber)} can no longer be changed.`
+  )
+}
+
+function reopenReceipt(sessionNumber: number): string {
+  const stillFrozen =
+    sessionNumber > 1
+      ? ` ${prefix(sessionNumber - 1)} ${sessionNumber === 2 ? 'stays' : 'stay'} complete.`
+      : ''
+  return `Session ${sessionNumber} reopened · it can be shuffled and edited again.${stillFrozen}`
+}
+
 const AssignmentsPage: React.FC = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { currentProgram, loading: programLoading } = useProgram()
+  const { user } = useAuth()
+  const uid = user?.uid ?? ''
   const programId = currentProgram?.id ?? null
 
   // null is the current plan; anything else is a look at the past, and looking
@@ -76,7 +109,21 @@ const AssignmentsPage: React.FC = () => {
   const { data: versions = [] } = useResultVersions(programId)
 
   const [notice, setNotice] = useState<Notice | null>(null)
+
+  // Mirrors `notice` so a replacement can retire the one it displaces. The
+  // side effect cannot live in a setState updater, which React may run twice.
+  const noticeRef = useRef<Notice | null>(null)
+  const showNotice = (next: Notice | null) => {
+    noticeRef.current?.onDismiss?.()
+    noticeRef.current = next
+    setNotice(next)
+  }
   const [shufflingSession, setShufflingSession] = useState<number | null>(null)
+
+  // The version that was current when Shuffle was pressed — captured up front,
+  // because undo must not depend on an invalidated version list having
+  // resettled, nor on no other tab having written in between.
+  const undoTarget = useRef<ResultVersion | null>(null)
 
   // Held so a shuffle can be diffed against what was on screen before it ran.
   const beforeShuffle = useRef<Assignment[]>([])
@@ -99,6 +146,26 @@ const AssignmentsPage: React.FC = () => {
   const scrollToFirstLive = () => {
     firstLiveRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
+
+  /**
+   * Item 13's second push: the one place a once-only user is told there is
+   * anything to read. Once per user, and recorded the moment it leaves the
+   * strip — including when a receipt displaces it — so it never nags.
+   */
+  useEffect(() => {
+    if (!uid || sorted.length === 0) return
+    if (localStorage.getItem(nudgeKey(uid))) return
+    showNotice({
+      tone: 'info',
+      message: "Assignments created. New to this? Here's how session management works.",
+      actions: [
+        { label: 'Show me', onClick: () => navigate('/help#editing-sessions') },
+      ],
+      onDismiss: () => localStorage.setItem(nudgeKey(uid), 'true'),
+    })
+    // Fires once per program load; the flag stops it from returning.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid, sorted.length])
 
   const invalidateAll = () => {
     // A prefix, deliberately not resultsQueryKey: this must match every
@@ -127,19 +194,31 @@ const AssignmentsPage: React.FC = () => {
       }
       return response.json()
     },
-    onSuccess: () => {
-      setNotice(null)
+    onSuccess: (_data, { sessionNumber, method }) => {
+      // Completion does not move anyone, so `sorted` is still the right seating
+      // to count from — nothing has to refetch before the sentence is true.
+      const seated = sorted.find(a => a.session === sessionNumber)
+      showNotice({
+        tone: 'info',
+        message:
+          method === 'POST'
+            ? completionReceipt(sessionNumber, seated ? seatedCount(seated) : 0)
+            : reopenReceipt(sessionNumber),
+      })
       invalidateAll()
       scrollToFirstLive()
     },
     onError: (error: Error) => {
-      setNotice({ tone: 'error', message: error.message })
+      showNotice({ tone: 'error', message: error.message })
     },
   })
 
   const shuffleMutation = useMutation({
     mutationFn: async (sessionNumber: number) => {
       beforeShuffle.current = sorted
+      // The first version in a set has nothing behind it, and a version from an
+      // older set cannot be promoted — either way there is nothing to undo to.
+      undoTarget.current = versions[0]?.promotable ? versions[0] : null
       const response = await authenticatedFetch(
         `/api/assignments/regenerate/session/${sessionNumber}?program_id=${programId}`,
         {
@@ -164,13 +243,23 @@ const AssignmentsPage: React.FC = () => {
       const fresh = await queryClient.fetchQuery<Assignment[]>({
         queryKey: resultsQueryKey(programId),
       })
-      setNotice({
+      const target = undoTarget.current
+      showNotice({
         tone: 'info',
         message: shuffleReceipt(beforeShuffle.current, fresh ?? [], sessionNumber),
+        actions: target
+          ? [
+              {
+                label: 'Undo',
+                onClick: () =>
+                  promoteMutation.mutate({ version: target, undoOf: sessionNumber }),
+              },
+            ]
+          : undefined,
       })
     },
     onError: (error: Error) => {
-      setNotice({ tone: 'error', message: error.message })
+      showNotice({ tone: 'error', message: error.message })
     },
   })
 
@@ -180,7 +269,7 @@ const AssignmentsPage: React.FC = () => {
    * than deeper into the past.
    */
   const promoteMutation = useMutation({
-    mutationFn: async (version: ResultVersion) => {
+    mutationFn: async ({ version }: { version: ResultVersion; undoOf?: number }) => {
       const response = await authenticatedFetch(
         `/api/assignments/results/promote/${version.version_id}` +
           `?program_id=${programId}&assignment_set_id=${version.assignment_set_id}`,
@@ -191,12 +280,24 @@ const AssignmentsPage: React.FC = () => {
       }
       return response.json()
     },
-    onSuccess: (data: { label: string }) => {
+    onSuccess: (data: { label: string }, { undoOf }) => {
       setViewing(null)
       invalidateAll()
-      setNotice({ tone: 'info', message: `${data.label} is now the current plan.` })
+      // An undo is a promotion underneath, but saying `Restored "…" is now the
+      // current plan.` buries the thing the user actually did.
+      showNotice({
+        tone: 'info',
+        message:
+          undoOf === undefined
+            ? `${data.label} is now the current plan.`
+            : `Session ${undoOf} shuffle undone. ${
+                sorted.length === 1
+                  ? 'Session 1 is'
+                  : `Sessions 1–${sorted.length} are`
+              } back to where they were.`,
+      })
     },
-    onError: (error: Error) => setNotice({ tone: 'error', message: error.message }),
+    onError: (error: Error) => showNotice({ tone: 'error', message: error.message }),
   })
 
   /**
@@ -230,9 +331,9 @@ const AssignmentsPage: React.FC = () => {
     const link = `${window.location.origin}${window.location.pathname}?program=${programId}`
     try {
       await navigator.clipboard.writeText(link)
-      setNotice({ tone: 'info', message: 'Link copied.' })
+      showNotice({ tone: 'info', message: 'Link copied.' })
     } catch {
-      setNotice({ tone: 'error', message: 'Could not copy the link. Copy it from the address bar instead.' })
+      showNotice({ tone: 'error', message: 'Could not copy the link. Copy it from the address bar instead.' })
     }
   }
 
@@ -248,18 +349,18 @@ const AssignmentsPage: React.FC = () => {
       label: 'Back to current',
       onClick: () => {
         setViewing(null)
-        setNotice(null)
+        showNotice(null)
       },
     }
 
-    setNotice({
+    showNotice({
       tone: 'info',
       message: version.promotable
         ? `You're viewing "${name}" from ${formatVersionDate(version.created_at)}.`
         : `You're viewing "${name}" from ${formatVersionDate(version.created_at)}. ` +
           `${version.not_promotable_reason}`,
       actions: version.promotable
-        ? [{ label: 'Promote', onClick: () => promoteMutation.mutate(version) }, backToCurrent]
+        ? [{ label: 'Promote', onClick: () => promoteMutation.mutate({ version }) }, backToCurrent]
         : [backToCurrent],
     })
   }
@@ -286,7 +387,7 @@ const AssignmentsPage: React.FC = () => {
         { state: { seatingData } }
       )
     } catch (error) {
-      setNotice({
+      showNotice({
         tone: 'error',
         message: error instanceof Error ? error.message : 'Could not build the seating chart.',
       })
@@ -343,7 +444,7 @@ const AssignmentsPage: React.FC = () => {
           disabled={!readOnly}
           onSelect={() => {
             setViewing(null)
-            setNotice(null)
+            showNotice(null)
           }}
         >
           Latest
@@ -409,7 +510,7 @@ const AssignmentsPage: React.FC = () => {
       />
 
       <div className="flex flex-col gap-4 px-8">
-      <NoticeStrip notice={notice} onDismiss={() => setNotice(null)} />
+      <NoticeStrip notice={notice} onDismiss={() => showNotice(null)} />
 
       <div className="flex flex-col gap-5">
         {live.map((assignment, index) => (
