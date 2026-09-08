@@ -385,16 +385,34 @@ function HelpPage() {
           <p className="mb-4 text-slate-700 leading-relaxed">
             Every change is saved as a new version, and nothing is overwritten. Press{" "}
             <strong>History</strong> at the top of the page to look at an earlier one.
+            Each version is named for what created it — "Session 3 shuffled", "Manual
+            edit" — with its date underneath.
+          </p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
             While you are looking at an older version the page is read-only — Shuffle
             and Mark complete disappear, and a line at the top offers{" "}
-            <strong>Back to current</strong>. Printing still works.
+            <strong>Back to current</strong>. If you want that older arrangement back,
+            press <strong>Promote</strong> and it becomes the current plan. Nothing is
+            erased: promoting adds a new version rather than winding the history back,
+            so you can always return to where you were.
+          </p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            Printing still works while you look at an older version. Because the printed
+            sheet does not say which version it came from, you will be asked to confirm
+            first.
+          </p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            History goes back as far as your last change to Setup. Versions from before
+            that change are still there to look at, under a divider, but they cannot be
+            promoted — they were built for a different roster, and the list says how
+            many of your current participants each one seats.
           </p>
 
           <WarningCallout>
             <p>
               Shuffling a session replaces what was there. That is what the version
               history is for — if you preferred the previous arrangement, open History
-              and look at it.
+              and press Promote to bring it back.
             </p>
           </WarningCallout>
         </section>

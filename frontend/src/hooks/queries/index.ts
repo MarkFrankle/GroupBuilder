@@ -1,5 +1,6 @@
 export { useRoster } from './useRoster'
 export {
+  resultsQueryKey,
   useResultVersions,
   useAssignmentResults,
   useAssignmentSetMetadata,

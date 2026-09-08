@@ -26,13 +26,40 @@ describe('NoticeStrip', () => {
     const onClick = jest.fn()
     render(
       <NoticeStrip
-        notice={{ tone: 'info', message: 'Viewing an older version.', action: { label: 'Back to current', onClick } }}
+        notice={{
+          tone: 'info',
+          message: 'Viewing an older version.',
+          actions: [{ label: 'Back to current', onClick }],
+        }}
       />
     )
 
     await userEvent.click(screen.getByRole('button', { name: 'Back to current' }))
 
     expect(onClick).toHaveBeenCalled()
+  })
+
+  it('renders every action it is given, in order', async () => {
+    const promote = jest.fn()
+    const back = jest.fn()
+    render(
+      <NoticeStrip
+        notice={{
+          tone: 'info',
+          message: 'Viewing an older version.',
+          actions: [
+            { label: 'Promote', onClick: promote },
+            { label: 'Back to current', onClick: back },
+          ],
+        }}
+      />
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'Promote' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Back to current' }))
+
+    expect(promote).toHaveBeenCalled()
+    expect(back).toHaveBeenCalled()
   })
 
   it('dismisses on the close button', async () => {

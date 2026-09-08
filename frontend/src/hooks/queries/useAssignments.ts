@@ -1,10 +1,24 @@
 import { useQuery } from '@tanstack/react-query'
 import { authenticatedFetch } from '@/utils/apiClient'
+import type { ResultVersion } from '@/types/assignments'
+
+/**
+ * The one definition of the results query key. useAssignmentResults registers
+ * a query under it, and AssignmentsPage reads that query back with a
+ * queryFn-less fetchQuery — so the two must agree exactly. A drift here fails
+ * silently with an empty result rather than a type or lint error, which is why
+ * neither side is allowed to spell the key out by hand.
+ */
+export const resultsQueryKey = (
+  programId: string | null,
+  version?: string,
+  assignmentSetId?: string
+) => ['results', programId, version ?? 'latest', assignmentSetId ?? 'current'] as const
 
 export function useResultVersions(programId: string | null) {
   return useQuery({
     queryKey: ['versions', programId],
-    queryFn: async () => {
+    queryFn: async (): Promise<ResultVersion[]> => {
       const response = await authenticatedFetch(`/api/assignments/results/versions?program_id=${programId}`)
       if (!response.ok) throw new Error('Failed to fetch versions')
       const data = await response.json()
@@ -14,12 +28,18 @@ export function useResultVersions(programId: string | null) {
   })
 }
 
-export function useAssignmentResults(programId: string | null, version?: string) {
+export function useAssignmentResults(
+  programId: string | null,
+  version?: string,
+  assignmentSetId?: string
+) {
   return useQuery({
-    queryKey: ['results', programId, version ?? 'latest'],
+    queryKey: resultsQueryKey(programId, version, assignmentSetId),
     queryFn: async () => {
-      const versionQuery = version ? `&version=${version}` : ''
-      const response = await authenticatedFetch(`/api/assignments/results?program_id=${programId}${versionQuery}`)
+      const params = new URLSearchParams({ program_id: programId as string })
+      if (version) params.set('version', version)
+      if (assignmentSetId) params.set('assignment_set_id', assignmentSetId)
+      const response = await authenticatedFetch(`/api/assignments/results?${params}`)
       if (response.status === 404) {
         throw new Error('This program has no assignments yet. Generate them from the roster.')
       }

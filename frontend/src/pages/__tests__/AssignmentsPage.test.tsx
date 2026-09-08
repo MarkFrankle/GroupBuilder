@@ -39,6 +39,7 @@ const assignments = [1, 2, 3].map(session => ({
 }))
 
 const metadata = {
+  created_at: 1740000000,
   num_participants: 4,
   num_tables: 2,
   num_sessions: 3,
@@ -49,6 +50,8 @@ interface ApiState {
   completedThrough: number
   completionResponse?: { status: number; body: any }
   shuffled?: boolean
+  promoted?: string
+  promoteResponse?: { status: number; body: any }
 }
 
 let api: ApiState
@@ -80,12 +83,38 @@ function mockApi() {
       } as Response)
     }
 
+    if (url.includes('/api/assignments/seating/')) {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ tables: [] }),
+      } as Response)
+    }
+
     if (url.includes('/api/assignments/regenerate/session/')) {
       api.shuffled = true
       return Promise.resolve({
         ok: true,
         status: 200,
         json: () => Promise.resolve({ version_id: 'v2' }),
+      } as Response)
+    }
+
+    if (url.includes('/api/assignments/results/promote/')) {
+      api.promoted = url
+      if (api.promoteResponse) {
+        const { status, body } = api.promoteResponse
+        return Promise.resolve({
+          ok: status < 400,
+          status,
+          json: () => Promise.resolve(body),
+        } as Response)
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({ version_id: 'v3', label: 'Restored "Session 3 shuffled"' }),
       } as Response)
     }
 
@@ -96,8 +125,32 @@ function mockApi() {
         json: () =>
           Promise.resolve({
             versions: [
-              { version_id: 'v1', created_at: 1740000000 },
-              { version_id: 'v2', created_at: 1740086400 },
+              {
+                version_id: 'v2',
+                created_at: 1740086400,
+                assignment_set_id: 'set-current',
+                label: 'Session 3 shuffled',
+                promotable: true,
+                not_promotable_reason: null,
+              },
+              {
+                version_id: 'v1',
+                created_at: 1740000000,
+                assignment_set_id: 'set-current',
+                label: null,
+                promotable: true,
+                not_promotable_reason: null,
+              },
+              {
+                version_id: 'v1',
+                created_at: 1739000000,
+                assignment_set_id: 'set-previous',
+                label: 'Original plan',
+                promotable: false,
+                not_promotable_reason:
+                  'This version predates your roster change on Feb 19, 2025 — ' +
+                  'it seats 3 of your 4 participants, and 1 person who has since left.',
+              },
             ],
           }),
       } as Response)
@@ -269,17 +322,168 @@ describe('AssignmentsPage', () => {
   it('goes read-only when an older version is selected', async () => {
     renderPage()
 
-    // user-event v13 emits no pointer events, so the Radix trigger is opened
-    // the way a keyboard user would.
-    fireEvent.keyDown(await screen.findByRole('button', { name: /history/i }), {
-      key: 'Enter',
-    })
-    const versions = await screen.findAllByRole('menuitem', { name: /Feb/ })
-    fireEvent.click(versions[versions.length - 1])
+    // A version from the current set: the one that still offers Promote, so
+    // read-only is proved against the version most likely to tempt an edit.
+    await openVersion(/Session 3 shuffled/)
 
-    expect(await screen.findByText(/viewing an older version/i)).toBeInTheDocument()
+    expect(await screen.findByText(/You're viewing "Session 3 shuffled"/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /promote/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /shuffle/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /mark complete/i })).not.toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /^print$/i }).length).toBeGreaterThan(0)
+  })
+
+  /** Opens History and picks a version by its menu label. */
+  async function openVersion(label: string | RegExp) {
+    fireEvent.keyDown(await screen.findByRole('button', { name: /history/i }), {
+      key: 'Enter',
+    })
+    fireEvent.click(await screen.findByRole('menuitem', { name: label }))
+  }
+
+  it('offers Promote when viewing a version from the current set', async () => {
+    renderPage()
+
+    await openVersion(/Session 3 shuffled/)
+
+    expect(await screen.findByRole('button', { name: /promote/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /back to current/i })).toBeInTheDocument()
+  })
+
+  it('states the reason and offers no Promote for a version from an older set', async () => {
+    renderPage()
+
+    await openVersion(/Original plan/)
+
+    expect(await screen.findByText(/predates your roster change/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /promote/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /back to current/i })).toBeInTheDocument()
+  })
+
+  it('returns to the current plan after promoting', async () => {
+    renderPage()
+
+    await openVersion(/Session 3 shuffled/)
+    fireEvent.click(await screen.findByRole('button', { name: /promote/i }))
+
+    expect(
+      await screen.findByText(/Restored "Session 3 shuffled" is now the current plan\./)
+    ).toBeInTheDocument()
+    expect(api.promoted).toContain('/api/assignments/results/promote/v2')
+    expect(api.promoted).toContain('program_id=test-program-id')
+    expect(api.promoted).toContain('assignment_set_id=set-current')
+
+    // Promotion writes a new version at the head, so the page is live again.
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: /shuffle/i }).length).toBeGreaterThan(0)
+    )
+  })
+
+  it('surfaces the API refusal when a promotion is rejected', async () => {
+    api.promoteResponse = {
+      status: 409,
+      body: {
+        detail:
+          'Session 1 is marked complete and cannot be changed. ' +
+          'Reopen it first if you need to make changes.',
+      },
+    }
+    renderPage()
+
+    await openVersion(/Session 3 shuffled/)
+    fireEvent.click(await screen.findByRole('button', { name: /promote/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /Session 1 is marked complete and cannot be changed/
+    )
+  })
+
+  describe('printing an older version', () => {
+    const realConfirm = window.confirm
+
+    afterEach(() => {
+      window.confirm = realConfirm
+    })
+
+    /** Clicks Print on the first session card. */
+    async function clickPrint() {
+      const session1 = await screen.findByRole('region', { name: 'Session 1' })
+      fireEvent.click(within(session1).getByRole('button', { name: /^print$/i }))
+    }
+
+    it('aborts the print when the confirm is declined', async () => {
+      window.confirm = jest.fn(() => false)
+      renderPage()
+
+      await openVersion(/Session 3 shuffled/)
+      await clickPrint()
+
+      expect(window.confirm).toHaveBeenCalledWith(
+        expect.stringContaining('older version')
+      )
+      await waitFor(() =>
+        expect(mockAuthenticatedFetch).not.toHaveBeenCalledWith(
+          expect.stringContaining('/api/assignments/seating/'),
+          expect.anything()
+        )
+      )
+    })
+
+    it('prints when the confirm is accepted', async () => {
+      window.confirm = jest.fn(() => true)
+      renderPage()
+
+      await openVersion(/Session 3 shuffled/)
+      await clickPrint()
+
+      expect(window.confirm).toHaveBeenCalledWith(
+        expect.stringContaining('older version')
+      )
+      await waitFor(() =>
+        expect(mockAuthenticatedFetch).toHaveBeenCalledWith(
+          expect.stringContaining('/api/assignments/seating/1'),
+          expect.objectContaining({ method: 'POST' })
+        )
+      )
+    })
+
+    it('asks nothing when printing the current plan', async () => {
+      window.confirm = jest.fn(() => true)
+      renderPage()
+
+      await clickPrint()
+
+      await waitFor(() =>
+        expect(mockAuthenticatedFetch).toHaveBeenCalledWith(
+          expect.stringContaining('/api/assignments/seating/1'),
+          expect.objectContaining({ method: 'POST' })
+        )
+      )
+      expect(window.confirm).not.toHaveBeenCalled()
+    })
+  })
+
+  it('labels versions and divides them at the setup change', async () => {
+    renderPage()
+
+    fireEvent.keyDown(await screen.findByRole('button', { name: /history/i }), {
+      key: 'Enter',
+    })
+
+    expect(await screen.findByText('Session 3 shuffled')).toBeInTheDocument()
+    expect(screen.getByText('Original plan')).toBeInTheDocument()
+    expect(screen.getByText(/before your roster change/i)).toBeInTheDocument()
+  })
+
+  it('falls back to the timestamp for a version saved before labelling', async () => {
+    renderPage()
+
+    fireEvent.keyDown(await screen.findByRole('button', { name: /history/i }), {
+      key: 'Enter',
+    })
+
+    const unlabelled = await screen.findByRole('menuitem', { name: /Feb 19/ })
+    expect(unlabelled).toHaveTextContent(/Feb 19/)
+    expect(unlabelled).not.toHaveTextContent(/null/)
   })
 })

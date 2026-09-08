@@ -21,8 +21,10 @@ class AssignmentSetStorage:
 
     organizations/{program_id}/assignment_sets/{set_id}/versions/{version_id}
 
-    The program document holds ``current_assignment_set_id``. Only the set it
-    points at is ever served; older sets are unreachable by design.
+    The program document holds ``current_assignment_set_id``. That pointer is
+    the authority on which set is current; older sets are kept, and
+    ``list_recent_sets`` returns the current one followed by the rest,
+    newest first.
     """
 
     def __init__(self):
@@ -80,6 +82,32 @@ class AssignmentSetStorage:
         """Return one assignment set document by id, or None."""
         doc = self._set_ref(program_id, set_id).get()
         return doc.to_dict() if doc.exists else None
+
+    def list_recent_sets(self, program_id: str, limit: int = 2) -> List[Dict[str, Any]]:
+        """The program's current set, then the most recent others.
+
+        History reaches back exactly one set, so the default limit is two. The
+        program pointer decides which set is current — creation order does not,
+        because the pointer is the authority on "current" everywhere else in
+        this service. If the pointer names a set that no longer exists, the
+        result is simply the newest sets, with no current one to lead it.
+        """
+        current_id = self.get_current_set_id(program_id)
+        if not current_id:
+            return []
+
+        by_recency = [
+            doc.to_dict()
+            for doc in self._program_ref(program_id)
+            .collection("assignment_sets")
+            .order_by("created_at", direction="DESCENDING")
+            .stream()
+        ]
+
+        current = [s for s in by_recency if s.get("assignment_set_id") == current_id]
+        others = [s for s in by_recency if s.get("assignment_set_id") != current_id]
+
+        return (current + others)[:limit]
 
     def save_version(
         self,

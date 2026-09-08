@@ -118,3 +118,37 @@ A shared link is adopted only if the recipient is a member of that program.
 There is no route or hook that lists a program's assignment sets. A Program has exactly
 one reachable set — the one its `current_assignment_set_id` points at — and older sets
 have no route and appear in no URL.
+
+## Versions and assignment sets
+
+An **assignment set** is one generation lineage: a frozen roster (`participant_data`) plus
+shape, holding a chain of **versions**.
+
+```
+organizations/{program_id}/assignment_sets/{set_id}/versions/{version_id}
+```
+
+The program document's `current_assignment_set_id` points at the current set. Every generate
+mints a *new* set and repoints; **old sets are never deleted**. History serves the current set
+plus the immediately previous one (`AssignmentSetStorage.list_recent_sets`), and that window is
+enforced in the API rather than by what the History menu offers.
+
+Two rakes worth knowing before touching any of this:
+
+- **Version ids collide across sets.** `_next_version_id` counts versions *within* a set, so
+  `v1` exists in every set. A bare version id is not a unique identifier — anything reading,
+  selecting, or caching a version must carry `assignment_set_id` alongside it. This includes
+  the TanStack query key on the frontend; `resultsQueryKey` in
+  `frontend/src/hooks/queries/useAssignments.ts` is the single definition, and a hand-spelled
+  key that drifts from it fails silently with an empty result and no type error.
+- **The `id` in `participant_data` is positional, not stable.** `roster.py`'s
+  `_roster_to_participant_list` consumes the Firestore roster doc id to build the partner
+  lookup and then discards it, writing `{"id": i + 1}` from `enumerate`. Adding one person near
+  the front of the roster shifts every later id. Compare participants across two frozen rosters
+  **by name** — the app already assumes name-uniqueness elsewhere (couples are paired by name).
+
+Every version carries `metadata["label"]` naming the action that produced it, written at the
+save site rather than inferred afterwards. **Promotion** (`POST /assignments/results/promote/…`)
+makes an older version current by writing its content as a new head version — never by
+rewinding — and reuses `_refuse_if_completed_sessions_changed` so the completed-session freeze
+has exactly one implementation.

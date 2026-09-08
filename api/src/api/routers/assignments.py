@@ -11,6 +11,7 @@ from api.services.session_completion_storage import (
     get_session_completion_storage,
 )
 from api.services.session_completion_guards import refuse_if_any_session_complete
+from api.services.version_promotion import roster_change_reason
 from api.utils.seating_arrangement import arrange_circular_seating
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -33,6 +34,13 @@ ASSIGNMENTS_MALFORMED = (
     "These assignments could not be saved. Reload the page and try your edit again."
 )
 
+# A version is the state after something happened, so every label is a completed
+# action in the past tense.
+LABEL_GENERATED = "Sessions generated"
+LABEL_REBUILT = "Sessions rebuilt"
+LABEL_REBUILT_WITH_ABSENCES = "Sessions rebuilt with absences"
+LABEL_MANUAL_EDIT = "Manual edit"
+
 
 def _require_current_set_id(storage: AssignmentSetStorage, program_id: str) -> str:
     """Resolve the program's current assignment set, or 404."""
@@ -41,6 +49,33 @@ def _require_current_set_id(storage: AssignmentSetStorage, program_id: str) -> s
         logger.warning(f"No assignment set for program: {program_id}")
         raise HTTPException(status_code=404, detail=NO_ASSIGNMENT_SET)
     return set_id
+
+
+SET_OUT_OF_WINDOW = (
+    "That version is no longer available. History goes back to your last setup change."
+)
+
+
+def _resolve_readable_set_id(
+    storage: AssignmentSetStorage, program_id: str, assignment_set_id: Optional[str]
+) -> str:
+    """The set a read may target: the current one, or the one before it.
+
+    Enforced here rather than left to what History happens to offer, so the
+    two-set window is a property of the API and not of one menu.
+    """
+    current_set_id = _require_current_set_id(storage, program_id)
+    if not assignment_set_id or assignment_set_id == current_set_id:
+        return current_set_id
+
+    readable = {
+        s.get("assignment_set_id")
+        for s in storage.list_recent_sets(program_id, limit=2)
+    }
+    if assignment_set_id not in readable:
+        raise HTTPException(status_code=409, detail=SET_OUT_OF_WINDOW)
+
+    return assignment_set_id
 
 
 def _require_current_set(
@@ -60,6 +95,14 @@ def _require_current_set(
         )
         raise HTTPException(status_code=500, detail=ASSIGNMENT_SET_MISSING)
     return set_id, assignment_set
+
+
+def _format_set_date(created_at: Any) -> str:
+    """The date a setup change was committed, for the not-promotable sentence."""
+    try:
+        return created_at.strftime("%b %-d")
+    except (AttributeError, ValueError):
+        return "an earlier date"
 
 
 def session_complete_refusal(session_number: int) -> str:
@@ -334,6 +377,7 @@ def _generate_assignments_internal(
         "solve_time": results.get("solve_time"),
         "total_deviation": results.get("total_deviation"),
         "max_time_seconds": max_time_seconds,
+        "label": LABEL_REBUILT if mark_regenerated else LABEL_GENERATED,
     }
 
     if mark_regenerated:
@@ -518,6 +562,9 @@ async def regenerate_all_with_absences(
         metadata = {
             "max_time_seconds": max_time_seconds,
             "regenerated": True,
+            "label": (
+                LABEL_REBUILT_WITH_ABSENCES if absences_applied else LABEL_REBUILT
+            ),
         }
         if absences_applied:
             metadata["solution_quality"] = None
@@ -722,6 +769,7 @@ async def regenerate_single_session(
             "max_time_seconds": max_time_seconds,
             "regenerated": True,
             "regenerated_session": session_number,
+            "label": f"Session {session_number} shuffled",
             "assignments_unchanged": assignments_unchanged,  # Flag if same assignments returned
         }
 
@@ -764,10 +812,19 @@ async def get_cached_results(
     version: Optional[str] = Query(
         None, description="Version ID (e.g., 'v1'). Defaults to latest.", max_length=10
     ),
+    assignment_set_id: Optional[str] = Query(
+        None,
+        description="Assignment set the version belongs to. Defaults to current.",
+        max_length=64,
+    ),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
 ):
-    """Get assignment results for a program's current assignment set."""
-    set_id = _require_current_set_id(storage, program_id)
+    """Get assignment results for one version of a readable assignment set.
+
+    Defaults to the current set. A previous set may be named explicitly, which
+    is how History reads a version minted before the last setup change.
+    """
+    set_id = _resolve_readable_set_id(storage, program_id, assignment_set_id)
 
     logger.info(
         f"Retrieving cached results for program: {program_id}, version: {version or 'latest'}"
@@ -790,20 +847,49 @@ async def get_result_version_list(
     program_id: str = Depends(validate_program_access),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
 ):
-    """Get list of all result versions for the current assignment set."""
-    set_id = _require_current_set_id(storage, program_id)
+    """Versions for the current assignment set, then the one before it.
+
+    History reaches back exactly one set. Further back would be the browsable
+    archive this redesign deleted; no further back leaves the divider at the
+    setup change with nothing to draw.
+    """
+    current_set_id, current_set = _require_current_set(storage, program_id)
 
     logger.info(f"Retrieving version list for program: {program_id}")
 
-    versions = storage.list_versions(program_id, set_id)
+    recent_sets = storage.list_recent_sets(program_id, limit=2)
 
-    if not versions:
+    entries: List[Dict[str, Any]] = []
+    for assignment_set in recent_sets:
+        set_id = assignment_set.get("assignment_set_id")
+        is_current = set_id == current_set_id
+
+        reason = None
+        if not is_current:
+            reason = roster_change_reason(
+                old_participants=assignment_set.get("participant_data", []),
+                current_participants=current_set.get("participant_data", []),
+                change_date=_format_set_date(current_set.get("created_at")),
+            )
+
+        for version in storage.list_versions(program_id, set_id):
+            entries.append(
+                {
+                    **version,
+                    "assignment_set_id": set_id,
+                    "label": (version.get("metadata") or {}).get("label"),
+                    "promotable": is_current,
+                    "not_promotable_reason": reason,
+                }
+            )
+
+    if not entries:
         logger.warning(f"No versions found for program: {program_id}")
         raise HTTPException(
             status_code=404, detail="No results found for this program."
         )
 
-    return {"versions": versions}
+    return {"versions": entries}
 
 
 @router.post("/results/save")
@@ -837,6 +923,7 @@ async def save_edited_assignments(
         metadata = {
             "source": "manual_edit",
             "based_on": based_on_version,
+            "label": LABEL_MANUAL_EDIT,
         }
 
         storage.save_version(
@@ -858,6 +945,69 @@ async def save_edited_assignments(
     except Exception as e:
         logger.error(f"Failed to save edited assignments: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to save edited assignments")
+
+
+@router.post("/results/promote/{version_id}")
+async def promote_version(
+    version_id: str = Path(..., max_length=10),
+    program_id: str = Depends(validate_program_access),
+    assignment_set_id: Optional[str] = Query(None, max_length=64),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+    completion: SessionCompletionStorage = Depends(get_session_completion_storage),
+):
+    """Make an older version current again, by writing it as a new version.
+
+    Promotion is not a rewind — the chain only ever grows, so undoing a shuffle
+    leaves you at a new version whose content equals an old one. History stays
+    honest about what happened and when.
+    """
+    current_set_id, current_set = _require_current_set(storage, program_id)
+
+    if assignment_set_id and assignment_set_id != current_set_id:
+        older = storage.get_set(program_id, assignment_set_id)
+        if older is None:
+            raise HTTPException(status_code=404, detail=SET_OUT_OF_WINDOW)
+        raise HTTPException(
+            status_code=409,
+            detail=roster_change_reason(
+                old_participants=older.get("participant_data", []),
+                current_participants=current_set.get("participant_data", []),
+                change_date=_format_set_date(current_set.get("created_at")),
+            ),
+        )
+
+    promoted = storage.get_version(program_id, current_set_id, version_id=version_id)
+    if promoted is None:
+        raise HTTPException(status_code=404, detail=f"Version {version_id} not found.")
+
+    assignments = promoted.get("assignments")
+    _require_wellformed_assignments(assignments)
+
+    current = storage.get_version(program_id, current_set_id)
+    if current is not None:
+        _refuse_if_completed_sessions_changed(
+            completion, program_id, current.get("assignments"), assignments
+        )
+
+    promoted_label = (promoted.get("metadata") or {}).get("label") or version_id
+    label = f'Restored "{promoted_label}"'
+
+    new_version_id = _next_version_id(storage, program_id, current_set_id)
+    storage.save_version(
+        program_id=program_id,
+        set_id=current_set_id,
+        version_id=new_version_id,
+        assignments=assignments,
+        metadata={
+            "source": "promotion",
+            "based_on": version_id,
+            "label": label,
+        },
+    )
+
+    logger.info(f"Promoted {version_id} as {new_version_id} for program {program_id}")
+
+    return {"version_id": new_version_id, "label": label}
 
 
 @router.get("/metadata")
