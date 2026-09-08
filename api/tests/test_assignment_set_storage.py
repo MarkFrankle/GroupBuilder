@@ -103,3 +103,37 @@ def test_versions_are_scoped_to_their_set(storage):
 
     assert storage.list_versions(PROGRAM, second) == []
     assert storage.get_version(PROGRAM, second) is None
+
+
+def test_list_recent_sets_returns_current_first_then_previous(storage):
+    first = _make_set(storage, filename="old")
+    second = _make_set(storage, filename="new")
+
+    sets = storage.list_recent_sets(PROGRAM)
+
+    assert [s["assignment_set_id"] for s in sets] == [second, first]
+
+
+def test_list_recent_sets_stops_at_the_limit(storage):
+    _make_set(storage, filename="oldest")
+    middle = _make_set(storage, filename="middle")
+    newest = _make_set(storage, filename="newest")
+
+    sets = storage.list_recent_sets(PROGRAM, limit=2)
+
+    assert [s["assignment_set_id"] for s in sets] == [newest, middle]
+
+
+def test_list_recent_sets_puts_the_pointer_first_even_if_it_is_not_newest(storage):
+    """The program pointer is the authority on 'current', not creation order."""
+    older = _make_set(storage, filename="old")
+    _make_set(storage, filename="new")
+    storage._program_ref(PROGRAM).set({"current_assignment_set_id": older}, merge=True)
+
+    sets = storage.list_recent_sets(PROGRAM)
+
+    assert sets[0]["assignment_set_id"] == older
+
+
+def test_list_recent_sets_on_a_program_with_no_sets(storage):
+    assert storage.list_recent_sets("program_that_does_not_exist") == []
