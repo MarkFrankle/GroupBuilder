@@ -25,12 +25,7 @@ import {
   useSessionCompletion,
 } from '@/hooks/queries'
 import { useProgram } from '@/contexts/ProgramContext'
-import type { Assignment } from '@/types/assignments'
-
-interface ResultVersion {
-  version_id: string
-  created_at: number
-}
+import type { Assignment, ResultVersion } from '@/types/assignments'
 
 function formatVersionDate(createdAt: number): string {
   return new Date(createdAt * 1000).toLocaleString(undefined, {
@@ -159,7 +154,7 @@ const AssignmentsPage: React.FC = () => {
     onSuccess: async (sessionNumber: number) => {
       invalidateAll()
       const fresh = await queryClient.fetchQuery<Assignment[]>({
-        queryKey: ['results', programId, 'latest'],
+        queryKey: ['results', programId, 'latest', 'current'],
       })
       setNotice({
         tone: 'info',

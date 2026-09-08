@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { authenticatedFetch } from '@/utils/apiClient'
+import type { ResultVersion } from '@/types/assignments'
 
 export function useResultVersions(programId: string | null) {
   return useQuery({
     queryKey: ['versions', programId],
-    queryFn: async () => {
+    queryFn: async (): Promise<ResultVersion[]> => {
       const response = await authenticatedFetch(`/api/assignments/results/versions?program_id=${programId}`)
       if (!response.ok) throw new Error('Failed to fetch versions')
       const data = await response.json()
@@ -14,12 +15,18 @@ export function useResultVersions(programId: string | null) {
   })
 }
 
-export function useAssignmentResults(programId: string | null, version?: string) {
+export function useAssignmentResults(
+  programId: string | null,
+  version?: string,
+  assignmentSetId?: string
+) {
   return useQuery({
-    queryKey: ['results', programId, version ?? 'latest'],
+    queryKey: ['results', programId, version ?? 'latest', assignmentSetId ?? 'current'],
     queryFn: async () => {
-      const versionQuery = version ? `&version=${version}` : ''
-      const response = await authenticatedFetch(`/api/assignments/results?program_id=${programId}${versionQuery}`)
+      const params = new URLSearchParams({ program_id: programId as string })
+      if (version) params.set('version', version)
+      if (assignmentSetId) params.set('assignment_set_id', assignmentSetId)
+      const response = await authenticatedFetch(`/api/assignments/results?${params}`)
       if (response.status === 404) {
         throw new Error('This program has no assignments yet. Generate them from the roster.')
       }

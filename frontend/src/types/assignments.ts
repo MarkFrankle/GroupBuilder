@@ -20,3 +20,12 @@ export interface Assignment {
   }
   absentParticipants?: Participant[]
 }
+
+export interface ResultVersion {
+  version_id: string
+  created_at: number
+  assignment_set_id: string
+  label: string | null
+  promotable: boolean
+  not_promotable_reason: string | null
+}
