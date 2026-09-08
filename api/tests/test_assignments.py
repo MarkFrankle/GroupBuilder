@@ -1715,7 +1715,11 @@ class TestPromotion:
     ):
         add_assignment_set_to_firestore(sample_set_data)
 
-        assert self._promote(client, "v99").status_code == 404
+        response = self._promote(client, "v99")
+
+        assert response.status_code == 404
+        # Names the version, so a deleted route's own 404 cannot pass this test.
+        assert response.json()["detail"] == "Version v99 not found."
 
     def test_promoting_an_unlabelled_version_names_the_version(
         self,
