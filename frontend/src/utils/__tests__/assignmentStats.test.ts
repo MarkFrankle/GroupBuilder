@@ -2,6 +2,7 @@ import {
   shuffleReceipt,
   uniqueTablematesAverage,
   linkedPairCount,
+  seatedCount,
 } from '../assignmentStats'
 import type { Assignment, Participant } from '@/types/assignments'
 
@@ -89,5 +90,19 @@ describe('linkedPairCount', () => {
 
   it('is zero when nobody is linked', () => {
     expect(linkedPairCount(before)).toBe(0)
+  })
+})
+
+describe('seatedCount', () => {
+  it('counts filled seats, not table slots', () => {
+    const assignment = {
+      session: 1,
+      tables: {
+        1: [{ name: 'Ann', religion: 'Jewish', gender: 'Female', partner: null }, null],
+        2: [{ name: 'Ben', religion: 'Muslim', gender: 'Male', partner: null }],
+      },
+    } as any
+
+    expect(seatedCount(assignment)).toBe(2)
   })
 })

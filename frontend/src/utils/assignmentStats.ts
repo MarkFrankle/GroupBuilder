@@ -27,6 +27,11 @@ function seatingByName(assignment: Assignment): Map<string, number> {
   return seating
 }
 
+/** How many seats a session actually fills — empty chairs are not people. */
+export function seatedCount(assignment: Assignment): number {
+  return people(assignment).length
+}
+
 /** Unordered name pairs sharing a table, counted across the whole program. */
 function pairCounts(assignments: Assignment[]): Map<string, number> {
   const counts = new Map<string, number>()

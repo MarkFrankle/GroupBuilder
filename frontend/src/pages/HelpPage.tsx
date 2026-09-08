@@ -380,6 +380,12 @@ function HelpPage() {
             was already close to the best one — shuffle again if you want a bigger
             change.
           </p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            That same line offers <strong>Undo</strong>. Pressing it puts back the
+            arrangement you had before the shuffle. It stays available until you do
+            something else, and even after it is gone you can bring any earlier
+            arrangement back through History.
+          </p>
 
           <h3 className="text-xl font-semibold mt-8 mb-2">Earlier versions</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
@@ -410,9 +416,9 @@ function HelpPage() {
 
           <WarningCallout>
             <p>
-              Shuffling a session replaces what was there. That is what the version
-              history is for — if you preferred the previous arrangement, open History
-              and press Promote to bring it back.
+              Shuffling a session replaces what was there. If you preferred the
+              previous arrangement, press <strong>Undo</strong> on the line at the top
+              of the page — or, later, open History and press Promote.
             </p>
           </WarningCallout>
         </section>
