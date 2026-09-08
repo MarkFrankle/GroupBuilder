@@ -28,6 +28,9 @@
 - **The solver never runs without an explicit user action.** No auto-resolve, no silent rebalance. The app may flag a problem; changing the plan is always something the user pressed.
 - **Never modify a completed session.** Completion freezes the past — every rebuild is scoped to incomplete sessions only.
 - **Print output (roster + seating) is settled.** Strong user feedback; don't redesign it.
+- **Run frontend tests through `npm test`, never `npx jest` directly.** The transform config
+  comes from craco, so a bare `npx jest` fails every suite with "Cannot use import statement
+  outside a module" — a config problem that looks like a code problem.
 - **Mock `@/utils/apiClient` in frontend tests** — don't mock Firebase SDK internals. Example: `jest.mock('@/utils/apiClient', () => ({ authenticatedFetch: (...args) => fetch(...args) }))`
 
 ## Build & Dev Commands
