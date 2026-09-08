@@ -83,6 +83,14 @@ function mockApi() {
       } as Response)
     }
 
+    if (url.includes('/api/assignments/seating/')) {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ tables: [] }),
+      } as Response)
+    }
+
     if (url.includes('/api/assignments/regenerate/session/')) {
       api.shuffled = true
       return Promise.resolve({
@@ -390,6 +398,71 @@ describe('AssignmentsPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       /Session 1 is marked complete and cannot be changed/
     )
+  })
+
+  describe('printing an older version', () => {
+    const realConfirm = window.confirm
+
+    afterEach(() => {
+      window.confirm = realConfirm
+    })
+
+    /** Clicks Print on the first session card. */
+    async function clickPrint() {
+      const session1 = await screen.findByRole('region', { name: 'Session 1' })
+      fireEvent.click(within(session1).getByRole('button', { name: /^print$/i }))
+    }
+
+    it('aborts the print when the confirm is declined', async () => {
+      window.confirm = jest.fn(() => false)
+      renderPage()
+
+      await openVersion(/Session 3 shuffled/)
+      await clickPrint()
+
+      expect(window.confirm).toHaveBeenCalledWith(
+        expect.stringContaining('older version')
+      )
+      await waitFor(() =>
+        expect(mockAuthenticatedFetch).not.toHaveBeenCalledWith(
+          expect.stringContaining('/api/assignments/seating/'),
+          expect.anything()
+        )
+      )
+    })
+
+    it('prints when the confirm is accepted', async () => {
+      window.confirm = jest.fn(() => true)
+      renderPage()
+
+      await openVersion(/Session 3 shuffled/)
+      await clickPrint()
+
+      expect(window.confirm).toHaveBeenCalledWith(
+        expect.stringContaining('older version')
+      )
+      await waitFor(() =>
+        expect(mockAuthenticatedFetch).toHaveBeenCalledWith(
+          expect.stringContaining('/api/assignments/seating/1'),
+          expect.objectContaining({ method: 'POST' })
+        )
+      )
+    })
+
+    it('asks nothing when printing the current plan', async () => {
+      window.confirm = jest.fn(() => true)
+      renderPage()
+
+      await clickPrint()
+
+      await waitFor(() =>
+        expect(mockAuthenticatedFetch).toHaveBeenCalledWith(
+          expect.stringContaining('/api/assignments/seating/1'),
+          expect.objectContaining({ method: 'POST' })
+        )
+      )
+      expect(window.confirm).not.toHaveBeenCalled()
+    })
   })
 
   it('labels versions and divides them at the setup change', async () => {

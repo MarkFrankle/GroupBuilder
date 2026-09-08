@@ -197,7 +197,22 @@ const AssignmentsPage: React.FC = () => {
     onError: (error: Error) => setNotice({ tone: 'error', message: error.message }),
   })
 
+  /**
+   * Print stays available while viewing an older version — a coordinator may
+   * genuinely want yesterday's plan on paper. What it must not be is an
+   * accident, and the sheet itself carries no version marking, so the only
+   * place that fact can be told is here, before the paper exists.
+   */
+  const confirmPrintingOldVersion = (): boolean => {
+    if (!viewing) return true
+    const name = viewing.label ?? formatVersionDate(viewing.created_at)
+    return window.confirm(
+      `You're printing an older version — "${name}". The sheet will not say so.`
+    )
+  }
+
   const handlePrintRoster = () => {
+    if (!confirmPrintingOldVersion()) return
     navigate('/table-assignments/roster-print', {
       state: { assignments: sorted, programId },
     })
@@ -250,6 +265,7 @@ const AssignmentsPage: React.FC = () => {
   const handlePrintSession = async (sessionNumber: number) => {
     const sessionAssignment = sorted.find(a => a.session === sessionNumber)
     if (!sessionAssignment || !programId) return
+    if (!confirmPrintingOldVersion()) return
     try {
       const response = await authenticatedFetch(
         `/api/assignments/seating/${sessionNumber}?program_id=${programId}`,
