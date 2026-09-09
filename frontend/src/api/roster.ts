@@ -83,7 +83,7 @@ export async function getKeepApart(programId: string): Promise<[string, string][
     throw new Error(`Failed to fetch keep-apart pairs: ${response.status}`);
   }
   const data = await response.json();
-  return data.pairs;
+  return data.pairs ?? [];
 }
 
 /**

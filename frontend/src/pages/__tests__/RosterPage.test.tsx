@@ -1,9 +1,12 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
 import { RosterPage } from '../RosterPage';
 import { authenticatedFetch } from '@/utils/apiClient';
 import { createQueryWrapper } from '@/test-utils/queryWrapper';
+
+// Radix Select scrolls the highlighted option into view; jsdom has no such method.
+Element.prototype.scrollIntoView = jest.fn();
 
 jest.mock('uuid', () => ({
   v4: () => 'mock-uuid-1234',
@@ -517,6 +520,34 @@ describe('the Keep apart block', () => {
 
   const matching = { Alice: ['Bob'], Bob: ['Alice'] };
 
+  /** Everything except keep-apart, for the tests that drive that route by hand.
+   * The sessions were built with nobody kept apart. */
+  const baseline = (url: string) => {
+    if (url.includes('/api/roster/canonical')) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          participants: [alice, bob].map(p => ({
+            name: p.name, religion: p.religion, gender: p.gender,
+            partner: null, is_facilitator: false, keep_together: false,
+            keep_apart: [] as string[],
+          })),
+          num_tables: 2,
+          num_sessions: 3,
+        }),
+      } as Response);
+    }
+    if (url.includes('/api/assignments/metadata')) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ assignment_set_id: 's1', num_tables: 2, num_sessions: 3 }),
+      } as Response);
+    }
+    return Promise.resolve({
+      ok: true, json: async () => ({ participants: [alice, bob] }),
+    } as Response);
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -563,6 +594,137 @@ describe('the Keep apart block', () => {
     renderPage();
 
     expect(await screen.findByRole('button', { name: /edit roster/i })).toBeInTheDocument();
+  });
+
+  // The add path end to end: the POST goes out and the committed rule comes
+  // back on screen without a reload.
+  test('adds a pair and shows it', async () => {
+    let pairs: [string, string][] = [];
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).includes('/api/roster/keep-apart')) {
+        if ((init as RequestInit | undefined)?.method === 'POST') {
+          pairs = [['p1', 'p2']];
+          return Promise.resolve({
+            ok: true, status: 200, json: async () => ({ pairs }),
+          } as Response);
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ pairs }) } as Response);
+      }
+      return baseline(String(url));
+    });
+    renderPage();
+
+    // The roster matches the sessions, so the block starts inert: pressing
+    // Edit roster is how a coordinator gets at it, exactly as for the grid.
+    fireEvent.click(await screen.findByRole('button', { name: /edit roster/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add a pair' }));
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'First person' }), { key: 'Enter' });
+    fireEvent.click(screen.getByRole('option', { name: 'Alice' }));
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Second person' }), { key: 'Enter' });
+    fireEvent.click(screen.getByRole('option', { name: 'Bob' }));
+
+    expect(await screen.findByText('Alice and Bob')).toBeInTheDocument();
+    const posts = mockFetch.mock.calls.filter(
+      ([url, init]) => String(url).includes('/api/roster/keep-apart')
+        && (init as RequestInit | undefined)?.method === 'POST'
+    );
+    expect(posts).toHaveLength(1);
+    expect(JSON.parse(String((posts[0][1] as RequestInit).body)))
+      .toEqual({ a_id: 'p1', b_id: 'p2' });
+  });
+
+  // The refusal is rendered beside the two dropdowns that caused it, not at the
+  // top of the page. handleAddKeepApart lets the rejection through on purpose;
+  // a try/catch there would break this with nothing else failing.
+  test('shows the server’s refusal beside the dropdowns', async () => {
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).includes('/api/roster/keep-apart')) {
+        if ((init as RequestInit | undefined)?.method === 'POST') {
+          return Promise.resolve({
+            ok: false,
+            status: 400,
+            json: async () => ({ detail: 'Alice and Bob are partners.' }),
+          } as Response);
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ pairs: [] }) } as Response);
+      }
+      return baseline(String(url));
+    });
+    renderPage();
+
+    // The roster matches the sessions, so the block starts inert: pressing
+    // Edit roster is how a coordinator gets at it, exactly as for the grid.
+    fireEvent.click(await screen.findByRole('button', { name: /edit roster/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add a pair' }));
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'First person' }), { key: 'Enter' });
+    fireEvent.click(screen.getByRole('option', { name: 'Alice' }));
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Second person' }), { key: 'Enter' });
+    fireEvent.click(screen.getByRole('option', { name: 'Bob' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Alice and Bob are partners.');
+    // The row stays up so it can be fixed rather than re-opened.
+    expect(screen.getByRole('combobox', { name: 'First person' })).toBeInTheDocument();
+  });
+
+  test('names both people in the changeset', async () => {
+    mockProgram({ pairs: [['p1', 'p2']] });
+    renderPage();
+
+    expect(await screen.findByText('Alice: kept apart none → Bob')).toBeInTheDocument();
+    expect(screen.getByText('Bob: kept apart none → Alice')).toBeInTheDocument();
+  });
+
+  test('counts the pairs in the population line', async () => {
+    mockProgram({ pairs: [['p1', 'p2']], canonicalKeepApart: matching });
+    renderPage();
+
+    expect(await screen.findByText(/1 pair kept apart/)).toBeInTheDocument();
+  });
+
+  // A failed read must never render as "nobody is being kept apart yet" - an
+  // affirmative claim - beside a dirty roster offering Discard.
+  test('names a failed read instead of implying there are no rules', async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (String(url).includes('/api/roster/keep-apart')) {
+        return Promise.resolve({ ok: false, status: 500, json: async () => ({}) } as Response);
+      }
+      return baseline(String(url));
+    });
+    renderPage();
+
+    expect(
+      await screen.findByText(/Couldn’t load who is being kept apart/i)
+    ).toBeInTheDocument();
+  });
+
+  // The lock is derived from four queries now. Painting once the other three
+  // have landed reads the rules as absent, which on a locked program is a
+  // dirty roster: grid editable and autosaving, with Discard - destructive -
+  // on screen, until the rules land and it all silently flips back.
+  test('does not paint before the rules have landed', async () => {
+    let releasePairs: () => void = () => {};
+    const pairsArrived = new Promise<void>((resolve) => { releasePairs = resolve; });
+
+    mockFetch.mockImplementation(async (url: string) => {
+      if (String(url).includes('/api/roster/keep-apart')) {
+        await pairsArrived;
+        return { ok: true, status: 200, json: async () => ({ pairs: [['p1', 'p2']] }) } as Response;
+      }
+      return baseline(String(url));
+    });
+
+    renderPage();
+
+    // A macrotask, so everything already settled is in React state and only
+    // the keep-apart query is genuinely outstanding.
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+
+    expect(screen.getByRole('status', { name: /loading roster/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /discard changes/i })).not.toBeInTheDocument();
+
+    await act(async () => { releasePairs(); await pairsArrived; });
+    expect(await screen.findByText(/2 changes not yet in your sessions/i)).toBeInTheDocument();
   });
 
   test('removes a pair', async () => {

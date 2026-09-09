@@ -68,7 +68,7 @@ function toCanonical(
   keepApartPairs.forEach(([aId, bId]) => {
     const aName = nameById.get(aId);
     const bName = nameById.get(bId);
-    if (!aName || !bName || aName === bName) return;
+    if (aName === undefined || bName === undefined || aName === bName) return;
     keepApartNames.get(aName)!.push(bName);
     keepApartNames.get(bName)!.push(aName);
   });
@@ -100,7 +100,11 @@ export function RosterPage() {
     error: canonicalError,
   } = useCanonicalRoster(currentProgram?.id ?? null);
   const canonical = (canonicalData as CanonicalRoster | undefined) ?? null;
-  const { data: keepApartData } = useKeepApart(currentProgram?.id ?? null);
+  const {
+    data: keepApartData,
+    isLoading: keepApartLoading,
+    error: keepApartError,
+  } = useKeepApart(currentProgram?.id ?? null);
   const keepApartPairs = keepApartData ?? [];
 
   // Every one of the three, not just the roster. The lock is derived from all
@@ -108,7 +112,10 @@ export function RosterPage() {
   // brand-new one: unlocked, offering "Generate assignments", with an editable
   // grid that autosaves each keystroke. A guard that is off for the first paint
   // is not a guard.
-  const loading = rosterLoading || metadataLoading || canonicalLoading;
+  // Keep-apart belongs here for the same reason: the lock is derived from it
+  // too, so painting before it lands shows a locked program as dirty - grid
+  // editable, autosaving, Discard on screen - and then silently flips back.
+  const loading = rosterLoading || metadataLoading || canonicalLoading || keepApartLoading;
 
   const [participants, setParticipants] = useState<RosterParticipant[]>([]);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
@@ -228,11 +235,12 @@ export function RosterPage() {
     }
   }, [participants, currentProgram]);
 
+  // Only this key. The rules live on the program document: adding or removing
+  // one writes no roster document, and /api/roster/canonical serves the frozen
+  // participant_data, which only a rebuild rewrites. Refetching the roster here
+  // would be a chance to overwrite the grid with a stale body for no gain.
   const invalidateKeepApart = () => {
-    const programId = currentProgram!.id;
-    queryClient.invalidateQueries({ queryKey: ['keep-apart', programId] });
-    queryClient.invalidateQueries({ queryKey: ['roster', programId] });
-    queryClient.invalidateQueries({ queryKey: ['canonical-roster', programId] });
+    queryClient.invalidateQueries({ queryKey: ['keep-apart', currentProgram!.id] });
   };
 
   /** Deliberately not caught: the section renders the server's refusal inline,
@@ -427,7 +435,7 @@ export function RosterPage() {
             readOnly={locked}
           />
 
-          {(error || fetchError || canonicalError) && (
+          {(error || fetchError || canonicalError || keepApartError) && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               {/* A failure to load is not a refusal to rebuild, and a canonical
@@ -438,7 +446,12 @@ export function RosterPage() {
                   ? 'Can’t rebuild yet'
                   : canonicalError
                     ? 'Can’t tell whether your roster matches your sessions'
-                    : 'Couldn’t load your roster'}
+                    : keepApartError
+                      // Named, not implied: an unread rule renders as "nobody is
+                      // being kept apart yet", which is a claim rather than an
+                      // absence - and the roster reads dirty beside it.
+                      ? 'Couldn’t load who is being kept apart'
+                      : 'Couldn’t load your roster'}
               </AlertTitle>
               <AlertDescription>
                 {error ||
