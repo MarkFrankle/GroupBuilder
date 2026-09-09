@@ -20,14 +20,14 @@ const assignment: Assignment = {
 
 describe('SessionCard — a live session', () => {
   it('renders one table block per table', () => {
-    render(<SessionCard assignment={assignment} selectedName={null} onSelect={jest.fn()} />)
+    render(<SessionCard assignment={assignment} selectedName={null} onSelect={jest.fn()} onMarkAbsent={jest.fn()} />)
 
     expect(screen.getByText('Table 1')).toBeInTheDocument()
     expect(screen.getByText('Table 2')).toBeInTheDocument()
   })
 
   it('offers Shuffle, Print and Mark complete', () => {
-    render(<SessionCard assignment={assignment} selectedName={null} onSelect={jest.fn()} />)
+    render(<SessionCard assignment={assignment} selectedName={null} onSelect={jest.fn()} onMarkAbsent={jest.fn()} />)
 
     expect(screen.getByRole('button', { name: /shuffle/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /print/i })).toBeInTheDocument()
@@ -45,6 +45,7 @@ describe('SessionCard — a live session', () => {
         }}
         selectedName={null}
         onSelect={jest.fn()}
+        onMarkAbsent={jest.fn()}
       />
     )
 
@@ -53,7 +54,7 @@ describe('SessionCard — a live session', () => {
   })
 
   it('disables Shuffle while a shuffle is running', () => {
-    render(<SessionCard assignment={assignment} isShuffling selectedName={null} onSelect={jest.fn()} />)
+    render(<SessionCard assignment={assignment} isShuffling selectedName={null} onSelect={jest.fn()} onMarkAbsent={jest.fn()} />)
 
     expect(screen.getByRole('button', { name: /shuffling/i })).toBeDisabled()
   })
@@ -65,6 +66,7 @@ describe('SessionCard — a live session', () => {
         onReopen={jest.fn()}
         selectedName={null}
         onSelect={jest.fn()}
+        onMarkAbsent={jest.fn()}
       />)
 
     expect(screen.getByRole('button', { name: /print/i })).toBeInTheDocument()
@@ -76,7 +78,7 @@ describe('SessionCard — a live session', () => {
 
 describe('SessionCard — a completed session', () => {
   it('renders as one row', () => {
-    render(<SessionCard assignment={assignment} completed selectedName={null} onSelect={jest.fn()} />)
+    render(<SessionCard assignment={assignment} completed selectedName={null} onSelect={jest.fn()} onMarkAbsent={jest.fn()} />)
 
     expect(screen.getByText(/Session 1/)).toBeInTheDocument()
     expect(screen.getByText(/completed/)).toBeInTheDocument()
@@ -85,7 +87,7 @@ describe('SessionCard — a completed session', () => {
   })
 
   it('expands to the full session on the chevron', async () => {
-    render(<SessionCard assignment={assignment} completed selectedName={null} onSelect={jest.fn()} />)
+    render(<SessionCard assignment={assignment} completed selectedName={null} onSelect={jest.fn()} onMarkAbsent={jest.fn()} />)
 
     await userEvent.click(screen.getByRole('button', { name: /expand session 1/i }))
 
@@ -103,11 +105,12 @@ describe('SessionCard — a completed session', () => {
         onReopen={jest.fn()}
         selectedName={null}
         onSelect={jest.fn()}
+        onMarkAbsent={jest.fn()}
       />
     )
     expect(screen.getByRole('button', { name: /reopen/i })).toBeInTheDocument()
 
-    rerender(<SessionCard assignment={assignment} completed selectedName={null} onSelect={jest.fn()} />)
+    rerender(<SessionCard assignment={assignment} completed selectedName={null} onSelect={jest.fn()} onMarkAbsent={jest.fn()} />)
     expect(screen.queryByRole('button', { name: /reopen/i })).not.toBeInTheDocument()
   })
 })
@@ -154,7 +157,7 @@ describe('SessionCard — the absent row', () => {
   it('renders absent names as selectable chips', () => {
     const onSelect = jest.fn()
     render(
-      <SessionCard assignment={withAbsence} selectedName={null} onSelect={onSelect} />
+      <SessionCard assignment={withAbsence} selectedName={null} onSelect={onSelect} onMarkAbsent={jest.fn()} />
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Cara' }))
@@ -168,6 +171,7 @@ describe('SessionCard — the absent row', () => {
         assignment={withAbsence}
         selectedName="Ann"
         onSelect={jest.fn()}
+        onMarkAbsent={jest.fn()}
         onMarkPresent={jest.fn()}
       />
     )
@@ -178,6 +182,7 @@ describe('SessionCard — the absent row', () => {
         assignment={withAbsence}
         selectedName="Cara"
         onSelect={jest.fn()}
+        onMarkAbsent={jest.fn()}
         onMarkPresent={jest.fn()}
       />
     )
@@ -190,6 +195,7 @@ describe('SessionCard — the absent row', () => {
         assignment={withAbsence}
         selectedName="Cara"
         onSelect={jest.fn()}
+        onMarkAbsent={jest.fn()}
         onMarkPresent={jest.fn()}
       />
     )
@@ -209,6 +215,7 @@ describe('SessionCard — the absent row', () => {
         assignment={withAbsence}
         selectedName="Cara"
         onSelect={jest.fn()}
+        onMarkAbsent={jest.fn()}
         onMarkPresent={jest.fn()}
       />
     )
@@ -230,6 +237,7 @@ describe('SessionCard — the absent row', () => {
         assignment={withAbsence}
         selectedName="Cara"
         onSelect={jest.fn()}
+        onMarkAbsent={jest.fn()}
         onMarkPresent={onMarkPresent}
       />
     )
@@ -255,6 +263,7 @@ describe('SessionCard — the absent row', () => {
         }}
         selectedName="Cara"
         onSelect={jest.fn()}
+        onMarkAbsent={jest.fn()}
         onMarkPresent={jest.fn()}
       />
     )
@@ -273,6 +282,7 @@ describe('SessionCard — the absent row', () => {
         completed
         selectedName="Cara"
         onSelect={onSelect}
+        onMarkAbsent={jest.fn()}
         onMarkPresent={jest.fn()}
       />
     )
@@ -292,6 +302,7 @@ describe('SessionCard — the absent row', () => {
         assignment={withAbsence}
         selectedName="Cara"
         onSelect={jest.fn()}
+        onMarkAbsent={jest.fn()}
         onMarkPresent={jest.fn()}
       />
     )
@@ -303,6 +314,7 @@ describe('SessionCard — the absent row', () => {
         readOnly
         selectedName="Cara"
         onSelect={jest.fn()}
+        onMarkAbsent={jest.fn()}
         onMarkPresent={jest.fn()}
       />
     )

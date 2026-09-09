@@ -38,8 +38,13 @@ interface SessionCardProps {
   /** Pass-throughs to TableBlock. */
   selectedName: string | null
   onSelect: (name: string) => void
-  /** Absent where acting is not allowed. See TableBlock. */
-  onMarkAbsent?: (name: string) => void
+  /**
+   * Required, and passed by the page to completed cards too: the card already
+   * gates the button on `actionable`, so the suppression lives in one place and
+   * `tsc` enforces that every call site is wired. TableBlock's own
+   * `onMarkAbsent?` stays optional — there, absence *is* the suppression.
+   */
+  onMarkAbsent: (name: string) => void
   onMarkPresent?: (name: string, tableNumber: number) => void
 }
 
