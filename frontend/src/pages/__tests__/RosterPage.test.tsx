@@ -554,6 +554,17 @@ describe('the Keep apart block', () => {
     ).not.toBeInTheDocument();
   });
 
+  // The server prunes rules on delete, but a rule naming someone already gone
+  // must read as no rule at all — exactly as a dangling partner_id resolves to
+  // nobody — or the page would report a change the rebuild cannot make and the
+  // roster would never lock again.
+  test('ignores a rule naming someone no longer on the roster', async () => {
+    mockProgram({ pairs: [['p1', 'gone']] });
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: /edit roster/i })).toBeInTheDocument();
+  });
+
   test('removes a pair', async () => {
     mockProgram({ pairs: [['p1', 'p2']] });
     renderPage();
