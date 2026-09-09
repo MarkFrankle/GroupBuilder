@@ -156,12 +156,6 @@ async def generate_from_roster(
     # partnered person as changed.
     participant_list = _roster_to_participant_list(participants)
 
-    # Arithmetic only, no solve.
-    try:
-        check_shortfalls(participant_list, data.num_tables)
-    except ShortfallError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
     # "No current set" is the first-run signal, not "canonical is empty" - that
     # distinguishes never-generated from a degenerate empty-roster set.
     current_set_id = storage.get_current_set_id(program_id)
@@ -181,25 +175,32 @@ async def generate_from_roster(
             canonical=current_set.get("participant_data") or [], draft=participant_list
         )
         if shape_unchanged and diff.renames and not diff.needs_rebuild:
-            versions = storage.list_versions(program_id, current_set_id)
-            if versions:
-                head_id = versions[0]["version_id"]
-                head = storage.get_version(program_id, current_set_id, head_id) or {}
-                renamed_assignments, renamed_participants = apply_renames(
-                    head.get("assignments") or [],
-                    current_set.get("participant_data") or [],
-                    diff.renames,
-                )
-                # The head version is overwritten rather than replaced by a new
-                # one: nobody moved, so a new history entry would be materially
+            # The canonical roster is renamed once.
+            _, renamed_participants = apply_renames(
+                [], current_set.get("participant_data") or [], diff.renames
+            )
+            # Then every version of the set, not just the head. Promotion can
+            # put any version of the current set back at the head, so leaving
+            # the older ones spelt the old way means undoing a shuffle
+            # resurrects the typo - and the page would then read Locked,
+            # because the roster still matches participant_data, offering no
+            # way to notice it or clear it. Version counts per set are small
+            # and bounded.
+            for entry in storage.list_versions(program_id, current_set_id):
+                version_id = entry["version_id"]
+                version = storage.get_version(program_id, current_set_id, version_id)
+                if not version:
+                    continue
+                # Overwritten in place rather than replaced by a new version:
+                # nobody moved, so a new history entry would be materially
                 # identical to its parent.
+                renamed_assignments, _ = apply_renames(
+                    version.get("assignments") or [], [], diff.renames
+                )
                 storage.overwrite_version_assignments(
-                    program_id, current_set_id, head_id, renamed_assignments
+                    program_id, current_set_id, version_id, renamed_assignments
                 )
-            else:
-                _, renamed_participants = apply_renames(
-                    [], current_set.get("participant_data") or [], diff.renames
-                )
+
             storage.update_participant_data(
                 program_id, current_set_id, renamed_participants
             )
@@ -208,6 +209,15 @@ async def generate_from_roster(
                 "rebuilt": False,
                 "message": "Roster saved. No rebuild needed.",
             }
+
+    # Shortfall gate - arithmetic only, no solve. It sits after the rename fast
+    # path on purpose: the gate exists to name what is short before we run the
+    # solver, and a rename never reaches the solver. Running it first refused a
+    # typo fix whenever the roster happened to be below the headcount.
+    try:
+        check_shortfalls(participant_list, data.num_tables)
+    except ShortfallError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     # Absences carry across every rebuild, always - there is no checkbox,
     # because forgetting one silently seats someone who is away.

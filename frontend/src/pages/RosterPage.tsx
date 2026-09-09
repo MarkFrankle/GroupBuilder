@@ -66,9 +66,11 @@ export function RosterPage() {
   );
   const currentSet: AssignmentSetSummary | null =
     (metadata as AssignmentSetSummary | undefined) ?? null;
-  const { data: canonicalData, isLoading: canonicalLoading } = useCanonicalRoster(
-    currentProgram?.id ?? null,
-  );
+  const {
+    data: canonicalData,
+    isLoading: canonicalLoading,
+    error: canonicalError,
+  } = useCanonicalRoster(currentProgram?.id ?? null);
   const canonical = (canonicalData as CanonicalRoster | undefined) ?? null;
 
   // Every one of the three, not just the roster. The lock is derived from all
@@ -224,6 +226,9 @@ export function RosterPage() {
       // Nothing about the sessions moved, so sending the coordinator to look
       // at them would be a non-sequitur.
       setNotice(result.message);
+      // The change was accepted, so the guard goes back on - the page stays put
+      // and would otherwise leave the grid editable after a successful save.
+      setArmed(false);
       setGenerating(false);
     } catch (err: any) {
       // The server's wording is the user-facing wording; don't rewrite it.
@@ -240,6 +245,12 @@ export function RosterPage() {
     try {
       await discardRosterChanges(currentProgram!.id);
       setArmed(false);
+      // The selects are React state, and discard does not change the set id, so
+      // the effect that syncs them will not re-run. Without this a discarded
+      // session-count change stays on screen and the page goes on reporting an
+      // unsaved change that Discard can no longer clear.
+      if (canonical?.num_tables) setNumTables(String(canonical.num_tables));
+      if (canonical?.num_sessions) setNumSessions(String(canonical.num_sessions));
       queryClient.invalidateQueries({ queryKey: ['roster', currentProgram!.id] });
       queryClient.invalidateQueries({ queryKey: ['canonical-roster', currentProgram!.id] });
     } catch (err: any) {
@@ -257,7 +268,10 @@ export function RosterPage() {
   // matches the one it was built from, and the coordinator hasn't asked to edit.
   const locked = !!currentSet && !changeset.isDirty && !armed;
 
-  const canGenerate = participants.length >= parseInt(numTables) && participants.length > 0;
+  // Matches check_shortfalls on the server: a table with one person is not a
+  // discussion group. Disagreeing meant enabling the button and refusing the
+  // request a round trip later.
+  const canGenerate = participants.length >= parseInt(numTables) * 2;
   // computeChangeset reports a brand-new program as clean - there is no
   // canonical roster to differ from - so dirtiness alone would hide the button
   // on exactly the program that needs it.
@@ -349,11 +363,24 @@ export function RosterPage() {
             </div>
           </div>
 
-          {(error || fetchError) && (
+          {(error || fetchError || canonicalError) && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Can’t rebuild yet</AlertTitle>
-              <AlertDescription>{error || (fetchError as Error)?.message}</AlertDescription>
+              {/* A failure to load is not a refusal to rebuild, and a canonical
+                  failure is neither - without it the page renders a confident
+                  Locked and silently offers no way to save what gets typed. */}
+              <AlertTitle>
+                {error
+                  ? 'Can’t rebuild yet'
+                  : canonicalError
+                    ? 'Can’t tell whether your roster matches your sessions'
+                    : 'Couldn’t load your roster'}
+              </AlertTitle>
+              <AlertDescription>
+                {error ||
+                  (fetchError as Error)?.message ||
+                  'Reload the page before making changes — edits made now may not be saved to your sessions.'}
+              </AlertDescription>
             </Alert>
           )}
 

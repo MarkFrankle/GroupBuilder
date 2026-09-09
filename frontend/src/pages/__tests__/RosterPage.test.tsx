@@ -246,8 +246,16 @@ describe('the lock', () => {
   // between two stored copies, so it survives a reload with nothing persisted.
   test('stays unlocked on remount when the roster differs', async () => {
     mockProgram({ draft: [alice, bob], canonical: [alice] });
-    renderPage();
+    const { unmount } = renderPage();
 
+    expect(await screen.findByText(/1 change not yet in your sessions/i)).toBeInTheDocument();
+    unmount();
+
+    // Unlocked-clean is React-local and collapses back to Locked on remount.
+    // A real difference is read from two stored copies, so it has to survive -
+    // that asymmetry is the design, and without the remount this test only
+    // proved the first render.
+    renderPage();
     expect(await screen.findByText(/1 change not yet in your sessions/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /edit roster/i })).not.toBeInTheDocument();
   });
@@ -336,19 +344,25 @@ describe('rebuilding from the roster', () => {
   });
 
   test('makes exactly one request', async () => {
-    mockProgram({ draft: [alice, bob], canonical: [alice] });
+    // Four people for two tables: the server's shortfall gate wants
+    // participants >= tables x 2, and the button now agrees with it.
+    mockProgram({ draft: [alice, bob, cara, dan], canonical: [alice, bob, cara] });
     renderPage();
 
     const btn = await screen.findByRole('button', { name: /save and rebuild sessions/i });
     await waitFor(() => expect(btn).toBeEnabled());
     await userEvent.click(btn);
 
-    await waitFor(() => {
-      const generateCalls = mockFetch.mock.calls.filter(
-        ([url]) => String(url).includes('/api/roster/generate')
-      );
-      expect(generateCalls).toHaveLength(1);
+    // Flush a macrotask rather than asserting inside waitFor: waitFor succeeds
+    // on its first tick, so a second request arriving later would slip past it -
+    // and a second request is precisely the bug this test exists to catch.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
+    const generateCalls = mockFetch.mock.calls.filter(
+      ([url]) => String(url).includes('/api/roster/generate')
+    );
+    expect(generateCalls).toHaveLength(1);
     const solveCalls = mockFetch.mock.calls.filter(
       ([url]) => String(url).includes('/api/assignments/')
         && !String(url).includes('metadata')
@@ -358,7 +372,9 @@ describe('rebuilding from the roster', () => {
 
   test('blocks the page while solving', async () => {
     let release: (value: any) => void = () => {};
-    mockProgram({ draft: [alice, bob], canonical: [alice] });
+    // Four people for two tables: the server's shortfall gate wants
+    // participants >= tables x 2, and the button now agrees with it.
+    mockProgram({ draft: [alice, bob, cara, dan], canonical: [alice, bob, cara] });
     const passthrough = mockFetch.getMockImplementation()!;
     mockFetch.mockImplementation((url: string, init?: RequestInit) => {
       if (String(url).includes('/api/roster/generate')) {
@@ -380,8 +396,10 @@ describe('rebuilding from the roster', () => {
 
   test('shows the refusal and leaves the roster alone', async () => {
     mockProgram({
-      draft: [alice, bob],
-      canonical: [alice],
+      // Four for two tables, so the button's own check passes and the refusal
+      // under test is the server's, not the page's.
+      draft: [alice, bob, cara, dan],
+      canonical: [alice, bob, cara],
       generate: { ok: false, status: 400, body: { detail: 'Add 2 more participants.' } },
     });
     renderPage();
@@ -408,8 +426,10 @@ describe('rebuilding from the roster', () => {
 
   test('stays on the page when nothing needed rebuilding', async () => {
     mockProgram({
-      draft: [alice, bob],
-      canonical: [alice],
+      // Four for two tables, so the button's own check passes and the refusal
+      // under test is the server's, not the page's.
+      draft: [alice, bob, cara, dan],
+      canonical: [alice, bob, cara],
       generate: { body: { assignment_set_id: 's1', rebuilt: false, message: 'Roster saved. No rebuild needed.' } },
     });
     renderPage();
@@ -426,7 +446,7 @@ describe('rebuilding from the roster', () => {
   // canonical roster to differ from — so gating the button on dirtiness alone
   // would hide it on exactly the program that needs it most.
   test('still offers generate on a brand-new program', async () => {
-    mockProgram({ draft: [alice, bob], canonical: null });
+    mockProgram({ draft: [alice, bob, cara, dan], canonical: null });
     renderPage();
 
     expect(await screen.findByRole('button', { name: /generate assignments/i })).toBeInTheDocument();

@@ -14,7 +14,6 @@ from api.services.session_completion_guards import refuse_if_any_session_complet
 from api.services.version_promotion import roster_change_reason
 from api.services.program_solve import (
     LABEL_GENERATED,
-    LABEL_REBUILT_WITH_ABSENCES,
     SolveFailed,
     extract_pairings_from_sessions,
     solve_program,
@@ -43,7 +42,7 @@ ASSIGNMENTS_MALFORMED = (
 
 # A version is the state after something happened, so every label is a completed
 # action in the past tense.
-# LABEL_GENERATED and LABEL_REBUILT_WITH_ABSENCES are imported from
+# LABEL_GENERATED is imported from
 # program_solve, which decides which of them a solve earned.
 LABEL_REBUILT = "Sessions rebuilt"
 LABEL_MANUAL_EDIT = "Manual edit"
@@ -373,8 +372,18 @@ def get_assignments(
         120, ge=30, le=240, description="Maximum solver time in seconds (30-240)"
     ),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+    completion: SessionCompletionStorage = Depends(get_session_completion_storage),
 ):
-    """Generate assignments for a program's current assignment set."""
+    """Generate assignments for a program's current assignment set.
+
+    Re-solves the whole program and saves a version, so it must refuse once any
+    Session is frozen - the same rule ``/regenerate`` already enforced. This
+    route had no such guard and no remaining caller after Item 6a removed the
+    two-call generate flow, which made it a way to rewrite a completed Session's
+    seating. Deleting it outright is tracked in BACKLOG.md.
+    """
+    refuse_if_any_session_complete(completion, program_id)
+
     set_id, assignment_set = _require_current_set(storage, program_id)
 
     try:

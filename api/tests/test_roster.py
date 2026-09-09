@@ -676,6 +676,71 @@ class TestRebuild:
         assert "Katherine" in [p["name"] for p in stored["participant_data"]]
         assert "Kathrine" not in [p["name"] for p in stored["participant_data"]]
 
+    def test_a_rename_reaches_every_version_not_just_the_head(
+        self,
+        client,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+        add_roster_to_firestore,
+    ):
+        """Promotion can put any version of the current set back at the head, so
+        a rename that only fixed the head would let undoing a shuffle resurrect
+        the old spelling - while the page reported Locked, because the roster
+        still matched participant_data."""
+        canonical = [
+            {
+                "name": "Kathrine",
+                "religion": "Other",
+                "gender": "Other",
+                "partner": None,
+                "is_facilitator": False,
+                "keep_together": False,
+            }
+        ]
+        set_id = add_assignment_set_to_firestore(
+            {"participant_data": canonical, "num_tables": 1, "num_sessions": 1}
+        )
+        for version_id in ("v1", "v2"):
+            add_version_to_firestore(
+                set_id,
+                version_id,
+                [
+                    {
+                        "session": 1,
+                        "tables": {"1": [{"name": "Kathrine", "partner": None}]},
+                    }
+                ],
+            )
+        add_roster_to_firestore(
+            [
+                {
+                    "id": "a",
+                    "name": "Katherine",
+                    "religion": "Other",
+                    "gender": "Other",
+                    "partner_id": None,
+                    "is_facilitator": False,
+                    "keep_together": False,
+                }
+            ]
+        )
+
+        response = client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 1, "num_sessions": 1},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["rebuilt"] is False
+
+        from api.services.assignment_set_storage import AssignmentSetStorage
+
+        storage = AssignmentSetStorage()
+        for version_id in ("v1", "v2"):
+            version = storage.get_version("test_org_id", set_id, version_id)
+            seated = version["assignments"][0]["tables"]["1"][0]["name"]
+            assert seated == "Katherine", f"{version_id} kept the old spelling"
+
     def test_absences_survive_a_rebuild(
         self,
         client,
