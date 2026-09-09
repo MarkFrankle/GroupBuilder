@@ -24,6 +24,9 @@ interface SessionCardProps {
   onMarkComplete?: () => void
   /** Supplied only for the latest completed session; reopening below it would leave a gap. */
   onReopen?: () => void
+  /** Pass-throughs to TableBlock. Task 5 wires these to page-level selection. */
+  selectedName?: string | null
+  onSelect?: (name: string) => void
 }
 
 /** Table numbers arrive as object keys, so they are strings. */
@@ -49,6 +52,8 @@ const SessionCard: React.FC<SessionCardProps> = ({
   onPrint,
   onMarkComplete,
   onReopen,
+  selectedName = null,
+  onSelect = () => {},
 }) => {
   // Expansion is a glance at the past, not a preference — it is not persisted.
   const [expanded, setExpanded] = useState(false)
@@ -141,7 +146,13 @@ const SessionCard: React.FC<SessionCardProps> = ({
 
       <div className="flex flex-col gap-4 p-4">
         {tableNumbers(assignment).map(n => (
-          <TableBlock key={n} tableNumber={n} participants={assignment.tables[n]} />
+          <TableBlock
+            key={n}
+            tableNumber={n}
+            participants={assignment.tables[n]}
+            selectedName={selectedName}
+            onSelect={onSelect}
+          />
         ))}
         {absent.length > 0 && (
           <div className="text-xs text-muted-foreground">
