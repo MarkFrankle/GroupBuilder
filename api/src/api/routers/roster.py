@@ -131,17 +131,25 @@ def _roster_to_participant_list(
 
     # Keep-apart is stored program-level as id pairs because it is one-to-many;
     # it is *frozen* per participant because participant_data is what travels -
-    # through the solver, through the rename propagation, and into the
-    # client-side flag detection. Deriving it symmetrically here on every freeze
-    # is what makes an asymmetric field unrepresentable.
+    # into the solver, and into Item 15's client-side flag detection. Deriving
+    # it symmetrically here on every freeze is what makes an asymmetric field
+    # unrepresentable. Item 6a's rename propagation must rewrite this field too:
+    # until apply_renames does, a rename leaves stale names inside a frozen
+    # keep_apart.
     #
     # A pair naming an id that no longer resolves is dropped, exactly as a
     # dangling partner_id resolves to None above. Deleting a participant
     # therefore retires their rules with no cascade and no cleanup pass.
+    #
+    # The stamp is keyed by name, so two people sharing a name both receive a
+    # rule aimed at either of them - the same collapse partner already suffers,
+    # and in the safe direction: an extra separation, never a missed one. The
+    # a_name == b_name test below is only the self-pair guard, not a
+    # duplicate-name guard.
     keep_apart_names: dict[str, list[str]] = {p["name"]: [] for p in result}
     for a_id, b_id in keep_apart_pairs or []:
         a_name, b_name = id_to_name.get(a_id), id_to_name.get(b_id)
-        if not a_name or not b_name or a_name == b_name:
+        if a_name is None or b_name is None or a_name == b_name:
             continue
         keep_apart_names[a_name].append(b_name)
         keep_apart_names[b_name].append(a_name)
