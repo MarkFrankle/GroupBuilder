@@ -56,4 +56,11 @@ describe('ChangesetPanel', () => {
     expect(screen.queryByText('Removed')).not.toBeInTheDocument();
     expect(screen.queryByText('Renamed')).not.toBeInTheDocument();
   });
+
+  test('shows a keep-apart rule as an old-to-new list of names', () => {
+    render(<ChangesetPanel changeset={changeset({
+      changed: [{ name: 'Ken Adler', field: 'kept apart', from: null, to: 'Bill Ross' }],
+    })} />);
+    expect(screen.getByText(/Ken Adler: kept apart none → Bill Ross/)).toBeInTheDocument();
+  });
 });

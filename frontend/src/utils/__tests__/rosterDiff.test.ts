@@ -232,4 +232,69 @@ describe('computeChangeset', () => {
     expect(result.needsRebuild).toBe(false);
   });
 
+  // `needsRebuild` must come from the pair comparison itself, not from the
+  // display listing; and `total` is what the discard confirmation counts.
+  it('counts a keep-apart change alongside another change', () => {
+    const result = computeChangeset(
+      [person('A'), person('B')],
+      [
+        person('A', { keep_apart: ['B'], religion: 'Jewish' }),
+        person('B', { keep_apart: ['A'] }),
+      ],
+      { tables: 2, sessions: 3 },
+      { tables: 2, sessions: 3 },
+    );
+
+    expect(result.needsRebuild).toBe(true);
+    // A's religion, plus a "kept apart" line for each of A and B.
+    expect(result.total).toBe(3);
+    expect(result.changed).toHaveLength(3);
+  });
+
+  // Removing someone while another person still names them is an ordinary
+  // coordinator action, and leaves one side of the pair with no entry at all.
+  it('reports a keep-apart pair whose other member was removed', () => {
+    const result = computeChangeset(
+      [person('A', { keep_apart: ['B'] }), person('B', { keep_apart: ['A'] })],
+      [person('A')],
+      { tables: 2, sessions: 3 },
+      { tables: 2, sessions: 3 },
+    );
+
+    expect(result.removed).toEqual(['B']);
+    expect(result.needsRebuild).toBe(true);
+    expect(result.changed).toContainEqual({
+      name: 'A',
+      field: 'kept apart',
+      from: 'B',
+      to: null,
+    });
+    // B is gone from the draft entirely, so its rule reads as emptied.
+    expect(result.changed).toContainEqual({
+      name: 'B',
+      field: 'kept apart',
+      from: 'A',
+      to: null,
+    });
+  });
+
+  it('lists several keep-apart names in a stable order', () => {
+    const result = computeChangeset(
+      [person('A'), person('B'), person('C')],
+      [
+        person('A', { keep_apart: ['C', 'B'] }),
+        person('B', { keep_apart: ['A'] }),
+        person('C', { keep_apart: ['A'] }),
+      ],
+      { tables: 2, sessions: 3 },
+      { tables: 2, sessions: 3 },
+    );
+
+    expect(result.changed).toContainEqual({
+      name: 'A',
+      field: 'kept apart',
+      from: null,
+      to: 'B, C',
+    });
+  });
 });
