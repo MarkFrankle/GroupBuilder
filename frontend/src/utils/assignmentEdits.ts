@@ -6,9 +6,14 @@
  * sessions exactly (Item 2a), so a gratuitous rewrite of an untouched session
  * would be refused as tampering.
  */
-import type { Assignment, Participant } from '@/types/assignments'
+import type { Assignment } from '@/types/assignments'
 
-/** Table numbers arrive as object keys, so they are strings. */
+/**
+ * Table numbers arrive as object keys, so they are strings.
+ *
+ * This is copy number two — `assignmentStats.ts` has the other. A third caller
+ * should lift it somewhere neutral rather than paste it again.
+ */
 function tableNumbers(assignment: Assignment): number[] {
   return Object.keys(assignment.tables)
     .map(Number)
@@ -36,6 +41,8 @@ export function tablesWithOpenSeat(assignment: Assignment): number[] {
  *
  * The seat becomes null rather than disappearing: the solver never runs without
  * an explicit user action, so the gap stays visible until someone shuffles.
+ * Exactly one seat empties, so a roster holding two people of the same name
+ * loses one seat rather than both.
  */
 export function markAbsent(
   assignments: Assignment[],
@@ -43,24 +50,24 @@ export function markAbsent(
   name: string
 ): Assignment[] {
   return replaceSession(assignments, sessionNumber, assignment => {
-    const removed: Participant | undefined = tableNumbers(assignment)
-      .flatMap(n => assignment.tables[n])
-      .find((seat): seat is Participant => !!seat && seat.name === name)
-
-    if (!removed) return assignment
-
-    const tables: Assignment['tables'] = {}
     for (const n of tableNumbers(assignment)) {
-      tables[n] = assignment.tables[n].map(seat =>
-        seat && seat.name === name ? null : seat
-      )
-    }
+      const seats = assignment.tables[n]
+      const index = seats.findIndex(seat => seat?.name === name)
+      if (index === -1) continue
 
-    return {
-      ...assignment,
-      tables,
-      absentParticipants: [...(assignment.absentParticipants ?? []), removed],
+      const person = seats[index]
+      if (!person) continue
+
+      const replaced = [...seats]
+      replaced[index] = null
+
+      return {
+        ...assignment,
+        tables: { ...assignment.tables, [n]: replaced },
+        absentParticipants: [...(assignment.absentParticipants ?? []), person],
+      }
     }
+    return assignment
   })
 }
 
@@ -82,7 +89,10 @@ export function markPresent(
     const person = absent.find(a => a.name === name)
     if (!person) return assignment
 
-    const seats = [...(assignment.tables[tableNumber] ?? [])]
+    const existing = assignment.tables[tableNumber]
+    if (!existing) return assignment
+
+    const seats = [...existing]
     const gap = seats.indexOf(null)
     if (gap === -1) {
       seats.push(person)

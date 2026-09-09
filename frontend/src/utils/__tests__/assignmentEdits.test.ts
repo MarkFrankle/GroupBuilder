@@ -1,6 +1,9 @@
 import { markAbsent, markPresent, tablesWithOpenSeat } from '../assignmentEdits'
 import type { Assignment, Participant } from '@/types/assignments'
 
+/** jsdom does not expose `structuredClone`, and these fixtures are plain JSON. */
+const deepCopy = (a: Assignment[]): Assignment[] => JSON.parse(JSON.stringify(a))
+
 const p = (name: string): Participant => ({
   name,
   religion: 'Christian',
@@ -26,17 +29,47 @@ describe('markAbsent', () => {
     expect(next[0].absentParticipants).toEqual([p('Cara')])
   })
 
-  it('changes no other session', () => {
+  it('empties exactly one seat when two people share a name', () => {
+    const twins: Assignment[] = [
+      { session: 1, tables: { 1: [p('Ann'), p('Ben')], 2: [p('Ann'), p('Dan')] } },
+    ]
+
+    const next = markAbsent(twins, 1, 'Ann')
+
+    expect(next[0].tables[1]).toEqual([null, p('Ben')])
+    expect(next[0].tables[2]).toEqual([p('Ann'), p('Dan')])
+    expect(next[0].absentParticipants).toEqual([p('Ann')])
+  })
+
+  it('returns other sessions by identity', () => {
     const before = program()
     const next = markAbsent(before, 1, 'Cara')
 
-    expect(next[1]).toEqual(before[1])
+    expect(next[1]).toBe(before[1])
   })
 
-  it('returns the array unchanged when the person is not seated there', () => {
+  it('leaves untouched tables in the edited session by identity', () => {
+    const before = program()
+    const next = markAbsent(before, 1, 'Cara')
+
+    expect(next[0].tables[1]).toBe(before[0].tables[1])
+  })
+
+  it('does not mutate the input', () => {
+    const before = program()
+    const snapshot = deepCopy(before)
+
+    markAbsent(before, 1, 'Cara')
+
+    expect(before).toEqual(snapshot)
+  })
+
+  it('leaves every session as it was when the person is not seated there', () => {
     const before = program()
 
-    expect(markAbsent(before, 1, 'Nobody')).toEqual(before)
+    const next = markAbsent(before, 1, 'Nobody')
+
+    expect(next.every((a, i) => a === before[i])).toBe(true)
   })
 })
 
@@ -48,6 +81,15 @@ describe('tablesWithOpenSeat', () => {
     }
 
     expect(tablesWithOpenSeat(withGaps)).toEqual([1, 3])
+  })
+
+  it('names nothing when every seat is filled', () => {
+    const full: Assignment = {
+      session: 1,
+      tables: { 1: [p('Ann'), p('Ben')], 2: [p('Cara')] },
+    }
+
+    expect(tablesWithOpenSeat(full)).toEqual([])
   })
 })
 
@@ -79,10 +121,35 @@ describe('markPresent', () => {
     expect(next[0].absentParticipants).toEqual([])
   })
 
-  it('changes no other session', () => {
+  it('leaves every session as it was when the person is not absent', () => {
+    const before = absent()
+
+    const next = markPresent(before, 1, 'Nobody', 2)
+
+    expect(next.every((a, i) => a === before[i])).toBe(true)
+  })
+
+  it('invents no table when the chosen number does not exist', () => {
+    const before = absent()
+
+    const next = markPresent(before, 1, 'Cara', 9)
+
+    expect(next.every((a, i) => a === before[i])).toBe(true)
+  })
+
+  it('returns other sessions by identity', () => {
     const before = absent()
     const next = markPresent(before, 1, 'Cara', 2)
 
-    expect(next[1]).toEqual(before[1])
+    expect(next[1]).toBe(before[1])
+  })
+
+  it('does not mutate the input', () => {
+    const before = absent()
+    const snapshot = deepCopy(before)
+
+    markPresent(before, 1, 'Cara', 2)
+
+    expect(before).toEqual(snapshot)
   })
 })
