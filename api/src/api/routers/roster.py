@@ -324,13 +324,17 @@ async def discard_roster_changes(
     program_id: str = Depends(validate_program_access),
     roster_service: RosterService = Depends(get_roster_service),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+    keep_apart: KeepApartStorage = Depends(get_keep_apart_storage),
 ):
     """Throw the draft away and rewrite the roster from the current sessions.
 
-    The rebuilt documents get fresh ids. That is safe: nothing outside the
-    roster grid holds a roster document id, and ``partner_id`` is resolved back
-    to a name every time the program is generated, so the only thing that has
-    to survive is who is partnered with whom - which is matched by name here.
+    The rebuilt documents get fresh ids, so everything stored *as* a roster
+    document id has to be carried across: ``partner_id`` on the document, and
+    the program-level ``keep_apart`` pairs. Both are resolved to names before
+    the delete and re-resolved to the new ids after the rewrite, because names
+    are what the canonical roster is matched on. A keep-apart pair naming
+    someone the canonical roster does not contain is dropped - discard restores
+    the frozen set, so a person absent from it is genuinely gone.
     """
     set_id = storage.get_current_set_id(program_id)
     if not set_id:
@@ -342,7 +346,15 @@ async def discard_roster_changes(
     assignment_set = storage.get_set(program_id, set_id) or {}
     canonical = assignment_set.get("participant_data") or []
 
-    for participant in roster_service.get_roster(program_id):
+    live_roster = roster_service.get_roster(program_id)
+    live_names = {p["id"]: p["name"] for p in live_roster}
+    keep_apart_names = [
+        (live_names[a_id], live_names[b_id])
+        for a_id, b_id in keep_apart.get_pairs(program_id)
+        if a_id in live_names and b_id in live_names
+    ]
+
+    for participant in live_roster:
         roster_service.delete_participant(program_id, participant["id"])
 
     new_ids = {p["name"]: str(uuid.uuid4()) for p in canonical}
@@ -360,6 +372,15 @@ async def discard_roster_changes(
                 "keep_together": p.get("keep_together", False),
             },
         )
+
+    keep_apart.replace_pairs(
+        program_id,
+        [
+            (new_ids[a_name], new_ids[b_name])
+            for a_name, b_name in keep_apart_names
+            if a_name in new_ids and b_name in new_ids
+        ],
+    )
 
     return {"status": "discarded", "count": len(canonical)}
 
@@ -500,6 +521,7 @@ async def delete_participant(
     participant_id: str,
     program_id: str = Depends(validate_program_access),
     roster_service: RosterService = Depends(get_roster_service),
+    keep_apart: KeepApartStorage = Depends(get_keep_apart_storage),
 ):
     participant = roster_service.get_participant(program_id, participant_id)
     if participant and participant.get("partner_id"):
@@ -511,4 +533,10 @@ async def delete_participant(
                 {**partner, "partner_id": None, "keep_together": False},
             )
     roster_service.delete_participant(program_id, participant_id)
+    # A rule about someone who is gone is not a rule. Left behind, the pair
+    # would also point at an id that can never resolve again.
+    pairs = keep_apart.get_pairs(program_id)
+    remaining = [p for p in pairs if participant_id not in p]
+    if len(remaining) != len(pairs):
+        keep_apart.replace_pairs(program_id, remaining)
     return {"status": "deleted"}

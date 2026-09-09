@@ -83,7 +83,7 @@ class TestKeepApartPairs:
             ["dana", "heather"],
         ]
 
-    def test_pair_survives_deleting_a_participant_and_stays_removable(self, roster):
+    def test_deleting_a_participant_prunes_their_pairs(self, roster):
         roster.post(
             "/api/roster/keep-apart?program_id=test_org_id",
             json={"a_id": "mel", "b_id": "dana"},
@@ -91,11 +91,14 @@ class TestKeepApartPairs:
         assert (
             roster.delete("/api/roster/dana?program_id=test_org_id").status_code == 200
         )
-        # The rule is not cleaned up - the freeze drops it instead - and DELETE
-        # skips validation precisely so a rule naming a deleted person can go.
-        assert roster.get("/api/roster/keep-apart?program_id=test_org_id").json()[
-            "pairs"
-        ] == [["dana", "mel"]]
+        # A rule about someone who is gone is not a rule, and the stored pair
+        # would otherwise name an id that can never resolve again.
+        assert (
+            roster.get("/api/roster/keep-apart?program_id=test_org_id").json()["pairs"]
+            == []
+        )
+        # DELETE on a rule still skips roster validation, so removing one that
+        # names a departed person is a plain no-op rather than a 400.
         removed = roster.delete(
             "/api/roster/keep-apart/dana/mel?program_id=test_org_id"
         )

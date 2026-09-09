@@ -79,6 +79,19 @@ class KeepApartStorage:
         remaining = [p for p in self.get_pairs(program_id) if p != key]
         return self._write(program_id, remaining)
 
+    def replace_pairs(
+        self, program_id: str, pairs: List[Tuple[str, str]]
+    ) -> List[Tuple[str, str]]:
+        """Overwrite the whole list in one write. Returns the new list.
+
+        For the two callers that rewrite the list wholesale rather than edit
+        one rule: discard, which remaps every pair onto freshly created roster
+        ids, and delete, which drops every pair naming the deleted person.
+        Both would otherwise be a read-and-write per pair through
+        ``remove_pair``/``add_pair``.
+        """
+        return self._write(program_id, pairs)
+
     def _write(
         self, program_id: str, pairs: List[Tuple[str, str]]
     ) -> List[Tuple[str, str]]:
