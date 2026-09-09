@@ -586,4 +586,67 @@ describe('AssignmentsPage', () => {
     expect(unlabelled).toHaveTextContent(/Feb 19/)
     expect(unlabelled).not.toHaveTextContent(/null/)
   })
+
+  describe('selection', () => {
+    /** Every chip bearing this person's name, one per session. */
+    const chips = (name: string) => screen.getAllByRole('button', { name })
+
+    async function selectAnn() {
+      const anns = await screen.findAllByRole('button', { name: 'Ann' })
+      fireEvent.click(anns[0])
+      return anns
+    }
+
+    it('highlights the clicked person across every session', async () => {
+      renderPage()
+      await selectAnn()
+
+      chips('Ann').forEach(chip => expect(chip).not.toHaveClass('opacity-50'))
+      chips('Ben').forEach(chip => expect(chip).toHaveClass('opacity-50'))
+      chips('Cara').forEach(chip => expect(chip).toHaveClass('opacity-50'))
+    })
+
+    it('clears the selection when the chip is clicked again', async () => {
+      renderPage()
+      const anns = await selectAnn()
+      fireEvent.click(anns[0])
+
+      // With nobody selected, nothing dims.
+      chips('Ben').forEach(chip => expect(chip).not.toHaveClass('opacity-50'))
+    })
+
+    it('clears the selection on Escape', async () => {
+      renderPage()
+      await selectAnn()
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+
+      chips('Ben').forEach(chip => expect(chip).not.toHaveClass('opacity-50'))
+    })
+
+    it('clears the selection when anything that is not a chip is clicked', async () => {
+      renderPage()
+      await selectAnn()
+
+      fireEvent.click(screen.getAllByText('Table 1')[0])
+
+      chips('Ben').forEach(chip => expect(chip).not.toHaveClass('opacity-50'))
+    })
+
+    it('announces the selection for a screen reader', async () => {
+      renderPage()
+      const anns = await selectAnn()
+
+      // The nudge is suppressed in beforeEach and no receipt has been raised,
+      // so NoticeStrip is absent and this is the only live region on the page.
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Ann selected \u2014 showing them across all sessions.'
+      )
+
+      fireEvent.click(anns[0])
+
+      // Empty rather than gone: a region that unmounts stops announcing.
+      expect(screen.getByRole('status')).toHaveTextContent('')
+    })
+  })
 })

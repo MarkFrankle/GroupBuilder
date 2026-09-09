@@ -173,6 +173,18 @@ const AssignmentsPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid, sorted.length])
 
+  // Three dismissals, deliberately over-provided: the chip again, any non-chip
+  // click, and Escape. A user who has just dimmed the whole page needs an
+  // obvious way back, and any one of these is the one someone will not try.
+  useEffect(() => {
+    if (selectedName === null) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedName(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [selectedName])
+
   const invalidateAll = () => {
     // A prefix, deliberately not resultsQueryKey: this must match every
     // results query for the program, versioned ones included.
@@ -500,7 +512,17 @@ const AssignmentsPage: React.FC = () => {
   )
 
   return (
-    <div className="flex flex-col pb-10">
+    <div className="flex flex-col pb-10" onClick={() => setSelectedName(null)}>
+      {/*
+        Selecting a person dims 100+ chips across every session, and that has no
+        non-visual equivalent — a chip cannot announce it, because a chip does
+        not know the others dimmed. It belongs to the page that owns the state.
+        Rendered empty rather than unmounted: a region that unmounts stops being
+        announced on the next selection in some screen readers.
+      */}
+      <div role="status" aria-live="polite" className="sr-only">
+        {selectedName ? `${selectedName} selected — showing them across all sessions.` : ''}
+      </div>
       <ProgramHeader
         programName={currentProgram?.name ?? 'Assignments'}
         facts={{
