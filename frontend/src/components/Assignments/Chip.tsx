@@ -46,10 +46,19 @@ const Chip: React.FC<ChipProps> = ({ participant, selectedName, onSelect }) => {
         event.stopPropagation()
         onSelect(participant.name)
       }}
-      className={`${shape} text-left transition-opacity ${dimmed ? 'opacity-30' : ''}`}
+      className={[
+        shape,
+        // `text-left` undoes the button element's centring.
+        'cursor-pointer text-left transition-opacity',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-1',
+        dimmed && 'opacity-50',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       style={{ backgroundColor: bg, color: fg }}
     >
       {participant.name}
+      {isFacilitator && <span className="sr-only"> · Facilitator</span>}
     </button>
   )
 }

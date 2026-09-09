@@ -26,10 +26,9 @@ describe('Chip', () => {
       />
     )
 
-    expect(screen.getByRole('button', { name: /Alice/ })).toHaveAttribute(
-      'title',
-      'Alice · Facilitator'
-    )
+    expect(
+      screen.getByRole('button', { name: 'Alice · Facilitator' })
+    ).toBeInTheDocument()
   })
 
   it('falls back to the Other palette for an unlisted religion', () => {
@@ -71,12 +70,16 @@ describe('Chip', () => {
   it('dims a chip that is not the selected person', () => {
     render(<Chip participant={alice} selectedName="Ben" onSelect={jest.fn()} />)
 
-    expect(screen.getByRole('button', { name: /Alice/ })).toHaveClass('opacity-30')
+    const chip = screen.getByRole('button', { name: /Alice/ })
+    expect(chip).toHaveClass('opacity-50')
+    expect(chip).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('leaves the selected person at full strength', () => {
     render(<Chip participant={alice} selectedName="Alice" onSelect={jest.fn()} />)
 
-    expect(screen.getByRole('button', { name: /Alice/ })).not.toHaveClass('opacity-30')
+    const chip = screen.getByRole('button', { name: /Alice/ })
+    expect(chip).not.toHaveClass('opacity-50')
+    expect(chip).toHaveAttribute('aria-pressed', 'true')
   })
 })
