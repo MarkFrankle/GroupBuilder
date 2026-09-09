@@ -4,7 +4,17 @@
  */
 import type { Assignment, Participant } from '@/types/assignments'
 
-function tableNumbers(assignment: Assignment): number[] {
+/**
+ * Table numbers arrive as object keys, so they are strings.
+ *
+ * Exported because this was pasted a third time (SessionCard) and three copies
+ * is worse than an imperfect home. A stats module owning a shape helper an
+ * edits module also needs is the wrong dependency direction in the abstract,
+ * but a neutral fourth module for six lines is the clever abstraction this
+ * repo warns about — and every caller already imports from here or from a
+ * module that does.
+ */
+export function tableNumbers(assignment: Assignment): number[] {
   return Object.keys(assignment.tables)
     .map(Number)
     .sort((a, b) => a - b)
@@ -25,6 +35,16 @@ function seatingByName(assignment: Assignment): Map<string, number> {
     })
   })
   return seating
+}
+
+/**
+ * "6 people", "1 person" — the population of one table, said once.
+ *
+ * The per-table stats line and the Mark present picker both state this, and
+ * strings that agree today drift silently.
+ */
+export function personCount(count: number): string {
+  return `${count} ${count === 1 ? 'person' : 'people'}`
 }
 
 /** How many seats a session actually fills — empty chairs are not people. */

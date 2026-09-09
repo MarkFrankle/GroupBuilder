@@ -6,19 +6,8 @@
  * sessions exactly (Item 2a), so a gratuitous rewrite of an untouched session
  * would be refused as tampering.
  */
+import { tableNumbers } from '@/utils/assignmentStats'
 import type { Assignment } from '@/types/assignments'
-
-/**
- * Table numbers arrive as object keys, so they are strings.
- *
- * This is copy number two — `assignmentStats.ts` has the other. A third caller
- * should lift it somewhere neutral rather than paste it again.
- */
-function tableNumbers(assignment: Assignment): number[] {
-  return Object.keys(assignment.tables)
-    .map(Number)
-    .sort((a, b) => a - b)
-}
 
 /** Rewrite one session, leaving every other entry untouched by identity. */
 function replaceSession(

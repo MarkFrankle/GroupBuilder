@@ -20,6 +20,7 @@ import {
 import Chip from './Chip'
 import TableBlock from './TableBlock'
 import { tablesWithOpenSeat } from '@/utils/assignmentEdits'
+import { personCount, tableNumbers } from '@/utils/assignmentStats'
 import type { Assignment, Participant } from '@/types/assignments'
 
 interface SessionCardProps {
@@ -40,13 +41,6 @@ interface SessionCardProps {
   /** Absent where acting is not allowed. See TableBlock. */
   onMarkAbsent?: (name: string) => void
   onMarkPresent?: (name: string, tableNumber: number) => void
-}
-
-/** Table numbers arrive as object keys, so they are strings. */
-function tableNumbers(assignment: Assignment): number[] {
-  return Object.keys(assignment.tables)
-    .map(Number)
-    .sort((a, b) => a - b)
 }
 
 function seatedCount(assignment: Assignment): number {
@@ -89,7 +83,12 @@ const SessionCard: React.FC<SessionCardProps> = ({
 
   // The gap the absence left is the anchor for the correction case, and makes
   // the common case a confirming click. When a shuffle since has closed every
-  // gap, the annotation and the checkmark simply do not render.
+  // gap, the annotation and the suggestion simply do not render.
+  //
+  // Only the lowest-numbered gap is suggested, deliberately: with two absentees
+  // we cannot know whose gap is whose, and annotating one as theirs would
+  // present a guess as a fact. This is not an off-by-default bug — do not
+  // "fix" it by matching gaps to absentees.
   const openSeatTables = tablesWithOpenSeat(assignment)
 
   const reopenButton = showReopen && (
@@ -207,17 +206,36 @@ const SessionCard: React.FC<SessionCardProps> = ({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
                   <DropdownMenuLabel>{`Seat ${absentSelected} at…`}</DropdownMenuLabel>
+                  {/*
+                    If this picker grows again, the boundary to extract is
+                    `<TablePicker assignment name onPick />` — the menu content
+                    is domain logic wearing JSX. Lifting the whole absent row
+                    instead would relocate six props and separate the picker
+                    from the `actionable` definition that gates it.
+                  */}
                   {tableNumbers(assignment).map(n => {
                     const seated = assignment.tables[n].filter(Boolean).length
                     const hasGap = openSeatTables.includes(n)
+                    const label =
+                      `Table ${n} · ${personCount(seated)}` + (hasGap ? ' · open seat' : '')
                     return (
                       <DropdownMenuItem
                         key={n}
                         onSelect={() => onMarkPresent(absentSelected, n)}
                       >
-                        {`Table ${n} · ${seated} ${seated === 1 ? 'person' : 'people'}`}
-                        {hasGap ? ' · open seat' : ''}
-                        {n === openSeatTables[0] ? ' ✓' : ''}
+                        {label}
+                        {/*
+                          A default, not persistent state — so not a checkbox
+                          item, which would announce "not checked" on every
+                          other row and imply toggling. The glyph alone is read
+                          as "check mark" or dropped, so the word carries it.
+                        */}
+                        {n === openSeatTables[0] && (
+                          <>
+                            <span aria-hidden="true"> ✓</span>
+                            <span className="sr-only"> (suggested)</span>
+                          </>
+                        )}
                       </DropdownMenuItem>
                     )
                   })}

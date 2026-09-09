@@ -143,6 +143,10 @@ describe('SessionCard — the absent row', () => {
    * Radix menus do not open on a synthesized click — keyboard activation is
    * what works, as in KeepApartSection.test.tsx.
    */
+  // The trigger is queried by exact name, deliberately: naming the default
+  // table in it ("Mark present at Table 2") invites pressing it unread, which
+  // is how a false attendance record gets written. Loosening this to
+  // /mark present/i would delete that protection silently.
   const openPicker = () => {
     fireEvent.keyDown(screen.getByRole('button', { name: 'Mark present' }), { key: 'Enter' })
   }
@@ -199,6 +203,26 @@ describe('SessionCard — the absent row', () => {
     ).toBeInTheDocument()
   })
 
+  it('says "suggested" in words, not only as a glyph', () => {
+    render(
+      <SessionCard
+        assignment={withAbsence}
+        selectedName="Cara"
+        onSelect={jest.fn()}
+        onMarkPresent={jest.fn()}
+      />
+    )
+
+    openPicker()
+
+    // A screen reader either reads the check mark as noise or drops it, so the
+    // only cue marking the pre-picked row has to be a word.
+    expect(screen.getByRole('menuitem', { name: /open seat \(suggested\)/ })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /Table 1/ }).textContent).not.toMatch(
+      /suggested/
+    )
+  })
+
   it('reports the table the user chose', () => {
     const onMarkPresent = jest.fn()
     render(
@@ -242,19 +266,46 @@ describe('SessionCard — the absent row', () => {
   })
 
   it('suppresses Mark present on a completed session', () => {
+    const onSelect = jest.fn()
     render(
       <SessionCard
         assignment={withAbsence}
         completed
         selectedName="Cara"
-        onSelect={jest.fn()}
+        onSelect={onSelect}
         onMarkPresent={jest.fn()}
       />
     )
 
     fireEvent.click(screen.getByRole('button', { name: /expand session 3/i }))
 
-    expect(screen.getByRole('button', { name: 'Cara' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Mark present' })).not.toBeInTheDocument()
+
+    // Looking is free even here: the chip still selects, only acting is gated.
+    fireEvent.click(screen.getByRole('button', { name: 'Cara' }))
+    expect(onSelect).toHaveBeenCalledWith('Cara')
+  })
+
+  it('suppresses Mark present while viewing an older version', () => {
+    const { rerender } = render(
+      <SessionCard
+        assignment={withAbsence}
+        selectedName="Cara"
+        onSelect={jest.fn()}
+        onMarkPresent={jest.fn()}
+      />
+    )
+    expect(screen.getByRole('button', { name: 'Mark present' })).toBeInTheDocument()
+
+    rerender(
+      <SessionCard
+        assignment={withAbsence}
+        readOnly
+        selectedName="Cara"
+        onSelect={jest.fn()}
+        onMarkPresent={jest.fn()}
+      />
+    )
     expect(screen.queryByRole('button', { name: 'Mark present' })).not.toBeInTheDocument()
   })
 })

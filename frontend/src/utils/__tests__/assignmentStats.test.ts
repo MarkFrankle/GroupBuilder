@@ -1,4 +1,5 @@
 import {
+  personCount,
   shuffleReceipt,
   uniqueTablematesAverage,
   linkedPairCount,
@@ -104,5 +105,13 @@ describe('seatedCount', () => {
     } as any
 
     expect(seatedCount(assignment)).toBe(2)
+  })
+})
+
+describe('personCount', () => {
+  it('says person for one and people for any other count', () => {
+    expect(personCount(1)).toBe('1 person')
+    expect(personCount(2)).toBe('2 people')
+    expect(personCount(0)).toBe('0 people')
   })
 })

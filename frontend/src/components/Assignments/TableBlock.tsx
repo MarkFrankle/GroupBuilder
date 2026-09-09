@@ -2,6 +2,7 @@ import React from 'react'
 import { Button } from '@/components/ui/button'
 import { UserMinus } from 'lucide-react'
 import Chip from './Chip'
+import { personCount } from '@/utils/assignmentStats'
 import type { Participant } from '@/types/assignments'
 
 interface TableBlockProps {
@@ -23,7 +24,7 @@ function tableStats(people: Participant[]): string {
   const females = people.filter(p => p.gender?.[0]?.toUpperCase() === 'F').length
   const religions = new Set(people.map(p => p.religion)).size
   return (
-    `${people.length} ${people.length === 1 ? 'person' : 'people'} · ` +
+    `${personCount(people.length)} · ` +
     `${females}F/${people.length - females}M · ` +
     `${religions} ${religions === 1 ? 'religion' : 'religions'}`
   )
