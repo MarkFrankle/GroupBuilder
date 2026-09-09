@@ -20,14 +20,14 @@ const assignment: Assignment = {
 
 describe('SessionCard — a live session', () => {
   it('renders one table block per table', () => {
-    render(<SessionCard assignment={assignment} />)
+    render(<SessionCard assignment={assignment} selectedName={null} onSelect={jest.fn()} />)
 
     expect(screen.getByText('Table 1')).toBeInTheDocument()
     expect(screen.getByText('Table 2')).toBeInTheDocument()
   })
 
   it('offers Shuffle, Print and Mark complete', () => {
-    render(<SessionCard assignment={assignment} />)
+    render(<SessionCard assignment={assignment} selectedName={null} onSelect={jest.fn()} />)
 
     expect(screen.getByRole('button', { name: /shuffle/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /print/i })).toBeInTheDocument()
@@ -43,6 +43,8 @@ describe('SessionCard — a live session', () => {
             { name: 'Ken Adler', religion: 'Jewish', gender: 'Male', partner: null },
           ],
         }}
+        selectedName={null}
+        onSelect={jest.fn()}
       />
     )
 
@@ -50,13 +52,19 @@ describe('SessionCard — a live session', () => {
   })
 
   it('disables Shuffle while a shuffle is running', () => {
-    render(<SessionCard assignment={assignment} isShuffling />)
+    render(<SessionCard assignment={assignment} isShuffling selectedName={null} onSelect={jest.fn()} />)
 
     expect(screen.getByRole('button', { name: /shuffling/i })).toBeDisabled()
   })
 
   it('hides the mutating actions when read-only', () => {
-    render(<SessionCard assignment={assignment} readOnly onReopen={jest.fn()} />)
+    render(<SessionCard
+        assignment={assignment}
+        readOnly
+        onReopen={jest.fn()}
+        selectedName={null}
+        onSelect={jest.fn()}
+      />)
 
     expect(screen.getByRole('button', { name: /print/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /shuffle/i })).not.toBeInTheDocument()
@@ -67,7 +75,7 @@ describe('SessionCard — a live session', () => {
 
 describe('SessionCard — a completed session', () => {
   it('renders as one row', () => {
-    render(<SessionCard assignment={assignment} completed />)
+    render(<SessionCard assignment={assignment} completed selectedName={null} onSelect={jest.fn()} />)
 
     expect(screen.getByText(/Session 1/)).toBeInTheDocument()
     expect(screen.getByText(/completed/)).toBeInTheDocument()
@@ -76,7 +84,7 @@ describe('SessionCard — a completed session', () => {
   })
 
   it('expands to the full session on the chevron', async () => {
-    render(<SessionCard assignment={assignment} completed />)
+    render(<SessionCard assignment={assignment} completed selectedName={null} onSelect={jest.fn()} />)
 
     await userEvent.click(screen.getByRole('button', { name: /expand session 1/i }))
 
@@ -88,11 +96,17 @@ describe('SessionCard — a completed session', () => {
 
   it('offers Reopen on the latest completed session only', () => {
     const { rerender } = render(
-      <SessionCard assignment={assignment} completed onReopen={jest.fn()} />
+      <SessionCard
+        assignment={assignment}
+        completed
+        onReopen={jest.fn()}
+        selectedName={null}
+        onSelect={jest.fn()}
+      />
     )
     expect(screen.getByRole('button', { name: /reopen/i })).toBeInTheDocument()
 
-    rerender(<SessionCard assignment={assignment} completed />)
+    rerender(<SessionCard assignment={assignment} completed selectedName={null} onSelect={jest.fn()} />)
     expect(screen.queryByRole('button', { name: /reopen/i })).not.toBeInTheDocument()
   })
 })

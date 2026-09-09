@@ -25,8 +25,8 @@ interface SessionCardProps {
   /** Supplied only for the latest completed session; reopening below it would leave a gap. */
   onReopen?: () => void
   /** Pass-throughs to TableBlock. */
-  selectedName?: string | null
-  onSelect?: (name: string) => void
+  selectedName: string | null
+  onSelect: (name: string) => void
 }
 
 /** Table numbers arrive as object keys, so they are strings. */
@@ -52,10 +52,8 @@ const SessionCard: React.FC<SessionCardProps> = ({
   onPrint,
   onMarkComplete,
   onReopen,
-  selectedName = null,
-  // Temporary no-op default; chips depress and do nothing until the page owns
-  // selection.
-  onSelect = () => {},
+  selectedName,
+  onSelect,
 }) => {
   // Expansion is a glance at the past, not a preference — it is not persisted.
   const [expanded, setExpanded] = useState(false)

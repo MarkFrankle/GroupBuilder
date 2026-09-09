@@ -99,6 +99,12 @@ const AssignmentsPage: React.FC = () => {
   const [viewing, setViewing] = useState<ResultVersion | null>(null)
   const readOnly = viewing !== null
 
+  // Selection is cross-session by design — that is the trust demo, watching one
+  // person move every week — so it lives here rather than in a session card.
+  const [selectedName, setSelectedName] = useState<string | null>(null)
+  const toggleSelected = (name: string) =>
+    setSelectedName(current => (current === name ? null : name))
+
   const { data: metadata } = useAssignmentSetMetadata(programId)
   const { data: fetchedAssignments, isLoading } = useAssignmentResults(
     programId,
@@ -519,6 +525,8 @@ const AssignmentsPage: React.FC = () => {
               assignment={assignment}
               readOnly={readOnly}
               isShuffling={shufflingSession === assignment.session}
+              selectedName={selectedName}
+              onSelect={toggleSelected}
               onShuffle={() => shuffleMutation.mutate(assignment.session)}
               onPrint={() => handlePrintSession(assignment.session)}
               onMarkComplete={() =>
@@ -550,6 +558,8 @@ const AssignmentsPage: React.FC = () => {
                 assignment={assignment}
                 completed
                 readOnly={readOnly}
+                selectedName={selectedName}
+                onSelect={toggleSelected}
                 onPrint={() => handlePrintSession(assignment.session)}
                 onReopen={
                   assignment.session === completedThrough
