@@ -48,6 +48,12 @@
   `getByRole('status')` cannot find a bare `aria-live` div — add an explicit `role="status"` if you
   want to query the live region by role. Note `NoticeStrip` also renders `role="status"`, so a page
   can have two.
+- **A Radix trigger's click bubbles.** Radix opens a `DropdownMenu` on *pointerdown* and
+  does not stop the subsequent `click`, so a trigger inside a container with an `onClick`
+  fires that container's handler too. Verified on `AssignmentsPage`: a mouse-open of the
+  History menu clears `selectedName` via the page's click-outside dismissal; a
+  keyboard-open (`keyDown` Enter) does not. Any trigger whose own rendering depends on that
+  state needs `onPointerDown`/`onClick` `stopPropagation`.
 - **Anything stored as a roster document id must survive `POST /roster/discard`.** Discard
   deletes every roster document and rewrites it with fresh uuids, so ids are not durable.
   `partner_id` and the program-level `keep_apart` pairs are both resolved to names before the
