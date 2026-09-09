@@ -109,18 +109,30 @@ redesign.
    only ever appears as good news is decoration.
 
 4. **Per-session actions live on the session; per-program actions live on Setup.**
-   Session-scoped: mark absent, shuffle, drag-to-move, print, mark complete.
+   Session-scoped: mark absent, mark present, shuffle, print, mark complete.
    Program-scoped: participants, linked partners, keep-apart, facilitator status, table and
    session counts — all behind the Setup lock.
 
-5. **Every change creates a version.** Versions are the universal safety net, which is what
-   makes silent overwrites (a shuffle discarding manual swaps) tolerable.
+5. **Shuffle is the only editor of seating.** There is no way to move a specific person to a
+   specific table. Precise editing shipped once — click-person, click-person to swap — and
+   users rejected it, so the redesign does not rebuild it as a drag. Every motive for a manual
+   move has a better home: "these two shouldn't sit together" is a keep-apart rule, "these two
+   should" is a linked pair, "she isn't coming" is mark absent, and "make it look different"
+   is shuffle. What remains — a one-off fact true for one night — is served by shuffling until
+   happy, which takes seconds. Added 2026-09-09.
 
-6. **Shuffle is scoped to one session.** It does not touch other sessions. Because the solver
+   The single exception is **mark present**, which asks which table. It can only place someone
+   already absent, so it cannot become a general move: the general move needs a source to pick
+   up, and this gesture has none.
+
+6. **Every change creates a version.** Versions are the universal safety net, which is what
+   makes silent overwrites (a shuffle discarding an absence-driven edit) tolerable.
+
+7. **Shuffle is scoped to one session.** It does not touch other sessions. Because the solver
    is aware of the whole set, re-solving one session against the real others is at worst
    quality-neutral — so predictability costs nothing.
 
-7. **Print output is settled.** Roster and seating printing have strong user feedback. Do not
+8. **Print output is settled.** Roster and seating printing have strong user feedback. Do not
    redesign them.
 
    This covers what comes out of the printer. The **pre-print notices are in scope**: printing
@@ -136,6 +148,7 @@ redesign.
 | `/groups` — list of past generations | **Deleted** | Users treated it as an escape hatch instead of fixing the current plan |
 | Full regeneration | **Deleted as a user action** | Shuffle covers wanting different results; Setup changes drive real rebuilds. Nothing was left for it to do |
 | Edit mode on assignments | **Deleted** | Fiddling is one poke, not a session with a beginning and end |
+| Precise seating edits — drag-to-move, click-to-swap | **Deleted 2026-09-09** | The click-to-swap version shipped and nobody understood it; the gesture was not the problem. Keep-apart rules and shuffle cover the real motives, and a rule outlives a move because a shuffle wipes a manual swap |
 | An "unseated" participant state | **Rejected** | "Absent" would be a lie about someone who is coming, and printing it embarrasses the coordinator in the room |
 | Creating keep-apart from the seating view | **Rejected** | It is a program-level change, and click is already single-select highlight — there is no gesture for selecting two people |
 | Auto-rebalancing after an absence | **Rejected** | Surprise motion an hour before an event is scarier than an unbalanced table |
