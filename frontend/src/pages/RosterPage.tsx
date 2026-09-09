@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RosterGrid } from '@/components/RosterGrid/RosterGrid';
+import { PopulationStats } from '@/components/Roster/PopulationStats';
+import { ChangesetPanel } from '@/components/Roster/ChangesetPanel';
 import { RosterParticipant } from '@/types/roster';
 import {
   upsertParticipant, deleteParticipant as apiDeleteParticipant,
@@ -365,6 +367,8 @@ export function RosterPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+          <PopulationStats participants={participants} />
+
           <RosterGrid
             participants={participants}
             onUpdate={handleUpdate}
@@ -373,6 +377,8 @@ export function RosterPage() {
             onKeepTogetherToggle={handleKeepTogetherToggle}
             readOnly={locked}
           />
+
+          {changeset.isDirty && <ChangesetPanel changeset={changeset} />}
 
           {currentSet ? (
             <Tabs defaultValue="update">
