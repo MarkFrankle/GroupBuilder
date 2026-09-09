@@ -825,6 +825,13 @@ async def save_edited_assignments(
     assignments = body.get("assignments")
     based_on_version = body.get("based_on_version")
 
+    # Item 7's rule — the caller that knows what happened writes the label —
+    # applied to a caller Item 7 could not yet see. A blank or non-string label
+    # falls back rather than putting an empty row in History.
+    label = body.get("label")
+    if not isinstance(label, str) or not label.strip():
+        label = LABEL_MANUAL_EDIT
+
     if not assignments:
         raise HTTPException(status_code=400, detail="assignments is required")
 
@@ -842,7 +849,7 @@ async def save_edited_assignments(
         metadata = {
             "source": "manual_edit",
             "based_on": based_on_version,
-            "label": LABEL_MANUAL_EDIT,
+            "label": label,
         }
 
         storage.save_version(

@@ -514,6 +514,56 @@ class TestSaveEditedAssignments:
 
         assert response.status_code == 400
 
+    def test_save_honours_a_supplied_label(
+        self,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+    ):
+        """History must be able to say what happened, not just that something did."""
+        add_assignment_set_to_firestore(sample_set_data)
+
+        response = client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json={
+                "assignments": sample_assignments_result["assignments"],
+                "label": "Kathy Veit marked absent from Session 1",
+            },
+        )
+
+        assert response.status_code == 200
+
+        versions = client.get(
+            f"/api/assignments/results/versions?program_id={PROGRAM}"
+        ).json()["versions"]
+        assert versions[0]["label"] == "Kathy Veit marked absent from Session 1"
+
+    def test_save_falls_back_to_the_manual_edit_label(
+        self,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+    ):
+        """A blank label is no label; History says Manual edit rather than nothing."""
+        add_assignment_set_to_firestore(sample_set_data)
+
+        response = client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json={
+                "assignments": sample_assignments_result["assignments"],
+                "label": "   ",
+            },
+        )
+
+        assert response.status_code == 200
+
+        versions = client.get(
+            f"/api/assignments/results/versions?program_id={PROGRAM}"
+        ).json()["versions"]
+        assert versions[0]["label"] == "Manual edit"
+
 
 class TestListAssignmentSets:
     """The Previous Groups shim is gone; the route must 404."""
