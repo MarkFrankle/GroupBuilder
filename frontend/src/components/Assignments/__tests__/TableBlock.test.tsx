@@ -126,4 +126,32 @@ describe('TableBlock', () => {
 
     expect(onMarkAbsent).toHaveBeenCalledWith('Ben')
   })
+
+  // Tests 3-5 above each pass vacuously on their own — deleting the button
+  // entirely would satisfy all three. This one holds the positive and negative
+  // assertions a single variable apart, so the suppression cannot pass for the
+  // wrong reason.
+  it('offers the button only in the table where the selected person sits', () => {
+    const { rerender } = render(
+      <TableBlock
+        tableNumber={1}
+        participants={people}
+        selectedName="Ben"
+        onSelect={jest.fn()}
+        onMarkAbsent={jest.fn()}
+      />
+    )
+    expect(screen.getByRole('button', { name: 'Mark Ben absent' })).toBeInTheDocument()
+
+    rerender(
+      <TableBlock
+        tableNumber={1}
+        participants={[people[0]]}
+        selectedName="Ben"
+        onSelect={jest.fn()}
+        onMarkAbsent={jest.fn()}
+      />
+    )
+    expect(screen.queryByRole('button', { name: /Mark .* absent/ })).not.toBeInTheDocument()
+  })
 })
