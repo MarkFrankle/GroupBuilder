@@ -177,7 +177,7 @@ async def generate_from_roster(
             and current_set.get("num_sessions") == data.num_sessions
         )
         diff = diff_rosters(
-            canonical=current_set.get("participant_data", []), draft=participant_list
+            canonical=current_set.get("participant_data") or [], draft=participant_list
         )
         if shape_unchanged and diff.renames and not diff.needs_rebuild:
             versions = storage.list_versions(program_id, current_set_id)
@@ -185,8 +185,8 @@ async def generate_from_roster(
                 head_id = versions[0]["version_id"]
                 head = storage.get_version(program_id, current_set_id, head_id) or {}
                 renamed_assignments, renamed_participants = apply_renames(
-                    head.get("assignments", []),
-                    current_set.get("participant_data", []),
+                    head.get("assignments") or [],
+                    current_set.get("participant_data") or [],
                     diff.renames,
                 )
                 # The head version is overwritten rather than replaced by a new
@@ -197,7 +197,7 @@ async def generate_from_roster(
                 )
             else:
                 _, renamed_participants = apply_renames(
-                    [], current_set.get("participant_data", []), diff.renames
+                    [], current_set.get("participant_data") or [], diff.renames
                 )
             storage.update_participant_data(
                 program_id, current_set_id, renamed_participants
@@ -232,6 +232,11 @@ async def generate_from_roster(
 
     # Commit: mint the set and write its first version together.
     try:
+        # The program is repointed last. Creating the set and writing its first
+        # version are two writes, and a program pointed at a set whose version
+        # never arrived is the empty-set bug this endpoint exists to close -
+        # narrower than before, but the same failure. Until the pointer moves,
+        # the half-built set is unreachable and the old plan is still current.
         set_id = storage.create_set(
             program_id=program_id,
             user_id=user.user_id,
@@ -239,6 +244,7 @@ async def generate_from_roster(
             filename="roster",
             num_tables=data.num_tables,
             num_sessions=data.num_sessions,
+            make_current=False,
         )
         storage.save_version(
             program_id=program_id,
@@ -247,6 +253,7 @@ async def generate_from_roster(
             assignments=assignments,
             metadata=metadata,
         )
+        storage.set_current_set_id(program_id, set_id)
     except Exception as e:
         logger.error(f"Failed to save the rebuilt program: {e}", exc_info=True)
         raise HTTPException(

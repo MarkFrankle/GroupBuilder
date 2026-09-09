@@ -46,8 +46,15 @@ class AssignmentSetStorage:
         filename: str,
         num_tables: int,
         num_sessions: int,
+        make_current: bool = True,
     ) -> str:
-        """Mint a new assignment set and point the program at it.
+        """Mint a new assignment set, and by default point the program at it.
+
+        Pass ``make_current=False`` to create the set without repointing, then
+        call :meth:`set_current_set_id` once its first version is safely
+        written. The program pointer is what every read resolves through, so
+        moving it before the version exists would publish an empty plan - the
+        failure this ordering exists to prevent.
 
         Returns the new set id.
         """
@@ -65,11 +72,16 @@ class AssignmentSetStorage:
             }
         )
 
+        if make_current:
+            self.set_current_set_id(program_id, set_id)
+
+        return set_id
+
+    def set_current_set_id(self, program_id: str, set_id: str) -> None:
+        """Point the program at one of its assignment sets."""
         self._program_ref(program_id).set(
             {"current_assignment_set_id": set_id}, merge=True
         )
-
-        return set_id
 
     def get_current_set_id(self, program_id: str) -> Optional[str]:
         """Return the program's current assignment set id, or None."""

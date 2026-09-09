@@ -542,6 +542,52 @@ class TestRebuild:
         assert response.json()["detail"] == NO_SOLUTION
         assert AssignmentSetStorage().get_current_set_id("test_org_id") == original
 
+    def test_a_failed_version_write_leaves_the_old_set_in_place(
+        self,
+        client,
+        add_assignment_set_to_firestore,
+        add_roster_to_firestore,
+        monkeypatch,
+    ):
+        """The narrower half of the same bug: the solve succeeded, the set was
+        created, and then the version write failed. The program must still point
+        at the old set, because a program pointed at a versionless set shows an
+        empty plan."""
+        from api.services.assignment_set_storage import AssignmentSetStorage
+
+        original_set_id = add_assignment_set_to_firestore(
+            {"participant_data": [], "num_tables": 2, "num_sessions": 1}
+        )
+        add_roster_to_firestore(
+            [
+                {
+                    "id": f"p{i}",
+                    "name": f"P{i}",
+                    "religion": "Other",
+                    "gender": "Other",
+                    "partner_id": None,
+                    "is_facilitator": False,
+                    "keep_together": False,
+                }
+                for i in range(4)
+            ]
+        )
+
+        def _boom(*args, **kwargs):
+            raise RuntimeError("firestore is having a day")
+
+        monkeypatch.setattr(AssignmentSetStorage, "save_version", _boom)
+
+        response = client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 2, "num_sessions": 1},
+        )
+
+        assert response.status_code == 500
+        assert (
+            AssignmentSetStorage().get_current_set_id("test_org_id") == original_set_id
+        )
+
     def test_a_successful_rebuild_mints_a_set_with_its_first_version(
         self, client, add_roster_to_firestore
     ):
