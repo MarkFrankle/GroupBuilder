@@ -44,6 +44,10 @@
   `<DropdownMenuLabel>Seat {name} at…</DropdownMenuLabel>` renders three text nodes, so
   `getByText('Seat Cara at…')` fails with "the text is broken up by multiple elements". Use a single
   template literal in the component rather than weakening the test to a function matcher.
+- **`aria-live="polite"` alone is not `role="status"`.** Only `<output>` implies that role, so
+  `getByRole('status')` cannot find a bare `aria-live` div — add an explicit `role="status"` if you
+  want to query the live region by role. Note `NoticeStrip` also renders `role="status"`, so a page
+  can have two.
 - **Anything stored as a roster document id must survive `POST /roster/discard`.** Discard
   deletes every roster document and rewrites it with fresh uuids, so ids are not durable.
   `partner_id` and the program-level `keep_apart` pairs are both resolved to names before the
