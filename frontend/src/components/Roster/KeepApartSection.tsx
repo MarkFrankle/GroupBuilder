@@ -21,12 +21,26 @@ interface KeepApartSectionProps {
   readOnly: boolean;
 }
 
+/** The half-written pair. There is only ever one: a second row could commit
+ * the same pair as the first, and nobody has asked to write two rules at once. */
 interface Draft {
-  key: number;
   a: string | null;
   b: string | null;
   error: string | null;
+  /** An add is in flight. Both selects are inert, so one pick cannot be
+   * overtaken by the next. */
+  pending: boolean;
 }
+
+const EMPTY_DRAFT: Draft = { a: null, b: null, error: null, pending: false };
+
+const ERROR_ID = 'keep-apart-error';
+const HEADING_ID = 'keep-apart-heading';
+
+/** Someone was taken off the roster without their rule going with them. The
+ * server prunes on delete, so this should not happen — but naming the gap
+ * keeps the rule visible and removable instead of silently dropping it. */
+const MISSING = 'someone no longer on the roster';
 
 /**
  * The people who must never share a table.
@@ -39,7 +53,10 @@ interface Draft {
 export function KeepApartSection({
   participants, pairs, onAdd, onRemove, readOnly,
 }: KeepApartSectionProps) {
-  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [draft, setDraft] = useState<Draft | null>(null);
+
+  // Alphabetical, matching the partner select on the same page.
+  const people = [...participants].sort((a, b) => a.name.localeCompare(b.name));
 
   const nameOf = (id: string) => participants.find(p => p.id === id)?.name;
 
@@ -47,47 +64,62 @@ export function KeepApartSection({
     pairs.filter(([a, b]) => a === id || b === id).map(([a, b]) => (a === id ? b : a));
 
   // A duplicate pair and a self-pair are unreachable rather than explained.
+  // Applied to both selects, so the order they are filled in does not matter.
   const choicesExcluding = (otherId: string | null) => {
-    if (!otherId) return participants;
+    if (!otherId) return people;
     const taken = new Set([otherId, ...partnersOf(otherId)]);
-    return participants.filter(p => !taken.has(p.id));
+    return people.filter(p => !taken.has(p.id));
   };
 
-  const updateDraft = (key: number, changes: Partial<Draft>) =>
-    setDrafts(prev => prev.map(d => (d.key === key ? { ...d, ...changes } : d)));
-
-  const choose = async (draft: Draft, side: 'a' | 'b', id: string) => {
-    const next = { ...draft, [side]: id, error: null };
-    updateDraft(draft.key, { [side]: id, error: null });
-    if (!next.a || !next.b) return;
+  const choose = async (side: 'a' | 'b', id: string) => {
+    const next: Draft = { ...(draft ?? EMPTY_DRAFT), [side]: id, error: null };
+    if (!next.a || !next.b) {
+      setDraft(next);
+      return;
+    }
+    setDraft({ ...next, pending: true });
     try {
       await onAdd(next.a, next.b);
-      setDrafts(prev => prev.filter(d => d.key !== draft.key));
+      setDraft(null);
     } catch (err) {
       // The refusal wording is the server's; the row stays so it can be fixed.
-      updateDraft(draft.key, { error: (err as Error).message });
+      setDraft({ ...next, pending: false, error: (err as Error).message });
     }
   };
 
-  // Stays up while a draft row is open: this sentence is the only place the
-  // feature is explained, and opening a row is exactly when someone is asking
-  // what the block does.
-  const showEmptyLine = pairs.length === 0;
+  const describedBy = draft?.error ? ERROR_ID : undefined;
+
+  const personSelect = (side: 'a' | 'b', label: string) => (
+    <Select
+      value={draft?.[side] ?? undefined}
+      disabled={draft?.pending}
+      onValueChange={v => choose(side, v)}
+    >
+      <SelectTrigger className="w-52" aria-label={label} aria-describedby={describedBy}>
+        <SelectValue placeholder="Choose a person" />
+      </SelectTrigger>
+      <SelectContent className="max-h-60 overflow-y-auto border shadow-md">
+        {choicesExcluding(side === 'a' ? draft?.b ?? null : draft?.a ?? null).map(p => (
+          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
 
   return (
-    <div className="space-y-2">
-      <div className="text-sm font-medium">Keep apart</div>
+    <div className="space-y-2" role="group" aria-labelledby={HEADING_ID}>
+      <h3 id={HEADING_ID} className="text-sm font-medium">Keep apart</h3>
 
-      {showEmptyLine && (
-        <p className="text-sm text-muted-foreground">
-          No pairs. People here will never be seated at the same table.
-        </p>
-      )}
+      {/* Permanent, not an empty state: this sentence is the only place the
+          feature is explained, and it is as needed a week later as on day one. */}
+      <p className="text-sm text-muted-foreground">
+        {(pairs.length === 0 ? 'Nobody is being kept apart yet. ' : '') +
+          'People here will never be seated at the same table.'}
+      </p>
 
       {pairs.map(([aId, bId]) => {
-        const aName = nameOf(aId);
-        const bName = nameOf(bId);
-        if (!aName || !bName) return null;
+        const aName = nameOf(aId) ?? MISSING;
+        const bName = nameOf(bId) ?? MISSING;
         return (
           <div key={`${aId}-${bId}`} className="flex items-center gap-2">
             <span className="text-sm">{`${aName} and ${bName}`}</span>
@@ -105,55 +137,32 @@ export function KeepApartSection({
         );
       })}
 
-      {!readOnly && drafts.map(draft => (
-        <div key={draft.key} className="space-y-1">
+      {!readOnly && draft && (
+        <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <Select
-              value={draft.a ?? undefined}
-              onValueChange={v => choose(draft, 'a', v)}
-            >
-              <SelectTrigger className="w-52"><SelectValue placeholder="Choose a person" /></SelectTrigger>
-              <SelectContent className="max-h-60 overflow-y-auto border shadow-md">
-                {choicesExcluding(draft.b).map(p => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {personSelect('a', 'First person')}
             <span className="text-sm text-muted-foreground">and</span>
-            <Select
-              value={draft.b ?? undefined}
-              onValueChange={v => choose(draft, 'b', v)}
-            >
-              <SelectTrigger className="w-52"><SelectValue placeholder="Choose a person" /></SelectTrigger>
-              <SelectContent className="max-h-60 overflow-y-auto border shadow-md">
-                {choicesExcluding(draft.a).map(p => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {personSelect('b', 'Second person')}
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setDrafts(prev => prev.filter(d => d.key !== draft.key))}
-              aria-label="Discard this pair"
+              onClick={() => setDraft(null)}
+              aria-label="Discard this row"
             >
               <X className="h-4 w-4" />
             </Button>
           </div>
           {draft.error && (
-            <p className="text-sm text-destructive">{draft.error}</p>
+            <p id={ERROR_ID} role="alert" className="text-sm text-destructive">
+              {draft.error}
+            </p>
           )}
         </div>
-      ))}
+      )}
 
-      {!readOnly && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setDrafts(prev => [
-            ...prev, { key: Date.now() + prev.length, a: null, b: null, error: null },
-          ])}
-        >
+      {/* One row at a time: the button comes back when this one is done. */}
+      {!readOnly && !draft && (
+        <Button variant="outline" size="sm" onClick={() => setDraft({ ...EMPTY_DRAFT })}>
           <Plus className="h-4 w-4 mr-1" />
           Add a pair
         </Button>

@@ -37,7 +37,7 @@ describe('KeepApartSection', () => {
     render(<KeepApartSection {...defaultProps} />);
     expect(screen.getByText('Keep apart')).toBeInTheDocument();
     expect(screen.getByText(
-      'No pairs. People here will never be seated at the same table.',
+      'Nobody is being kept apart yet. People here will never be seated at the same table.',
     )).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add a pair' })).toBeInTheDocument();
   });
@@ -46,9 +46,10 @@ describe('KeepApartSection', () => {
     render(<KeepApartSection {...defaultProps} pairs={[['p1', 'p2']]} />);
     expect(screen.getByText('Ken Adler and Bill Steigelmann')).toBeInTheDocument();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
-    expect(screen.queryByText(
-      'No pairs. People here will never be seated at the same table.',
-    )).not.toBeInTheDocument();
+    // The description stays; only the "nobody yet" half goes away.
+    expect(screen.getByText(
+      'People here will never be seated at the same table.',
+    )).toBeInTheDocument();
   });
 
   test('the explanation stays up while a draft row is open', () => {
@@ -56,7 +57,7 @@ describe('KeepApartSection', () => {
     click(screen.getByRole('button', { name: 'Add a pair' }));
     expect(screen.getAllByRole('combobox')).toHaveLength(2);
     expect(screen.getByText(
-      'No pairs. People here will never be seated at the same table.',
+      'Nobody is being kept apart yet. People here will never be seated at the same table.',
     )).toBeInTheDocument();
   });
 
@@ -66,7 +67,7 @@ describe('KeepApartSection', () => {
     openSelect(0);
     pick('Ken Adler');
 
-    click(screen.getByRole('button', { name: 'Discard this pair' }));
+    click(screen.getByRole('button', { name: 'Discard this row' }));
 
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     expect(defaultProps.onAdd).not.toHaveBeenCalled();
@@ -74,7 +75,7 @@ describe('KeepApartSection', () => {
 
   test('nothing is saved until both names are chosen', async () => {
     render(<KeepApartSection {...defaultProps} />);
-    await click(screen.getByRole('button', { name: 'Add a pair' }));
+    click(screen.getByRole('button', { name: 'Add a pair' }));
     expect(screen.getAllByRole('combobox')).toHaveLength(2);
 
     await openSelect(0);
@@ -88,7 +89,7 @@ describe('KeepApartSection', () => {
 
   test('the second select excludes the first person and anyone already kept apart from them', async () => {
     render(<KeepApartSection {...defaultProps} pairs={[['p1', 'p2']]} />);
-    await click(screen.getByRole('button', { name: 'Add a pair' }));
+    click(screen.getByRole('button', { name: 'Add a pair' }));
 
     await openSelect(0);
     await pick('Ken Adler');
@@ -104,23 +105,31 @@ describe('KeepApartSection', () => {
       'Ken Adler and Bill Steigelmann are a couple, and couples are always seated at different tables.',
     )));
     render(<KeepApartSection {...defaultProps} onAdd={onAdd} />);
-    await click(screen.getByRole('button', { name: 'Add a pair' }));
+    click(screen.getByRole('button', { name: 'Add a pair' }));
 
     await openSelect(0);
     await pick('Ken Adler');
     await openSelect(1);
     await pick('Bill Steigelmann');
 
-    expect(await screen.findByText(
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(
       'Ken Adler and Bill Steigelmann are a couple, and couples are always seated at different tables.',
-    )).toBeInTheDocument();
+    );
     expect(screen.getAllByRole('combobox')).toHaveLength(2);
+    // A screen reader must be able to reach the refusal from either name.
+    expect(screen.getByLabelText('First person')).toHaveAttribute('aria-describedby', alert.id);
+    expect(screen.getByLabelText('Second person')).toHaveAttribute('aria-describedby', alert.id);
   });
 
   test('the refusal clears when a name is changed', async () => {
-    const onAdd = jest.fn(() => Promise.reject(new Error('A person can\'t be kept apart from themselves.')));
+    const onAdd = jest.fn<Promise<void>, [string, string]>()
+      .mockRejectedValueOnce(new Error('A person can\'t be kept apart from themselves.'))
+      // The re-pick commits again; leave that one hanging so the error's
+      // disappearance can only be the change clearing it.
+      .mockReturnValue(new Promise(() => {}));
     render(<KeepApartSection {...defaultProps} onAdd={onAdd} />);
-    await click(screen.getByRole('button', { name: 'Add a pair' }));
+    click(screen.getByRole('button', { name: 'Add a pair' }));
 
     await openSelect(0);
     await pick('Ken Adler');
@@ -135,11 +144,81 @@ describe('KeepApartSection', () => {
     ).not.toBeInTheDocument());
   });
 
+  test('a successful commit clears the draft row', async () => {
+    render(<KeepApartSection {...defaultProps} />);
+    click(screen.getByRole('button', { name: 'Add a pair' }));
+
+    openSelect(0);
+    pick('Ken Adler');
+    openSelect(1);
+    pick('Bill Steigelmann');
+
+    await waitFor(() => expect(screen.queryByRole('combobox')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Add a pair' })).toBeInTheDocument();
+  });
+
+  test('the exclusion works in the other direction too', async () => {
+    render(<KeepApartSection {...defaultProps} pairs={[['p1', 'p2']]} />);
+    click(screen.getByRole('button', { name: 'Add a pair' }));
+
+    openSelect(1);
+    pick('Ken Adler');
+
+    openSelect(0);
+    expect(screen.getByRole('option', { name: 'Diane Stadlen' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Ken Adler' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Bill Steigelmann' })).not.toBeInTheDocument();
+  });
+
+  test('both names are inert while the add is in flight', async () => {
+    const onAdd = jest.fn(() => new Promise<void>(() => {}));
+    render(<KeepApartSection {...defaultProps} onAdd={onAdd} />);
+    click(screen.getByRole('button', { name: 'Add a pair' }));
+
+    openSelect(0);
+    pick('Ken Adler');
+    openSelect(1);
+    pick('Bill Steigelmann');
+
+    await waitFor(() => expect(screen.getByLabelText('First person')).toBeDisabled());
+    expect(screen.getByLabelText('Second person')).toBeDisabled();
+
+    // A second pick cannot get through, so only one rule is ever created.
+    openSelect(0);
+    expect(screen.queryByRole('option', { name: 'Diane Stadlen' })).not.toBeInTheDocument();
+    expect(onAdd).toHaveBeenCalledTimes(1);
+  });
+
+  test('only one draft row exists at a time', () => {
+    render(<KeepApartSection {...defaultProps} />);
+    click(screen.getByRole('button', { name: 'Add a pair' }));
+    expect(screen.getAllByRole('combobox')).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: 'Add a pair' })).not.toBeInTheDocument();
+  });
+
+  test('the block and its selects carry accessible names', () => {
+    render(<KeepApartSection {...defaultProps} />);
+    expect(screen.getByRole('group', { name: 'Keep apart' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Keep apart' })).toBeInTheDocument();
+    click(screen.getByRole('button', { name: 'Add a pair' }));
+    expect(screen.getByLabelText('First person')).toBeInTheDocument();
+    expect(screen.getByLabelText('Second person')).toBeInTheDocument();
+  });
+
+  test('names are offered in alphabetical order', () => {
+    render(<KeepApartSection {...defaultProps} participants={[diane, ken, bill]} />);
+    click(screen.getByRole('button', { name: 'Add a pair' }));
+    openSelect(0);
+    expect(screen.getAllByRole('option').map(o => o.textContent)).toEqual([
+      'Bill Steigelmann', 'Diane Stadlen', 'Ken Adler',
+    ]);
+  });
+
   test('removing a pair happens on one click, with no confirmation', async () => {
     const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
     render(<KeepApartSection {...defaultProps} pairs={[['p1', 'p2']]} />);
 
-    await click(screen.getByRole('button', {
+    click(screen.getByRole('button', {
       name: 'Stop keeping Ken Adler and Bill Steigelmann apart',
     }));
     expect(defaultProps.onRemove).toHaveBeenCalledWith('p1', 'p2');
