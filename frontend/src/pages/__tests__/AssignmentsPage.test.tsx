@@ -58,6 +58,8 @@ interface ApiState {
   shuffled?: boolean
   promoted?: string
   promoteResponse?: { status: number; body: any }
+  saved?: { assignments: any[]; label?: string }
+  saveResponse?: { status: number; body: any }
 }
 
 let api: ApiState
@@ -103,6 +105,23 @@ function mockApi() {
         ok: true,
         status: 200,
         json: () => Promise.resolve({ version_id: 'v2' }),
+      } as Response)
+    }
+
+    if (url.includes('/api/assignments/results/save')) {
+      api.saved = JSON.parse(options.body)
+      if (api.saveResponse) {
+        const { status, body } = api.saveResponse
+        return Promise.resolve({
+          ok: status < 400,
+          status,
+          json: () => Promise.resolve(body),
+        } as Response)
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ version_id: 'v3' }),
       } as Response)
     }
 
@@ -647,6 +666,95 @@ describe('AssignmentsPage', () => {
 
       // Empty rather than gone: a region that unmounts stops announcing.
       expect(screen.getByRole('status')).toHaveTextContent('')
+    })
+  })
+
+  describe('mark absent', () => {
+    /** Selects Ann, then presses Mark absent inside Session 1. */
+    async function markAnnAbsent() {
+      const anns = await screen.findAllByRole('button', { name: 'Ann' })
+      fireEvent.click(anns[0])
+      const session1 = screen.getByRole('region', { name: 'Session 1' })
+      fireEvent.click(
+        within(session1).getByRole('button', { name: /mark ann absent/i })
+      )
+    }
+
+    it('sends the whole program with one session edited, and a label', async () => {
+      renderPage()
+      await markAnnAbsent()
+
+      await waitFor(() => expect(api.saved).toBeDefined())
+      const body = api.saved!
+      expect(body.assignments).toHaveLength(3)
+      expect(body.assignments[0].tables[1]).toEqual([null, person('Ben', 'Male')])
+      expect(body.assignments[0].absentParticipants).toEqual([person('Ann')])
+      // The trust clause, checked rather than asserted in prose: session 2 goes
+      // back exactly as it came.
+      expect(body.assignments[1]).toEqual(assignments[1])
+      expect(body.assignments[2]).toEqual(assignments[2])
+      expect(body.label).toBe('Ann marked absent from Session 1')
+    })
+
+    it('reports the edit with its consequence and an undo', async () => {
+      renderPage()
+      await markAnnAbsent()
+
+      expect(
+        await screen.findByText(
+          'Ann marked absent from Session 1 \u00b7 Table 1 now seats 1 \u00b7 other sessions unchanged.'
+        )
+      ).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^undo$/i })).toBeInTheDocument()
+    })
+
+    it('undoes by promoting the version that was current before the edit', async () => {
+      renderPage()
+      await markAnnAbsent()
+
+      fireEvent.click(await screen.findByRole('button', { name: /^undo$/i }))
+
+      await waitFor(() => expect(api.promoted).toContain('/promote/v2'))
+    })
+
+    it('surfaces the server\u2019s refusal rather than writing its own', async () => {
+      api.saveResponse = {
+        status: 409,
+        body: {
+          detail:
+            "Session 1 is complete and can't be changed. Reopen it first if you need to edit it.",
+        },
+      }
+      renderPage()
+      await markAnnAbsent()
+
+      expect(
+        await screen.findByText(/Reopen it first if you need to edit it/)
+      ).toBeInTheDocument()
+    })
+
+    it('marks absent the person who was selected, though the click clears the selection', async () => {
+      renderPage()
+      await markAnnAbsent()
+
+      // The button's click bubbles to the page's click-outside dismissal, so
+      // the selection is gone the moment it is pressed. React runs the button's
+      // own handler first, and the name travels as an argument from there, so
+      // neither the payload nor the receipt can be affected.
+      screen
+        .getAllByRole('button', { name: 'Ben' })
+        .forEach(chip => expect(chip).not.toHaveClass('opacity-50'))
+
+      await waitFor(() => expect(api.saved).toBeDefined())
+      expect(api.saved!.label).toBe('Ann marked absent from Session 1')
+      expect(api.saved!.assignments[0].tables[1]).toEqual([
+        null,
+        person('Ben', 'Male'),
+      ])
+      // Raised from onSuccess, long after the clear.
+      expect(
+        await screen.findByText(/^Ann marked absent from Session 1/)
+      ).toBeInTheDocument()
     })
   })
 })

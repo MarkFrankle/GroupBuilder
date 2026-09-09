@@ -387,6 +387,22 @@ function HelpPage() {
             arrangement back through History.
           </p>
 
+          <h3 className="text-xl font-semibold mt-8 mb-2">
+            Someone didn't come
+          </h3>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            Click a person's name anywhere on the page and they light up in every
+            session, so you can see where they sit all series. While they are lit up,
+            a <strong>Mark [name] absent</strong> button appears above their table.
+            Press it and they move to the Absent list under that session.
+          </p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            Their chair is left empty rather than filled in — the app will not reshuffle
+            the table behind your back. Only that one session changes, and the line at
+            the top says so, with an <strong>Undo</strong> if you clicked the wrong
+            person. Click anywhere else, or press Escape, to stop highlighting someone.
+          </p>
+
           <h3 className="text-xl font-semibold mt-8 mb-2">Earlier versions</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Every change is saved as a new version, and nothing is overwritten. Press{" "}

@@ -17,8 +17,10 @@ import {
   linkedPairCount,
   seatedCount,
   shuffleReceipt,
+  tableNumbers,
   uniqueTablematesAverage,
 } from '@/utils/assignmentStats'
+import { markAbsent } from '@/utils/assignmentEdits'
 import {
   resultsQueryKey,
   useAssignmentResults,
@@ -280,6 +282,81 @@ const AssignmentsPage: React.FC = () => {
       showNotice({ tone: 'error', message: error.message })
     },
   })
+
+  /**
+   * A manual edit is a version write, so undo is "promote the previous version"
+   * with no new machinery — unlike completion, which is not a version write and
+   * is why its own undo is still an open question.
+   */
+  const editMutation = useMutation({
+    mutationFn: async ({
+      assignments: edited,
+      label,
+    }: {
+      assignments: Assignment[]
+      label: string
+      receipt: string
+    }) => {
+      undoTarget.current = versions[0]?.promotable ? versions[0] : null
+      const response = await authenticatedFetch(
+        `/api/assignments/results/save?program_id=${programId}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assignments: edited, label }),
+        }
+      )
+      if (!response.ok) {
+        throw new Error(
+          await refusalDetail(response, 'Could not save this change. Please try again.')
+        )
+      }
+      return response.json()
+    },
+    onSuccess: (_data, { receipt }) => {
+      invalidateAll()
+      setSelectedName(null)
+      const target = undoTarget.current
+      showNotice({
+        tone: 'info',
+        message: receipt,
+        actions: target
+          ? [{ label: 'Undo', onClick: () => promoteMutation.mutate({ version: target }) }]
+          : undefined,
+      })
+    },
+    onError: (error: Error) => showNotice({ tone: 'error', message: error.message }),
+  })
+
+  /**
+   * "other sessions unchanged" is the trust clause, and the reason the banner
+   * exists. It is truthful here by construction: the edit touches one session's
+   * array and nothing else.
+   *
+   * The receipt is computed here, before the mutation, because the counts it
+   * states are about the array being sent — waiting for a refetch would let the
+   * sentence and the plan disagree.
+   */
+  const handleMarkAbsent = (sessionNumber: number, name: string) => {
+    const before = sorted.find(a => a.session === sessionNumber)
+    const edited = markAbsent(sorted, sessionNumber, name)
+    const session = edited.find(a => a.session === sessionNumber)
+    if (!before || !session) return
+
+    const table = tableNumbers(before).find(n =>
+      before.tables[n].some(seat => seat?.name === name)
+    )
+    if (table === undefined) return
+    const seats = session.tables[table].filter(Boolean).length
+
+    editMutation.mutate({
+      assignments: edited,
+      label: `${name} marked absent from Session ${sessionNumber}`,
+      receipt:
+        `${name} marked absent from Session ${sessionNumber} · ` +
+        `Table ${table} now seats ${seats} · other sessions unchanged.`,
+    })
+  }
 
   /**
    * Promotion is not a rewind: the server writes the old content as a new
@@ -557,6 +634,7 @@ const AssignmentsPage: React.FC = () => {
                   method: 'POST',
                 })
               }
+              onMarkAbsent={(name: string) => handleMarkAbsent(assignment.session, name)}
             />
           </div>
         ))}
@@ -583,6 +661,7 @@ const AssignmentsPage: React.FC = () => {
                 selectedName={selectedName}
                 onSelect={toggleSelected}
                 onPrint={() => handlePrintSession(assignment.session)}
+                onMarkAbsent={(name: string) => handleMarkAbsent(assignment.session, name)}
                 onReopen={
                   assignment.session === completedThrough
                     ? () =>
