@@ -8,8 +8,18 @@ import {
   Printer,
   RotateCcw,
   Shuffle,
+  UserPlus,
 } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import Chip from './Chip'
 import TableBlock from './TableBlock'
+import { tablesWithOpenSeat } from '@/utils/assignmentEdits'
 import type { Assignment, Participant } from '@/types/assignments'
 
 interface SessionCardProps {
@@ -27,6 +37,9 @@ interface SessionCardProps {
   /** Pass-throughs to TableBlock. */
   selectedName: string | null
   onSelect: (name: string) => void
+  /** Absent where acting is not allowed. See TableBlock. */
+  onMarkAbsent?: (name: string) => void
+  onMarkPresent?: (name: string, tableNumber: number) => void
 }
 
 /** Table numbers arrive as object keys, so they are strings. */
@@ -54,12 +67,30 @@ const SessionCard: React.FC<SessionCardProps> = ({
   onReopen,
   selectedName,
   onSelect,
+  onMarkAbsent,
+  onMarkPresent,
 }) => {
   // Expansion is a glance at the past, not a preference — it is not persisted.
   const [expanded, setExpanded] = useState(false)
 
   const showReopen = completed && !readOnly && !!onReopen
   const absent = assignment.absentParticipants ?? []
+
+  // Mark present is reachable only from the absent row, and only where acting
+  // is allowed — the same condition that hides Shuffle.
+  const actionable = !completed && !readOnly
+
+  // Carries the name rather than a boolean, so the picker's label and callback
+  // get a `string` without a non-null assertion.
+  const absentSelected =
+    selectedName !== null && absent.some((p: Participant) => p.name === selectedName)
+      ? selectedName
+      : null
+
+  // The gap the absence left is the anchor for the correction case, and makes
+  // the common case a confirming click. When a shuffle since has closed every
+  // gap, the annotation and the checkmark simply do not render.
+  const openSeatTables = tablesWithOpenSeat(assignment)
 
   const reopenButton = showReopen && (
     <Button variant="outline" size="sm" onClick={onReopen}>
@@ -152,11 +183,47 @@ const SessionCard: React.FC<SessionCardProps> = ({
             participants={assignment.tables[n]}
             selectedName={selectedName}
             onSelect={onSelect}
+            onMarkAbsent={actionable ? onMarkAbsent : undefined}
           />
         ))}
         {absent.length > 0 && (
-          <div className="text-xs text-muted-foreground">
-            Absent: {absent.map((p: Participant) => p.name).join(', ')}
+          <div className="flex flex-wrap items-center gap-2 border-t pt-2">
+            <span className="text-xs text-muted-foreground">Absent:</span>
+            {absent.map((person: Participant) => (
+              <Chip
+                key={person.name}
+                participant={person}
+                selectedName={selectedName}
+                onSelect={onSelect}
+              />
+            ))}
+            {actionable && absentSelected && onMarkPresent && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <UserPlus className="mr-1.5 h-3.5 w-3.5" />
+                    Mark present
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuLabel>{`Seat ${absentSelected} at…`}</DropdownMenuLabel>
+                  {tableNumbers(assignment).map(n => {
+                    const seated = assignment.tables[n].filter(Boolean).length
+                    const hasGap = openSeatTables.includes(n)
+                    return (
+                      <DropdownMenuItem
+                        key={n}
+                        onSelect={() => onMarkPresent(absentSelected, n)}
+                      >
+                        {`Table ${n} · ${seated} ${seated === 1 ? 'person' : 'people'}`}
+                        {hasGap ? ' · open seat' : ''}
+                        {n === openSeatTables[0] ? ' ✓' : ''}
+                      </DropdownMenuItem>
+                    )
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         )}
       </div>
