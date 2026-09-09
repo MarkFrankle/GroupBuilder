@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import AssignmentsPage from '../AssignmentsPage'
@@ -739,7 +739,24 @@ describe('AssignmentsPage', () => {
       // otherwise be on <body> with the Undo nowhere near it.
       const strip = screen.getByTestId('notice-strip')
       expect(strip).toContainElement(receipt)
+
+      // Awaited, because focus arrives one step behind the text: the receipt is
+      // in the DOM at commit, and the effect that moves focus runs after it.
+      // findByText can resolve on that commit while the effect is still pending,
+      // which is why a bare assertion here passes or fails with machine load.
+      await waitFor(() => expect(strip).toHaveFocus())
+
+      // And it has to still be there once everything the edit kicked off has
+      // settled: onSuccess invalidates every query, so refetches re-render the
+      // page around the strip a moment later. Awaiting arrival alone would go
+      // green even if that re-render stole focus back or replaced the node —
+      // this is the half that would catch it. `strip` is deliberately the node
+      // captured above, so a replacement fails rather than being re-found.
+      await act(async () => {
+        await new Promise(resolve => setTimeout(resolve, 50))
+      })
       expect(strip).toHaveFocus()
+      expect(strip).toContainElement(screen.getByRole('button', { name: /^undo$/i }))
     })
 
     it('offers no Mark absent inside a completed session', async () => {
