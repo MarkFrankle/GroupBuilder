@@ -45,7 +45,8 @@ interface SessionCardProps {
    * `onMarkAbsent?` stays optional — there, absence *is* the suppression.
    */
   onMarkAbsent: (name: string) => void
-  onMarkPresent?: (name: string, tableNumber: number) => void
+  /** Required on the same terms as `onMarkAbsent`, and gated the same way. */
+  onMarkPresent: (name: string, tableNumber: number) => void
 }
 
 function seatedCount(assignment: Assignment): number {
@@ -201,10 +202,23 @@ const SessionCard: React.FC<SessionCardProps> = ({
                 onSelect={onSelect}
               />
             ))}
-            {actionable && absentSelected && onMarkPresent && (
+            {actionable && absentSelected && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
+                  {/*
+                    Radix opens on pointerdown and lets the following click
+                    through. The page dismisses a selection on any click that
+                    reaches its root, and this picker is gated on that
+                    selection — so without this the menu unmounted in the
+                    instant it opened, and mark-present was unusable with a
+                    mouse. Stopped here rather than by weakening the
+                    dismissal, which is deliberately over-provided.
+                  */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={event => event.stopPropagation()}
+                  >
                     <UserPlus className="mr-1.5 h-3.5 w-3.5" />
                     Mark present
                   </Button>

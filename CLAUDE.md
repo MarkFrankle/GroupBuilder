@@ -54,6 +54,11 @@
   History menu clears `selectedName` via the page's click-outside dismissal; a
   keyboard-open (`keyDown` Enter) does not. Any trigger whose own rendering depends on that
   state needs `onPointerDown`/`onClick` `stopPropagation`.
+- **To test that mouse path, dispatch a real `MouseEvent`.** jsdom has no `PointerEvent`, so
+  `fireEvent.pointerDown(el, { button: 0 })` never delivers `button` and Radix ignores it. Use
+  `fireEvent(el, new MouseEvent('pointerdown', { bubbles: true, cancelable: true, button: 0 }))`
+  then `fireEvent.click(el)`. The keyboard open masks trigger-propagation bugs entirely — it
+  hid a live one where the Mark present picker unmounted the instant it opened.
 - **Anything stored as a roster document id must survive `POST /roster/discard`.** Discard
   deletes every roster document and rewrites it with fresh uuids, so ids are not durable.
   `partner_id` and the program-level `keep_apart` pairs are both resolved to names before the

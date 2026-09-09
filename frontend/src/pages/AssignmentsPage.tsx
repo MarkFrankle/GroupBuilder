@@ -20,7 +20,7 @@ import {
   tableNumbers,
   uniqueTablematesAverage,
 } from '@/utils/assignmentStats'
-import { markAbsent } from '@/utils/assignmentEdits'
+import { markAbsent, markPresent } from '@/utils/assignmentEdits'
 import {
   resultsQueryKey,
   useAssignmentResults,
@@ -359,6 +359,25 @@ const AssignmentsPage: React.FC = () => {
   }
 
   /**
+   * The table comes from the user, never from the app: filing a corrected
+   * attendance at the wrong table teaches the solver a history that did not
+   * happen. See the picker in SessionCard for why nothing is auto-placed.
+   */
+  const handleMarkPresent = (
+    sessionNumber: number,
+    name: string,
+    tableNumber: number
+  ) => {
+    editMutation.mutate({
+      assignments: markPresent(sorted, sessionNumber, name, tableNumber),
+      label: `${name} marked present in Session ${sessionNumber}`,
+      receipt:
+        `${name} marked present in Session ${sessionNumber} \u00b7 ` +
+        `seated at Table ${tableNumber} \u00b7 other sessions unchanged.`,
+    })
+  }
+
+  /**
    * Promotion is not a rewind: the server writes the old content as a new
    * version at the head, so a success lands us back on the current plan rather
    * than deeper into the past.
@@ -635,6 +654,9 @@ const AssignmentsPage: React.FC = () => {
                 })
               }
               onMarkAbsent={(name: string) => handleMarkAbsent(assignment.session, name)}
+              onMarkPresent={(name: string, tableNumber: number) =>
+                handleMarkPresent(assignment.session, name, tableNumber)
+              }
             />
           </div>
         ))}
@@ -662,6 +684,9 @@ const AssignmentsPage: React.FC = () => {
                 onSelect={toggleSelected}
                 onPrint={() => handlePrintSession(assignment.session)}
                 onMarkAbsent={(name: string) => handleMarkAbsent(assignment.session, name)}
+                onMarkPresent={(name: string, tableNumber: number) =>
+                  handleMarkPresent(assignment.session, name, tableNumber)
+                }
                 onReopen={
                   assignment.session === completedThrough
                     ? () =>

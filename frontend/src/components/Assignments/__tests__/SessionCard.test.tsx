@@ -20,14 +20,14 @@ const assignment: Assignment = {
 
 describe('SessionCard — a live session', () => {
   it('renders one table block per table', () => {
-    render(<SessionCard assignment={assignment} selectedName={null} onSelect={jest.fn()} onMarkAbsent={jest.fn()} />)
+    render(<SessionCard assignment={assignment} selectedName={null} onSelect={jest.fn()} onMarkAbsent={jest.fn()} onMarkPresent={jest.fn()} />)
 
     expect(screen.getByText('Table 1')).toBeInTheDocument()
     expect(screen.getByText('Table 2')).toBeInTheDocument()
   })
 
   it('offers Shuffle, Print and Mark complete', () => {
-    render(<SessionCard assignment={assignment} selectedName={null} onSelect={jest.fn()} onMarkAbsent={jest.fn()} />)
+    render(<SessionCard assignment={assignment} selectedName={null} onSelect={jest.fn()} onMarkAbsent={jest.fn()} onMarkPresent={jest.fn()} />)
 
     expect(screen.getByRole('button', { name: /shuffle/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /print/i })).toBeInTheDocument()
@@ -46,6 +46,7 @@ describe('SessionCard — a live session', () => {
         selectedName={null}
         onSelect={jest.fn()}
         onMarkAbsent={jest.fn()}
+        onMarkPresent={jest.fn()}
       />
     )
 
@@ -54,7 +55,7 @@ describe('SessionCard — a live session', () => {
   })
 
   it('disables Shuffle while a shuffle is running', () => {
-    render(<SessionCard assignment={assignment} isShuffling selectedName={null} onSelect={jest.fn()} onMarkAbsent={jest.fn()} />)
+    render(<SessionCard assignment={assignment} isShuffling selectedName={null} onSelect={jest.fn()} onMarkAbsent={jest.fn()} onMarkPresent={jest.fn()} />)
 
     expect(screen.getByRole('button', { name: /shuffling/i })).toBeDisabled()
   })
@@ -67,6 +68,7 @@ describe('SessionCard — a live session', () => {
         selectedName={null}
         onSelect={jest.fn()}
         onMarkAbsent={jest.fn()}
+        onMarkPresent={jest.fn()}
       />)
 
     expect(screen.getByRole('button', { name: /print/i })).toBeInTheDocument()
@@ -78,7 +80,7 @@ describe('SessionCard — a live session', () => {
 
 describe('SessionCard — a completed session', () => {
   it('renders as one row', () => {
-    render(<SessionCard assignment={assignment} completed selectedName={null} onSelect={jest.fn()} onMarkAbsent={jest.fn()} />)
+    render(<SessionCard assignment={assignment} completed selectedName={null} onSelect={jest.fn()} onMarkAbsent={jest.fn()} onMarkPresent={jest.fn()} />)
 
     expect(screen.getByText(/Session 1/)).toBeInTheDocument()
     expect(screen.getByText(/completed/)).toBeInTheDocument()
@@ -87,7 +89,7 @@ describe('SessionCard — a completed session', () => {
   })
 
   it('expands to the full session on the chevron', async () => {
-    render(<SessionCard assignment={assignment} completed selectedName={null} onSelect={jest.fn()} onMarkAbsent={jest.fn()} />)
+    render(<SessionCard assignment={assignment} completed selectedName={null} onSelect={jest.fn()} onMarkAbsent={jest.fn()} onMarkPresent={jest.fn()} />)
 
     await userEvent.click(screen.getByRole('button', { name: /expand session 1/i }))
 
@@ -106,11 +108,12 @@ describe('SessionCard — a completed session', () => {
         selectedName={null}
         onSelect={jest.fn()}
         onMarkAbsent={jest.fn()}
+        onMarkPresent={jest.fn()}
       />
     )
     expect(screen.getByRole('button', { name: /reopen/i })).toBeInTheDocument()
 
-    rerender(<SessionCard assignment={assignment} completed selectedName={null} onSelect={jest.fn()} onMarkAbsent={jest.fn()} />)
+    rerender(<SessionCard assignment={assignment} completed selectedName={null} onSelect={jest.fn()} onMarkAbsent={jest.fn()} onMarkPresent={jest.fn()} />)
     expect(screen.queryByRole('button', { name: /reopen/i })).not.toBeInTheDocument()
   })
 })
@@ -154,10 +157,41 @@ describe('SessionCard — the absent row', () => {
     fireEvent.keyDown(screen.getByRole('button', { name: 'Mark present' }), { key: 'Enter' })
   }
 
+  /**
+   * The mouse path, which the keyboard one masks: Radix opens on pointerdown,
+   * and the trigger stops the click that follows so a container's
+   * click-outside handler never sees it. A real MouseEvent, because jsdom has
+   * no PointerEvent and Radix opens only on button 0.
+   */
+  it('opens on the mouse path too, without letting the click escape', () => {
+    const onContainerClick = jest.fn()
+    render(
+      <div onClick={onContainerClick}>
+        <SessionCard
+          assignment={withAbsence}
+          selectedName="Cara"
+          onSelect={jest.fn()}
+          onMarkAbsent={jest.fn()}
+          onMarkPresent={jest.fn()}
+        />
+      </div>
+    )
+
+    const trigger = screen.getByRole('button', { name: 'Mark present' })
+    fireEvent(
+      trigger,
+      new MouseEvent('pointerdown', { bubbles: true, cancelable: true, button: 0 })
+    )
+    fireEvent.click(trigger)
+
+    expect(screen.getByText('Seat Cara at\u2026')).toBeInTheDocument()
+    expect(onContainerClick).not.toHaveBeenCalled()
+  })
+
   it('renders absent names as selectable chips', () => {
     const onSelect = jest.fn()
     render(
-      <SessionCard assignment={withAbsence} selectedName={null} onSelect={onSelect} onMarkAbsent={jest.fn()} />
+      <SessionCard assignment={withAbsence} selectedName={null} onSelect={onSelect} onMarkAbsent={jest.fn()} onMarkPresent={jest.fn()} />
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Cara' }))

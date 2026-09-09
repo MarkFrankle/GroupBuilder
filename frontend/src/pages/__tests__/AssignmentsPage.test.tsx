@@ -44,6 +44,24 @@ const assignments = [1, 2, 3].map(session => ({
   },
 }))
 
+/**
+ * The same three sessions, but with Cara absent from session 2 and the gap she
+ * left still open at table 2 — the fixture a mark-present needs. Sessions 1 and
+ * 3 are the shared objects, so the trust clause can be checked by identity.
+ */
+const withAbsence = [
+  assignments[0],
+  {
+    session: 2,
+    tables: {
+      1: [person('Ann'), person('Ben', 'Male')],
+      2: [null, person('Dan', 'Male')],
+    },
+    absentParticipants: [person('Cara')],
+  },
+  assignments[2],
+]
+
 const metadata = {
   created_at: 1740000000,
   num_participants: 4,
@@ -56,6 +74,8 @@ interface ApiState {
   completedThrough: number
   completionResponse?: { status: number; body: any }
   shuffled?: boolean
+  /** Serve the fixture where Cara is absent from session 2 with a gap open. */
+  absence?: boolean
   promoted?: string
   promoteResponse?: { status: number; body: any }
   saved?: { assignments: any[]; label?: string }
@@ -191,7 +211,9 @@ function mockApi() {
 
     if (url.includes('/api/assignments/results')) {
       // After a shuffle, session 2 comes back with Ann and Cara swapped.
-      const body = api.shuffled
+      const body = api.absence
+        ? withAbsence
+        : api.shuffled
         ? [
             assignments[0],
             {
@@ -755,6 +777,93 @@ describe('AssignmentsPage', () => {
       expect(
         await screen.findByText(/^Ann marked absent from Session 1/)
       ).toBeInTheDocument()
+    })
+  })
+  describe('mark present', () => {
+    /** Selects Cara, the absentee, inside session 2. */
+    async function selectCara() {
+      const caras = await screen.findAllByRole('button', { name: 'Cara' })
+      // Session 2's chip is the absent-row one; every session renders a Cara,
+      // and selection is page-wide, so any of them opens the picker.
+      fireEvent.click(caras[0])
+      return screen.getByRole('region', { name: 'Session 2' })
+    }
+
+    /**
+     * Drives the trigger the way a mouse does. Radix opens on pointerdown and
+     * lets the following click through, so keyboard activation — the project's
+     * usual Radix rake — cannot see a trigger whose click bubbles away the
+     * selection the picker is gated on.
+     */
+    function openPickerWithMouse(trigger: HTMLElement) {
+      // A real MouseEvent, not fireEvent.pointerDown's init object: jsdom has
+      // no PointerEvent, so `button` would never reach the handler, and Radix
+      // opens only on button 0.
+      fireEvent(
+        trigger,
+        new MouseEvent('pointerdown', { bubbles: true, cancelable: true, button: 0 })
+      )
+      fireEvent.click(trigger)
+    }
+
+    it('keeps the selection when the picker is opened with a mouse', async () => {
+      api.absence = true
+      renderPage()
+      const session2 = await selectCara()
+
+      openPickerWithMouse(
+        within(session2).getByRole('button', { name: 'Mark present' })
+      )
+
+      // The menu is the proof: it is gated on the selection, so an open menu
+      // means the trigger's click did not reach the page's dismissal.
+      expect(await screen.findByText('Seat Cara at\u2026')).toBeInTheDocument()
+      // And said in as many words. Queried by text, not by role: an open Radix
+      // menu is modal and aria-hides the rest of the page behind it.
+      expect(
+        screen.getByText('Cara selected \u2014 showing them across all sessions.')
+      ).toBeInTheDocument()
+    })
+
+    it('seats the person at the chosen table and clears the absence', async () => {
+      api.absence = true
+      renderPage()
+      const session2 = await selectCara()
+
+      openPickerWithMouse(
+        within(session2).getByRole('button', { name: 'Mark present' })
+      )
+      fireEvent.click(await screen.findByRole('menuitem', { name: /Table 2/ }))
+
+      await waitFor(() => expect(api.saved).toBeDefined())
+      const body = api.saved!
+      expect(body.assignments).toHaveLength(3)
+      expect(body.assignments[1].tables[2]).toEqual([
+        person('Cara'),
+        person('Dan', 'Male'),
+      ])
+      expect(body.assignments[1].absentParticipants).toEqual([])
+      // The trust clause: session 3 goes back exactly as it came.
+      expect(body.assignments[2]).toEqual(withAbsence[2])
+      expect(body.label).toBe('Cara marked present in Session 2')
+    })
+
+    it('reports the seating with an undo', async () => {
+      api.absence = true
+      renderPage()
+      const session2 = await selectCara()
+
+      openPickerWithMouse(
+        within(session2).getByRole('button', { name: 'Mark present' })
+      )
+      fireEvent.click(await screen.findByRole('menuitem', { name: /Table 2/ }))
+
+      expect(
+        await screen.findByText(
+          'Cara marked present in Session 2 \u00b7 seated at Table 2 \u00b7 other sessions unchanged.'
+        )
+      ).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^undo$/i })).toBeInTheDocument()
     })
   })
 })
