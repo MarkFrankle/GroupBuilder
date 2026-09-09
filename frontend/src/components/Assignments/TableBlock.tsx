@@ -5,6 +5,9 @@ import type { Participant } from '@/types/assignments'
 interface TableBlockProps {
   tableNumber: number
   participants: (Participant | null)[]
+  /** Threaded to Chip. Task 4 wires these to real page-level selection. */
+  selectedName?: string | null
+  onSelect?: (name: string) => void
 }
 
 /** "6 people · 4F/2M · 3 religions" — the mock's per-table line. */
@@ -18,7 +21,12 @@ function tableStats(people: Participant[]): string {
   )
 }
 
-const TableBlock: React.FC<TableBlockProps> = ({ tableNumber, participants }) => {
+const TableBlock: React.FC<TableBlockProps> = ({
+  tableNumber,
+  participants,
+  selectedName = null,
+  onSelect = () => {},
+}) => {
   // Empty seats are stored as null, and Item 4b's mark-absent deliberately
   // leaves the gap rather than re-solving.
   const people = participants.filter((p): p is Participant => !!p)
@@ -44,7 +52,7 @@ const TableBlock: React.FC<TableBlockProps> = ({ tableNumber, participants }) =>
           </span>
           <div className="flex flex-wrap gap-1.5">
             {facilitators.map(p => (
-              <Chip key={p.name} participant={p} />
+              <Chip key={p.name} participant={p} selectedName={selectedName} onSelect={onSelect} />
             ))}
           </div>
         </div>
@@ -52,7 +60,7 @@ const TableBlock: React.FC<TableBlockProps> = ({ tableNumber, participants }) =>
 
       <div className="flex flex-wrap gap-[5px]">
         {others.map(p => (
-          <Chip key={p.name} participant={p} />
+          <Chip key={p.name} participant={p} selectedName={selectedName} onSelect={onSelect} />
         ))}
       </div>
     </div>
