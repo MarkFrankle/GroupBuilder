@@ -364,6 +364,91 @@ async def discard_roster_changes(
     return {"status": "discarded", "count": len(canonical)}
 
 
+class KeepApartPair(BaseModel):
+    a_id: str
+    b_id: str
+
+
+def _validate_keep_apart(participants: list[dict], a_id: str, b_id: str) -> None:
+    """Refuse the two pairs a coordinator can state but should not.
+
+    Both are detectable by reading two fields, so neither needs a solve - which
+    is why refusing them here does not reintroduce the feasibility pre-check
+    this feature ruled out. Everything that *would* need a solve falls through
+    to the solver's own refusal at rebuild time.
+    """
+    by_id = {p["id"]: p for p in participants}
+    a, b = by_id.get(a_id), by_id.get(b_id)
+
+    if a_id == b_id:
+        raise HTTPException(
+            status_code=400, detail="A person can't be kept apart from themselves."
+        )
+    if not a or not b:
+        raise HTTPException(
+            status_code=400, detail="That person is no longer on the roster."
+        )
+
+    partnered = a.get("partner_id") == b_id or b.get("partner_id") == a_id
+    if partnered:
+        if a.get("keep_together") or b.get("keep_together"):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"{a['name']} and {b['name']} are linked partners, so they "
+                    "can't also be kept apart. Remove the link first."
+                ),
+            )
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"{a['name']} and {b['name']} are a couple, and couples are "
+                "always seated at different tables."
+            ),
+        )
+
+
+# These three are declared above the /{participant_id} routes on purpose: a
+# route declared after them would have "keep-apart" matched as a participant id,
+# and DELETE would delete a participant instead of a rule.
+@router.get("/keep-apart")
+@limiter.limit("30/minute")
+async def list_keep_apart(
+    request: Request,
+    program_id: str = Depends(validate_program_access),
+    keep_apart: KeepApartStorage = Depends(get_keep_apart_storage),
+):
+    return {"pairs": [list(p) for p in keep_apart.get_pairs(program_id)]}
+
+
+@router.post("/keep-apart")
+@limiter.limit("30/minute")
+async def add_keep_apart(
+    request: Request,
+    data: KeepApartPair,
+    program_id: str = Depends(validate_program_access),
+    roster_service: RosterService = Depends(get_roster_service),
+    keep_apart: KeepApartStorage = Depends(get_keep_apart_storage),
+):
+    _validate_keep_apart(roster_service.get_roster(program_id), data.a_id, data.b_id)
+    pairs = keep_apart.add_pair(program_id, data.a_id, data.b_id)
+    return {"pairs": [list(p) for p in pairs]}
+
+
+@router.delete("/keep-apart")
+@limiter.limit("30/minute")
+async def remove_keep_apart(
+    request: Request,
+    data: KeepApartPair,
+    program_id: str = Depends(validate_program_access),
+    keep_apart: KeepApartStorage = Depends(get_keep_apart_storage),
+):
+    """No validation: removing a rule can never create an impossible state, and
+    a rule naming someone since deleted has to stay removable."""
+    pairs = keep_apart.remove_pair(program_id, data.a_id, data.b_id)
+    return {"pairs": [list(p) for p in pairs]}
+
+
 @router.put("/{participant_id}")
 @limiter.limit("60/minute")
 async def upsert_participant(
