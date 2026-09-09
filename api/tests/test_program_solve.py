@@ -65,13 +65,44 @@ class TestSolveProgram:
         assert "absentParticipants" not in assignments[0]
 
     def test_an_infeasible_program_raises_rather_than_returning_junk(self):
-        # Note: 2 people at 5 tables is *not* infeasible - the solver happily
-        # seats them at two tables and drops the empty ones. A zero-table
-        # program is the smallest input the solver genuinely refuses.
+        """A couple with only one table to sit at.
+
+        Couples separation is a *hard* constraint, so two people who must not
+        share a table and have exactly one table between them is unsatisfiable.
+        Chosen over the more obvious "more tables than people", which is not
+        infeasible at all - the solver seats everyone and drops the empty
+        tables - and over ``num_tables=0``, which the API rejects at validation
+        (``Field(ge=1)``) and so can never reach the solver in production.
+        """
+        couple = [
+            {
+                "id": 1,
+                "name": "Alice",
+                "religion": "Other",
+                "gender": "Other",
+                "partner": "Bob",
+                "couple_id": 1,
+                "linked_id": None,
+                "is_facilitator": False,
+                "keep_together": False,
+            },
+            {
+                "id": 2,
+                "name": "Bob",
+                "religion": "Other",
+                "gender": "Other",
+                "partner": "Alice",
+                "couple_id": 1,
+                "linked_id": None,
+                "is_facilitator": False,
+                "keep_together": False,
+            },
+        ]
+
         with pytest.raises(SolveFailed) as exc:
             solve_program(
-                participants=_identical_people(2),
-                num_tables=0,
+                participants=couple,
+                num_tables=1,
                 num_sessions=1,
                 absence_map={},
                 max_time_seconds=10,
