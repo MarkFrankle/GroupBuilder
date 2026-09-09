@@ -7,6 +7,7 @@ const person = (name: string, over: Partial<CanonicalParticipant> = {}): Canonic
   partner: null,
   is_facilitator: false,
   keep_together: false,
+  keep_apart: [],
   ...over,
 });
 
@@ -109,4 +110,126 @@ describe('computeChangeset', () => {
 
     expect(result.isDirty).toBe(false);
   });
+
+  it('reports an added keep-apart pair as a change needing a rebuild', () => {
+    const result = computeChangeset(
+      [person('A'), person('B')],
+      [person('A', { keep_apart: ['B'] }), person('B', { keep_apart: ['A'] })],
+      { tables: 2, sessions: 3 },
+      { tables: 2, sessions: 3 },
+    );
+
+    expect(result.needsRebuild).toBe(true);
+    expect(result.isDirty).toBe(true);
+    expect(result.changed).toContainEqual(
+      expect.objectContaining({ name: 'A', field: 'kept apart', from: null, to: 'B' }),
+    );
+  });
+
+  it('reports a removed keep-apart pair as a change needing a rebuild', () => {
+    const result = computeChangeset(
+      [person('A', { keep_apart: ['B'] }), person('B', { keep_apart: ['A'] })],
+      [person('A'), person('B')],
+      { tables: 2, sessions: 3 },
+      { tables: 2, sessions: 3 },
+    );
+
+    expect(result.needsRebuild).toBe(true);
+    expect(result.changed).toContainEqual(
+      expect.objectContaining({ name: 'A', field: 'kept apart', from: 'B', to: null }),
+    );
+  });
+
+  // The rule is untouched; only the spelling moved. Falling through to a
+  // rebuild here would destroy the plan over a typo fix, through the one
+  // action in the app that cannot be undone.
+  it('still treats a rename of someone inside a keep-apart pair as a rename', () => {
+    const result = computeChangeset(
+      [person('Kathrine', { keep_apart: ['B'] }), person('B', { keep_apart: ['Kathrine'] })],
+      [person('Katherine', { keep_apart: ['B'] }), person('B', { keep_apart: ['Katherine'] })],
+      { tables: 2, sessions: 3 },
+      { tables: 2, sessions: 3 },
+    );
+
+    expect(result.renamed).toEqual([{ from: 'Kathrine', to: 'Katherine' }]);
+    expect(result.changed).toEqual([]);
+    expect(result.needsRebuild).toBe(false);
+    expect(result.isDirty).toBe(true);
+  });
+
+  // The one case where the two halves interact: the rename must not
+  // short-circuit the pair comparison, or the new rule never reaches the solver.
+  it('needs a rebuild for a rename plus a keep-apart change in the same edit', () => {
+    const result = computeChangeset(
+      [person('Kathrine'), person('B'), person('C')],
+      [person('Katherine'), person('B', { keep_apart: ['C'] }), person('C', { keep_apart: ['B'] })],
+      { tables: 2, sessions: 3 },
+      { tables: 2, sessions: 3 },
+    );
+
+    expect(result.renamed).toEqual([{ from: 'Kathrine', to: 'Katherine' }]);
+    expect(result.needsRebuild).toBe(true);
+    expect(result.changed.map((c) => c.name).sort()).toEqual(['B', 'C']);
+  });
+
+  it('reads an asymmetric canonical rule as the same rule', () => {
+    const result = computeChangeset(
+      [person('A', { keep_apart: ['B'] }), person('B')],
+      [person('A', { keep_apart: ['B'] }), person('B', { keep_apart: ['A'] })],
+      { tables: 2, sessions: 3 },
+      { tables: 2, sessions: 3 },
+    );
+
+    expect(result.isDirty).toBe(false);
+    expect(result.needsRebuild).toBe(false);
+  });
+
+  // A set frozen before the feature existed has no `keep_apart` at all. Those
+  // rosters must not read as dirty the moment the field is added.
+  it('is not dirty when the canonical roster predates the keep-apart field', () => {
+    const legacy = (name: string): CanonicalParticipant => {
+      const p = person(name);
+      delete p.keep_apart;
+      return p;
+    };
+    const result = computeChangeset(
+      [legacy('A'), legacy('B')],
+      [person('A'), person('B')],
+      { tables: 2, sessions: 3 },
+      { tables: 2, sessions: 3 },
+    );
+
+    expect(result.isDirty).toBe(false);
+  });
+
+  // A freshly derived draft can never carry a rule naming its own participant,
+  // so keeping one would be a permanent spurious rebuild.
+  it('drops a canonical self-pair rather than reading it as a change', () => {
+    const result = computeChangeset(
+      [person('A', { keep_apart: ['A'] }), person('B')],
+      [person('A'), person('B')],
+      { tables: 2, sessions: 3 },
+      { tables: 2, sessions: 3 },
+    );
+
+    expect(result.isDirty).toBe(false);
+  });
+
+  // Renames must resolve on the *canonical* side, which holds the old
+  // spellings. An asymmetric canonical rule is where that shows: matching the
+  // pairs by luck is not enough, because the per-person listing below it would
+  // then report a rule the coordinator never touched.
+  it('resolves a rename against an asymmetric canonical keep-apart rule', () => {
+    const result = computeChangeset(
+      [person('Kathrine', { keep_apart: ['B'] }), person('B')],
+      [person('Katherine', { keep_apart: ['B'] }), person('B', { keep_apart: ['Katherine'] })],
+      { tables: 2, sessions: 3 },
+      { tables: 2, sessions: 3 },
+    );
+
+    expect(result.renamed).toEqual([{ from: 'Kathrine', to: 'Katherine' }]);
+    expect(result.changed).toEqual([]);
+    expect(result.needsRebuild).toBe(false);
+  });
+
 });
