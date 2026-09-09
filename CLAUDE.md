@@ -33,12 +33,17 @@
   outside a module" — a config problem that looks like a code problem.
 - **Mock `@/utils/apiClient` in frontend tests** — don't mock Firebase SDK internals. Example: `jest.mock('@/utils/apiClient', () => ({ authenticatedFetch: (...args) => fetch(...args) }))`
 
-- **`user-event` v13 cannot drive a Radix `Select`.** `userEvent.click` on an option leaves the
-  trigger unchanged, even with `skipPointerEventsCheck`, and a synthesized `pointerUp` does not
-  select either. Use `fireEvent.keyDown(trigger, { key: 'Enter' })` to open and
-  `fireEvent.click(option)` to choose. Tests touching a Select also need
-  `Element.prototype.scrollIntoView` stubbed — Radix calls it on open. See
-  `KeepApartSection.test.tsx`.
+- **`user-event` v13 cannot drive a Radix `Select` or `DropdownMenu`.** `userEvent.click` on an
+  option leaves the trigger unchanged, even with `skipPointerEventsCheck`, and a synthesized
+  `pointerUp` does not select either. Use `fireEvent.keyDown(trigger, { key: 'Enter' })` to open and
+  `fireEvent.click(option)` to choose. **`fireEvent.click` on the trigger does not open either one** —
+  confirmed for `DropdownMenu` in `SessionCard.test.tsx`, so reach for `keyDown` first rather than
+  treating it as a fallback. Tests touching either need `Element.prototype.scrollIntoView` stubbed —
+  Radix calls it on open. See `KeepApartSection.test.tsx` and `SessionCard.test.tsx`.
+- **Don't interpolate into a Radix menu label you plan to query as one string.**
+  `<DropdownMenuLabel>Seat {name} at…</DropdownMenuLabel>` renders three text nodes, so
+  `getByText('Seat Cara at…')` fails with "the text is broken up by multiple elements". Use a single
+  template literal in the component rather than weakening the test to a function matcher.
 - **Anything stored as a roster document id must survive `POST /roster/discard`.** Discard
   deletes every roster document and rewrites it with fresh uuids, so ids are not durable.
   `partner_id` and the program-level `keep_apart` pairs are both resolved to names before the
