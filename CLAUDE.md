@@ -40,6 +40,15 @@
   confirmed for `DropdownMenu` in `SessionCard.test.tsx`, so reach for `keyDown` first rather than
   treating it as a fallback. Tests touching either need `Element.prototype.scrollIntoView` stubbed —
   Radix calls it on open. See `KeepApartSection.test.tsx` and `SessionCard.test.tsx`.
+- **`userEvent.type` is slow enough to blow Jest's 5s timeout.** Seven characters means seven
+  keystrokes, each with its own React state update. `RosterGrid.test.tsx` timed out on
+  `userEvent.type(input, 'Charlie')`, and because the timeout aborts mid-`await`, teardown left React
+  broken and the **next two tests** rendered `<body><div /></body>` — a failure that looks like a
+  broken component and is really a corpse. Prefer `fireEvent.change(input, { target: { value } })`:
+  inputs read `e.target.value` wholesale, so per-keystroke typing exercises nothing extra. That one
+  swap took the suite from 33s to 7.5s. **But check what the value change is supposed to trigger** —
+  `fireEvent.change` does not focus, so a commit hanging off blur needs an explicit `.focus()` first
+  and a real click away to move focus out.
 - **Don't interpolate into a Radix menu label you plan to query as one string.**
   `<DropdownMenuLabel>Seat {name} at…</DropdownMenuLabel>` renders three text nodes, so
   `getByText('Seat Cara at…')` fails with "the text is broken up by multiple elements". Use a single
