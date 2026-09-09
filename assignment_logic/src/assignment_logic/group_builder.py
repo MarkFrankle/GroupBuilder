@@ -480,10 +480,10 @@ class GroupBuilder:
         # couples - the tool does not quietly produce a plan that breaks a rule
         # the user typed. Infeasible is refused upstream, not absorbed.
         #
-        # The field is symmetric by construction (it is derived from the stored
-        # id-pair list on every freeze), so reading one direction would do.
-        # Both are read anyway because a sorted pair is cheaper to dedupe than
-        # it is to reason about which half to trust.
+        # The field is intended to be symmetric - Task 3 derives it from the
+        # stored id-pair list on every freeze - but this code does not depend
+        # on that, because it reads both directions. Sorted tuples dedupe the
+        # two directions.
         name_to_id = {p["name"]: p["id"] for p in self.participants}
         keep_apart_pairs = set()
         for p in self.participants:

@@ -45,7 +45,10 @@ def test_keep_apart_is_hard_enough_to_make_a_program_infeasible():
 
     result = GroupBuilder(participants, 1, 1).generate_assignments(max_time_seconds=10)
 
-    assert result["status"] != "success"
+    # Not merely "not success": assert the model was proven INFEASIBLE rather
+    # than invalid or timed out, which are the other two failure returns.
+    assert result["status"] == "failure"
+    assert result["error"].startswith("No solution exists with the given constraints")
 
 
 def test_a_missing_keep_apart_field_is_treated_as_no_rule():
@@ -57,3 +60,38 @@ def test_a_missing_keep_apart_field_is_treated_as_no_rule():
     result = GroupBuilder(participants, 3, 3).generate_assignments(max_time_seconds=10)
 
     assert result["status"] == "success"
+
+
+def test_a_rule_naming_someone_off_the_roster_is_dropped():
+    # The roster is the authority on who exists: a pair is retired with the
+    # person, not raised over.
+    participants = [_person(i) for i in range(1, 10)]
+    participants[0]["keep_apart"] = ["Someone Who Left"]
+
+    result = GroupBuilder(participants, 3, 3).generate_assignments(max_time_seconds=10)
+
+    assert result["status"] == "success"
+
+
+def test_keep_apart_survives_the_incremental_solve_path():
+    # generate_assignments_incremental builds a fresh GroupBuilder per batch.
+    # The constraint only survives because the participant dicts - keep_apart
+    # and all - are passed through verbatim to each one. Four sessions is what
+    # handle_generate_assignments auto-selects the incremental path at.
+    participants = [_person(i) for i in range(1, 10)]
+    participants[0]["keep_apart"] = ["P2"]
+    participants[1]["keep_apart"] = ["P1"]
+
+    result = GroupBuilder(participants, 3, 4).generate_assignments_incremental(
+        batch_size=2, max_time_seconds=20
+    )
+
+    assert result["status"] == "success"
+    # Proof the batched path really ran, rather than falling through to the
+    # single-shot solver: only the incremental return carries this quality.
+    assert result["solution_quality"] == "incremental"
+    assert len(result["assignments"]) == 4
+    for session in result["assignments"]:
+        for table in session["tables"].values():
+            names = {p["name"] for p in table}
+            assert not {"P1", "P2"} <= names
