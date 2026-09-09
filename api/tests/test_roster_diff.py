@@ -191,6 +191,19 @@ class TestDiffRosters:
         assert diff.is_dirty is False
         assert diff.needs_rebuild is False
 
+    def test_a_canonical_self_pair_is_dropped_rather_than_read_as_a_change(self):
+        """Hand-edited or pre-feature canonical data could carry a rule naming
+        its own participant. A freshly derived draft never can, so keeping it
+        would be a phantom pair and a permanent spurious rebuild - on the one
+        action in the app that cannot be undone."""
+        canonical = [_canonical("A", keep_apart=["A"]), _canonical("B")]
+        draft = [_canonical("A"), _canonical("B")]
+
+        diff = diff_rosters(canonical=canonical, draft=draft)
+
+        assert diff.is_dirty is False
+        assert diff.needs_rebuild is False
+
 
 class TestApplyRenames:
     def test_rewrites_names_seats_partners_and_absences(self):
