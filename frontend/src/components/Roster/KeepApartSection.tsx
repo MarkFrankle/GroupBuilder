@@ -10,8 +10,12 @@ interface KeepApartSectionProps {
   participants: RosterParticipant[];
   /** Roster ids, each pair sorted, as the server stores them. */
   pairs: [string, string][];
-  /** Rejects with the server's refusal wording, which we render as-is. */
+  /** Rejects with the server's refusal wording, which we render as-is
+   * beneath the draft row. */
   onAdd: (aId: string, bId: string) => Promise<void>;
+  /** Must not reject. Removal is never refused server-side, so the only
+   * realistic failure is the network, and the page surfaces that through its
+   * own error handling rather than through a per-pair message here. */
   onRemove: (aId: string, bId: string) => Promise<void>;
   /** Locked: the sessions were built from this roster, so the rules are inert. */
   readOnly: boolean;
@@ -65,7 +69,10 @@ export function KeepApartSection({
     }
   };
 
-  const showEmptyLine = pairs.length === 0 && drafts.length === 0;
+  // Stays up while a draft row is open: this sentence is the only place the
+  // feature is explained, and opening a row is exactly when someone is asking
+  // what the block does.
+  const showEmptyLine = pairs.length === 0;
 
   return (
     <div className="space-y-2">

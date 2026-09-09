@@ -51,6 +51,27 @@ describe('KeepApartSection', () => {
     )).not.toBeInTheDocument();
   });
 
+  test('the explanation stays up while a draft row is open', () => {
+    render(<KeepApartSection {...defaultProps} />);
+    click(screen.getByRole('button', { name: 'Add a pair' }));
+    expect(screen.getAllByRole('combobox')).toHaveLength(2);
+    expect(screen.getByText(
+      'No pairs. People here will never be seated at the same table.',
+    )).toBeInTheDocument();
+  });
+
+  test('a half-filled draft row is discarded, not remembered', () => {
+    render(<KeepApartSection {...defaultProps} />);
+    click(screen.getByRole('button', { name: 'Add a pair' }));
+    openSelect(0);
+    pick('Ken Adler');
+
+    click(screen.getByRole('button', { name: 'Discard this pair' }));
+
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(defaultProps.onAdd).not.toHaveBeenCalled();
+  });
+
   test('nothing is saved until both names are chosen', async () => {
     render(<KeepApartSection {...defaultProps} />);
     await click(screen.getByRole('button', { name: 'Add a pair' }));
