@@ -22,6 +22,10 @@ from api.services.session_completion_guards import (
     refuse_if_any_session_complete,
     refuse_if_below_completed_prefix,
 )
+from api.services.keep_apart_storage import (
+    KeepApartStorage,
+    get_keep_apart_storage,
+)
 from api.services.roster_diff import apply_renames, diff_rosters
 from api.services.roster_gate import ShortfallError, check_shortfalls
 from api.services.program_solve import SolveFailed, solve_program
@@ -80,7 +84,10 @@ class GenerateRequest(BaseModel):
     num_sessions: int = Field(ge=1, le=6)
 
 
-def _roster_to_participant_list(participants: list[dict]) -> list[dict]:
+def _roster_to_participant_list(
+    participants: list[dict],
+    keep_apart_pairs: list[tuple[str, str]] | None = None,
+) -> list[dict]:
     """Convert roster docs to the solver's expected participant dict format."""
     id_to_name = {p["id"]: p["name"] for p in participants}
 
@@ -122,6 +129,26 @@ def _roster_to_participant_list(participants: list[dict]) -> list[dict]:
                     next_couple_id += 1
                 p["couple_id"] = couple_map[key]
 
+    # Keep-apart is stored program-level as id pairs because it is one-to-many;
+    # it is *frozen* per participant because participant_data is what travels -
+    # through the solver, through the rename propagation, and into the
+    # client-side flag detection. Deriving it symmetrically here on every freeze
+    # is what makes an asymmetric field unrepresentable.
+    #
+    # A pair naming an id that no longer resolves is dropped, exactly as a
+    # dangling partner_id resolves to None above. Deleting a participant
+    # therefore retires their rules with no cascade and no cleanup pass.
+    keep_apart_names: dict[str, list[str]] = {p["name"]: [] for p in result}
+    for a_id, b_id in keep_apart_pairs or []:
+        a_name, b_name = id_to_name.get(a_id), id_to_name.get(b_id)
+        if not a_name or not b_name or a_name == b_name:
+            continue
+        keep_apart_names[a_name].append(b_name)
+        keep_apart_names[b_name].append(a_name)
+
+    for p in result:
+        p["keep_apart"] = sorted(set(keep_apart_names[p["name"]]))
+
     return result
 
 
@@ -135,6 +162,7 @@ async def generate_from_roster(
     roster_service: RosterService = Depends(get_roster_service),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
     completion: SessionCompletionStorage = Depends(get_session_completion_storage),
+    keep_apart: KeepApartStorage = Depends(get_keep_apart_storage),
 ):
     """Rebuild the program from the live roster.
 
@@ -154,7 +182,9 @@ async def generate_from_roster(
     # draft has to pass through it before any comparison. Diffing raw roster
     # documents would compare partner_id against partner and read every
     # partnered person as changed.
-    participant_list = _roster_to_participant_list(participants)
+    participant_list = _roster_to_participant_list(
+        participants, keep_apart_pairs=keep_apart.get_pairs(program_id)
+    )
 
     # "No current set" is the first-run signal, not "canonical is empty" - that
     # distinguishes never-generated from a degenerate empty-roster set.
