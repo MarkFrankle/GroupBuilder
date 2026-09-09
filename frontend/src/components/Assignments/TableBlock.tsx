@@ -36,17 +36,17 @@ const TableBlock: React.FC<TableBlockProps> = ({
   onSelect,
   onMarkAbsent,
 }) => {
-  // Empty seats are stored as null, and Item 4b's mark-absent deliberately
-  // leaves the gap rather than re-solving.
+  // Empty seats are stored as null: mark-absent deliberately leaves the gap
+  // rather than re-solving.
   const people = participants.filter((p): p is Participant => !!p)
   const facilitators = people.filter(p => p.is_facilitator)
   const others = people.filter(p => !p.is_facilitator)
 
-  // The button appears in every table where the selected person sits, each
-  // scoped to its own session — lighting someone up in five places and making
-  // one actionable is an inconsistency the user has to reverse-engineer.
-  const selectedSitsHere =
-    selectedName !== null && people.some(p => p.name === selectedName)
+  // The selected person, when they sit at this table. The button appears in every
+  // such table — lighting someone up in five places and making one actionable is
+  // an inconsistency the user has to reverse-engineer.
+  const selectedHere =
+    selectedName !== null && people.some(p => p.name === selectedName) ? selectedName : null
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -54,22 +54,17 @@ const TableBlock: React.FC<TableBlockProps> = ({
         <div className="flex items-center gap-2">
           <div className="text-[13px] font-semibold">Table {tableNumber}</div>
           {/*
-            The free left slot. An earlier design assumed this button would have
-            to displace the stats on the right; this slot was empty the whole
-            time, so the stats never move.
+            Left slot, so the stats on the right never move while a person is
+            selected.
 
             Invisible until a person is selected, not present-and-disabled: an
             appearing control explains itself by appearing in response to the
             click just made.
           */}
-          {selectedName !== null && selectedSitsHere && onMarkAbsent && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onMarkAbsent(selectedName)}
-            >
+          {selectedHere && onMarkAbsent && (
+            <Button variant="outline" size="sm" onClick={() => onMarkAbsent(selectedHere)}>
               <UserMinus className="mr-1.5 h-3.5 w-3.5" />
-              Mark {selectedName} absent
+              Mark {selectedHere} absent
             </Button>
           )}
         </div>

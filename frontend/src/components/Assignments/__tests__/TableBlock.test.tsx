@@ -66,7 +66,23 @@ describe('TableBlock', () => {
       />
     )
 
-    expect(screen.getByText('3 people · 2F/1M · 3 religions')).toBeInTheDocument()
+    // Not just "the stats are on the page somewhere": the left-slot decision is
+    // a structural fact, so assert both sit inside the same header row and that
+    // the button comes first.
+    //
+    // `stats.parentElement` would be too loose — if the stats moved out of the
+    // header the parent becomes the outer wrapper, which still *contains* the
+    // button, so the assertion would pass in exactly the world it rules out.
+    const button = screen.getByRole('button', { name: 'Mark Ben absent' })
+    const stats = screen.getByText('3 people · 2F/1M · 3 religions')
+    // Testing Library's queries cannot express "these two share a row", and
+    // where they sit relative to each other is the whole claim here.
+    /* eslint-disable testing-library/no-node-access */
+    const row = button.closest('.border-b')
+    expect(row).not.toBeNull()
+    expect(stats.closest('.border-b')).toBe(row)
+    expect(stats.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy()
+    /* eslint-enable testing-library/no-node-access */
   })
 
   it('offers nothing when the selected person sits elsewhere', () => {
@@ -110,7 +126,7 @@ describe('TableBlock', () => {
     expect(screen.queryByRole('button', { name: /Mark .* absent/ })).not.toBeInTheDocument()
   })
 
-  it('reports the person and this table when pressed', () => {
+  it('reports the person when pressed', () => {
     const onMarkAbsent = jest.fn()
     render(
       <TableBlock
@@ -153,5 +169,26 @@ describe('TableBlock', () => {
       />
     )
     expect(screen.queryByRole('button', { name: /Mark .* absent/ })).not.toBeInTheDocument()
+  })
+
+  // Both Chip call sites — the facilitator row and everyone else — must stay
+  // wired. tsc catches a missing prop but not a dead branch, so a facilitator
+  // row going inert would otherwise be silent.
+  it('reports selection from the facilitator row and from everyone else', () => {
+    const onSelect = jest.fn()
+    render(
+      <TableBlock
+        tableNumber={1}
+        participants={people}
+        selectedName={null}
+        onSelect={onSelect}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ann · Facilitator' }))
+    expect(onSelect).toHaveBeenCalledWith('Ann')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ben' }))
+    expect(onSelect).toHaveBeenCalledWith('Ben')
   })
 })

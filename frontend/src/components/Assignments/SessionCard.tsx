@@ -24,7 +24,7 @@ interface SessionCardProps {
   onMarkComplete?: () => void
   /** Supplied only for the latest completed session; reopening below it would leave a gap. */
   onReopen?: () => void
-  /** Pass-throughs to TableBlock. Task 5 wires these to page-level selection. */
+  /** Pass-throughs to TableBlock. */
   selectedName?: string | null
   onSelect?: (name: string) => void
 }
@@ -53,6 +53,8 @@ const SessionCard: React.FC<SessionCardProps> = ({
   onMarkComplete,
   onReopen,
   selectedName = null,
+  // Temporary no-op default; chips depress and do nothing until the page owns
+  // selection.
   onSelect = () => {},
 }) => {
   // Expansion is a glance at the past, not a preference — it is not persisted.
