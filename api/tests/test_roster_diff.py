@@ -3,7 +3,9 @@
 from api.services.roster_diff import apply_renames, diff_rosters
 
 
-def _canonical(name, religion="Other", gender="Other", facilitator=False):
+def _canonical(
+    name, religion="Other", gender="Other", facilitator=False, keep_apart=None
+):
     return {
         "name": name,
         "religion": religion,
@@ -11,6 +13,7 @@ def _canonical(name, religion="Other", gender="Other", facilitator=False):
         "partner": None,
         "is_facilitator": facilitator,
         "keep_together": False,
+        "keep_apart": keep_apart or [],
     }
 
 
@@ -101,6 +104,43 @@ class TestDiffRosters:
         assert result.renames == {}
         assert result.needs_rebuild is True
 
+    def test_adding_a_keep_apart_pair_needs_a_rebuild(self):
+        canonical = [_canonical("A"), _canonical("B")]
+        draft = [_canonical("A", keep_apart=["B"]), _canonical("B", keep_apart=["A"])]
+
+        diff = diff_rosters(canonical=canonical, draft=draft)
+
+        assert diff.is_dirty is True
+        assert diff.needs_rebuild is True
+
+    def test_removing_a_keep_apart_pair_needs_a_rebuild(self):
+        canonical = [
+            _canonical("A", keep_apart=["B"]),
+            _canonical("B", keep_apart=["A"]),
+        ]
+        draft = [_canonical("A"), _canonical("B")]
+
+        assert diff_rosters(canonical=canonical, draft=draft).needs_rebuild is True
+
+    def test_renaming_someone_inside_a_keep_apart_pair_is_still_a_rename(self):
+        """The rule is untouched; only the spelling moved. Falling through to a
+        rebuild here would destroy the plan over a typo fix, through the one
+        action in the app that cannot be undone."""
+        canonical = [
+            _canonical("Kathrine", keep_apart=["B"]),
+            _canonical("B", keep_apart=["Kathrine"]),
+        ]
+        draft = [
+            _canonical("Katherine", keep_apart=["B"]),
+            _canonical("B", keep_apart=["Katherine"]),
+        ]
+
+        diff = diff_rosters(canonical=canonical, draft=draft)
+
+        assert diff.renames == {"Kathrine": "Katherine"}
+        assert diff.is_dirty is True
+        assert diff.needs_rebuild is False
+
 
 class TestApplyRenames:
     def test_rewrites_names_seats_partners_and_absences(self):
@@ -131,6 +171,21 @@ class TestApplyRenames:
         assert new_assignments[0]["absentParticipants"][0]["name"] == "Katherine"
         assert [p["name"] for p in new_participants] == ["Katherine", "Bob"]
         assert new_participants[1]["partner"] == "Katherine"
+
+    def test_a_rename_rewrites_keep_apart_on_other_participants(self):
+        """The fast path writes ``apply_renames``' output straight back as the
+        canonical ``participant_data``, so a rule left pointing at the old name
+        would be a name nobody answers to."""
+        participant_data = [
+            {"name": "Ken Adler", "partner": None, "keep_apart": ["Bill"]},
+            {"name": "Bill", "partner": None, "keep_apart": ["Ken Adler"]},
+        ]
+
+        _, renamed = apply_renames([], participant_data, {"Ken Adler": "Ken A."})
+
+        by_name = {p["name"]: p for p in renamed}
+        assert by_name["Ken A."]["keep_apart"] == ["Bill"]
+        assert by_name["Bill"]["keep_apart"] == ["Ken A."]
 
     def test_leaves_the_input_untouched(self):
         """Callers hold the originals; mutating them in place would surprise."""

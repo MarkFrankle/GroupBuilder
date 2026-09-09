@@ -11,6 +11,9 @@ Two questions, deliberately separate:
 * ``is_dirty`` - do they differ at all? Drives the lock and the changeset.
 * ``needs_rebuild`` - do they differ in a way that changes the mixing?
 
+Mixing-relevant differences are the ``MIXING_FIELDS`` below, plus the set of
+``keep_apart`` pairs, which is compared separately - see ``diff_rosters``.
+
 The only difference that is dirty but does not need a rebuild is a name
 spelling change, which is propagated instead. See ``apply_renames``.
 """
@@ -76,8 +79,25 @@ def diff_rosters(
         else:
             added, removed = {new}, {old}
 
-    is_dirty = bool(added or removed or changed or renames)
-    needs_rebuild = bool(added or removed or changed)
+    # Keep-apart is compared as a set of pairs rather than as a per-person
+    # field, and *after* renames are resolved. Adding it to MIXING_FIELDS
+    # instead would compare partner names literally, so renaming anyone named
+    # in a rule would read as a mixing change and collapse the rename fast path
+    # into a full rebuild - destroying the plan over a typo fix.
+    def _pairs(people, rename_map):
+        out = set()
+        for p in people:
+            a = rename_map.get(p["name"], p["name"])
+            for other in p.get("keep_apart") or []:
+                b = rename_map.get(other, other)
+                if a != b:
+                    out.add(tuple(sorted((a, b))))
+        return out
+
+    keep_apart_changed = _pairs(canonical, renames) != _pairs(draft, {})
+
+    is_dirty = bool(added or removed or changed or renames or keep_apart_changed)
+    needs_rebuild = bool(added or removed or changed or keep_apart_changed)
 
     return RosterDiff(is_dirty=is_dirty, needs_rebuild=needs_rebuild, renames=renames)
 
@@ -89,9 +109,10 @@ def apply_renames(
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """Rewrite old names to new ones everywhere a name is stored.
 
-    Names appear in four places, all of them here: seat entries, the ``partner``
-    field on a seat, the ``absentParticipants`` list, and the canonical
-    ``participant_data``. Returns fresh structures; the inputs are not mutated.
+    Names appear in five places, all of them here: seat entries, the ``partner``
+    field on a seat, the ``absentParticipants`` list, the canonical
+    ``participant_data``, and the ``keep_apart`` lists it carries. Returns fresh
+    structures; the inputs are not mutated.
     """
     new_assignments = copy.deepcopy(assignments)
     new_participants = copy.deepcopy(participant_data)
@@ -101,6 +122,10 @@ def apply_renames(
             person["name"] = renames[person["name"]]
         if person.get("partner") in renames:
             person["partner"] = renames[person["partner"]]
+        if person.get("keep_apart"):
+            person["keep_apart"] = [
+                renames.get(other, other) for other in person["keep_apart"]
+            ]
 
     for session in new_assignments:
         for seats in (session.get("tables") or {}).values():
