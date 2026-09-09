@@ -72,6 +72,35 @@ class TestDiffRosters:
         assert result.needs_rebuild is True
         assert result.renames == {}
 
+    def test_a_like_for_like_replacement_is_treated_as_a_rename_on_purpose(self):
+        """Ellen drops out, Priya joins, every mixing field the same.
+
+        This reads as a rename, and that is the intended behaviour rather than a
+        gap in the detection. Seating Priya in Ellen's chair preserves every
+        constraint and the entire repeat structure, so a rebuild would destroy a
+        working plan to arrive somewhere no better. Safe only because the
+        endpoint refuses renames once any Session is complete - see the note in
+        ``roster_diff``.
+        """
+        result = diff_rosters(
+            canonical=[_canonical("Alice"), _canonical("Ellen")],
+            draft=[_canonical("Alice"), _canonical("Priya")],
+        )
+
+        assert result.renames == {"Ellen": "Priya"}
+        assert result.needs_rebuild is False
+
+    def test_a_replacement_by_someone_different_does_need_a_rebuild(self):
+        """The moment any mixing field differs it stops being a rename, because
+        the plan's balance no longer holds."""
+        result = diff_rosters(
+            canonical=[_canonical("Alice"), _canonical("Ellen")],
+            draft=[_canonical("Alice"), _canonical("Priya", religion="Muslim")],
+        )
+
+        assert result.renames == {}
+        assert result.needs_rebuild is True
+
 
 class TestApplyRenames:
     def test_rewrites_names_seats_partners_and_absences(self):

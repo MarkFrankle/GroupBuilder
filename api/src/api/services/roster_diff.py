@@ -52,6 +52,21 @@ def diff_rosters(
     # A rename shows up as exactly one unmatched name on each side. More than one
     # on either side is ambiguous - we will not pair them up by guesswork, so it
     # falls through as a rebuild.
+    #
+    # Note this also catches a genuine *replacement* - Ellen drops out, Priya
+    # joins - whenever the two happen to share every mixing field. That is
+    # deliberate, not an oversight. Because a rename is only ever detected when
+    # all of MIXING_FIELDS match, seating Priya in Ellen's chair preserves every
+    # constraint the solver enforces and the whole repeat structure: the plan is
+    # exactly as good, and re-solving would cost the coordinator their seating
+    # for no gain. Nor can it falsify the past - the endpoint refuses every
+    # rebuild, this fast path included, once any Session is complete, so every
+    # Session a rename can touch is still prospective.
+    #
+    # That last clause is what makes it safe. If renames are ever allowed while
+    # a Session is complete, rewriting a name would rewrite who attended a night
+    # that already happened, and telling a typo from a replacement would become
+    # load-bearing.
     renames: Dict[str, str] = {}
     if len(added) == 1 and len(removed) == 1:
         old, new = removed.pop(), added.pop()
