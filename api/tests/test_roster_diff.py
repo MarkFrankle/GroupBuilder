@@ -141,6 +141,56 @@ class TestDiffRosters:
         assert diff.is_dirty is True
         assert diff.needs_rebuild is False
 
+    def test_a_rename_plus_a_keep_apart_change_needs_a_rebuild(self):
+        """The one case where the two halves interact.
+
+        A coordinator fixing a typo and adding a separation rule in the same
+        save is an ordinary sequence. The rename must not short-circuit the pair
+        comparison: propagating the name without re-solving would leave the new
+        rule unenforced, and the router declines the fast path only because
+        ``needs_rebuild`` is true here.
+        """
+        canonical = [
+            _canonical("Kathrine"),
+            _canonical("B"),
+            _canonical("C"),
+        ]
+        draft = [
+            _canonical("Katherine"),
+            _canonical("B", keep_apart=["C"]),
+            _canonical("C", keep_apart=["B"]),
+        ]
+
+        diff = diff_rosters(canonical=canonical, draft=draft)
+
+        assert diff.renames == {"Kathrine": "Katherine"}
+        assert diff.is_dirty is True
+        assert diff.needs_rebuild is True
+
+    def test_an_asymmetric_canonical_rule_is_not_a_change(self):
+        """Pairs are unordered, so one side naming the other is the same rule."""
+        canonical = [_canonical("A", keep_apart=["B"]), _canonical("B")]
+        draft = [_canonical("A", keep_apart=["B"]), _canonical("B", keep_apart=["A"])]
+
+        diff = diff_rosters(canonical=canonical, draft=draft)
+
+        assert diff.is_dirty is False
+        assert diff.needs_rebuild is False
+
+    def test_canonical_without_the_keep_apart_key_is_not_a_change(self):
+        """A set frozen before the feature existed has no ``keep_apart`` at all.
+        Those rosters must not read as dirty the moment the field is added."""
+        canonical = [
+            {k: v for k, v in _canonical(n).items() if k != "keep_apart"}
+            for n in ("A", "B")
+        ]
+        draft = [_canonical("A"), _canonical("B")]
+
+        diff = diff_rosters(canonical=canonical, draft=draft)
+
+        assert diff.is_dirty is False
+        assert diff.needs_rebuild is False
+
 
 class TestApplyRenames:
     def test_rewrites_names_seats_partners_and_absences(self):
