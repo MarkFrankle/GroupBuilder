@@ -417,7 +417,7 @@ const AssignmentsPage: React.FC = () => {
           This program has no assignments yet.
         </p>
         <Button variant="outline" size="sm" onClick={() => navigate('/roster')}>
-          Go to Setup
+          Go to Roster
         </Button>
       </div>
     )

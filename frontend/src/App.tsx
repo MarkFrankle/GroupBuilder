@@ -42,7 +42,7 @@ function NavBar() {
     <nav className="no-print border-b px-4 py-2 flex gap-4 text-sm items-center">
       {(hasProgram || isAdminPage || isHelpPage) && <>
         <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
-        <Link to="/roster" className="text-muted-foreground hover:text-foreground transition-colors">Setup</Link>
+        <Link to="/roster" className="text-muted-foreground hover:text-foreground transition-colors">Roster</Link>
         <Link to="/table-assignments" className="text-muted-foreground hover:text-foreground transition-colors">Assignments</Link>
         <Link to="/help" className="text-muted-foreground hover:text-foreground transition-colors">Help</Link>
       </>}
