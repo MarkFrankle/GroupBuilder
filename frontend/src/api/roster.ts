@@ -75,3 +75,52 @@ export async function discardRosterChanges(programId: string): Promise<void> {
     throw new Error(data?.detail || 'Could not undo those changes. Please try again.');
   }
 }
+
+/** The pairs who must never share a table: roster ids, each pair sorted. */
+export async function getKeepApart(programId: string): Promise<[string, string][]> {
+  const response = await authenticatedFetch(`/api/roster/keep-apart?program_id=${programId}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch keep-apart pairs: ${response.status}`);
+  }
+  const data = await response.json();
+  return data.pairs;
+}
+
+/**
+ * Keep two people apart.
+ *
+ * A refusal comes back worded for the coordinator, so it is thrown as-is
+ * rather than replaced with our own.
+ */
+export async function addKeepApart(
+  programId: string,
+  aId: string,
+  bId: string
+): Promise<[string, string][]> {
+  const response = await authenticatedFetch(`/api/roster/keep-apart?program_id=${programId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ a_id: aId, b_id: bId }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.detail || 'Something went wrong. Please try again.');
+  }
+  return data.pairs;
+}
+
+export async function removeKeepApart(
+  programId: string,
+  aId: string,
+  bId: string
+): Promise<[string, string][]> {
+  const response = await authenticatedFetch(
+    `/api/roster/keep-apart/${aId}/${bId}?program_id=${programId}`,
+    { method: 'DELETE' }
+  );
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.detail || 'Could not remove that pair. Please try again.');
+  }
+  return data.pairs;
+}
