@@ -16,6 +16,9 @@ interface RosterGridProps {
   onDelete: (id: string) => void;
   onAdd: (data: Omit<RosterParticipant, 'id'>) => void;
   onKeepTogetherToggle: (id: string) => void;
+  /** Locked: the assignments were built from this roster and editing it would
+   * invalidate them. Every field is inert and the add-row is gone. */
+  readOnly?: boolean;
 }
 
 interface EmptyRowState {
@@ -30,7 +33,7 @@ const EMPTY_ROW: EmptyRowState = {
   name: '', religion: 'Other', gender: 'Other', partner_id: null, is_facilitator: false,
 };
 
-export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepTogetherToggle }: RosterGridProps) {
+export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepTogetherToggle, readOnly = false }: RosterGridProps) {
 
   const [editingNames, setEditingNames] = useState<Record<string, string>>({});
   const [emptyRow, setEmptyRow] = useState<EmptyRowState>({ ...EMPTY_ROW });
@@ -169,11 +172,12 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
                       value={currentName}
                       onChange={e => handleNameChange(p.id, e.target.value)}
                       onBlur={() => handleNameBlur(p)}
+                      disabled={readOnly}
                       className={hasError ? 'border-red-500' : ''}
                     />
                   </TableCell>
                   <TableCell className="p-1">
-                    <Select value={p.religion} onValueChange={v => handleFieldChange(p, 'religion', v)}>
+                    <Select value={p.religion} disabled={readOnly} onValueChange={v => handleFieldChange(p, 'religion', v)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {RELIGIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
@@ -181,7 +185,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
                     </Select>
                   </TableCell>
                   <TableCell className="p-1">
-                    <Select value={p.gender} onValueChange={v => handleFieldChange(p, 'gender', v)}>
+                    <Select value={p.gender} disabled={readOnly} onValueChange={v => handleFieldChange(p, 'gender', v)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {GENDERS.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
@@ -192,6 +196,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
                     <div className="flex items-center gap-1">
                       <Select
                         value={p.partner_id ?? 'none'}
+                        disabled={readOnly}
                         onValueChange={v => handleFieldChange(p, 'partner_id', v)}
                       >
                         <SelectTrigger className="min-w-0"><SelectValue placeholder="None" /></SelectTrigger>
@@ -208,7 +213,8 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
                       {p.partner_id && (
                         <button
                           onClick={() => onKeepTogetherToggle(p.id)}
-                          className="p-0.5 rounded hover:bg-gray-100 shrink-0"
+                          disabled={readOnly}
+                          className="p-0.5 rounded hover:bg-gray-100 shrink-0 disabled:cursor-not-allowed"
                           title={p.keep_together ? "Partner will be at the same table (click to separate)" : "Partner will be at a different table (click to keep together)"}
                         >
                           {p.keep_together ? (
@@ -225,11 +231,13 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
                       type="checkbox"
                       checked={p.is_facilitator ?? false}
                       onChange={e => handleFacilitatorChange(p, e.target.checked)}
-                      className="h-4 w-4 cursor-pointer"
+                      disabled={readOnly}
+                      className="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
                       aria-label={`Mark ${p.name} as facilitator`}
                     />
                   </TableCell>
                   <TableCell className="p-1">
+                    {!readOnly && (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -239,11 +247,13 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
                     >
                       <Trash2 className="h-4 w-4 text-muted-foreground" />
                     </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               );
             })}
-            {/* Perpetual empty row */}
+            {/* Perpetual empty row - there is nothing to add to a locked roster */}
+            {!readOnly && (
             <TableRow ref={emptyRowRef} onBlur={handleEmptyRowBlur}>
               <TableCell className="p-1">
                 <Input
@@ -283,6 +293,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
               </TableCell>
               <TableCell className="p-1"></TableCell>
             </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>

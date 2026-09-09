@@ -17,14 +17,15 @@ import {
   upsertParticipant, deleteParticipant as apiDeleteParticipant,
   generateFromRoster,
 } from '@/api/roster';
-import { useRoster, useAssignmentSetMetadata } from '@/hooks/queries';
+import { useRoster, useAssignmentSetMetadata, useCanonicalRoster } from '@/hooks/queries';
+import { computeChangeset, CanonicalParticipant } from '@/utils/rosterDiff';
 import { useProgram } from '@/contexts/ProgramContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { authenticatedFetch } from '@/utils/apiClient';
 import { fetchWithRetry } from '@/utils/fetchWithRetry';
 import { API_BASE_URL } from '@/config/api';
 import { MAX_TABLES, MAX_SESSIONS } from '@/constants';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, Pencil } from 'lucide-react';
 import { movePartnerAdjacent, sortPartnersAdjacent } from '@/utils/sortWithPartnerAdjacency';
 
 type SaveStatus = 'saved' | 'saving' | 'error';
@@ -48,6 +49,29 @@ interface SessionResult {
   absentParticipants?: AbsentParticipant[];
 }
 
+interface CanonicalRoster {
+  participants: CanonicalParticipant[];
+  num_tables: number | null;
+  num_sessions: number | null;
+}
+
+/**
+ * The draft roster in the shape the assignment set froze. The canonical copy
+ * stores a partner *name*, not an id, so a partnered person would read as
+ * changed on every comparison unless the draft is translated first.
+ */
+function toCanonical(participants: RosterParticipant[]): CanonicalParticipant[] {
+  const nameById = new Map(participants.map(p => [p.id, p.name]));
+  return participants.map(p => ({
+    name: p.name,
+    religion: p.religion,
+    gender: p.gender,
+    partner: p.partner_id ? nameById.get(p.partner_id) ?? null : null,
+    is_facilitator: p.is_facilitator ?? false,
+    keep_together: p.keep_together ?? false,
+  }));
+}
+
 export function RosterPage() {
   const navigate = useNavigate();
   const { currentProgram } = useProgram();
@@ -56,6 +80,8 @@ export function RosterPage() {
   const { data: metadata } = useAssignmentSetMetadata(currentProgram?.id ?? null);
   const currentSet: AssignmentSetSummary | null =
     (metadata as AssignmentSetSummary | undefined) ?? null;
+  const { data: canonicalData } = useCanonicalRoster(currentProgram?.id ?? null);
+  const canonical = (canonicalData as CanonicalRoster | undefined) ?? null;
 
   const [participants, setParticipants] = useState<RosterParticipant[]>([]);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
@@ -67,6 +93,9 @@ export function RosterPage() {
   const [maintainAbsences, setMaintainAbsences] = useState(true);
   const [sourceAbsences, setSourceAbsences] = useState<SessionResult[] | null>(null);
   const [absencesLoading, setAbsencesLoading] = useState(false);
+  // Deliberately not persisted: "I pressed Edit but changed nothing" is not
+  // worth remembering, and a reload should put the guard back.
+  const [armed, setArmed] = useState(false);
 
   useEffect(() => {
     if (!currentSet || !currentProgram) return;
@@ -77,6 +106,14 @@ export function RosterPage() {
       .catch(() => setSourceAbsences([]))
       .finally(() => setAbsencesLoading(false));
   }, [currentSet?.assignment_set_id, currentProgram?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The selects have to start on the plan's real shape, or a program built as
+  // anything other than the 4x5 default would read as changed forever.
+  useEffect(() => {
+    if (!currentSet) return;
+    setNumTables(String(currentSet.num_tables));
+    setNumSessions(String(currentSet.num_sessions));
+  }, [currentSet?.assignment_set_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (rosterData) {
@@ -274,6 +311,16 @@ export function RosterPage() {
     }
   };
 
+  const changeset = computeChangeset(
+    canonical?.participants ?? [],
+    toCanonical(participants),
+    { tables: canonical?.num_tables ?? null, sessions: canonical?.num_sessions ?? null },
+    { tables: parseInt(numTables), sessions: parseInt(numSessions) },
+  );
+  // The lock is derived, never stored: a current set exists, the roster still
+  // matches the one it was built from, and the coordinator hasn't asked to edit.
+  const locked = !!currentSet && !changeset.isDirty && !armed;
+
   const canGenerate = participants.length >= parseInt(numTables) && participants.length > 0;
   const canRegenerateExisting = currentSet
     ? participants.length >= currentSet.num_tables && participants.length > 0
@@ -294,13 +341,27 @@ export function RosterPage() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Roster</CardTitle>
-              <CardDescription>Manage your participants</CardDescription>
+              <CardDescription>
+                {locked
+                  ? 'Locked \u2014 these are the people your sessions were built from'
+                  : changeset.total > 0
+                    ? `${changeset.total} change${changeset.total === 1 ? '' : 's'} not yet in your sessions`
+                    : 'Manage your participants'}
+              </CardDescription>
             </div>
-            <span className="text-sm text-muted-foreground">
-              {saveStatus === 'saving' && 'Saving...'}
-              {saveStatus === 'saved' && 'Saved'}
-              {saveStatus === 'error' && 'Save failed'}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground">
+                {saveStatus === 'saving' && 'Saving...'}
+                {saveStatus === 'saved' && 'Saved'}
+                {saveStatus === 'error' && 'Save failed'}
+              </span>
+              {locked && (
+                <Button variant="outline" size="sm" onClick={() => setArmed(true)}>
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Edit roster
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -310,6 +371,7 @@ export function RosterPage() {
             onDelete={handleDelete}
             onAdd={handleAdd}
             onKeepTogetherToggle={handleKeepTogetherToggle}
+            readOnly={locked}
           />
 
           {currentSet ? (
@@ -398,7 +460,7 @@ export function RosterPage() {
                 <div className="flex space-x-4">
                   <div className="flex-1">
                     <Label htmlFor="num-tables">Number of Tables</Label>
-                    <Select value={numTables} onValueChange={setNumTables}>
+                    <Select value={numTables} disabled={locked} onValueChange={setNumTables}>
                       <SelectTrigger id="num-tables">
                         <SelectValue />
                       </SelectTrigger>
@@ -411,7 +473,7 @@ export function RosterPage() {
                   </div>
                   <div className="flex-1">
                     <Label htmlFor="num-sessions">Number of Sessions</Label>
-                    <Select value={numSessions} onValueChange={setNumSessions}>
+                    <Select value={numSessions} disabled={locked} onValueChange={setNumSessions}>
                       <SelectTrigger id="num-sessions">
                         <SelectValue />
                       </SelectTrigger>
@@ -452,7 +514,7 @@ export function RosterPage() {
               <div className="flex space-x-4">
                 <div className="flex-1">
                   <Label htmlFor="num-tables">Number of Tables</Label>
-                  <Select value={numTables} onValueChange={setNumTables}>
+                  <Select value={numTables} disabled={locked} onValueChange={setNumTables}>
                     <SelectTrigger id="num-tables">
                       <SelectValue />
                     </SelectTrigger>
@@ -465,7 +527,7 @@ export function RosterPage() {
                 </div>
                 <div className="flex-1">
                   <Label htmlFor="num-sessions">Number of Sessions</Label>
-                  <Select value={numSessions} onValueChange={setNumSessions}>
+                  <Select value={numSessions} disabled={locked} onValueChange={setNumSessions}>
                     <SelectTrigger id="num-sessions">
                       <SelectValue />
                     </SelectTrigger>
