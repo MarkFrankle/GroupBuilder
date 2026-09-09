@@ -159,3 +159,40 @@ def test_list_recent_sets_survives_a_pointer_at_a_missing_set(storage):
     assert [s["assignment_set_id"] for s in storage.list_recent_sets(PROGRAM)] == [
         newest
     ]
+
+
+def test_overwrite_version_assignments_replaces_seats_in_place(storage):
+    """A rename rewrites the head version without minting a new one."""
+    set_id = _make_set(storage)
+    storage.save_version(
+        program_id=PROGRAM,
+        set_id=set_id,
+        version_id="v1",
+        assignments=[{"session": 1, "tables": {"1": [{"name": "Kathrine"}]}}],
+        metadata={"label": "Sessions generated"},
+    )
+    before = storage.get_version(PROGRAM, set_id, "v1")["created_at"]
+
+    storage.overwrite_version_assignments(
+        PROGRAM,
+        set_id,
+        "v1",
+        [{"session": 1, "tables": {"1": [{"name": "Katherine"}]}}],
+    )
+
+    version = storage.get_version(PROGRAM, set_id, "v1")
+    assert version["assignments"][0]["tables"]["1"][0]["name"] == "Katherine"
+    assert version["metadata"]["label"] == "Sessions generated"
+    assert version["created_at"] == before
+    assert [v["version_id"] for v in storage.list_versions(PROGRAM, set_id)] == ["v1"]
+
+
+def test_update_participant_data_replaces_the_canonical_roster(storage):
+    set_id = _make_set(storage)
+
+    storage.update_participant_data(PROGRAM, set_id, [{"name": "Carol"}])
+
+    data = storage.get_set(PROGRAM, set_id)
+    assert [p["name"] for p in data["participant_data"]] == ["Carol"]
+    assert data["num_tables"] == 2
+    assert data["filename"] == "roster"

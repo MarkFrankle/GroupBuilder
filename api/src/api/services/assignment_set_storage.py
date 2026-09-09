@@ -128,6 +128,36 @@ class AssignmentSetStorage:
             }
         )
 
+    def overwrite_version_assignments(
+        self,
+        program_id: str,
+        set_id: str,
+        version_id: str,
+        assignments: Any,
+    ) -> None:
+        """Replace one version's seating in place, leaving the rest of it alone.
+
+        Used by the rename path. A rename is not a change to the plan - nobody
+        moved - so a new version would be materially identical to its parent.
+        ``created_at`` and ``metadata`` are untouched, so history reads the same
+        as it did before the spelling was fixed.
+        """
+        self._set_ref(program_id, set_id).collection("versions").document(
+            version_id
+        ).set({"assignments": _serialize_for_firestore(assignments)}, merge=True)
+
+    def update_participant_data(
+        self,
+        program_id: str,
+        set_id: str,
+        participant_data: List[Dict[str, Any]],
+    ) -> None:
+        """Replace a set's canonical roster in place."""
+        self._set_ref(program_id, set_id).set(
+            {"participant_data": _serialize_for_firestore(participant_data)},
+            merge=True,
+        )
+
     def get_version(
         self, program_id: str, set_id: str, version_id: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
