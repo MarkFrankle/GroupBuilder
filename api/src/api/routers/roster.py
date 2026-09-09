@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -21,6 +22,9 @@ from api.services.session_completion_guards import (
     refuse_if_any_session_complete,
     refuse_if_below_completed_prefix,
 )
+from api.services.roster_diff import apply_renames, diff_rosters
+from api.services.roster_gate import ShortfallError, check_shortfalls
+from api.services.program_solve import SolveFailed, solve_program
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -45,6 +49,30 @@ async def get_roster(
 ):
     participants = roster_service.get_roster(program_id)
     return {"participants": participants}
+
+
+@router.get("/canonical")
+async def get_canonical_roster(
+    program_id: str = Depends(validate_program_access),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+):
+    """The roster the current assignments were built from, plus its shape.
+
+    This is the *canonical* copy - frozen on the assignment set at generate
+    time. The live ``roster/`` collection is the draft. The Roster page derives
+    its lock by comparing the two, so an empty answer here means "no assignments
+    yet", which is a normal first-run state rather than an error.
+    """
+    set_id = storage.get_current_set_id(program_id)
+    if not set_id:
+        return {"participants": [], "num_tables": None, "num_sessions": None}
+
+    assignment_set = storage.get_set(program_id, set_id) or {}
+    return {
+        "participants": assignment_set.get("participant_data", []),
+        "num_tables": assignment_set.get("num_tables"),
+        "num_sessions": assignment_set.get("num_sessions"),
+    }
 
 
 class GenerateRequest(BaseModel):
@@ -108,11 +136,13 @@ async def generate_from_roster(
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
     completion: SessionCompletionStorage = Depends(get_session_completion_storage),
 ):
-    # Generating from the roster mints a new set and repoints the program at it,
-    # which is a whole-program rebuild. It must refuse before any work or write.
-    # Checked before the general refusal so the more specific message wins: a
-    # coordinator shrinking the program needs to hear about the floor, not just
-    # that a rebuild is impossible.
+    """Rebuild the program from the live roster.
+
+    Solves first and commits only on success. The set is minted *after* a
+    solution exists, so a failed solve leaves the program exactly where it was.
+    """
+    # Refuse before any work or write. The floor check goes first so the more
+    # specific message wins for a coordinator shrinking the program.
     refuse_if_below_completed_prefix(completion, program_id, data.num_sessions)
     refuse_if_any_session_complete(completion, program_id)
 
@@ -120,24 +150,104 @@ async def generate_from_roster(
     if not participants:
         raise HTTPException(status_code=400, detail="Roster is empty")
 
-    if len(participants) < data.num_tables:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Need at least {data.num_tables} participants for {data.num_tables} tables",
-        )
-
+    # Canonical participant_data is literally this function's output, so the
+    # draft has to pass through it before any comparison. Diffing raw roster
+    # documents would compare partner_id against partner and read every
+    # partnered person as changed.
     participant_list = _roster_to_participant_list(participants)
 
-    facilitator_count = sum(
-        1 for p in participant_list if p.get("is_facilitator", False)
+    # "No current set" is the first-run signal, not "canonical is empty" - that
+    # distinguishes never-generated from a degenerate empty-roster set.
+    current_set_id = storage.get_current_set_id(program_id)
+    current_set = (
+        storage.get_set(program_id, current_set_id) if current_set_id else None
     )
-    if facilitator_count > 0 and facilitator_count < data.num_tables:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Need at least {data.num_tables} facilitators for {data.num_tables} tables (have {facilitator_count})",
-        )
 
+    # A rename-only change propagates and returns without solving. Skipping the
+    # rebuild without propagating would leave the old spelling on the
+    # Assignments page forever - participants are matched by name everywhere.
+    if current_set:
+        shape_unchanged = (
+            current_set.get("num_tables") == data.num_tables
+            and current_set.get("num_sessions") == data.num_sessions
+        )
+        diff = diff_rosters(
+            canonical=current_set.get("participant_data") or [], draft=participant_list
+        )
+        if shape_unchanged and diff.renames and not diff.needs_rebuild:
+            # The canonical roster is renamed once.
+            _, renamed_participants = apply_renames(
+                [], current_set.get("participant_data") or [], diff.renames
+            )
+            # Then every version of the set, not just the head. Promotion can
+            # put any version of the current set back at the head, so leaving
+            # the older ones spelt the old way means undoing a shuffle
+            # resurrects the typo - and the page would then read Locked,
+            # because the roster still matches participant_data, offering no
+            # way to notice it or clear it. Version counts per set are small
+            # and bounded.
+            for entry in storage.list_versions(program_id, current_set_id):
+                version_id = entry["version_id"]
+                version = storage.get_version(program_id, current_set_id, version_id)
+                if not version:
+                    continue
+                # Overwritten in place rather than replaced by a new version:
+                # nobody moved, so a new history entry would be materially
+                # identical to its parent.
+                renamed_assignments, _ = apply_renames(
+                    version.get("assignments") or [], [], diff.renames
+                )
+                storage.overwrite_version_assignments(
+                    program_id, current_set_id, version_id, renamed_assignments
+                )
+
+            storage.update_participant_data(
+                program_id, current_set_id, renamed_participants
+            )
+            return {
+                "assignment_set_id": current_set_id,
+                "rebuilt": False,
+                "message": "Roster saved. No rebuild needed.",
+            }
+
+    # Shortfall gate - arithmetic only, no solve. It sits after the rename fast
+    # path on purpose: the gate exists to name what is short before we run the
+    # solver, and a rename never reaches the solver. Running it first refused a
+    # typo fix whenever the roster happened to be below the headcount.
     try:
+        check_shortfalls(participant_list, data.num_tables)
+    except ShortfallError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Absences carry across every rebuild, always - there is no checkbox,
+    # because forgetting one silently seats someone who is away.
+    absence_map = {}
+    if current_set_id:
+        version = storage.get_version(program_id, current_set_id)
+        for session in (version or {}).get("assignments", []):
+            absent = session.get("absentParticipants") or []
+            if absent:
+                absence_map[int(session["session"])] = absent
+
+    # Still nothing written.
+    try:
+        assignments, metadata = solve_program(
+            participants=participant_list,
+            num_tables=data.num_tables,
+            num_sessions=data.num_sessions,
+            absence_map=absence_map,
+            max_time_seconds=120,
+        )
+    except SolveFailed as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Commit: mint the set and write its first version together.
+    try:
+        # The program is repointed last. Creating the set and writing its first
+        # version are two writes, and a program pointed at a set whose version
+        # never arrived is the empty-set bug this endpoint exists to close -
+        # narrower than before, but the same failure. Until the pointer moves,
+        # the half-built set is unreachable and the old plan is still current.
         set_id = storage.create_set(
             program_id=program_id,
             user_id=user.user_id,
@@ -145,9 +255,18 @@ async def generate_from_roster(
             filename="roster",
             num_tables=data.num_tables,
             num_sessions=data.num_sessions,
+            make_current=False,
         )
+        storage.save_version(
+            program_id=program_id,
+            set_id=set_id,
+            version_id="v1",
+            assignments=assignments,
+            metadata=metadata,
+        )
+        storage.set_current_set_id(program_id, set_id)
     except Exception as e:
-        logger.error(f"Failed to create assignment set: {e}", exc_info=True)
+        logger.error(f"Failed to save the rebuilt program: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail="Couldn't save the new group set. Please try again.",
@@ -155,8 +274,56 @@ async def generate_from_roster(
 
     return {
         "assignment_set_id": set_id,
-        "message": "Assignment set created from roster",
+        "rebuilt": True,
+        "message": "Sessions rebuilt.",
     }
+
+
+@router.post("/discard")
+@limiter.limit("10/minute")
+async def discard_roster_changes(
+    request: Request,
+    program_id: str = Depends(validate_program_access),
+    roster_service: RosterService = Depends(get_roster_service),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+):
+    """Throw the draft away and rewrite the roster from the current sessions.
+
+    The rebuilt documents get fresh ids. That is safe: nothing outside the
+    roster grid holds a roster document id, and ``partner_id`` is resolved back
+    to a name every time the program is generated, so the only thing that has
+    to survive is who is partnered with whom - which is matched by name here.
+    """
+    set_id = storage.get_current_set_id(program_id)
+    if not set_id:
+        raise HTTPException(
+            status_code=400,
+            detail="There are no sessions yet, so there is nothing to go back to.",
+        )
+
+    assignment_set = storage.get_set(program_id, set_id) or {}
+    canonical = assignment_set.get("participant_data") or []
+
+    for participant in roster_service.get_roster(program_id):
+        roster_service.delete_participant(program_id, participant["id"])
+
+    new_ids = {p["name"]: str(uuid.uuid4()) for p in canonical}
+    for p in canonical:
+        partner_name = p.get("partner")
+        roster_service.upsert_participant(
+            program_id,
+            new_ids[p["name"]],
+            {
+                "name": p["name"],
+                "religion": p["religion"],
+                "gender": p["gender"],
+                "partner_id": new_ids.get(partner_name) if partner_name else None,
+                "is_facilitator": p.get("is_facilitator", False),
+                "keep_together": p.get("keep_together", False),
+            },
+        )
+
+    return {"status": "discarded", "count": len(canonical)}
 
 
 @router.put("/{participant_id}")

@@ -472,3 +472,24 @@ def add_version_to_firestore():
         )
 
     return _add_version
+
+
+@pytest.fixture
+def add_roster_to_firestore():
+    """Seed the live roster collection — the draft side of the comparison."""
+
+    def _add_roster(participants: list, org_id: str = "test_org_id"):
+        """Write participants to the program's roster.
+
+        Each dict needs an ``id`` plus the fields ``upsert_participant``
+        validates. The caller's dicts are left alone — copied, not popped.
+        """
+        from api.services.roster_service import RosterService
+
+        service = RosterService()
+        for participant in participants:
+            data = dict(participant)
+            participant_id = data.pop("id")
+            service.upsert_participant(org_id, participant_id, data)
+
+    return _add_roster

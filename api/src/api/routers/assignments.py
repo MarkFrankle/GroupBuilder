@@ -12,6 +12,12 @@ from api.services.session_completion_storage import (
 )
 from api.services.session_completion_guards import refuse_if_any_session_complete
 from api.services.version_promotion import roster_change_reason
+from api.services.program_solve import (
+    LABEL_GENERATED,
+    SolveFailed,
+    extract_pairings_from_sessions,
+    solve_program,
+)
 from api.utils.seating_arrangement import arrange_circular_seating
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -36,9 +42,9 @@ ASSIGNMENTS_MALFORMED = (
 
 # A version is the state after something happened, so every label is a completed
 # action in the past tense.
-LABEL_GENERATED = "Sessions generated"
+# LABEL_GENERATED is imported from
+# program_solve, which decides which of them a solve earned.
 LABEL_REBUILT = "Sessions rebuilt"
-LABEL_REBUILT_WITH_ABSENCES = "Sessions rebuilt with absences"
 LABEL_MANUAL_EDIT = "Manual edit"
 
 
@@ -219,45 +225,6 @@ def _next_version_id(
     return f"v{len(storage.list_versions(program_id, set_id)) + 1}"
 
 
-def _extract_pairings_from_sessions(
-    assignments: List[Dict[str, Any]], exclude_session: int
-) -> set:
-    """
-    Extract all participant pairings from sessions except the one being regenerated.
-
-    Args:
-        assignments: List of session assignments
-        exclude_session: Session number to exclude (the one being regenerated)
-
-    Returns:
-        Set of tuples representing pairs that have met in other sessions
-    """
-    historical_pairings = set()
-
-    for session_data in assignments:
-        session_num = session_data["session"]
-
-        # Skip the session we're regenerating
-        if session_num == exclude_session:
-            continue
-
-        # Extract pairings from each table in this session
-        for table_num, participants in session_data["tables"].items():
-            # Create pairs for all participants at this table
-            for i in range(len(participants)):
-                for j in range(i + 1, len(participants)):
-                    p1 = participants[i]["name"]
-                    p2 = participants[j]["name"]
-                    # Use sorted tuple so (Alice, Bob) == (Bob, Alice)
-                    pair_key = tuple(sorted([p1, p2]))
-                    historical_pairings.add(pair_key)
-
-    logger.info(
-        f"Extracted {len(historical_pairings)} historical pairings from {len(assignments) - 1} sessions"
-    )
-    return historical_pairings
-
-
 def _get_active_participants(
     all_participants: List[Dict[str, Any]], absent_participants: List[Dict[str, Any]]
 ) -> List[Dict[str, Any]]:
@@ -405,8 +372,18 @@ def get_assignments(
         120, ge=30, le=240, description="Maximum solver time in seconds (30-240)"
     ),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+    completion: SessionCompletionStorage = Depends(get_session_completion_storage),
 ):
-    """Generate assignments for a program's current assignment set."""
+    """Generate assignments for a program's current assignment set.
+
+    Re-solves the whole program and saves a version, so it must refuse once any
+    Session is frozen - the same rule ``/regenerate`` already enforced. This
+    route had no such guard and no remaining caller after Item 6a removed the
+    two-call generate flow, which made it a way to rewrite a completed Session's
+    seating. Deleting it outright is tracked in BACKLOG.md.
+    """
+    refuse_if_any_session_complete(completion, program_id)
+
     set_id, assignment_set = _require_current_set(storage, program_id)
 
     try:
@@ -500,80 +477,22 @@ async def regenerate_all_with_absences(
             if sn and absent:
                 absence_map[int(sn)] = absent
 
-        # Full solve — all participants present
-        results = handle_generate_assignments(
-            participants, num_tables, num_sessions, max_time_seconds=max_time_seconds
-        )
-        if results["status"] != "success":
-            raise HTTPException(
-                status_code=400, detail=results.get("error", "Solver failed")
-            )
-
-        assignments = results["assignments"]
-        absences_applied = False
-
-        # Re-solve sessions with absences, keeping other sessions' pairings as history
-        for session_number, absent in absence_map.items():
-            if session_number < 1 or session_number > num_sessions:
-                continue
-            active = _get_active_participants(participants, absent)
-            if len(active) < num_tables:
-                logger.warning(
-                    f"Skipping absence regen for session {session_number}: "
-                    f"only {len(active)} active participants for {num_tables} tables"
-                )
-                # Preserve the absence record so it survives future regenerations,
-                # even though the tables keep the full-solve (everyone-present) layout.
-                assignments[session_number - 1]["absentParticipants"] = absent
-                continue
-            historical = _extract_pairings_from_sessions(
-                assignments, exclude_session=session_number
-            )
-            builder = GroupBuilder(
-                participants=active,
+        try:
+            assignments, metadata = solve_program(
+                participants=participants,
                 num_tables=num_tables,
-                num_sessions=1,
-                historical_pairings=historical,
-                solver_num_workers=4,
+                num_sessions=num_sessions,
+                absence_map=absence_map,
+                max_time_seconds=max_time_seconds,
+                label_when_clean=LABEL_REBUILT,
             )
-            single_result = builder.generate_assignments(
-                max_time_seconds=min(60, max_time_seconds)
-            )
-            if single_result["status"] == "success":
-                assignments[session_number - 1] = {
-                    "session": session_number,
-                    "tables": single_result["assignments"][0]["tables"],
-                    "absentParticipants": absent,
-                }
-                absences_applied = True
-            else:
-                logger.warning(
-                    f"Could not apply absences for session {session_number}, keeping full-solve result"
-                )
-                # Preserve the absence record even when the re-solve failed.
-                assignments[session_number - 1]["absentParticipants"] = absent
+        except SolveFailed as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+        metadata["regenerated"] = True
 
         # Save exactly one new version
         version_id = _next_version_id(storage, program_id, set_id)
-
-        # The full-solve quality metrics only describe the all-present solve. Once any
-        # session was re-solved with absences, those aggregate numbers no longer match
-        # the saved assignments, so drop them rather than report stale values.
-        metadata = {
-            "max_time_seconds": max_time_seconds,
-            "regenerated": True,
-            "label": (
-                LABEL_REBUILT_WITH_ABSENCES if absences_applied else LABEL_REBUILT
-            ),
-        }
-        if absences_applied:
-            metadata["solution_quality"] = None
-            metadata["solve_time"] = None
-            metadata["total_deviation"] = None
-        else:
-            metadata["solution_quality"] = results.get("solution_quality")
-            metadata["solve_time"] = results.get("solve_time")
-            metadata["total_deviation"] = results.get("total_deviation")
 
         storage.save_version(
             program_id=program_id,
@@ -659,7 +578,7 @@ async def regenerate_single_session(
         existing_assignments = current_result["assignments"]
 
         # 3. Extract historical pairings from OTHER sessions
-        historical_pairings = _extract_pairings_from_sessions(
+        historical_pairings = extract_pairings_from_sessions(
             existing_assignments, exclude_session=session_number
         )
 

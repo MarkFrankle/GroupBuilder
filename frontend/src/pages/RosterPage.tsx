@@ -5,26 +5,24 @@ import { v4 as uuidv4 } from 'uuid';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RosterGrid } from '@/components/RosterGrid/RosterGrid';
+import { PopulationStats } from '@/components/Roster/PopulationStats';
+import { ChangesetPanel } from '@/components/Roster/ChangesetPanel';
 import { RosterParticipant } from '@/types/roster';
 import {
   upsertParticipant, deleteParticipant as apiDeleteParticipant,
-  generateFromRoster,
+  generateFromRoster, discardRosterChanges,
 } from '@/api/roster';
-import { useRoster, useAssignmentSetMetadata } from '@/hooks/queries';
+import { useRoster, useAssignmentSetMetadata, useCanonicalRoster } from '@/hooks/queries';
+import { computeChangeset, CanonicalParticipant } from '@/utils/rosterDiff';
 import { useProgram } from '@/contexts/ProgramContext';
 import { useQueryClient } from '@tanstack/react-query';
-import { authenticatedFetch } from '@/utils/apiClient';
-import { fetchWithRetry } from '@/utils/fetchWithRetry';
-import { API_BASE_URL } from '@/config/api';
 import { MAX_TABLES, MAX_SESSIONS } from '@/constants';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, Pencil } from 'lucide-react';
 import { movePartnerAdjacent, sortPartnersAdjacent } from '@/utils/sortWithPartnerAdjacency';
 
 type SaveStatus = 'saved' | 'saving' | 'error';
@@ -35,27 +33,52 @@ interface AssignmentSetSummary {
   num_sessions: number;
 }
 
-interface AbsentParticipant {
-  name: string;
-  religion: string;
-  gender: string;
-  partner: string | null;
-  is_facilitator?: boolean;
+interface CanonicalRoster {
+  participants: CanonicalParticipant[];
+  num_tables: number | null;
+  num_sessions: number | null;
 }
 
-interface SessionResult {
-  session: number;
-  absentParticipants?: AbsentParticipant[];
+/**
+ * The draft roster in the shape the assignment set froze. The canonical copy
+ * stores a partner *name*, not an id, so a partnered person would read as
+ * changed on every comparison unless the draft is translated first.
+ */
+function toCanonical(participants: RosterParticipant[]): CanonicalParticipant[] {
+  const nameById = new Map(participants.map(p => [p.id, p.name]));
+  return participants.map(p => ({
+    name: p.name,
+    religion: p.religion,
+    gender: p.gender,
+    partner: p.partner_id ? nameById.get(p.partner_id) ?? null : null,
+    is_facilitator: p.is_facilitator ?? false,
+    keep_together: p.keep_together ?? false,
+  }));
 }
 
 export function RosterPage() {
   const navigate = useNavigate();
   const { currentProgram } = useProgram();
   const queryClient = useQueryClient();
-  const { data: rosterData, isLoading: loading, error: fetchError } = useRoster();
-  const { data: metadata } = useAssignmentSetMetadata(currentProgram?.id ?? null);
+  const { data: rosterData, isLoading: rosterLoading, error: fetchError } = useRoster();
+  const { data: metadata, isLoading: metadataLoading } = useAssignmentSetMetadata(
+    currentProgram?.id ?? null,
+  );
   const currentSet: AssignmentSetSummary | null =
     (metadata as AssignmentSetSummary | undefined) ?? null;
+  const {
+    data: canonicalData,
+    isLoading: canonicalLoading,
+    error: canonicalError,
+  } = useCanonicalRoster(currentProgram?.id ?? null);
+  const canonical = (canonicalData as CanonicalRoster | undefined) ?? null;
+
+  // Every one of the three, not just the roster. The lock is derived from all
+  // of them, so rendering before they land shows an established program as a
+  // brand-new one: unlocked, offering "Generate assignments", with an editable
+  // grid that autosaves each keystroke. A guard that is off for the first paint
+  // is not a guard.
+  const loading = rosterLoading || metadataLoading || canonicalLoading;
 
   const [participants, setParticipants] = useState<RosterParticipant[]>([]);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
@@ -63,20 +86,18 @@ export function RosterPage() {
   const [numTables, setNumTables] = useState('4');
   const [numSessions, setNumSessions] = useState('5');
   const [generating, setGenerating] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('');
-  const [maintainAbsences, setMaintainAbsences] = useState(true);
-  const [sourceAbsences, setSourceAbsences] = useState<SessionResult[] | null>(null);
-  const [absencesLoading, setAbsencesLoading] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  // Deliberately not persisted: "I pressed Edit but changed nothing" is not
+  // worth remembering, and a reload should put the guard back.
+  const [armed, setArmed] = useState(false);
 
+  // The selects have to start on the plan's real shape, or a program built as
+  // anything other than the 4x5 default would read as changed forever.
   useEffect(() => {
-    if (!currentSet || !currentProgram) return;
-    setAbsencesLoading(true);
-    authenticatedFetch(`/api/assignments/results?program_id=${currentProgram.id}`)
-      .then(res => res.ok ? res.json() : null)
-      .then((results: SessionResult[] | null) => setSourceAbsences(results ?? []))
-      .catch(() => setSourceAbsences([]))
-      .finally(() => setAbsencesLoading(false));
-  }, [currentSet?.assignment_set_id, currentProgram?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!currentSet) return;
+    setNumTables(String(currentSet.num_tables));
+    setNumSessions(String(currentSet.num_sessions));
+  }, [currentSet?.assignment_set_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (rosterData) {
@@ -184,104 +205,86 @@ export function RosterPage() {
     queryClient.invalidateQueries({ queryKey: ['results', programId] });
   };
 
-  const handleGenerate = async () => {
+  /**
+   * One request. The server refuses, solves, and repoints the program itself,
+   * so there is nothing left for the page to do but wait and report back.
+   */
+  const handleRebuild = async () => {
     setError(null);
-    const facilitatorCount = participants.filter(p => p.is_facilitator).length;
-    if (facilitatorCount > 0 && facilitatorCount < parseInt(numTables)) {
-      setError(`Need at least ${numTables} facilitators for ${numTables} tables (have ${facilitatorCount})`);
-      return;
-    }
+    setNotice(null);
     setGenerating(true);
-    setLoadingMessage('Creating session from roster...');
     try {
-      await generateFromRoster(
+      const result = await generateFromRoster(
         currentProgram!.id, parseInt(numTables), parseInt(numSessions)
       );
-      setLoadingMessage('Generating assignments...');
-      const response = await fetchWithRetry(
-        `${API_BASE_URL}/api/assignments/?program_id=${currentProgram!.id}&max_time_seconds=120`
-      );
-      if (!response.ok) throw new Error('Assignment generation failed');
       invalidateAssignmentQueries();
-      navigate(`/table-assignments?program=${currentProgram!.id}`);
-    } catch (err: any) {
-      setError(err.message || 'Failed to generate assignments');
-      setGenerating(false);
-      setLoadingMessage('');
-    }
-  };
-
-  const handleRegenerateExisting = async () => {
-    if (!currentSet) return;
-    setError(null);
-
-    const { num_tables: srcTables, num_sessions: srcSessions } = currentSet;
-
-    const facilitatorCount = participants.filter(p => p.is_facilitator).length;
-    if (facilitatorCount > 0 && facilitatorCount < srcTables) {
-      setError(`Need at least ${srcTables} facilitators for ${srcTables} tables (have ${facilitatorCount})`);
-      return;
-    }
-    if (participants.length < srcTables) {
-      setError(`Need at least ${srcTables} participants for ${srcTables} tables`);
-      return;
-    }
-
-    setGenerating(true);
-
-    try {
-      // Reuse the per-session absences already loaded on mount; only fall back to
-      // a fetch if they haven't finished loading yet.
-      let sessionsWithAbsences: { sessionNumber: number; absent: AbsentParticipant[] }[] = [];
-      if (maintainAbsences) {
-        let sourceResults = sourceAbsences;
-        if (sourceResults === null) {
-          setLoadingMessage('Reading saved absences...');
-          const resultsRes = await authenticatedFetch(`/api/assignments/results?program_id=${currentProgram!.id}`);
-          sourceResults = resultsRes.ok ? await resultsRes.json() : [];
-        }
-        sessionsWithAbsences = (sourceResults ?? [])
-          .map(s => ({ sessionNumber: s.session, absent: s.absentParticipants || [] }))
-          .filter(s => s.absent.length > 0);
+      queryClient.invalidateQueries({ queryKey: ['canonical-roster', currentProgram!.id] });
+      if (result.rebuilt) {
+        navigate(`/table-assignments?program=${currentProgram!.id}`);
+        return;
       }
-
-      // Create new session from current roster
-      setLoadingMessage('Creating session from roster...');
-      await generateFromRoster(currentProgram!.id, srcTables, srcSessions);
-
-      // Solve all sessions, applying absences, in a single backend call
-      setLoadingMessage('Generating assignments...');
-      const perSessionAbsences = sessionsWithAbsences.map(s => ({
-        session_number: s.sessionNumber,
-        absent_participants: s.absent,
-      }));
-      const solveRes = await authenticatedFetch(
-        `/api/assignments/regenerate/with_absences?program_id=${currentProgram!.id}&max_time_seconds=120`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(perSessionAbsences),
-        }
-      );
-      if (!solveRes.ok) throw new Error('Assignment generation failed');
-
-      invalidateAssignmentQueries();
-      navigate(`/table-assignments?program=${currentProgram!.id}`);
-    } catch (err: any) {
-      setError(err.message || 'Failed to regenerate assignments');
+      // Nothing about the sessions moved, so sending the coordinator to look
+      // at them would be a non-sequitur.
+      setNotice(result.message);
+      // The change was accepted, so the guard goes back on - the page stays put
+      // and would otherwise leave the grid editable after a successful save.
+      setArmed(false);
       setGenerating(false);
-      setLoadingMessage('');
+    } catch (err: any) {
+      // The server's wording is the user-facing wording; don't rewrite it.
+      setError(err.message);
+      setGenerating(false);
     }
   };
 
-  const canGenerate = participants.length >= parseInt(numTables) && participants.length > 0;
-  const canRegenerateExisting = currentSet
-    ? participants.length >= currentSet.num_tables && participants.length > 0
-    : false;
+  const handleDiscard = async () => {
+    const count = changeset.total;
+    if (!window.confirm(`Discard ${count} roster change${count === 1 ? '' : 's'}?`)) return;
+    setError(null);
+    setNotice(null);
+    try {
+      await discardRosterChanges(currentProgram!.id);
+      setArmed(false);
+      // The selects are React state, and discard does not change the set id, so
+      // the effect that syncs them will not re-run. Without this a discarded
+      // session-count change stays on screen and the page goes on reporting an
+      // unsaved change that Discard can no longer clear.
+      if (canonical?.num_tables) setNumTables(String(canonical.num_tables));
+      if (canonical?.num_sessions) setNumSessions(String(canonical.num_sessions));
+      queryClient.invalidateQueries({ queryKey: ['roster', currentProgram!.id] });
+      queryClient.invalidateQueries({ queryKey: ['canonical-roster', currentProgram!.id] });
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const changeset = computeChangeset(
+    canonical?.participants ?? [],
+    toCanonical(participants),
+    { tables: canonical?.num_tables ?? null, sessions: canonical?.num_sessions ?? null },
+    { tables: parseInt(numTables), sessions: parseInt(numSessions) },
+  );
+  // The lock is derived, never stored: a current set exists, the roster still
+  // matches the one it was built from, and the coordinator hasn't asked to edit.
+  const locked = !!currentSet && !changeset.isDirty && !armed;
+
+  // Matches check_shortfalls on the server: a table with one person is not a
+  // discussion group. Disagreeing meant enabling the button and refusing the
+  // request a round trip later.
+  const canGenerate = participants.length >= parseInt(numTables) * 2;
+  // computeChangeset reports a brand-new program as clean - there is no
+  // canonical roster to differ from - so dirtiness alone would hide the button
+  // on exactly the program that needs it.
+  const hasAssignmentSet = !!currentSet;
+  const showActions = changeset.isDirty || !hasAssignmentSet;
 
   if (loading) {
     return (
-      <div className="container mx-auto p-4 flex justify-center">
+      <div
+        className="container mx-auto p-4 flex justify-center"
+        role="status"
+        aria-label="Loading roster"
+      >
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
@@ -294,212 +297,123 @@ export function RosterPage() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Roster</CardTitle>
-              <CardDescription>Manage your participants</CardDescription>
+              <CardDescription>
+                {locked
+                  ? 'Locked \u2014 these are the people your sessions were built from'
+                  : changeset.total > 0
+                    ? `${changeset.total} change${changeset.total === 1 ? '' : 's'} not yet in your sessions`
+                    : 'Manage your participants'}
+              </CardDescription>
             </div>
-            <span className="text-sm text-muted-foreground">
-              {saveStatus === 'saving' && 'Saving...'}
-              {saveStatus === 'saved' && 'Saved'}
-              {saveStatus === 'error' && 'Save failed'}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground">
+                {saveStatus === 'saving' && 'Saving...'}
+                {saveStatus === 'saved' && 'Saved'}
+                {saveStatus === 'error' && 'Save failed'}
+              </span>
+              {locked && (
+                <Button variant="outline" size="sm" onClick={() => setArmed(true)}>
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Edit roster
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+          <PopulationStats participants={participants} />
+
           <RosterGrid
             participants={participants}
             onUpdate={handleUpdate}
             onDelete={handleDelete}
             onAdd={handleAdd}
             onKeepTogetherToggle={handleKeepTogetherToggle}
+            readOnly={locked}
           />
 
-          {currentSet ? (
-            <Tabs defaultValue="update">
-              <TabsList className="w-full h-auto p-0 bg-transparent border-b rounded-none gap-0">
-                <TabsTrigger
-                  value="update"
-                  className="flex-1 rounded-none rounded-tl-md border border-b-0 py-2.5 font-medium text-sm transition-colors data-[state=active]:bg-background data-[state=active]:shadow-none data-[state=active]:border-t-2 data-[state=active]:border-t-primary data-[state=active]:text-foreground data-[state=inactive]:bg-muted data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/70"
-                >
-                  Regenerate
-                </TabsTrigger>
-                <TabsTrigger
-                  value="fresh"
-                  className="flex-1 rounded-none rounded-tr-md border border-l-0 border-b-0 py-2.5 font-medium text-sm transition-colors data-[state=active]:bg-background data-[state=active]:shadow-none data-[state=active]:border-t-2 data-[state=active]:border-t-primary data-[state=active]:text-foreground data-[state=inactive]:bg-muted data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/70"
-                >
-                  Fresh Start
-                </TabsTrigger>
-              </TabsList>
+          {changeset.isDirty && <ChangesetPanel changeset={changeset} />}
 
-              <TabsContent value="update" className="space-y-4 border border-t-0 rounded-b-md p-4 mt-0">
-                <p className="text-sm text-muted-foreground">
-                  Regenerate all sessions using your current roster and constraints.
-                  {currentSet && (
-                    <span className="ml-1">
-                      Keeps the existing layout: {currentSet.num_tables} tables &times; {currentSet.num_sessions} sessions.
-                    </span>
-                  )}
-                </p>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="maintain-absences"
-                      checked={maintainAbsences}
-                      onCheckedChange={(checked: boolean | 'indeterminate') => setMaintainAbsences(checked === true)}
-                    />
-                    <Label htmlFor="maintain-absences">Maintain saved absences</Label>
-                  </div>
-                  <div className="ml-6 text-xs text-muted-foreground space-y-0.5">
-                    {absencesLoading ? (
-                      <span className="flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Loading absences…</span>
-                    ) : sourceAbsences === null ? null : sourceAbsences.every(s => !s.absentParticipants?.length) ? (
-                      <span>No absences recorded in the most recent session.</span>
-                    ) : (
-                      sourceAbsences
-                        .slice()
-                        .sort((a, b) => a.session - b.session)
-                        .map(s => (
-                          <div key={s.session}>
-                            <span className="font-medium">Session {s.session}:</span>{' '}
-                            {s.absentParticipants?.length
-                              ? s.absentParticipants.map(p => p.name).join(', ')
-                              : 'no absences'}
-                          </div>
-                        ))
-                    )}
-                  </div>
-                </div>
-                {(error || fetchError) && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Error</AlertTitle>
-                    <AlertDescription>{error || (fetchError as Error)?.message}</AlertDescription>
-                  </Alert>
-                )}
-                {generating && loadingMessage && (
-                  <Alert>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <AlertTitle>Generating</AlertTitle>
-                    <AlertDescription>{loadingMessage}</AlertDescription>
-                  </Alert>
-                )}
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleRegenerateExisting}
-                  disabled={!canRegenerateExisting || generating}
-                >
-                  {generating ? 'Generating...' : 'Regenerate All Sessions'}
-                </Button>
-              </TabsContent>
+          <div className="flex space-x-4">
+            <div className="flex-1">
+              <Label htmlFor="num-tables">Number of Tables</Label>
+              <Select value={numTables} disabled={locked} onValueChange={setNumTables}>
+                <SelectTrigger id="num-tables">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: MAX_TABLES }, (_, i) => (
+                    <SelectItem key={i + 1} value={String(i + 1)}>{i + 1}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1">
+              <Label htmlFor="num-sessions">Number of Sessions</Label>
+              <Select value={numSessions} disabled={locked} onValueChange={setNumSessions}>
+                <SelectTrigger id="num-sessions">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: MAX_SESSIONS }, (_, i) => (
+                    <SelectItem key={i + 1} value={String(i + 1)}>{i + 1}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
-              <TabsContent value="fresh" className="space-y-4 border border-t-0 rounded-b-md p-4 mt-0">
-                <p className="text-sm text-muted-foreground">
-                  Create a completely new set of sessions. All existing assignments and saved absences will be lost.
-                </p>
-                <div className="flex space-x-4">
-                  <div className="flex-1">
-                    <Label htmlFor="num-tables">Number of Tables</Label>
-                    <Select value={numTables} onValueChange={setNumTables}>
-                      <SelectTrigger id="num-tables">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: MAX_TABLES }, (_, i) => (
-                          <SelectItem key={i + 1} value={String(i + 1)}>{i + 1}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex-1">
-                    <Label htmlFor="num-sessions">Number of Sessions</Label>
-                    <Select value={numSessions} onValueChange={setNumSessions}>
-                      <SelectTrigger id="num-sessions">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: MAX_SESSIONS }, (_, i) => (
-                          <SelectItem key={i + 1} value={String(i + 1)}>{i + 1}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                {(error || fetchError) && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Error</AlertTitle>
-                    <AlertDescription>{error || (fetchError as Error)?.message}</AlertDescription>
-                  </Alert>
-                )}
-                {generating && loadingMessage && (
-                  <Alert>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <AlertTitle>Generating</AlertTitle>
-                    <AlertDescription>{loadingMessage}</AlertDescription>
-                  </Alert>
-                )}
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleGenerate}
-                  disabled={!canGenerate || generating}
-                >
-                  {generating ? 'Generating...' : 'Generate Assignments'}
-                </Button>
-              </TabsContent>
-            </Tabs>
-          ) : (
-            <>
-              <div className="flex space-x-4">
-                <div className="flex-1">
-                  <Label htmlFor="num-tables">Number of Tables</Label>
-                  <Select value={numTables} onValueChange={setNumTables}>
-                    <SelectTrigger id="num-tables">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: MAX_TABLES }, (_, i) => (
-                        <SelectItem key={i + 1} value={String(i + 1)}>{i + 1}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex-1">
-                  <Label htmlFor="num-sessions">Number of Sessions</Label>
-                  <Select value={numSessions} onValueChange={setNumSessions}>
-                    <SelectTrigger id="num-sessions">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: MAX_SESSIONS }, (_, i) => (
-                        <SelectItem key={i + 1} value={String(i + 1)}>{i + 1}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              {(error || fetchError) && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Error</AlertTitle>
-                  <AlertDescription>{error || (fetchError as Error)?.message}</AlertDescription>
-                </Alert>
-              )}
-              {generating && loadingMessage && (
-                <Alert>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <AlertTitle>Generating</AlertTitle>
-                  <AlertDescription>{loadingMessage}</AlertDescription>
-                </Alert>
-              )}
+          {(error || fetchError || canonicalError) && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              {/* A failure to load is not a refusal to rebuild, and a canonical
+                  failure is neither - without it the page renders a confident
+                  Locked and silently offers no way to save what gets typed. */}
+              <AlertTitle>
+                {error
+                  ? 'Can’t rebuild yet'
+                  : canonicalError
+                    ? 'Can’t tell whether your roster matches your sessions'
+                    : 'Couldn’t load your roster'}
+              </AlertTitle>
+              <AlertDescription>
+                {error ||
+                  (fetchError as Error)?.message ||
+                  'Reload the page before making changes — edits made now may not be saved to your sessions.'}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {notice && (
+            <Alert>
+              <AlertTitle>Saved</AlertTitle>
+              <AlertDescription>{notice}</AlertDescription>
+            </Alert>
+          )}
+
+          {generating ? (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-md border p-8 text-center">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                Rebuilding your sessions… this can take up to two minutes.
+              </p>
+            </div>
+          ) : showActions && (
+            <div className="flex gap-3">
               <Button
                 variant="outline"
-                className="w-full"
-                onClick={handleGenerate}
-                disabled={!canGenerate || generating}
+                className="flex-1"
+                onClick={handleRebuild}
+                disabled={!canGenerate}
               >
-                {generating ? 'Generating...' : 'Generate Assignments'}
+                {hasAssignmentSet ? 'Save and rebuild sessions' : 'Generate assignments'}
               </Button>
-            </>
+              {hasAssignmentSet && (
+                <Button variant="outline" onClick={handleDiscard}>
+                  Discard changes
+                </Button>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>

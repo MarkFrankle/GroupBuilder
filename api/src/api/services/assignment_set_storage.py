@@ -46,8 +46,15 @@ class AssignmentSetStorage:
         filename: str,
         num_tables: int,
         num_sessions: int,
+        make_current: bool = True,
     ) -> str:
-        """Mint a new assignment set and point the program at it.
+        """Mint a new assignment set, and by default point the program at it.
+
+        Pass ``make_current=False`` to create the set without repointing, then
+        call :meth:`set_current_set_id` once its first version is safely
+        written. The program pointer is what every read resolves through, so
+        moving it before the version exists would publish an empty plan - the
+        failure this ordering exists to prevent.
 
         Returns the new set id.
         """
@@ -65,11 +72,16 @@ class AssignmentSetStorage:
             }
         )
 
+        if make_current:
+            self.set_current_set_id(program_id, set_id)
+
+        return set_id
+
+    def set_current_set_id(self, program_id: str, set_id: str) -> None:
+        """Point the program at one of its assignment sets."""
         self._program_ref(program_id).set(
             {"current_assignment_set_id": set_id}, merge=True
         )
-
-        return set_id
 
     def get_current_set_id(self, program_id: str) -> Optional[str]:
         """Return the program's current assignment set id, or None."""
@@ -126,6 +138,36 @@ class AssignmentSetStorage:
                 "assignments": _serialize_for_firestore(assignments),
                 "metadata": _serialize_for_firestore(metadata),
             }
+        )
+
+    def overwrite_version_assignments(
+        self,
+        program_id: str,
+        set_id: str,
+        version_id: str,
+        assignments: Any,
+    ) -> None:
+        """Replace one version's seating in place, leaving the rest of it alone.
+
+        Used by the rename path. A rename is not a change to the plan - nobody
+        moved - so a new version would be materially identical to its parent.
+        ``created_at`` and ``metadata`` are untouched, so history reads the same
+        as it did before the spelling was fixed.
+        """
+        self._set_ref(program_id, set_id).collection("versions").document(
+            version_id
+        ).set({"assignments": _serialize_for_firestore(assignments)}, merge=True)
+
+    def update_participant_data(
+        self,
+        program_id: str,
+        set_id: str,
+        participant_data: List[Dict[str, Any]],
+    ) -> None:
+        """Replace a set's canonical roster in place."""
+        self._set_ref(program_id, set_id).set(
+            {"participant_data": _serialize_for_firestore(participant_data)},
+            merge=True,
         )
 
     def get_version(
