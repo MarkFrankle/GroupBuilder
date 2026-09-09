@@ -475,6 +475,36 @@ class GroupBuilder:
                             == self.participant_table_assignments[(p2["id"], s, t)]
                         )
 
+        # Keep-apart pairs: the same shape as couples separation above, but
+        # driven by an explicit rule rather than by a partnership. Hard, like
+        # couples - the tool does not quietly produce a plan that breaks a rule
+        # the user typed. Infeasible is refused upstream, not absorbed.
+        #
+        # The field is symmetric by construction (it is derived from the stored
+        # id-pair list on every freeze), so reading one direction would do.
+        # Both are read anyway because a sorted pair is cheaper to dedupe than
+        # it is to reason about which half to trust.
+        name_to_id = {p["name"]: p["id"] for p in self.participants}
+        keep_apart_pairs = set()
+        for p in self.participants:
+            for other_name in p.get("keep_apart") or []:
+                other_id = name_to_id.get(other_name)
+                # A rule naming someone no longer on the roster is dropped
+                # rather than raising: the roster is the authority on who
+                # exists, and the pair is retired with the person.
+                if other_id is None or other_id == p["id"]:
+                    continue
+                keep_apart_pairs.add(tuple(sorted((p["id"], other_id))))
+
+        for s in self.sessions:
+            for t in self.tables:
+                for a, b in keep_apart_pairs:
+                    self.model.Add(
+                        self.participant_table_assignments[(a, s, t)]
+                        + self.participant_table_assignments[(b, s, t)]
+                        <= 1
+                    )
+
         # OPTIMIZED: Rolling window approach - penalize pairs meeting within N sessions
         # This balances sophistication with performance: better than "count all repeats",
         # simpler than complex session weighting, and matches user expectations
