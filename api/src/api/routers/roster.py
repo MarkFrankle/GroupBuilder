@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -266,6 +267,53 @@ async def generate_from_roster(
         "rebuilt": True,
         "message": "Sessions rebuilt.",
     }
+
+
+@router.post("/discard")
+@limiter.limit("10/minute")
+async def discard_roster_changes(
+    request: Request,
+    program_id: str = Depends(validate_program_access),
+    roster_service: RosterService = Depends(get_roster_service),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+):
+    """Throw the draft away and rewrite the roster from the current sessions.
+
+    The rebuilt documents get fresh ids. That is safe: nothing outside the
+    roster grid holds a roster document id, and ``partner_id`` is resolved back
+    to a name every time the program is generated, so the only thing that has
+    to survive is who is partnered with whom - which is matched by name here.
+    """
+    set_id = storage.get_current_set_id(program_id)
+    if not set_id:
+        raise HTTPException(
+            status_code=400,
+            detail="There are no sessions yet, so there is nothing to go back to.",
+        )
+
+    assignment_set = storage.get_set(program_id, set_id) or {}
+    canonical = assignment_set.get("participant_data") or []
+
+    for participant in roster_service.get_roster(program_id):
+        roster_service.delete_participant(program_id, participant["id"])
+
+    new_ids = {p["name"]: str(uuid.uuid4()) for p in canonical}
+    for p in canonical:
+        partner_name = p.get("partner")
+        roster_service.upsert_participant(
+            program_id,
+            new_ids[p["name"]],
+            {
+                "name": p["name"],
+                "religion": p["religion"],
+                "gender": p["gender"],
+                "partner_id": new_ids.get(partner_name) if partner_name else None,
+                "is_facilitator": p.get("is_facilitator", False),
+                "keep_together": p.get("keep_together", False),
+            },
+        )
+
+    return {"status": "discarded", "count": len(canonical)}
 
 
 @router.put("/{participant_id}")

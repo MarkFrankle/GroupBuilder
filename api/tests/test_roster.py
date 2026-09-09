@@ -742,3 +742,56 @@ class TestRebuild:
         )
 
         assert response.status_code == 409
+
+
+class TestDiscard:
+    """``POST /roster/discard`` throws the draft away and rewrites the live
+    roster from the roster the current sessions were built from."""
+
+    def test_refuses_when_there_is_nothing_to_discard_back_to(
+        self, client, add_roster_to_firestore
+    ):
+        add_roster_to_firestore(_draft(4))
+
+        response = client.post("/api/roster/discard?program_id=test_org_id")
+
+        assert response.status_code == 400
+
+    def test_restores_the_canonical_roster_by_name(
+        self, client, add_assignment_set_to_firestore, add_roster_to_firestore
+    ):
+        """Document ids change across a discard, and that is safe: nothing
+        outside the grid holds a roster document id, and ``partner_id`` is
+        re-resolved to names at every generate."""
+        from api.services.roster_service import RosterService
+
+        canonical = _canonical(4)
+        canonical[0]["partner"] = canonical[1]["name"]
+        canonical[1]["partner"] = canonical[0]["name"]
+        canonical[0]["keep_together"] = True
+        canonical[1]["keep_together"] = True
+        canonical[2]["is_facilitator"] = True
+        add_assignment_set_to_firestore(
+            {"participant_data": canonical, "num_tables": 2, "num_sessions": 2}
+        )
+        draft = _draft(6)
+        draft[0]["name"] = "Typo"
+        add_roster_to_firestore(draft)
+
+        response = client.post("/api/roster/discard?program_id=test_org_id")
+
+        assert response.status_code == 200
+        roster = RosterService().get_roster("test_org_id")
+        by_name = {p["name"]: p for p in roster}
+        assert sorted(by_name) == sorted(p["name"] for p in canonical)
+        assert "Typo" not in by_name
+
+        # Partnerships survive, resolved back to the *new* ids.
+        a, b = by_name[canonical[0]["name"]], by_name[canonical[1]["name"]]
+        assert a["partner_id"] == b["id"]
+        assert b["partner_id"] == a["id"]
+        assert a["keep_together"] is True
+        assert by_name[canonical[2]["name"]]["is_facilitator"] is True
+
+        # The ids are new, and that is the point of the name matching above.
+        assert not ({p["id"] for p in roster} & {p["id"] for p in draft})

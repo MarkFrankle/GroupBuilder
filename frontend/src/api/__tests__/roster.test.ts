@@ -44,13 +44,14 @@ describe('roster API', () => {
   test('generateFromRoster calls POST /api/roster/generate', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ assignment_set_id: 'abc' }),
+      json: async () => ({ assignment_set_id: 'abc', rebuilt: true, message: 'Sessions rebuilt.' }),
     } as Response);
 
     const result = await generateFromRoster('test-program-id', 3, 2);
     expect(mockFetch).toHaveBeenCalledWith('/api/roster/generate?program_id=test-program-id', expect.objectContaining({
       method: 'POST',
     }));
-    expect(result).toBe('abc');
+    expect(result.assignment_set_id).toBe('abc');
+    expect(result.rebuilt).toBe(true);
   });
 });

@@ -35,19 +35,43 @@ export async function deleteParticipant(programId: string, participantId: string
   }
 }
 
+export interface GenerateResult {
+  assignment_set_id: string;
+  rebuilt: boolean;
+  message: string;
+}
+
+/**
+ * Rebuild the program from the live roster — one blocking call.
+ *
+ * The server refuses, solves, and repoints the program on its own. A refusal
+ * comes back with wording meant for the coordinator, so it is thrown as-is
+ * rather than replaced with our own.
+ */
 export async function generateFromRoster(
   programId: string,
   numTables: number,
   numSessions: number
-): Promise<string> {
+): Promise<GenerateResult> {
   const response = await authenticatedFetch(`/api/roster/generate?program_id=${programId}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ num_tables: numTables, num_sessions: numSessions }),
   });
+  const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(`Failed to generate: ${response.status}`);
+    throw new Error(data?.detail || 'Something went wrong. Please try again.');
   }
-  const data = await response.json();
-  return data.assignment_set_id;
+  return data as GenerateResult;
+}
+
+/** Throw away every unsaved roster change and go back to the sessions' roster. */
+export async function discardRosterChanges(programId: string): Promise<void> {
+  const response = await authenticatedFetch(`/api/roster/discard?program_id=${programId}`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data?.detail || 'Could not undo those changes. Please try again.');
+  }
 }

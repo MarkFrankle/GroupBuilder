@@ -12,6 +12,12 @@ jest.mock('uuid', () => ({
 jest.mock('@/utils/apiClient');
 const mockFetch = authenticatedFetch as jest.MockedFunction<typeof authenticatedFetch>;
 
+const mockNavigate = jest.fn();
+jest.mock('react-router-dom', () => ({
+  ...jest.requireActual('react-router-dom'),
+  useNavigate: () => mockNavigate,
+}));
+
 jest.mock('@/contexts/ProgramContext', () => ({
   useProgram: () => ({
     currentProgram: { id: 'test-program-id', name: 'Test' },
@@ -90,55 +96,6 @@ describe('RosterPage', () => {
     renderPage();
     await waitFor(() => {
       expect(screen.getByText(/Saved/i)).toBeInTheDocument();
-    });
-  });
-});
-
-describe('RosterPage with an existing assignment set', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockFetch.mockImplementation((url: string) => {
-      if (url.includes('/api/assignments/metadata')) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ assignment_set_id: 's1', num_tables: 4, num_sessions: 2 }),
-        } as Response);
-      }
-      if (url.includes('/api/assignments/results')) {
-        return Promise.resolve({ ok: true, json: async () => [] } as Response);
-      }
-      return Promise.resolve({
-        ok: true,
-        json: async () => ({
-          participants: [
-            { id: 'p1', name: 'Alice', religion: 'Christian', gender: 'Female', partner_id: null },
-            { id: 'p2', name: 'Bob', religion: 'Jewish', gender: 'Male', partner_id: null },
-            { id: 'p3', name: 'Cara', religion: 'Muslim', gender: 'Female', partner_id: null },
-            { id: 'p4', name: 'Dan', religion: 'None', gender: 'Male', partner_id: null },
-          ],
-        }),
-      } as Response);
-    });
-  });
-
-  test('shows both regeneration tabs', async () => {
-    renderPage();
-    expect(await screen.findByRole('tab', { name: /Regenerate/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /Fresh Start/i })).toBeInTheDocument();
-  });
-
-  test('describes the layout the existing set will preserve', async () => {
-    renderPage();
-    expect(
-      await screen.findByText(/Keeps the existing layout: 4 tables × 2 sessions\./)
-    ).toBeInTheDocument();
-  });
-
-  test('enables the regenerate button when there are enough participants', async () => {
-    renderPage();
-    await screen.findByDisplayValue('Alice');
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Regenerate All Sessions/i })).toBeEnabled();
     });
   });
 });
@@ -254,5 +211,176 @@ describe('the lock', () => {
     expect(await screen.findByDisplayValue('Alice')).toBeDisabled();
     expect(screen.getByLabelText(/Mark Alice as facilitator/i)).toBeDisabled();
     expect(screen.queryByRole('button', { name: /Delete Alice/i })).not.toBeInTheDocument();
+  });
+});
+
+
+/**
+ * One button, one request. The rebuild is a single blocking call: the server
+ * refuses, solves, and repoints the program on its own, so the page's only job
+ * is to ask once and report what came back.
+ */
+describe('rebuilding from the roster', () => {
+  const person = (id: string, name: string) => ({
+    id, name, religion: 'Christian', gender: 'Female',
+    partner_id: null, is_facilitator: false, keep_together: false,
+  });
+  const canonicalOf = (p: { name: string; religion: string; gender: string }) => ({
+    name: p.name, religion: p.religion, gender: p.gender,
+    partner: null, is_facilitator: false, keep_together: false,
+  });
+
+  /** Wires the page's reads, and lets one test choose what generate answers. */
+  const mockProgram = (opts: {
+    draft: ReturnType<typeof person>[];
+    canonical: ReturnType<typeof person>[] | null;
+    generate?: { ok?: boolean; status?: number; body?: any };
+  }) => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('/api/roster/generate')) {
+        const g = opts.generate ?? {};
+        return Promise.resolve({
+          ok: g.ok ?? true,
+          status: g.status ?? 200,
+          json: async () => g.body ?? { assignment_set_id: 's2', rebuilt: true, message: 'Sessions rebuilt.' },
+        } as Response);
+      }
+      if (url.includes('/api/roster/discard')) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ status: 'discarded' }) } as Response);
+      }
+      if (url.includes('/api/roster/canonical')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => opts.canonical
+            ? { participants: opts.canonical.map(canonicalOf), num_tables: 2, num_sessions: 3 }
+            : { participants: [], num_tables: null, num_sessions: null },
+        } as Response);
+      }
+      if (url.includes('/api/assignments/metadata')) {
+        return opts.canonical
+          ? Promise.resolve({
+              ok: true,
+              json: async () => ({ assignment_set_id: 's1', num_tables: 2, num_sessions: 3 }),
+            } as Response)
+          : Promise.resolve({ ok: false, status: 404, json: async () => ({}) } as Response);
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ participants: opts.draft }) } as Response);
+    });
+  };
+
+  const alice = person('p1', 'Alice');
+  const bob = person('p2', 'Bob');
+  const cara = person('p3', 'Cara');
+  const dan = person('p4', 'Dan');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('makes exactly one request', async () => {
+    mockProgram({ draft: [alice, bob], canonical: [alice] });
+    renderPage();
+
+    const btn = await screen.findByRole('button', { name: /save and rebuild sessions/i });
+    await waitFor(() => expect(btn).toBeEnabled());
+    await userEvent.click(btn);
+
+    await waitFor(() => {
+      const generateCalls = mockFetch.mock.calls.filter(
+        ([url]) => String(url).includes('/api/roster/generate')
+      );
+      expect(generateCalls).toHaveLength(1);
+    });
+    const solveCalls = mockFetch.mock.calls.filter(
+      ([url]) => String(url).includes('/api/assignments/')
+        && !String(url).includes('metadata')
+    );
+    expect(solveCalls).toHaveLength(0);
+  });
+
+  test('blocks the page while solving', async () => {
+    let release: (value: any) => void = () => {};
+    mockProgram({ draft: [alice, bob], canonical: [alice] });
+    const passthrough = mockFetch.getMockImplementation()!;
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).includes('/api/roster/generate')) {
+        return new Promise(resolve => { release = resolve; });
+      }
+      return passthrough(url, init);
+    });
+    renderPage();
+
+    const btn = await screen.findByRole('button', { name: /save and rebuild sessions/i });
+    await waitFor(() => expect(btn).toBeEnabled());
+    await userEvent.click(btn);
+
+    expect(
+      await screen.findByText(/Rebuilding your sessions… this can take up to two minutes\./)
+    ).toBeInTheDocument();
+    release({ ok: true, status: 200, json: async () => ({ assignment_set_id: 's2', rebuilt: true }) });
+  });
+
+  test('shows the refusal and leaves the roster alone', async () => {
+    mockProgram({
+      draft: [alice, bob],
+      canonical: [alice],
+      generate: { ok: false, status: 400, body: { detail: 'Add 2 more participants.' } },
+    });
+    renderPage();
+
+    const btn = await screen.findByRole('button', { name: /save and rebuild sessions/i });
+    await waitFor(() => expect(btn).toBeEnabled());
+    await userEvent.click(btn);
+
+    expect(await screen.findByText('Add 2 more participants.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /save and rebuild sessions/i })).toBeEnabled();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  test('confirms a discard and names the count', async () => {
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
+    mockProgram({ draft: [alice, bob, cara, dan], canonical: [alice] });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: /discard changes/i }));
+
+    expect(confirmSpy).toHaveBeenCalledWith('Discard 3 roster changes?');
+    confirmSpy.mockRestore();
+  });
+
+  test('stays on the page when nothing needed rebuilding', async () => {
+    mockProgram({
+      draft: [alice, bob],
+      canonical: [alice],
+      generate: { body: { assignment_set_id: 's1', rebuilt: false, message: 'Roster saved. No rebuild needed.' } },
+    });
+    renderPage();
+
+    const btn = await screen.findByRole('button', { name: /save and rebuild sessions/i });
+    await waitFor(() => expect(btn).toBeEnabled());
+    await userEvent.click(btn);
+
+    expect(await screen.findByText(/No rebuild needed\./)).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  // computeChangeset reports a brand-new program as clean — there is no
+  // canonical roster to differ from — so gating the button on dirtiness alone
+  // would hide it on exactly the program that needs it most.
+  test('still offers generate on a brand-new program', async () => {
+    mockProgram({ draft: [alice, bob], canonical: null });
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: /generate assignments/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /discard changes/i })).not.toBeInTheDocument();
+  });
+
+  test('offers nothing to press when the roster matches the sessions', async () => {
+    mockProgram({ draft: [alice], canonical: [alice] });
+    renderPage();
+
+    await screen.findByRole('button', { name: /edit roster/i });
+    expect(screen.queryByRole('button', { name: /rebuild sessions/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /discard changes/i })).not.toBeInTheDocument();
   });
 });
