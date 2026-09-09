@@ -125,6 +125,11 @@ redesign.
    already absent, so it cannot become a general move: the general move needs a source to pick
    up, and this gesture has none.
 
+   *Shipped 2026-09-09.* Selection is cross-session and lives on the Assignments page; the actions
+   hung off it are session-scoped. Three dismissals — the chip again, Escape, any non-chip click —
+   because a user who has just dimmed the whole page needs an obvious way back, and any one of them
+   is the one someone will not try.
+
 6. **Every change creates a version.** Versions are the universal safety net, which is what
    makes silent overwrites (a shuffle discarding an absence-driven edit) tolerable.
 
