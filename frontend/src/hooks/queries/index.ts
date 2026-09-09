@@ -1,4 +1,4 @@
-export { useRoster, useCanonicalRoster } from './useRoster'
+export { useRoster, useCanonicalRoster, useKeepApart } from './useRoster'
 export {
   resultsQueryKey,
   useResultVersions,

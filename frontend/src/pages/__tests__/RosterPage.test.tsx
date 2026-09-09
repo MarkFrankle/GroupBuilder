@@ -462,3 +462,112 @@ describe('rebuilding from the roster', () => {
     expect(screen.queryByRole('button', { name: /discard changes/i })).not.toBeInTheDocument();
   });
 });
+
+/**
+ * Keep apart. Two people who must never share a table — a rule that lives
+ * beside the roster it is about, and that counts as a roster change like any
+ * other.
+ */
+describe('the Keep apart block', () => {
+  const person = (id: string, name: string) => ({
+    id, name, religion: 'Christian', gender: 'Female',
+    partner_id: null, is_facilitator: false, keep_together: false,
+  });
+  const alice = person('p1', 'Alice');
+  const bob = person('p2', 'Bob');
+
+  /** The live pairs come back as ids; the canonical copy stores names, exactly
+   * as the server's own canonical roster does. */
+  const mockProgram = (opts: {
+    pairs: [string, string][];
+    canonicalKeepApart?: Record<string, string[]>;
+  }) => {
+    const keepApart = opts.canonicalKeepApart ?? {};
+    mockFetch.mockImplementation((url: string) => {
+      if (String(url).includes('/api/roster/keep-apart')) {
+        return Promise.resolve({
+          ok: true, status: 200, json: async () => ({ pairs: opts.pairs }),
+        } as Response);
+      }
+      if (String(url).includes('/api/roster/canonical')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            participants: [alice, bob].map(p => ({
+              name: p.name, religion: p.religion, gender: p.gender,
+              partner: null, is_facilitator: false, keep_together: false,
+              keep_apart: keepApart[p.name] ?? [],
+            })),
+            num_tables: 2,
+            num_sessions: 3,
+          }),
+        } as Response);
+      }
+      if (String(url).includes('/api/assignments/metadata')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ assignment_set_id: 's1', num_tables: 2, num_sessions: 3 }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true, json: async () => ({ participants: [alice, bob] }),
+      } as Response);
+    });
+  };
+
+  const matching = { Alice: ['Bob'], Bob: ['Alice'] };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('renders below the shape controls', async () => {
+    mockProgram({ pairs: [] });
+    renderPage();
+
+    const heading = await screen.findByRole('heading', { name: /keep apart/i });
+    const sessions = screen.getByText('Number of Sessions');
+    expect(
+      sessions.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  test('marks the roster dirty when a pair is kept apart', async () => {
+    // The sessions were built with nobody kept apart; the live roster now
+    // keeps two people apart, so the plan no longer matches the roster. Both
+    // people gain a rule, so the changeset reports two lines.
+    mockProgram({ pairs: [['p1', 'p2']] });
+    renderPage();
+
+    expect(await screen.findByText(/2 changes not yet in your sessions/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /edit roster/i })).not.toBeInTheDocument();
+  });
+
+  test('lists a matching pair, locked and unremovable', async () => {
+    mockProgram({ pairs: [['p1', 'p2']], canonicalKeepApart: matching });
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: /edit roster/i })).toBeInTheDocument();
+    expect(screen.getByText('Alice and Bob')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /stop keeping alice and bob apart/i })
+    ).not.toBeInTheDocument();
+  });
+
+  test('removes a pair', async () => {
+    mockProgram({ pairs: [['p1', 'p2']] });
+    renderPage();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /stop keeping alice and bob apart/i })
+    );
+
+    await waitFor(() => {
+      const deletes = mockFetch.mock.calls.filter(
+        ([url, init]) => String(url).includes('/api/roster/keep-apart/p1/p2')
+          && (init as RequestInit | undefined)?.method === 'DELETE'
+      );
+      expect(deletes).toHaveLength(1);
+    });
+  });
+});

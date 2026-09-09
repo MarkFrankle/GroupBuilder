@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { getRoster } from '@/api/roster'
+import { getKeepApart, getRoster } from '@/api/roster'
 import { authenticatedFetch } from '@/utils/apiClient'
 import { useProgram } from '@/contexts/ProgramContext'
 
@@ -28,6 +28,18 @@ export function useCanonicalRoster(programId: string | null) {
       if (!response.ok) throw new Error('Failed to fetch canonical roster')
       return response.json()
     },
+    enabled: !!programId,
+  })
+}
+
+/**
+ * The pairs who must never share a table, as roster ids. Read on the Roster
+ * page, which both renders them and folds them into the roster's changeset.
+ */
+export function useKeepApart(programId: string | null) {
+  return useQuery({
+    queryKey: ['keep-apart', programId],
+    queryFn: () => getKeepApart(programId!),
     enabled: !!programId,
   })
 }
