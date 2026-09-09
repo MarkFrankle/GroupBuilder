@@ -415,3 +415,48 @@ class TestGenerateRefusesCompletedSessions:
         from api.services.assignment_set_storage import AssignmentSetStorage
 
         assert AssignmentSetStorage().get_current_set_id("test_org_id") == first
+
+
+class TestCanonicalRoster:
+    """GET /api/roster/canonical serves the roster the current assignments were built from."""
+
+    def test_returns_the_frozen_roster_and_shape(
+        self, client, add_assignment_set_to_firestore
+    ):
+        add_assignment_set_to_firestore(
+            {
+                "participant_data": [
+                    {
+                        "id": 1,
+                        "name": "Alice",
+                        "religion": "Christian",
+                        "gender": "Female",
+                        "partner": None,
+                        "is_facilitator": False,
+                        "keep_together": False,
+                    }
+                ],
+                "num_tables": 2,
+                "num_sessions": 3,
+            }
+        )
+
+        response = client.get("/api/roster/canonical?program_id=test_org_id")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["num_tables"] == 2
+        assert body["num_sessions"] == 3
+        assert [p["name"] for p in body["participants"]] == ["Alice"]
+
+    def test_no_assignment_set_yet_is_a_normal_state(self, client):
+        """A program before its first generate has no canonical roster. That is
+        not an error - it is the first-run state, and the page renders unlocked."""
+        response = client.get("/api/roster/canonical?program_id=test_org_id")
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "participants": [],
+            "num_tables": None,
+            "num_sessions": None,
+        }
