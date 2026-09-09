@@ -9,7 +9,7 @@
  * This mirrors the backend's `api/src/api/services/roster_diff.py` — same
  * rules, different output. The backend asks "may I skip the solve?"; this asks
  * "what do I tell the user?". Keep the RULES in step: which fields count, and
- * how a rename is detected.
+ * how a rename is detected, and how the keep-apart pairs are compared.
  */
 
 /** Everything the solver mixes on. `name` is deliberately absent: it is the
@@ -37,6 +37,9 @@ export interface CanonicalParticipant {
   partner: string | null;
   is_facilitator: boolean;
   keep_together: boolean;
+  /** Optional: a roster frozen before the feature existed carries no rules at
+   * all, and must not read as dirty the moment the field arrives. */
+  keep_apart?: string[];
 }
 
 /** The size of the plan. `tables: null` means there is no assignment set yet. */
@@ -79,6 +82,52 @@ export interface RosterChangeset {
 
 const byName = (people: CanonicalParticipant[]): Map<string, CanonicalParticipant> =>
   new Map(people.map((p) => [p.name, p]));
+
+/** Joins a pair into a set key. No name a coordinator can type contains a NUL,
+ * so the two halves cannot be confused for one longer name. */
+const PAIR_SEP = '\u0000';
+
+/** The roster's keep-apart rules as an unordered set of name pairs.
+ *
+ * Compared as a set of pairs rather than as a mixing field, and only after
+ * renames are resolved. `keep_apart` is deliberately absent from MIXING_FIELDS:
+ * `sameMixing` compares values literally, and a partner's *name* moves under a
+ * rename, so listing it there would make renaming anyone named in a rule read
+ * as a mixing change — collapsing the rename fast path into a full rebuild and
+ * destroying the plan over a typo fix.
+ *
+ * This rests on the backend's `apply_renames` rewriting `keep_apart` when it
+ * propagates a rename. If it ever stops, the canonical side keeps the old
+ * spelling, every later diff here sees a pair the draft can never match, and
+ * the Roster page reads dirty forever with a rebuild as the only way out. */
+const keepApartPairs = (
+  people: CanonicalParticipant[],
+  renameMap: Map<string, string>,
+): Set<string> => {
+  const pairs = new Set<string>();
+  people.forEach((person) => {
+    const a = renameMap.get(person.name) ?? person.name;
+    (person.keep_apart ?? []).forEach((other) => {
+      const b = renameMap.get(other) ?? other;
+      // A self-pair in pre-feature or hand-edited canonical data would be a
+      // phantom the draft can never match, and so a permanent spurious rebuild.
+      if (a !== b) pairs.add([a, b].sort().join(PAIR_SEP));
+    });
+  });
+  return pairs;
+};
+
+/** The names one person is kept apart from, as the changeset shows them. */
+const keepApartOf = (
+  person: CanonicalParticipant | undefined,
+  renameMap: Map<string, string>,
+): string | null => {
+  const names = (person?.keep_apart ?? []).map((n) => renameMap.get(n) ?? n).sort();
+  return names.length > 0 ? names.join(', ') : null;
+};
+
+const sameSet = (a: Set<string>, b: Set<string>): boolean =>
+  a.size === b.size && Array.from(a).every((v) => b.has(v));
 
 const sameMixing = (a: CanonicalParticipant, b: CanonicalParticipant): boolean =>
   MIXING_FIELDS.every((f) => a[f] === b[f]);
@@ -135,12 +184,56 @@ export function computeChangeset(
     }
   }
 
+  // Renames are applied to the canonical side, which holds the old spellings,
+  // so a spelling change reads as the same rule rather than a different one.
+  // Removing a rule needs a rebuild too: the existing plan stays *legal*
+  // without it — a relaxed constraint is still satisfied — so only optimality
+  // is lost. It is still the right call: the coordinator removed the rule
+  // precisely so those two may now meet.
+  const renameMap = new Map(renamed.map((r) => [r.from, r.to]));
+  const keepApartChanged = !sameSet(
+    keepApartPairs(canonical, renameMap),
+    keepApartPairs(draft, new Map()),
+  );
+
+  // This one boolean decides the rebuild, as it does in the backend. The
+  // per-person listing below is purely what we tell the coordinator: it walks
+  // the roster a second time and may legitimately disagree with the gate, so it
+  // must never be what `needsRebuild` is read from.
+  //
+  // Where it disagrees: an *asymmetric* canonical rule — A names B, B silent —
+  // is the same rule to the gate but a differing list to one of the two people,
+  // so once the gate fires for some genuine edit, that person also gets a line
+  // for a rule nobody touched. Reachable only through hand-edited or
+  // pre-feature frozen data, and the spurious line also adds one to `total`,
+  // which the discard confirmation counts. Accepted deliberately: normalising
+  // both sides to symmetric rules is more machinery than the exposure is worth.
+  // Note this cannot happen on a pure rename — the pair sets match, so the gate
+  // never fires and a coordinator fixing a typo never sees a keep-apart line.
+  if (keepApartChanged) {
+    const canonicalByNewName = byName(
+      canonical.map((p) => ({ ...p, name: renameMap.get(p.name) ?? p.name })),
+    );
+    const names = Array.from(
+      new Set(Array.from(canonicalByNewName.keys()).concat(draft.map((p) => p.name))),
+    );
+    names.forEach((name) => {
+      const from = keepApartOf(canonicalByNewName.get(name), renameMap);
+      const to = keepApartOf(draftByName.get(name), new Map());
+      if (from !== to) changed.push({ name, field: 'kept apart', from, to });
+    });
+  }
+
   const shape: ShapeChange[] = (['tables', 'sessions'] as const)
     .filter((f) => canonicalShape[f] !== draftShape[f])
     .map((f) => ({ field: f, from: canonicalShape[f], to: draftShape[f] }));
 
   const needsRebuild =
-    added.length > 0 || removed.length > 0 || changed.length > 0 || shape.length > 0;
+    added.length > 0 ||
+    removed.length > 0 ||
+    changed.length > 0 ||
+    shape.length > 0 ||
+    keepApartChanged;
 
   return {
     added,

@@ -33,6 +33,16 @@
   outside a module" — a config problem that looks like a code problem.
 - **Mock `@/utils/apiClient` in frontend tests** — don't mock Firebase SDK internals. Example: `jest.mock('@/utils/apiClient', () => ({ authenticatedFetch: (...args) => fetch(...args) }))`
 
+- **`user-event` v13 cannot drive a Radix `Select`.** `userEvent.click` on an option leaves the
+  trigger unchanged, even with `skipPointerEventsCheck`, and a synthesized `pointerUp` does not
+  select either. Use `fireEvent.keyDown(trigger, { key: 'Enter' })` to open and
+  `fireEvent.click(option)` to choose. Tests touching a Select also need
+  `Element.prototype.scrollIntoView` stubbed — Radix calls it on open. See
+  `KeepApartSection.test.tsx`.
+- **Anything stored as a roster document id must survive `POST /roster/discard`.** Discard
+  deletes every roster document and rewrites it with fresh uuids, so ids are not durable.
+  `partner_id` and the program-level `keep_apart` pairs are both resolved to names before the
+  delete and re-resolved after. A third such field must do the same or it silently orphans.
 ## Build & Dev Commands
 
 ### Frontend (`frontend/`) — npm + CRA + craco

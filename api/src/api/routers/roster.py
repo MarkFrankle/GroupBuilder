@@ -22,6 +22,10 @@ from api.services.session_completion_guards import (
     refuse_if_any_session_complete,
     refuse_if_below_completed_prefix,
 )
+from api.services.keep_apart_storage import (
+    KeepApartStorage,
+    get_keep_apart_storage,
+)
 from api.services.roster_diff import apply_renames, diff_rosters
 from api.services.roster_gate import ShortfallError, check_shortfalls
 from api.services.program_solve import SolveFailed, solve_program
@@ -80,7 +84,10 @@ class GenerateRequest(BaseModel):
     num_sessions: int = Field(ge=1, le=6)
 
 
-def _roster_to_participant_list(participants: list[dict]) -> list[dict]:
+def _roster_to_participant_list(
+    participants: list[dict],
+    keep_apart_pairs: list[tuple[str, str]] | None = None,
+) -> list[dict]:
     """Convert roster docs to the solver's expected participant dict format."""
     id_to_name = {p["id"]: p["name"] for p in participants}
 
@@ -122,6 +129,34 @@ def _roster_to_participant_list(participants: list[dict]) -> list[dict]:
                     next_couple_id += 1
                 p["couple_id"] = couple_map[key]
 
+    # Keep-apart is stored program-level as id pairs because it is one-to-many;
+    # it is *frozen* per participant because participant_data is what travels -
+    # into the solver, and into Item 15's client-side flag detection. Deriving
+    # it symmetrically here on every freeze is what makes an asymmetric field
+    # unrepresentable. Item 6a's rename propagation must rewrite this field too:
+    # until apply_renames does, a rename leaves stale names inside a frozen
+    # keep_apart.
+    #
+    # A pair naming an id that no longer resolves is dropped, exactly as a
+    # dangling partner_id resolves to None above. Deleting a participant
+    # therefore retires their rules with no cascade and no cleanup pass.
+    #
+    # The stamp is keyed by name, so two people sharing a name both receive a
+    # rule aimed at either of them - the same collapse partner already suffers,
+    # and in the safe direction: an extra separation, never a missed one. The
+    # a_name == b_name test below is only the self-pair guard, not a
+    # duplicate-name guard.
+    keep_apart_names: dict[str, list[str]] = {p["name"]: [] for p in result}
+    for a_id, b_id in keep_apart_pairs or []:
+        a_name, b_name = id_to_name.get(a_id), id_to_name.get(b_id)
+        if a_name is None or b_name is None or a_name == b_name:
+            continue
+        keep_apart_names[a_name].append(b_name)
+        keep_apart_names[b_name].append(a_name)
+
+    for p in result:
+        p["keep_apart"] = sorted(set(keep_apart_names[p["name"]]))
+
     return result
 
 
@@ -135,6 +170,7 @@ async def generate_from_roster(
     roster_service: RosterService = Depends(get_roster_service),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
     completion: SessionCompletionStorage = Depends(get_session_completion_storage),
+    keep_apart: KeepApartStorage = Depends(get_keep_apart_storage),
 ):
     """Rebuild the program from the live roster.
 
@@ -154,7 +190,9 @@ async def generate_from_roster(
     # draft has to pass through it before any comparison. Diffing raw roster
     # documents would compare partner_id against partner and read every
     # partnered person as changed.
-    participant_list = _roster_to_participant_list(participants)
+    participant_list = _roster_to_participant_list(
+        participants, keep_apart_pairs=keep_apart.get_pairs(program_id)
+    )
 
     # "No current set" is the first-run signal, not "canonical is empty" - that
     # distinguishes never-generated from a degenerate empty-roster set.
@@ -286,13 +324,17 @@ async def discard_roster_changes(
     program_id: str = Depends(validate_program_access),
     roster_service: RosterService = Depends(get_roster_service),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+    keep_apart: KeepApartStorage = Depends(get_keep_apart_storage),
 ):
     """Throw the draft away and rewrite the roster from the current sessions.
 
-    The rebuilt documents get fresh ids. That is safe: nothing outside the
-    roster grid holds a roster document id, and ``partner_id`` is resolved back
-    to a name every time the program is generated, so the only thing that has
-    to survive is who is partnered with whom - which is matched by name here.
+    The rebuilt documents get fresh ids, so everything stored *as* a roster
+    document id has to be carried across: ``partner_id`` on the document, and
+    the program-level ``keep_apart`` pairs. Both are resolved to names before
+    the delete and re-resolved to the new ids after the rewrite, because names
+    are what the canonical roster is matched on. A keep-apart pair naming
+    someone the canonical roster does not contain is dropped - discard restores
+    the frozen set, so a person absent from it is genuinely gone.
     """
     set_id = storage.get_current_set_id(program_id)
     if not set_id:
@@ -304,7 +346,15 @@ async def discard_roster_changes(
     assignment_set = storage.get_set(program_id, set_id) or {}
     canonical = assignment_set.get("participant_data") or []
 
-    for participant in roster_service.get_roster(program_id):
+    live_roster = roster_service.get_roster(program_id)
+    live_names = {p["id"]: p["name"] for p in live_roster}
+    keep_apart_names = [
+        (live_names[a_id], live_names[b_id])
+        for a_id, b_id in keep_apart.get_pairs(program_id)
+        if a_id in live_names and b_id in live_names
+    ]
+
+    for participant in live_roster:
         roster_service.delete_participant(program_id, participant["id"])
 
     new_ids = {p["name"]: str(uuid.uuid4()) for p in canonical}
@@ -323,7 +373,106 @@ async def discard_roster_changes(
             },
         )
 
+    keep_apart.replace_pairs(
+        program_id,
+        [
+            (new_ids[a_name], new_ids[b_name])
+            for a_name, b_name in keep_apart_names
+            if a_name in new_ids and b_name in new_ids
+        ],
+    )
+
     return {"status": "discarded", "count": len(canonical)}
+
+
+class KeepApartPair(BaseModel):
+    a_id: str
+    b_id: str
+
+
+def _validate_keep_apart(participants: list[dict], a_id: str, b_id: str) -> None:
+    """Refuse the two pairs a coordinator can state but should not.
+
+    Both are detectable by reading two fields, so neither needs a solve - which
+    is why refusing them here does not reintroduce the feasibility pre-check
+    this feature ruled out. Everything that *would* need a solve falls through
+    to the solver's own refusal at rebuild time.
+    """
+    by_id = {p["id"]: p for p in participants}
+    a, b = by_id.get(a_id), by_id.get(b_id)
+
+    if a_id == b_id:
+        raise HTTPException(
+            status_code=400, detail="A person can't be kept apart from themselves."
+        )
+    if not a or not b:
+        raise HTTPException(
+            status_code=400, detail="That person is no longer on the roster."
+        )
+
+    partnered = a.get("partner_id") == b_id or b.get("partner_id") == a_id
+    if partnered:
+        if a.get("keep_together") or b.get("keep_together"):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"{a['name']} and {b['name']} are linked partners, so they "
+                    "can't also be kept apart. Remove the link first."
+                ),
+            )
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"{a['name']} and {b['name']} are a couple, and couples are "
+                "always seated at different tables."
+            ),
+        )
+
+
+# These three are declared above the /{participant_id} routes on purpose: a
+# route declared after them would have "keep-apart" matched as a participant id,
+# and DELETE would delete a participant instead of a rule.
+@router.get("/keep-apart")
+@limiter.limit("30/minute")
+async def list_keep_apart(
+    request: Request,
+    program_id: str = Depends(validate_program_access),
+    keep_apart: KeepApartStorage = Depends(get_keep_apart_storage),
+):
+    return {"pairs": [list(p) for p in keep_apart.get_pairs(program_id)]}
+
+
+@router.post("/keep-apart")
+@limiter.limit("60/minute")
+async def add_keep_apart(
+    request: Request,
+    data: KeepApartPair,
+    program_id: str = Depends(validate_program_access),
+    roster_service: RosterService = Depends(get_roster_service),
+    keep_apart: KeepApartStorage = Depends(get_keep_apart_storage),
+):
+    _validate_keep_apart(roster_service.get_roster(program_id), data.a_id, data.b_id)
+    pairs = keep_apart.add_pair(program_id, data.a_id, data.b_id)
+    return {"pairs": [list(p) for p in pairs]}
+
+
+@router.delete("/keep-apart/{a_id}/{b_id}")
+@limiter.limit("60/minute")
+async def remove_keep_apart(
+    request: Request,
+    a_id: str,
+    b_id: str,
+    program_id: str = Depends(validate_program_access),
+    keep_apart: KeepApartStorage = Depends(get_keep_apart_storage),
+):
+    """No validation: removing a rule can never create an impossible state, and
+    a rule naming someone since deleted has to stay removable.
+
+    The pair travels in the path, like every other DELETE here - a body on
+    DELETE has no defined semantics and some proxies strip it.
+    """
+    pairs = keep_apart.remove_pair(program_id, a_id, b_id)
+    return {"pairs": [list(p) for p in pairs]}
 
 
 @router.put("/{participant_id}")
@@ -334,7 +483,28 @@ async def upsert_participant(
     data: ParticipantData,
     program_id: str = Depends(validate_program_access),
     roster_service: RosterService = Depends(get_roster_service),
+    keep_apart: KeepApartStorage = Depends(get_keep_apart_storage),
 ):
+    # The mirror of the POST /keep-apart refusal. Without it the contradiction
+    # is reachable from this side - link two people already kept apart - and
+    # the coordinator meets it as the solver's generic "No solution exists"
+    # at rebuild time instead of a message naming the remedy. Only
+    # keep_together conflicts; a couple plus a keep-apart rule is redundant,
+    # not contradictory, and couple_id already separates them.
+    if data.keep_together and data.partner_id:
+        pair = tuple(sorted((participant_id, data.partner_id)))
+        if pair in keep_apart.get_pairs(program_id):
+            partner = roster_service.get_participant(program_id, data.partner_id)
+            partner_name = (partner or {}).get("name", "that person")
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"{data.name} and {partner_name} are kept apart, so they "
+                    "can't also be linked partners. Remove the keep-apart rule "
+                    "first."
+                ),
+            )
+
     try:
         result = roster_service.upsert_participant(
             program_id, participant_id, data.model_dump()
@@ -351,6 +521,7 @@ async def delete_participant(
     participant_id: str,
     program_id: str = Depends(validate_program_access),
     roster_service: RosterService = Depends(get_roster_service),
+    keep_apart: KeepApartStorage = Depends(get_keep_apart_storage),
 ):
     participant = roster_service.get_participant(program_id, participant_id)
     if participant and participant.get("partner_id"):
@@ -362,4 +533,10 @@ async def delete_participant(
                 {**partner, "partner_id": None, "keep_together": False},
             )
     roster_service.delete_participant(program_id, participant_id)
+    # A rule about someone who is gone is not a rule. Left behind, the pair
+    # would also point at an id that can never resolve again.
+    pairs = keep_apart.get_pairs(program_id)
+    remaining = [p for p in pairs if participant_id not in p]
+    if len(remaining) != len(pairs):
+        keep_apart.replace_pairs(program_id, remaining)
     return {"status": "deleted"}

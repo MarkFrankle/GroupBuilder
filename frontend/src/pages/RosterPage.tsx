@@ -12,12 +12,16 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RosterGrid } from '@/components/RosterGrid/RosterGrid';
 import { PopulationStats } from '@/components/Roster/PopulationStats';
 import { ChangesetPanel } from '@/components/Roster/ChangesetPanel';
+import { KeepApartSection } from '@/components/Roster/KeepApartSection';
 import { RosterParticipant } from '@/types/roster';
 import {
   upsertParticipant, deleteParticipant as apiDeleteParticipant,
   generateFromRoster, discardRosterChanges,
+  addKeepApart, removeKeepApart,
 } from '@/api/roster';
-import { useRoster, useAssignmentSetMetadata, useCanonicalRoster } from '@/hooks/queries';
+import {
+  useRoster, useAssignmentSetMetadata, useCanonicalRoster, useKeepApart,
+} from '@/hooks/queries';
 import { computeChangeset, CanonicalParticipant } from '@/utils/rosterDiff';
 import { useProgram } from '@/contexts/ProgramContext';
 import { useQueryClient } from '@tanstack/react-query';
@@ -43,9 +47,32 @@ interface CanonicalRoster {
  * The draft roster in the shape the assignment set froze. The canonical copy
  * stores a partner *name*, not an id, so a partnered person would read as
  * changed on every comparison unless the draft is translated first.
+ *
+ * Keep-apart rules get the same treatment, mirroring the server's
+ * `_roster_to_participant_list` exactly: each pair stamps each person's name
+ * on the other, sorted and deduped, and a pair naming an id that no longer
+ * resolves is dropped — just as a dangling partner_id resolves to null. The
+ * stamp is keyed by name, so two people sharing a name both receive a rule
+ * aimed at either of them, which is the safe direction and what the server
+ * does. Any divergence here would have the page report changes that aren't
+ * real, or miss ones that are.
  */
-function toCanonical(participants: RosterParticipant[]): CanonicalParticipant[] {
+function toCanonical(
+  participants: RosterParticipant[],
+  keepApartPairs: [string, string][],
+): CanonicalParticipant[] {
   const nameById = new Map(participants.map(p => [p.id, p.name]));
+
+  const keepApartNames = new Map<string, string[]>();
+  participants.forEach(p => keepApartNames.set(p.name, []));
+  keepApartPairs.forEach(([aId, bId]) => {
+    const aName = nameById.get(aId);
+    const bName = nameById.get(bId);
+    if (aName === undefined || bName === undefined || aName === bName) return;
+    keepApartNames.get(aName)!.push(bName);
+    keepApartNames.get(bName)!.push(aName);
+  });
+
   return participants.map(p => ({
     name: p.name,
     religion: p.religion,
@@ -53,6 +80,7 @@ function toCanonical(participants: RosterParticipant[]): CanonicalParticipant[] 
     partner: p.partner_id ? nameById.get(p.partner_id) ?? null : null,
     is_facilitator: p.is_facilitator ?? false,
     keep_together: p.keep_together ?? false,
+    keep_apart: Array.from(new Set(keepApartNames.get(p.name) ?? [])).sort(),
   }));
 }
 
@@ -72,13 +100,22 @@ export function RosterPage() {
     error: canonicalError,
   } = useCanonicalRoster(currentProgram?.id ?? null);
   const canonical = (canonicalData as CanonicalRoster | undefined) ?? null;
+  const {
+    data: keepApartData,
+    isLoading: keepApartLoading,
+    error: keepApartError,
+  } = useKeepApart(currentProgram?.id ?? null);
+  const keepApartPairs = keepApartData ?? [];
 
   // Every one of the three, not just the roster. The lock is derived from all
   // of them, so rendering before they land shows an established program as a
   // brand-new one: unlocked, offering "Generate assignments", with an editable
   // grid that autosaves each keystroke. A guard that is off for the first paint
   // is not a guard.
-  const loading = rosterLoading || metadataLoading || canonicalLoading;
+  // Keep-apart belongs here for the same reason: the lock is derived from it
+  // too, so painting before it lands shows a locked program as dirty - grid
+  // editable, autosaving, Discard on screen - and then silently flips back.
+  const loading = rosterLoading || metadataLoading || canonicalLoading || keepApartLoading;
 
   const [participants, setParticipants] = useState<RosterParticipant[]>([]);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
@@ -198,6 +235,33 @@ export function RosterPage() {
     }
   }, [participants, currentProgram]);
 
+  // Only this key. The rules live on the program document: adding or removing
+  // one writes no roster document, and /api/roster/canonical serves the frozen
+  // participant_data, which only a rebuild rewrites. Refetching the roster here
+  // would be a chance to overwrite the grid with a stale body for no gain.
+  const invalidateKeepApart = () => {
+    queryClient.invalidateQueries({ queryKey: ['keep-apart', currentProgram!.id] });
+  };
+
+  /** Deliberately not caught: the section renders the server's refusal inline,
+   * beside the two selects that caused it, rather than at the top of the page. */
+  const handleAddKeepApart = async (aId: string, bId: string) => {
+    await addKeepApart(currentProgram!.id, aId, bId);
+    invalidateKeepApart();
+  };
+
+  /** Removal is never refused, so the only realistic failure is the network.
+   * The section's contract is that this must not reject, so it is reported
+   * through the page's own error alert. */
+  const handleRemoveKeepApart = async (aId: string, bId: string) => {
+    try {
+      await removeKeepApart(currentProgram!.id, aId, bId);
+      invalidateKeepApart();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
   const invalidateAssignmentQueries = () => {
     const programId = currentProgram?.id;
     queryClient.invalidateQueries({ queryKey: ['assignment-set-metadata', programId] });
@@ -260,7 +324,7 @@ export function RosterPage() {
 
   const changeset = computeChangeset(
     canonical?.participants ?? [],
-    toCanonical(participants),
+    toCanonical(participants, keepApartPairs),
     { tables: canonical?.num_tables ?? null, sessions: canonical?.num_sessions ?? null },
     { tables: parseInt(numTables), sessions: parseInt(numSessions) },
   );
@@ -321,7 +385,7 @@ export function RosterPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <PopulationStats participants={participants} />
+          <PopulationStats participants={participants} keepApartPairs={keepApartPairs} />
 
           <RosterGrid
             participants={participants}
@@ -363,7 +427,15 @@ export function RosterPage() {
             </div>
           </div>
 
-          {(error || fetchError || canonicalError) && (
+          <KeepApartSection
+            participants={participants}
+            pairs={keepApartPairs}
+            onAdd={handleAddKeepApart}
+            onRemove={handleRemoveKeepApart}
+            readOnly={locked}
+          />
+
+          {(error || fetchError || canonicalError || keepApartError) && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               {/* A failure to load is not a refusal to rebuild, and a canonical
@@ -374,7 +446,12 @@ export function RosterPage() {
                   ? 'Can’t rebuild yet'
                   : canonicalError
                     ? 'Can’t tell whether your roster matches your sessions'
-                    : 'Couldn’t load your roster'}
+                    : keepApartError
+                      // Named, not implied: an unread rule renders as "nobody is
+                      // being kept apart yet", which is a claim rather than an
+                      // absence - and the roster reads dirty beside it.
+                      ? 'Couldn’t load who is being kept apart'
+                      : 'Couldn’t load your roster'}
               </AlertTitle>
               <AlertDescription>
                 {error ||

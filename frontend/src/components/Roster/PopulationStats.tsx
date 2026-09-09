@@ -10,7 +10,15 @@ import { RosterParticipant, RELIGIONS } from '@/types/roster';
  * what the current sessions contain. That is intended — it is the draft you
  * are proofreading.
  */
-export function PopulationStats({ participants }: { participants: RosterParticipant[] }) {
+export function PopulationStats({
+  participants,
+  keepApartPairs = [],
+}: {
+  participants: RosterParticipant[];
+  /** Roster ids. Unlike couples these arrive as pairs, not as two rows, so
+   * they are counted directly. */
+  keepApartPairs?: [string, string][];
+}) {
   if (participants.length === 0) return null;
 
   const religions = RELIGIONS
@@ -43,6 +51,9 @@ export function PopulationStats({ participants }: { participants: RosterParticip
   ];
   if (couples > 0) parts.push(`${couples} couple${couples === 1 ? '' : 's'}`);
   if (linked > 0) parts.push(`${linked} pair${linked === 1 ? '' : 's'} kept together`);
+  if (keepApartPairs.length > 0) {
+    parts.push(`${keepApartPairs.length} pair${keepApartPairs.length === 1 ? '' : 's'} kept apart`);
+  }
 
   return (
     <p className="text-sm text-muted-foreground">{parts.filter(Boolean).join(' · ')}</p>

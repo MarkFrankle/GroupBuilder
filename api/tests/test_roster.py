@@ -860,3 +860,135 @@ class TestDiscard:
 
         # The ids are new, and that is the point of the name matching above.
         assert not ({p["id"] for p in roster} & {p["id"] for p in draft})
+
+    def _add_keep_apart(self, client, a_id, b_id):
+        response = client.post(
+            "/api/roster/keep-apart?program_id=test_org_id",
+            json={"a_id": a_id, "b_id": b_id},
+        )
+        assert response.status_code == 200
+
+    def _pair_names(self, client):
+        """The stored pairs as name pairs, resolved through the live roster."""
+        from api.services.roster_service import RosterService
+
+        names = {p["id"]: p["name"] for p in RosterService().get_roster("test_org_id")}
+        pairs = client.get("/api/roster/keep-apart?program_id=test_org_id").json()[
+            "pairs"
+        ]
+        return sorted(
+            tuple(sorted((names[a], names[b])))
+            for a, b in pairs
+            if a in names and b in names
+        )
+
+    def test_keep_apart_pairs_survive_a_discard(
+        self, client, add_assignment_set_to_firestore, add_roster_to_firestore
+    ):
+        """The pairs are stored as roster document ids, and discard mints new
+        ones. They have to be remapped or every rule dangles."""
+        add_assignment_set_to_firestore(
+            {"participant_data": _canonical(4), "num_tables": 2, "num_sessions": 2}
+        )
+        add_roster_to_firestore(_draft(4))
+        self._add_keep_apart(client, "p0", "p2")
+
+        assert (
+            client.post("/api/roster/discard?program_id=test_org_id").status_code == 200
+        )
+
+        assert self._pair_names(client) == [("Person0", "Person2")]
+        # And the pair names ids that actually exist now.
+        stored = client.get("/api/roster/keep-apart?program_id=test_org_id").json()[
+            "pairs"
+        ]
+        assert len(stored) == 1
+        assert not set(stored[0]) & {"p0", "p2"}
+
+    def test_a_pair_naming_someone_absent_from_the_frozen_set_is_dropped(
+        self, client, add_assignment_set_to_firestore, add_roster_to_firestore
+    ):
+        """Discard restores the frozen roster, so a draft-only person is gone -
+        and so is any rule about them."""
+        add_assignment_set_to_firestore(
+            {"participant_data": _canonical(4), "num_tables": 2, "num_sessions": 2}
+        )
+        add_roster_to_firestore(_draft(6))
+        self._add_keep_apart(client, "p0", "p2")
+        self._add_keep_apart(client, "p1", "p5")
+
+        assert (
+            client.post("/api/roster/discard?program_id=test_org_id").status_code == 200
+        )
+
+        assert self._pair_names(client) == [("Person0", "Person2")]
+        assert (
+            len(
+                client.get("/api/roster/keep-apart?program_id=test_org_id").json()[
+                    "pairs"
+                ]
+            )
+            == 1
+        )
+
+    def test_the_frozen_keep_apart_names_are_unchanged_by_a_discard(
+        self, client, add_assignment_set_to_firestore, add_roster_to_firestore
+    ):
+        """The end-to-end shape the roster lock depends on: what
+        ``_roster_to_participant_list`` derives has to be the same on both sides
+        of a discard, or the roster reads permanently dirty."""
+        from api.services.roster_service import RosterService
+
+        canonical = _canonical(4)
+        canonical[0]["keep_apart"] = ["Person2"]
+        canonical[2]["keep_apart"] = ["Person0"]
+        add_assignment_set_to_firestore(
+            {"participant_data": canonical, "num_tables": 2, "num_sessions": 2}
+        )
+        add_roster_to_firestore(_draft(4))
+        self._add_keep_apart(client, "p0", "p2")
+
+        def derived():
+            roster = RosterService().get_roster("test_org_id")
+            pairs = [
+                tuple(p)
+                for p in client.get(
+                    "/api/roster/keep-apart?program_id=test_org_id"
+                ).json()["pairs"]
+            ]
+            return {
+                p["name"]: p["keep_apart"]
+                for p in _roster_to_participant_list(roster, keep_apart_pairs=pairs)
+            }
+
+        before = derived()
+        assert before["Person0"] == ["Person2"]
+
+        assert (
+            client.post("/api/roster/discard?program_id=test_org_id").status_code == 200
+        )
+
+        assert derived() == before
+        assert derived() == {p["name"]: p["keep_apart"] for p in canonical}
+
+
+class TestDeletePrunesKeepApart:
+    """Deleting a participant retires their keep-apart rules."""
+
+    def test_delete_removes_their_pairs_and_leaves_the_others(
+        self, client, add_roster_to_firestore
+    ):
+        add_roster_to_firestore(_draft(4))
+        for a, b in (("p0", "p1"), ("p0", "p2"), ("p1", "p3")):
+            response = client.post(
+                "/api/roster/keep-apart?program_id=test_org_id",
+                json={"a_id": a, "b_id": b},
+            )
+            assert response.status_code == 200
+
+        assert client.delete("/api/roster/p0?program_id=test_org_id").status_code == 200
+
+        pairs = client.get("/api/roster/keep-apart?program_id=test_org_id").json()[
+            "pairs"
+        ]
+        assert pairs == [["p1", "p3"]]

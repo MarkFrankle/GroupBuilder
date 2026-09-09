@@ -66,3 +66,26 @@ describe('PopulationStats', () => {
     expect(container).toBeEmptyDOMElement();
   });
 });
+
+describe('PopulationStats keep-apart', () => {
+  test('reports pairs kept apart', () => {
+    render(<PopulationStats
+      participants={[person('ken'), person('bill')]}
+      keepApartPairs={[['ken', 'bill']]}
+    />);
+    expect(screen.getByText(/1 pair kept apart/)).toBeInTheDocument();
+  });
+
+  test('counts every pair, and pluralises', () => {
+    render(<PopulationStats
+      participants={[person('ken'), person('bill'), person('sue')]}
+      keepApartPairs={[['ken', 'bill'], ['bill', 'sue']]}
+    />);
+    expect(screen.getByText(/2 pairs kept apart/)).toBeInTheDocument();
+  });
+
+  test('says nothing when nobody is kept apart', () => {
+    render(<PopulationStats participants={[person('ken')]} keepApartPairs={[]} />);
+    expect(screen.queryByText(/kept apart/)).not.toBeInTheDocument();
+  });
+});
