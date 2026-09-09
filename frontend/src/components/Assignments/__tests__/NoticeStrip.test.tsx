@@ -4,10 +4,30 @@ import userEvent from '@testing-library/user-event'
 import NoticeStrip from '../NoticeStrip'
 
 describe('NoticeStrip', () => {
-  it('renders nothing when there is nothing to say', () => {
-    const { container } = render(<NoticeStrip notice={null} />)
+  it('says nothing when there is nothing to say, but stays mounted', () => {
+    render(<NoticeStrip notice={null} />)
 
-    expect(container).toBeEmptyDOMElement()
+    // Mounted and empty rather than absent: a live region that appears with its
+    // text already inside it is generally not announced, and this strip carries
+    // every edit receipt and every Undo.
+    const region = screen.getByRole('status')
+    expect(region).toBeInTheDocument()
+    expect(region).toHaveTextContent('')
+    expect(region).toHaveClass('sr-only')
+  })
+
+  it('takes focus only when the notice asks for it', () => {
+    const { rerender } = render(
+      <NoticeStrip notice={{ tone: 'info', message: 'Assignments created.' }} />
+    )
+    expect(screen.getByRole('status')).not.toHaveFocus()
+
+    rerender(
+      <NoticeStrip
+        notice={{ tone: 'info', message: 'Ann marked absent.', focusOnAppear: true }}
+      />
+    )
+    expect(screen.getByRole('status')).toHaveFocus()
   })
 
   it('renders the message', () => {

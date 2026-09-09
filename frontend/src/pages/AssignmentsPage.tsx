@@ -131,6 +131,13 @@ const AssignmentsPage: React.FC = () => {
   // The version that was current when Shuffle was pressed — captured up front,
   // because undo must not depend on an invalidated version list having
   // resettled, nor on no other tab having written in between.
+  //
+  // Shared with editMutation, which writes it too: an edit landing while a
+  // shuffle is still in flight would overwrite the shuffle's undo target, and
+  // its Undo would then rewind to the wrong version. Left as one ref knowingly
+  // — both mutations take about a second and the UI gives no way to start the
+  // second before the first has settled. Split it per mutation if a path ever
+  // appears that can.
   const undoTarget = useRef<ResultVersion | null>(null)
 
   // Held so a shuffle can be diffed against what was on screen before it ran.
@@ -181,7 +188,13 @@ const AssignmentsPage: React.FC = () => {
   useEffect(() => {
     if (selectedName === null) return
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setSelectedName(null)
+      if (event.key !== 'Escape') return
+      // Radix does not stop Escape propagating out of an open menu, so without
+      // this one keystroke both backs out of the table picker and clears the
+      // selection the picker is gated on — the user loses their place instead of
+      // reconsidering a table. Inside a menu, Escape belongs to the menu.
+      if ((event.target as HTMLElement | null)?.closest?.('[role="menu"]')) return
+      setSelectedName(null)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -320,6 +333,11 @@ const AssignmentsPage: React.FC = () => {
       showNotice({
         tone: 'info',
         message: receipt,
+        // The control that was just pressed is gone — Mark absent unmounts with
+        // the selection, and choosing a table unmounts the whole picker — so
+        // focus has nowhere to fall back to. The receipt takes it, which is also
+        // where the Undo is.
+        focusOnAppear: true,
         actions: target
           ? [{ label: 'Undo', onClick: () => promoteMutation.mutate({ version: target }) }]
           : undefined,
@@ -372,8 +390,8 @@ const AssignmentsPage: React.FC = () => {
       assignments: markPresent(sorted, sessionNumber, name, tableNumber),
       label: `${name} marked present in Session ${sessionNumber}`,
       receipt:
-        `${name} marked present in Session ${sessionNumber} \u00b7 ` +
-        `seated at Table ${tableNumber} \u00b7 other sessions unchanged.`,
+        `${name} marked present in Session ${sessionNumber} · ` +
+        `seated at Table ${tableNumber} · other sessions unchanged.`,
     })
   }
 
@@ -616,7 +634,14 @@ const AssignmentsPage: React.FC = () => {
         Rendered empty rather than unmounted: a region that unmounts stops being
         announced on the next selection in some screen readers.
       */}
-      <div role="status" aria-live="polite" className="sr-only">
+      <div
+        role="status"
+        aria-live="polite"
+        // NoticeStrip's container is a role="status" region too, and it is now
+        // always mounted, so the two are told apart by this rather than by role.
+        data-testid="selection-announcement"
+        className="sr-only"
+      >
         {selectedName ? `${selectedName} selected — showing them across all sessions.` : ''}
       </div>
       <ProgramHeader

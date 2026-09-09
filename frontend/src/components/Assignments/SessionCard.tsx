@@ -20,7 +20,7 @@ import {
 import Chip from './Chip'
 import TableBlock from './TableBlock'
 import { tablesWithOpenSeat } from '@/utils/assignmentEdits'
-import { personCount, tableNumbers } from '@/utils/assignmentStats'
+import { personCount, seatedCount, tableNumbers } from '@/utils/assignmentStats'
 import type { Assignment, Participant } from '@/types/assignments'
 
 interface SessionCardProps {
@@ -47,13 +47,6 @@ interface SessionCardProps {
   onMarkAbsent: (name: string) => void
   /** Required on the same terms as `onMarkAbsent`, and gated the same way. */
   onMarkPresent: (name: string, tableNumber: number) => void
-}
-
-function seatedCount(assignment: Assignment): number {
-  return tableNumbers(assignment).reduce(
-    (total, n) => total + assignment.tables[n].filter(Boolean).length,
-    0
-  )
 }
 
 const SessionCard: React.FC<SessionCardProps> = ({

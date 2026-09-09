@@ -678,16 +678,16 @@ describe('AssignmentsPage', () => {
       renderPage()
       const anns = await selectAnn()
 
-      // The nudge is suppressed in beforeEach and no receipt has been raised,
-      // so NoticeStrip is absent and this is the only live region on the page.
-      expect(screen.getByRole('status')).toHaveTextContent(
+      // Scoped by test id, not by role: NoticeStrip's container is a
+      // role="status" region as well, and it is always mounted.
+      expect(screen.getByTestId('selection-announcement')).toHaveTextContent(
         'Ann selected \u2014 showing them across all sessions.'
       )
 
       fireEvent.click(anns[0])
 
       // Empty rather than gone: a region that unmounts stops announcing.
-      expect(screen.getByRole('status')).toHaveTextContent('')
+      expect(screen.getByTestId('selection-announcement')).toHaveTextContent('')
     })
   })
 
@@ -728,6 +728,49 @@ describe('AssignmentsPage', () => {
         )
       ).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /^undo$/i })).toBeInTheDocument()
+    })
+
+    it('moves focus to the receipt, so the Undo can be reached', async () => {
+      renderPage()
+      await markAnnAbsent()
+
+      const receipt = await screen.findByText(/^Ann marked absent from Session 1/)
+      // The button that was pressed unmounted with the selection, so focus would
+      // otherwise be on <body> with the Undo nowhere near it.
+      const strip = screen.getByTestId('notice-strip')
+      expect(strip).toContainElement(receipt)
+      expect(strip).toHaveFocus()
+    })
+
+    it('offers no Mark absent inside a completed session', async () => {
+      api.completedThrough = 1
+      api.absence = true
+      renderPage()
+
+      // Expanded first, and before anyone is selected: a collapsed completed
+      // card renders no tables at all, so asserting against one proves nothing —
+      // it passes with the card's gate removed. The chevron's click also reaches
+      // the page's click-outside dismissal, which would undo a selection made
+      // before it.
+      fireEvent.click(
+        await screen.findByRole('button', { name: /expand session 1/i })
+      )
+      const session1 = screen.getByRole('region', { name: 'Session 1' })
+      expect(within(session1).getByText('Table 1')).toBeInTheDocument()
+
+      // Ann is selected from a live session; selection is page-wide.
+      const session2 = screen.getByRole('region', { name: 'Session 2' })
+      fireEvent.click(within(session2).getByRole('button', { name: 'Ann' }))
+
+      // The page passes onMarkAbsent to completed cards too and leans entirely
+      // on the card's own `actionable` gate, so the "never change the past"
+      // guarantee is asserted here, at the layer that does the wiring.
+      expect(
+        within(session1).queryByRole('button', { name: /mark ann absent/i })
+      ).not.toBeInTheDocument()
+      expect(
+        within(session2).getByRole('button', { name: /mark ann absent/i })
+      ).toBeInTheDocument()
     })
 
     it('undoes by promoting the version that was current before the edit', async () => {
@@ -822,6 +865,28 @@ describe('AssignmentsPage', () => {
       // menu is modal and aria-hides the rest of the page behind it.
       expect(
         screen.getByText('Cara selected \u2014 showing them across all sessions.')
+      ).toBeInTheDocument()
+    })
+
+    it('lets Escape close the picker without losing the selection', async () => {
+      api.absence = true
+      renderPage()
+      const session2 = await selectCara()
+
+      openPickerWithMouse(
+        within(session2).getByRole('button', { name: 'Mark present' })
+      )
+      const item = await screen.findByRole('menuitem', { name: /Table 2/ })
+
+      fireEvent.keyDown(item, { key: 'Escape' })
+
+      // The menu is gone, and the trigger that opens it is still there — so the
+      // one keystroke did one thing.
+      await waitFor(() =>
+        expect(screen.queryByText('Seat Cara at\u2026')).not.toBeInTheDocument()
+      )
+      expect(
+        within(session2).getByRole('button', { name: 'Mark present' })
       ).toBeInTheDocument()
     })
 

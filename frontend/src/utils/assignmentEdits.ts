@@ -3,8 +3,8 @@
  *
  * Both rewrite one session's entry and return a new whole-program array. Every
  * other entry comes back by identity: `/results/save` compares completed
- * sessions exactly (Item 2a), so a gratuitous rewrite of an untouched session
- * would be refused as tampering.
+ * sessions exactly, so a gratuitous rewrite of an untouched session would be
+ * refused as tampering.
  */
 import { tableNumbers } from '@/utils/assignmentStats'
 import type { Assignment } from '@/types/assignments'
