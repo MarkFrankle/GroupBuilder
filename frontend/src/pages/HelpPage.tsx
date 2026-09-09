@@ -169,13 +169,6 @@ function HelpPage() {
             indicator at the top that changes to "Saved" when everything is up to date.
           </InfoCallout>
 
-          <InfoCallout>
-            Once you've generated groups, the roster locks. The header reads "Locked"
-            and the fields are greyed out, so you can't change the list your sessions
-            were built from by accident. Click <strong>"Edit roster"</strong> at the
-            top when you really do want to make a change.
-          </InfoCallout>
-
           <Screenshot
             src="/images/help/roster-management.png"
             alt="The roster manager showing several participants with their religion, gender, partner, and facilitator settings"
