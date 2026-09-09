@@ -422,7 +422,7 @@ async def list_keep_apart(
 
 
 @router.post("/keep-apart")
-@limiter.limit("30/minute")
+@limiter.limit("60/minute")
 async def add_keep_apart(
     request: Request,
     data: KeepApartPair,
@@ -435,17 +435,22 @@ async def add_keep_apart(
     return {"pairs": [list(p) for p in pairs]}
 
 
-@router.delete("/keep-apart")
-@limiter.limit("30/minute")
+@router.delete("/keep-apart/{a_id}/{b_id}")
+@limiter.limit("60/minute")
 async def remove_keep_apart(
     request: Request,
-    data: KeepApartPair,
+    a_id: str,
+    b_id: str,
     program_id: str = Depends(validate_program_access),
     keep_apart: KeepApartStorage = Depends(get_keep_apart_storage),
 ):
     """No validation: removing a rule can never create an impossible state, and
-    a rule naming someone since deleted has to stay removable."""
-    pairs = keep_apart.remove_pair(program_id, data.a_id, data.b_id)
+    a rule naming someone since deleted has to stay removable.
+
+    The pair travels in the path, like every other DELETE here - a body on
+    DELETE has no defined semantics and some proxies strip it.
+    """
+    pairs = keep_apart.remove_pair(program_id, a_id, b_id)
     return {"pairs": [list(p) for p in pairs]}
 
 
@@ -457,7 +462,28 @@ async def upsert_participant(
     data: ParticipantData,
     program_id: str = Depends(validate_program_access),
     roster_service: RosterService = Depends(get_roster_service),
+    keep_apart: KeepApartStorage = Depends(get_keep_apart_storage),
 ):
+    # The mirror of the POST /keep-apart refusal. Without it the contradiction
+    # is reachable from this side - link two people already kept apart - and
+    # the coordinator meets it as the solver's generic "No solution exists"
+    # at rebuild time instead of a message naming the remedy. Only
+    # keep_together conflicts; a couple plus a keep-apart rule is redundant,
+    # not contradictory, and couple_id already separates them.
+    if data.keep_together and data.partner_id:
+        pair = tuple(sorted((participant_id, data.partner_id)))
+        if pair in keep_apart.get_pairs(program_id):
+            partner = roster_service.get_participant(program_id, data.partner_id)
+            partner_name = (partner or {}).get("name", "that person")
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"{data.name} and {partner_name} are kept apart, so they "
+                    "can't also be linked partners. Remove the keep-apart rule "
+                    "first."
+                ),
+            )
+
     try:
         result = roster_service.upsert_participant(
             program_id, participant_id, data.model_dump()

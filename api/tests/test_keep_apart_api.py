@@ -46,10 +46,8 @@ class TestKeepApartPairs:
             "/api/roster/keep-apart?program_id=test_org_id",
             json={"a_id": "mel", "b_id": "dana"},
         )
-        response = roster.request(
-            "DELETE",
-            "/api/roster/keep-apart?program_id=test_org_id",
-            json={"a_id": "dana", "b_id": "mel"},
+        response = roster.delete(
+            "/api/roster/keep-apart/dana/mel?program_id=test_org_id"
         )
         assert response.status_code == 200
         assert response.json()["pairs"] == []
@@ -57,6 +55,63 @@ class TestKeepApartPairs:
             roster.get("/api/roster/keep-apart?program_id=test_org_id").json()["pairs"]
             == []
         )
+
+    def test_adding_the_same_pair_twice_stores_it_once(self, roster):
+        for _ in range(2):
+            response = roster.post(
+                "/api/roster/keep-apart?program_id=test_org_id",
+                json={"a_id": "mel", "b_id": "dana"},
+            )
+            assert response.status_code == 200
+        assert response.json()["pairs"] == [["dana", "mel"]]
+
+    def test_lists_several_pairs(self, roster):
+        for a, b in (("mel", "dana"), ("kathy", "mel"), ("heather", "dana")):
+            assert (
+                roster.post(
+                    "/api/roster/keep-apart?program_id=test_org_id",
+                    json={"a_id": a, "b_id": b},
+                ).status_code
+                == 200
+            )
+        listed = roster.get("/api/roster/keep-apart?program_id=test_org_id")
+        assert listed.status_code == 200
+        # Insertion order, each pair ordered smallest id first.
+        assert listed.json()["pairs"] == [
+            ["dana", "mel"],
+            ["kathy", "mel"],
+            ["dana", "heather"],
+        ]
+
+    def test_pair_survives_deleting_a_participant_and_stays_removable(self, roster):
+        roster.post(
+            "/api/roster/keep-apart?program_id=test_org_id",
+            json={"a_id": "mel", "b_id": "dana"},
+        )
+        assert (
+            roster.delete("/api/roster/dana?program_id=test_org_id").status_code == 200
+        )
+        # The rule is not cleaned up - the freeze drops it instead - and DELETE
+        # skips validation precisely so a rule naming a deleted person can go.
+        assert roster.get("/api/roster/keep-apart?program_id=test_org_id").json()[
+            "pairs"
+        ] == [["dana", "mel"]]
+        removed = roster.delete(
+            "/api/roster/keep-apart/dana/mel?program_id=test_org_id"
+        )
+        assert removed.status_code == 200
+        assert removed.json()["pairs"] == []
+
+    def test_removing_a_pair_that_was_never_added_is_a_no_op(self, roster):
+        roster.post(
+            "/api/roster/keep-apart?program_id=test_org_id",
+            json={"a_id": "mel", "b_id": "dana"},
+        )
+        response = roster.delete(
+            "/api/roster/keep-apart/kathy/dana?program_id=test_org_id"
+        )
+        assert response.status_code == 200
+        assert response.json()["pairs"] == [["dana", "mel"]]
 
 
 class TestRefusals:
@@ -72,6 +127,8 @@ class TestRefusals:
         )
 
     def test_couple_is_refused_with_the_fact_and_no_lecture(self, client):
+        # Its own roster, not the shared fixture: that Kathy is already linked
+        # to Heather, and a linked pair takes the other refusal.
         _put(client, "kathy", "Kathy Veit", partner_id="mel")
         _put(client, "mel", "Mel Kronick", gender="Male", partner_id="kathy")
         response = client.post(
@@ -107,3 +164,70 @@ class TestRefusals:
             roster.get("/api/roster/keep-apart?program_id=test_org_id").json()["pairs"]
             == []
         )
+
+
+class TestLinkingPeopleWhoAreKeptApart:
+    """The mirror refusal, on PUT. The contradiction has two doors."""
+
+    def test_linking_a_kept_apart_pair_is_refused(self, roster):
+        assert (
+            roster.post(
+                "/api/roster/keep-apart?program_id=test_org_id",
+                json={"a_id": "mel", "b_id": "dana"},
+            ).status_code
+            == 200
+        )
+        response = roster.put(
+            "/api/roster/mel?program_id=test_org_id",
+            json={
+                "name": "Mel Kronick",
+                "religion": "Christian",
+                "gender": "Male",
+                "partner_id": "dana",
+                "keep_together": True,
+            },
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"] == (
+            "Mel Kronick and Dana Ruiz are kept apart, so they can't also be "
+            "linked partners. Remove the keep-apart rule first."
+        )
+
+    def test_the_refusal_holds_from_the_other_side_too(self, roster):
+        roster.post(
+            "/api/roster/keep-apart?program_id=test_org_id",
+            json={"a_id": "mel", "b_id": "dana"},
+        )
+        response = roster.put(
+            "/api/roster/dana?program_id=test_org_id",
+            json={
+                "name": "Dana Ruiz",
+                "religion": "Christian",
+                "gender": "Female",
+                "partner_id": "mel",
+                "keep_together": True,
+            },
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"] == (
+            "Dana Ruiz and Mel Kronick are kept apart, so they can't also be "
+            "linked partners. Remove the keep-apart rule first."
+        )
+
+    def test_a_couple_over_a_kept_apart_pair_is_still_allowed(self, roster):
+        roster.post(
+            "/api/roster/keep-apart?program_id=test_org_id",
+            json={"a_id": "mel", "b_id": "dana"},
+        )
+        response = roster.put(
+            "/api/roster/mel?program_id=test_org_id",
+            json={
+                "name": "Mel Kronick",
+                "religion": "Christian",
+                "gender": "Male",
+                "partner_id": "dana",
+                "keep_together": False,
+            },
+        )
+        assert response.status_code == 200
+        assert response.json()["partner_id"] == "dana"
