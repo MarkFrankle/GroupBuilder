@@ -60,12 +60,23 @@ export function RosterPage() {
   const navigate = useNavigate();
   const { currentProgram } = useProgram();
   const queryClient = useQueryClient();
-  const { data: rosterData, isLoading: loading, error: fetchError } = useRoster();
-  const { data: metadata } = useAssignmentSetMetadata(currentProgram?.id ?? null);
+  const { data: rosterData, isLoading: rosterLoading, error: fetchError } = useRoster();
+  const { data: metadata, isLoading: metadataLoading } = useAssignmentSetMetadata(
+    currentProgram?.id ?? null,
+  );
   const currentSet: AssignmentSetSummary | null =
     (metadata as AssignmentSetSummary | undefined) ?? null;
-  const { data: canonicalData } = useCanonicalRoster(currentProgram?.id ?? null);
+  const { data: canonicalData, isLoading: canonicalLoading } = useCanonicalRoster(
+    currentProgram?.id ?? null,
+  );
   const canonical = (canonicalData as CanonicalRoster | undefined) ?? null;
+
+  // Every one of the three, not just the roster. The lock is derived from all
+  // of them, so rendering before they land shows an established program as a
+  // brand-new one: unlocked, offering "Generate assignments", with an editable
+  // grid that autosaves each keystroke. A guard that is off for the first paint
+  // is not a guard.
+  const loading = rosterLoading || metadataLoading || canonicalLoading;
 
   const [participants, setParticipants] = useState<RosterParticipant[]>([]);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
@@ -255,7 +266,11 @@ export function RosterPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-4 flex justify-center">
+      <div
+        className="container mx-auto p-4 flex justify-center"
+        role="status"
+        aria-label="Loading roster"
+      >
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );

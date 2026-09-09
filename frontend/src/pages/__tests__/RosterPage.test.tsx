@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
 import { RosterPage } from '../RosterPage';
@@ -106,6 +106,64 @@ describe('RosterPage', () => {
  * a plan by accident: locked when the live roster still matches the one the
  * sessions were built from, unlocked deliberately or by a real difference.
  */
+describe('while the page is still loading', () => {
+  test('an established program never paints as a brand-new one', async () => {
+    // The lock is derived from three queries. Rendering as soon as the roster
+    // alone had landed showed an existing program unlocked, offering "Generate
+    // assignments", with an editable grid that autosaves every keystroke - the
+    // guard off for exactly the first paint, which is when a returning
+    // coordinator looks at it.
+    //
+    // Each query is resolved by hand so the assertion lands in a window this
+    // test controls, rather than whenever promises happen to settle.
+    let releaseMetadata: () => void = () => {};
+    const metadataArrived = new Promise<void>((resolve) => {
+      releaseMetadata = resolve;
+    });
+
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.includes('/api/assignments/metadata')) {
+        await metadataArrived;
+        return {
+          ok: true,
+          json: async () => ({
+            assignment_set_id: 'set-1',
+            num_tables: 2,
+            num_sessions: 3,
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        json: async () => ({ participants: [], num_tables: 2, num_sessions: 3 }),
+      } as Response;
+    });
+
+    renderPage();
+
+    // Roster and canonical have landed; metadata has not. The page must still
+    // be waiting rather than guessing.
+    await act(async () => {
+      // A macrotask, so every already-settled promise has been flushed into
+      // React state. Only the metadata query is genuinely still outstanding.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(screen.getByRole('status', { name: /loading roster/i })).toBeInTheDocument();
+    expect(screen.queryByText('Roster')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /generate assignments/i })
+    ).not.toBeInTheDocument();
+
+    // And once it does land, the page renders - locked, not offering to generate.
+    await act(async () => {
+      releaseMetadata();
+      await metadataArrived;
+    });
+    expect(await screen.findByRole('button', { name: /edit roster/i })).toBeInTheDocument();
+  });
+});
+
 describe('the lock', () => {
   const alice = {
     id: 'p1', name: 'Alice', religion: 'Christian', gender: 'Female',
