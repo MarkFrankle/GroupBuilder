@@ -40,7 +40,7 @@ describe('ProgramHeader', () => {
     expect(screen.queryByText(/Rules/)).not.toBeInTheDocument()
   })
 
-  it('offers Print Roster and Copy Link', async () => {
+  it('offers Print roster & seating charts and Copy Link', async () => {
     const onPrintRoster = jest.fn()
     render(
       <ProgramHeader

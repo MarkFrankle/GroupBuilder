@@ -61,7 +61,7 @@ const ProgramHeader: React.FC<ProgramHeaderProps> = ({
     <div className="flex items-center gap-2">
       <Button variant="outline" size="sm" onClick={onPrintRoster}>
         <Printer className="mr-1.5 h-3.5 w-3.5" />
-        Print Roster
+        Print roster &amp; seating charts
       </Button>
       <Button variant="outline" size="sm" onClick={onCopyLink}>
         <LinkIcon className="mr-1.5 h-3.5 w-3.5" />
