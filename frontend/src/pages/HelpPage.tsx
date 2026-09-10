@@ -276,9 +276,9 @@ function HelpPage() {
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Just below that, a banner checks the plan against the rules you set —
-            couples kept apart, people you asked to keep apart, a facilitator at
-            every table — and either tells you it's ready to print or names what
-            to fix and in which session.
+            couples seated apart, anyone you asked to keep apart kept apart, a
+            facilitator at every table — and either tells you it's ready to print
+            or names what to fix and in which session.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Each session is a card. Inside it, each table lists its facilitators
