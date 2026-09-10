@@ -17,6 +17,7 @@ import { authenticatedFetch } from '@/utils/apiClient'
 import {
   linkedPairCount,
   seatedCount,
+  rebuildReceipt,
   shuffleReceipt,
   tableNumbers,
   uniqueTablematesAverage,
@@ -24,10 +25,12 @@ import {
 import { markAbsent, markPresent } from '@/utils/assignmentEdits'
 import {
   resultsQueryKey,
+  useAcceptRebuild,
   useAssignmentResults,
   useAssignmentSetMetadata,
   useResultVersions,
   useSessionCompletion,
+  useUndoRebuild,
 } from '@/hooks/queries'
 import { useProgram } from '@/contexts/ProgramContext'
 import { useAuth } from '@/contexts/AuthContext'
@@ -100,7 +103,6 @@ const AssignmentsPage: React.FC = () => {
   // rather than its id, because ids are minted per set and so `v1` exists in
   // every set: an id alone no longer names one version.
   const [viewing, setViewing] = useState<ResultVersion | null>(null)
-  const readOnly = viewing !== null
 
   // Selection is cross-session by design — that is the trust demo, watching one
   // person move every week — so it lives here rather than in a session card.
@@ -118,6 +120,14 @@ const AssignmentsPage: React.FC = () => {
   )
   const { data: completedThrough = 0 } = useSessionCompletion(programId)
   const { data: versions = [] } = useResultVersions(programId)
+
+  // A mid-program rebuild mints a provisional set (accepted: false). Until the
+  // user accepts or undoes it, every mutating endpoint 409s, so the page threads
+  // readOnly through the same prop that a history view uses.
+  const provisional = metadata?.accepted === false
+  const readOnly = viewing !== null || provisional
+  const acceptMutation = useAcceptRebuild(programId)
+  const undoMutation = useUndoRebuild(programId)
 
   const [notice, setNotice] = useState<Notice | null>(null)
 
@@ -568,6 +578,34 @@ const AssignmentsPage: React.FC = () => {
 
   const totalSessions = metadata?.num_sessions ?? sorted.length
 
+  // Computed, not transient: while the set is provisional this notice must hold
+  // the strip against every receipt, so it is passed ahead of `notice` rather
+  // than pushed through showNotice. The mutations surface their own failures.
+  const provisionalNotice: Notice | null = provisional
+    ? {
+        tone: 'info',
+        message: rebuildReceipt(completedThrough, totalSessions),
+        actions: [
+          {
+            label: 'Accept',
+            onClick: () =>
+              acceptMutation.mutate(undefined, {
+                onError: (error: Error) =>
+                  showNotice({ tone: 'error', message: error.message }),
+              }),
+          },
+          {
+            label: 'Undo',
+            onClick: () =>
+              undoMutation.mutate(undefined, {
+                onError: (error: Error) =>
+                  showNotice({ tone: 'error', message: error.message }),
+              }),
+          },
+        ],
+      }
+    : null
+
   // The moment the current set was minted is the moment the setup changed, so
   // it is the date the divider carries.
   const setChangeDate = metadata?.created_at
@@ -670,7 +708,7 @@ const AssignmentsPage: React.FC = () => {
       />
 
       <div className="flex flex-col gap-4 px-8">
-      <NoticeStrip notice={notice} onDismiss={() => showNotice(null)} />
+      <NoticeStrip notice={provisionalNotice ?? notice} onDismiss={() => showNotice(null)} />
 
       <ViewBar focus={focus} onFocusChange={setFocus} participants={allParticipants} />
 

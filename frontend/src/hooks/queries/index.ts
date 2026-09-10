@@ -5,5 +5,7 @@ export {
   useAssignmentResults,
   useAssignmentSetMetadata,
   useSessionCompletion,
+  useAcceptRebuild,
+  useUndoRebuild,
 } from './useAssignments'
 export { useIsAdmin, useAdminPrograms, useProgramDetails } from './useAdmin'
