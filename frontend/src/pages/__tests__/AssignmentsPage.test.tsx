@@ -708,13 +708,27 @@ describe('AssignmentsPage', () => {
       // Scoped by test id, not by role: NoticeStrip's container is a
       // role="status" region as well, and it is always mounted.
       expect(screen.getByTestId('selection-announcement')).toHaveTextContent(
-        'Ann selected \u2014 showing them across all sessions.'
+        /Ann · .* · sits with \d+ of the other \d+ participants/
       )
 
       fireEvent.click(anns[0])
 
       // Empty rather than gone: a region that unmounts stops announcing.
       expect(screen.getByTestId('selection-announcement')).toHaveTextContent('')
+    })
+
+    it('shows the person-tracking summary line when a person is selected', async () => {
+      renderPage()
+      await selectAnn()
+
+      expect(screen.getByTestId('tracking-summary')).toHaveTextContent(
+        /· .* · sits with \d+ of the other \d+ participants/
+      )
+    })
+
+    it('hides the summary line when no one is selected', () => {
+      renderPage()
+      expect(screen.queryByTestId('tracking-summary')).not.toBeInTheDocument()
     })
   })
 
@@ -908,8 +922,9 @@ describe('AssignmentsPage', () => {
       // And said in as many words. Queried by text, not by role: an open Radix
       // menu is modal and aria-hides the rest of the page behind it.
       expect(
-        screen.getByText('Cara selected \u2014 showing them across all sessions.')
-      ).toBeInTheDocument()
+        screen.getAllByText(/Cara · .* · sits with \d+ of the other \d+ participants/)
+          .length
+      ).toBeGreaterThan(0)
     })
 
     it('lets Escape close the picker without losing the selection', async () => {

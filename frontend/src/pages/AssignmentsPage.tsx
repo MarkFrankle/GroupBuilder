@@ -21,6 +21,7 @@ import {
   shuffleReceipt,
   tableNumbers,
   uniqueTablematesAverage,
+  personTrackingSummary,
 } from '@/utils/assignmentStats'
 import { markAbsent, markPresent } from '@/utils/assignmentEdits'
 import {
@@ -578,6 +579,9 @@ const AssignmentsPage: React.FC = () => {
 
   const totalSessions = metadata?.num_sessions ?? sorted.length
 
+  const trackingSummary =
+    selectedName !== null ? personTrackingSummary(selectedName, sorted) : null
+
   // Computed, not transient: while the set is provisional this notice must hold
   // the strip against every receipt, so it is passed ahead of `notice` rather
   // than pushed through showNotice. The mutations surface their own failures.
@@ -691,7 +695,7 @@ const AssignmentsPage: React.FC = () => {
         data-testid="selection-announcement"
         className="sr-only"
       >
-        {selectedName ? `${selectedName} selected — showing them across all sessions.` : ''}
+        {trackingSummary ?? ''}
       </div>
       <ProgramHeader
         programName={currentProgram?.name ?? 'Assignments'}
@@ -711,6 +715,12 @@ const AssignmentsPage: React.FC = () => {
       <NoticeStrip notice={provisionalNotice ?? notice} onDismiss={() => showNotice(null)} />
 
       <ViewBar focus={focus} onFocusChange={setFocus} participants={allParticipants} />
+
+      {trackingSummary && (
+        <p className="text-sm text-muted-foreground" data-testid="tracking-summary">
+          {trackingSummary}
+        </p>
+      )}
 
       <div className="flex flex-col gap-5">
         {live.map((assignment, index) => (
