@@ -475,6 +475,46 @@ describe('AssignmentsPage', () => {
     )
   })
 
+  describe('zoom', () => {
+    it('starts in Full zoom with a column layout', async () => {
+      renderPage()
+
+      await screen.findByText('Session 1')
+      expect(screen.getByRole('button', { name: 'Full' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
+      expect(screen.getByTestId('sessions-container')).toHaveClass('flex-col')
+    })
+
+    it('switches to a wrapping row of sessions when Compact is pressed', async () => {
+      renderPage()
+
+      await screen.findByText('Session 1')
+      fireEvent.click(screen.getByRole('button', { name: 'Compact' }))
+
+      expect(screen.getByTestId('sessions-container')).toHaveClass('flex-row')
+      expect(screen.getByRole('button', { name: 'Compact' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
+    })
+
+    it('renders every session including completed ones in compact (no Completed divider)', async () => {
+      api.completedThrough = 1
+      renderPage()
+
+      await screen.findByText('Session 2')
+      fireEvent.click(screen.getByRole('button', { name: 'Compact' }))
+
+      expect(screen.queryByText('Completed')).not.toBeInTheDocument()
+      const headings = screen
+        .getAllByText(/^Session \d$/)
+        .map(node => node.textContent)
+      expect(headings).toEqual(['Session 1', 'Session 2', 'Session 3'])
+    })
+  })
+
   describe('printing an older version', () => {
     const realConfirm = window.confirm
 

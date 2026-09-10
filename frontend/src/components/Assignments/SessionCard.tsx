@@ -27,6 +27,8 @@ interface SessionCardProps {
   assignment: Assignment
   /** One of the leading completed sessions: renders as a collapsed row. */
   completed?: boolean
+  /** Item 11 compact zoom — behavior implemented in a later task. */
+  compact?: boolean
   /** Viewing an older version — looking is free, acting is not. */
   readOnly?: boolean
   isShuffling?: boolean
@@ -54,6 +56,7 @@ interface SessionCardProps {
 const SessionCard: React.FC<SessionCardProps> = ({
   assignment,
   completed = false,
+  compact = false,
   readOnly = false,
   isShuffling = false,
   onShuffle,

@@ -7,9 +7,8 @@ interface ViewBarProps {
   onFocusChange: (focus: AttributeFocus) => void
   /** Every seated person, for deciding whether the gender "Other" swatch is needed. */
   participants: Participant[]
-  /** Optional until Task 4 wires the AssignmentsPage call site; defaults to 'full'. */
-  zoom?: ZoomLevel
-  onZoomChange?: (zoom: ZoomLevel) => void
+  zoom: ZoomLevel
+  onZoomChange: (zoom: ZoomLevel) => void
 }
 
 const OPTIONS: { value: AttributeFocus; label: string }[] = [
@@ -36,8 +35,8 @@ const ViewBar: React.FC<ViewBarProps> = ({
   focus,
   onFocusChange,
   participants,
-  zoom = 'full',
-  onZoomChange = () => {},
+  zoom,
+  onZoomChange,
 }) => (
   <div className="flex items-center justify-between gap-4 py-1">
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">

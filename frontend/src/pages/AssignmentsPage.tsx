@@ -35,7 +35,13 @@ import {
 } from '@/hooks/queries'
 import { useProgram } from '@/contexts/ProgramContext'
 import { useAuth } from '@/contexts/AuthContext'
-import type { Assignment, AttributeFocus, Participant, ResultVersion } from '@/types/assignments'
+import type {
+  Assignment,
+  AttributeFocus,
+  Participant,
+  ResultVersion,
+  ZoomLevel,
+} from '@/types/assignments'
 
 function formatVersionDate(createdAt: number): string {
   return new Date(createdAt * 1000).toLocaleString(undefined, {
@@ -110,6 +116,10 @@ const AssignmentsPage: React.FC = () => {
   const [selectedName, setSelectedName] = useState<string | null>(null)
   // Transient view preference — not persisted; religion is the right landing default.
   const [focus, setFocus] = useState<AttributeFocus>('religion')
+  // A zoom level on the same page, not a persisted preference: reload lands in
+  // Full, the only place the plan can be edited.
+  const [zoom, setZoom] = useState<ZoomLevel>('full')
+  const compact = zoom === 'compact'
   const toggleSelected = (name: string) =>
     setSelectedName(current => (current === name ? null : name))
 
@@ -714,7 +724,15 @@ const AssignmentsPage: React.FC = () => {
       <div className="flex flex-col gap-4 px-8">
       <NoticeStrip notice={provisionalNotice ?? notice} onDismiss={() => showNotice(null)} />
 
-      <ViewBar focus={focus} onFocusChange={setFocus} participants={allParticipants} />
+      <div className="sticky top-11 z-10 -mx-8 border-b bg-white px-8">
+        <ViewBar
+          focus={focus}
+          onFocusChange={setFocus}
+          zoom={zoom}
+          onZoomChange={setZoom}
+          participants={allParticipants}
+        />
+      </div>
 
       {trackingSummary && (
         <p className="text-sm text-muted-foreground" data-testid="tracking-summary">
@@ -722,7 +740,28 @@ const AssignmentsPage: React.FC = () => {
         </p>
       )}
 
-      <div className="flex flex-col gap-5">
+      <div
+        data-testid="sessions-container"
+        className={compact ? 'flex flex-row flex-wrap items-start gap-4' : 'flex flex-col gap-5'}
+      >
+        {compact ? (
+          sorted.map(assignment => (
+            <SessionCard
+              key={assignment.session}
+              assignment={assignment}
+              compact
+              readOnly={readOnly}
+              selectedName={selectedName}
+              onSelect={toggleSelected}
+              focus={focus}
+              onMarkAbsent={(name: string) => handleMarkAbsent(assignment.session, name)}
+              onMarkPresent={(name: string, tableNumber: number) =>
+                handleMarkPresent(assignment.session, name, tableNumber)
+              }
+            />
+          ))
+        ) : (
+          <>
         {live.map((assignment, index) => (
           <div key={assignment.session} ref={index === 0 ? firstLiveRef : undefined}>
             <SessionCard
@@ -786,6 +825,8 @@ const AssignmentsPage: React.FC = () => {
                 }
               />
             ))}
+          </>
+        )}
           </>
         )}
       </div>
