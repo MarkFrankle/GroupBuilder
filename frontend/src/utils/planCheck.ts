@@ -97,6 +97,7 @@ function worstPairRepeat(assignments: Assignment[]): number {
       })
       for (let i = 0; i < people.length; i += 1) {
         for (let j = i + 1; j < people.length; j += 1) {
+          if (people[i].is_facilitator || people[j].is_facilitator) continue
           const key = [people[i].name, people[j].name].sort().join('\x00')
           counts.set(key, (counts.get(key) ?? 0) + 1)
         }

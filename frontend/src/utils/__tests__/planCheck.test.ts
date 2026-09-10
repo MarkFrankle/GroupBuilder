@@ -182,3 +182,13 @@ describe('checkPlan — soft signals never flip the verdict', () => {
     expect(result.reassurances.balanceEven).toBe(false)
   })
 })
+
+describe('checkPlan — pair-repeat excludes facilitators', () => {
+  it('does not count a participant sitting with the same facilitator every session', () => {
+    const plan: Assignment[] = [1, 2, 3].map(session => ({
+      session,
+      tables: { 1: [p('F', { is_facilitator: true }), p('X')] },
+    }))
+    expect(checkPlan(plan, []).reassurances.maxPairRepeat).toBe(0)
+  })
+})
