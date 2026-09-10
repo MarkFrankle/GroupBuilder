@@ -40,6 +40,10 @@ export interface CanonicalParticipant {
   /** Optional: a roster frozen before the feature existed carries no rules at
    * all, and must not read as dirty the moment the field arrives. */
   keep_apart?: string[];
+  /** Display only. Deliberately NOT in MIXING_FIELDS: post-build the Away
+   * column is read-only, so it can never drive dirtiness, and adding it here
+   * would collapse the rename fast path exactly as keep_apart would. */
+  absent_sessions?: number[];
 }
 
 /** The size of the plan. `tables: null` means there is no assignment set yet. */

@@ -23,6 +23,8 @@ describe('RosterGrid', () => {
     onDelete: jest.fn(),
     onAdd: jest.fn(),
     onKeepTogetherToggle: jest.fn(),
+    numSessions: 4,
+    onAwayLockedClick: jest.fn(),
   };
 
   beforeEach(() => jest.clearAllMocks());
@@ -88,7 +90,7 @@ describe('RosterGrid', () => {
     render(<RosterGrid participants={[
       { id: 'p1', name: 'Alice', religion: 'Christian', gender: 'Female', partner_id: null, is_facilitator: true },
       { id: 'p2', name: 'Bob', religion: 'Jewish', gender: 'Male', partner_id: null, is_facilitator: false },
-    ]} onUpdate={jest.fn()} onDelete={jest.fn()} onAdd={jest.fn()} onKeepTogetherToggle={jest.fn()} />);
+    ]} onUpdate={jest.fn()} onDelete={jest.fn()} onAdd={jest.fn()} onKeepTogetherToggle={jest.fn()} numSessions={4} onAwayLockedClick={jest.fn()} />);
     const checkboxes = screen.getAllByRole('checkbox');
     // First two are participant checkboxes, third is the disabled empty-row checkbox
     expect(checkboxes[0]).toBeChecked();
@@ -99,9 +101,29 @@ describe('RosterGrid', () => {
     const onUpdate = jest.fn();
     render(<RosterGrid participants={[
       { id: 'p1', name: 'Alice', religion: 'Christian', gender: 'Female', partner_id: null, is_facilitator: false },
-    ]} onUpdate={onUpdate} onDelete={jest.fn()} onAdd={jest.fn()} onKeepTogetherToggle={jest.fn()} />);
+    ]} onUpdate={onUpdate} onDelete={jest.fn()} onAdd={jest.fn()} onKeepTogetherToggle={jest.fn()} numSessions={4} onAwayLockedClick={jest.fn()} />);
     const checkboxes = screen.getAllByRole('checkbox');
     await userEvent.click(checkboxes[0]);
     expect(onUpdate).toHaveBeenCalledWith('p1', expect.objectContaining({ is_facilitator: true }));
+  });
+
+  test('renders an Away column and a participant\'s current marks', () => {
+    render(<RosterGrid {...defaultProps} participants={[
+      { ...alice, absent_sessions: [2] },
+    ]} />);
+    expect(screen.getByText('Away')).toBeInTheDocument();
+    expect(screen.getByText('Misses session 2')).toBeInTheDocument();
+  });
+
+  test('an unrelated edit keeps absent_sessions intact', () => {
+    render(<RosterGrid {...defaultProps} participants={[
+      { ...alice, absent_sessions: [3] },
+    ]} />);
+    const nameInput = screen.getByDisplayValue('Alice');
+    fireEvent.change(nameInput, { target: { value: 'Alicia' } });
+    fireEvent.blur(nameInput);
+    expect(defaultProps.onUpdate).toHaveBeenCalledWith('p1', expect.objectContaining({
+      name: 'Alicia', absent_sessions: [3],
+    }));
   });
 });
