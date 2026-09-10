@@ -47,19 +47,29 @@ const shortenName = (name: string): string => {
  * using SVG. Names are positioned using polar coordinates for even distribution.
  */
 const CircularTable: React.FC<CircularTableProps> = ({ tableNumber, seats }) => {
-  // SVG dimensions - increased to prevent name truncation
+  // SVG geometry. The viewBox is fixed and every label box is clamped to stay
+  // fully inside it, so labels never spill into an adjacent table in the grid.
   const svgSize = 500
   const centerX = svgSize / 2
   const centerY = svgSize / 2
-  const radius = 180 // Radius for name positions (increased to push names further out)
   const circleRadius = 100 // Visual circle radius
+  const labelRadius = 168 // Distance from center to label-box center
+  const margin = 6
+  const boxHeight = 30
 
   const totalSeats = seats.length
   const angleStep = (2 * Math.PI) / totalSeats
 
+  // Approximate rendered width of a bold ~14px label, plus horizontal padding.
+  const boxWidthFor = (text: string): number =>
+    Math.min(210, Math.max(64, Math.round(text.length * 7.2) + 20))
+
+  const clamp = (value: number, min: number, max: number): number =>
+    Math.max(min, Math.min(max, value))
+
   return (
-    <div 
-      className="flex flex-col items-center p-6 bg-white border-2 border-gray-300 rounded-lg shadow-md hover:shadow-lg transition-shadow" 
+    <div
+      className="flex flex-col items-center p-6 bg-white border-2 border-gray-300 rounded-lg shadow-md hover:shadow-lg transition-shadow"
       data-testid="circular-table"
     >
       {/* Table number label */}
@@ -69,14 +79,14 @@ const CircularTable: React.FC<CircularTableProps> = ({ tableNumber, seats }) => 
 
       {/* Facilitator subtitle */}
       {(() => {
-        const facilitators = seats.filter(s => s.is_facilitator)
+        const facilitators = seats.filter((s) => s.is_facilitator)
         if (facilitators.length === 0) return null
         return (
           <div
             className="mb-2 text-xs text-gray-600 font-medium text-center"
             data-testid="facilitator-subtitle"
           >
-            Facilitators: {facilitators.map(f => shortenName(f.name)).join(' · ')}
+            Facilitators: {facilitators.map((f) => shortenName(f.name)).join(' · ')}
           </div>
         )
       })()}
@@ -85,7 +95,7 @@ const CircularTable: React.FC<CircularTableProps> = ({ tableNumber, seats }) => 
         width={svgSize}
         height={svgSize}
         viewBox={`0 0 ${svgSize} ${svgSize}`}
-        className="circular-table-svg overflow-visible"
+        className="circular-table-svg"
       >
         {/* Draw the table circle with gradient/depth */}
         <defs>
@@ -113,36 +123,39 @@ const CircularTable: React.FC<CircularTableProps> = ({ tableNumber, seats }) => 
           const markerX = centerX + circleRadius * Math.cos(angle)
           const markerY = centerY + circleRadius * Math.sin(angle)
 
-          // Name position (further out from circle)
-          const nameX = centerX + radius * Math.cos(angle)
-          const nameY = centerY + radius * Math.sin(angle)
-
-          // Determine text anchor based on position to avoid overlap with circle
-          let textAnchor: 'start' | 'middle' | 'end' = 'middle'
-          if (angle > -Math.PI / 4 && angle < Math.PI / 4) {
-            // Right side
-            textAnchor = 'start'
-          } else if (angle > (3 * Math.PI) / 4 || angle < (-3 * Math.PI) / 4) {
-            // Left side
-            textAnchor = 'end'
-          }
-
           // Shorten name if needed
           const displayName = shortenName(seat.name)
+          const boxWidth = boxWidthFor(displayName)
+
+          // Desired label-box center, then clamp the box inside the viewBox.
+          const desiredCenterX = centerX + labelRadius * Math.cos(angle)
+          const desiredCenterY = centerY + labelRadius * Math.sin(angle)
+          const boxX = clamp(
+            desiredCenterX - boxWidth / 2,
+            margin,
+            svgSize - margin - boxWidth
+          )
+          const boxY = clamp(
+            desiredCenterY - boxHeight / 2,
+            margin,
+            svgSize - margin - boxHeight
+          )
+          const textX = boxX + boxWidth / 2
+          const textY = boxY + boxHeight / 2
 
           return (
             <g key={seat.position}>
-              {/* Line connecting position marker to name */}
+              {/* Line connecting position marker to the label box */}
               <line
                 x1={markerX}
                 y1={markerY}
-                x2={nameX}
-                y2={nameY}
+                x2={textX}
+                y2={textY}
                 stroke="currentColor"
                 strokeWidth="2"
                 className="text-gray-400"
               />
-              
+
               {/* Position marker (small circle at seat location) */}
               <circle
                 cx={markerX}
@@ -151,25 +164,25 @@ const CircularTable: React.FC<CircularTableProps> = ({ tableNumber, seats }) => 
                 fill="currentColor"
                 className="text-gray-800"
               />
-              
+
               {/* Background rectangle for name text */}
               <rect
-                x={textAnchor === 'end' ? nameX - 130 : textAnchor === 'start' ? nameX - 5 : nameX - 65}
-                y={nameY - 16}
-                width="135"
-                height="32"
+                x={boxX}
+                y={boxY}
+                width={boxWidth}
+                height={boxHeight}
                 fill="white"
                 stroke="currentColor"
                 strokeWidth={seat.is_facilitator ? 2.5 : 1}
-                className={seat.is_facilitator ? "text-gray-800" : "text-gray-300"}
+                className={seat.is_facilitator ? 'text-gray-800' : 'text-gray-300'}
                 rx="4"
               />
 
               {/* Name text */}
               <text
-                x={nameX}
-                y={nameY}
-                textAnchor={textAnchor}
+                x={textX}
+                y={textY}
+                textAnchor="middle"
                 dominantBaseline="middle"
                 className="text-sm font-bold fill-current text-gray-900"
                 style={{ whiteSpace: 'nowrap' }}
