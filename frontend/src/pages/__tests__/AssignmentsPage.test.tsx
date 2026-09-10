@@ -81,6 +81,10 @@ interface ApiState {
   shuffleBody?: any
   /** Serve the fixture where Cara is absent from session 2 with a gap open. */
   absence?: boolean
+  /** Replace the results fixture wholesale (plan check band tests). */
+  resultsOverride?: any[]
+  /** Participants served by GET /api/roster/canonical. */
+  canonicalParticipants?: any[]
   promoted?: string
   promoteResponse?: { status: number; body: any }
   saved?: { assignments: any[]; label?: string }
@@ -238,9 +242,19 @@ function mockApi() {
       } as Response)
     }
 
+    if (url.includes('/api/roster/canonical')) {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ participants: api.canonicalParticipants ?? [] }),
+      } as Response)
+    }
+
     if (url.includes('/api/assignments/results')) {
       // After a shuffle, session 2 comes back with Ann and Cara swapped.
-      const body = api.absence
+      const body = api.resultsOverride
+        ? api.resultsOverride
+        : api.absence
         ? withAbsence
         : api.shuffled
         ? [
@@ -1112,5 +1126,55 @@ describe('AssignmentsPage', () => {
         )
       )
     })
+  })
+})
+
+describe('AssignmentsPage — plan check band', () => {
+  it('shows the green verdict for a clean plan', async () => {
+    renderPage()
+
+    expect(
+      await screen.findByText('Looks good — ready to print and hand out')
+    ).toBeInTheDocument()
+  })
+
+  it('flags a couple the current plan seats together', async () => {
+    api.resultsOverride = [1, 2, 3].map(session => ({
+      session,
+      tables: {
+        1: [
+          { ...person('Ann'), partner: 'Ben' },
+          { ...person('Ben', 'Male'), partner: 'Ann' },
+        ],
+        2: [person('Cara'), person('Dan', 'Male')],
+      },
+    }))
+    renderPage()
+
+    expect((await screen.findAllByText(/seats Ann & Ben together/)).length).toBeGreaterThan(0)
+    expect(
+      screen.getByText('A few things to check before you print')
+    ).toBeInTheDocument()
+  })
+})
+
+describe('AssignmentsPage — plan check band, keep-apart', () => {
+  it('flags a keep-apart pair the current plan seats together', async () => {
+    api.canonicalParticipants = [
+      { name: 'Ann', keep_apart: ['Cara'] },
+      { name: 'Cara', keep_apart: ['Ann'] },
+    ]
+    api.resultsOverride = [1, 2, 3].map(session => ({
+      session,
+      tables: {
+        1: [person('Ann'), person('Cara')],
+        2: [person('Ben', 'Male'), person('Dan', 'Male')],
+      },
+    }))
+    renderPage()
+
+    expect(
+      (await screen.findAllByText(/seats Ann & Cara together — you asked to keep them apart/)).length
+    ).toBeGreaterThan(0)
   })
 })
