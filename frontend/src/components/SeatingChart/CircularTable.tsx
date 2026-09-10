@@ -92,10 +92,9 @@ const CircularTable: React.FC<CircularTableProps> = ({ tableNumber, seats }) => 
       })()}
 
       <svg
-        width={svgSize}
-        height={svgSize}
         viewBox={`0 0 ${svgSize} ${svgSize}`}
-        className="circular-table-svg"
+        preserveAspectRatio="xMidYMid meet"
+        className="circular-table-svg w-full h-auto"
       >
         {/* Draw the table circle with gradient/depth */}
         <defs>
