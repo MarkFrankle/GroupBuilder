@@ -101,3 +101,33 @@ class TestUpsertParticipant:
                     "partner_id": None,
                 },
             )
+
+
+class TestAbsentSessions:
+    def _upsert(self, service, data):
+        doc_ref = MagicMock()
+        (
+            service.db.collection.return_value.document.return_value.collection.return_value.document.return_value
+        ) = doc_ref
+        service.upsert_participant("org_1", "p1", data)
+        return doc_ref.set.call_args[0][0]
+
+    def _base(self, **extra):
+        return {
+            "name": "Alice",
+            "religion": "Christian",
+            "gender": "Female",
+            "partner_id": None,
+            **extra,
+        }
+
+    def test_defaults_to_empty_list(self, service):
+        assert self._upsert(service, self._base())["absent_sessions"] == []
+
+    def test_persists_sessions_sorted_and_deduped(self, service):
+        call = self._upsert(service, self._base(absent_sessions=[4, 2, 2]))
+        assert call["absent_sessions"] == [2, 4]
+
+    def test_drops_non_positive_values(self, service):
+        call = self._upsert(service, self._base(absent_sessions=[0, -1, 3]))
+        assert call["absent_sessions"] == [3]

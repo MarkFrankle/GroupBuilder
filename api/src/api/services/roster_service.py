@@ -58,6 +58,9 @@ class RosterService:
             "partner_id": data.get("partner_id"),
             "is_facilitator": bool(data.get("is_facilitator", False)),
             "keep_together": bool(data.get("keep_together", False)),
+            "absent_sessions": sorted(
+                {int(n) for n in (data.get("absent_sessions") or []) if int(n) >= 1}
+            ),
             "updated_at": now,
         }
 
