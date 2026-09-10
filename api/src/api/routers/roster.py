@@ -19,7 +19,6 @@ from api.services.session_completion_storage import (
     get_session_completion_storage,
 )
 from api.services.session_completion_guards import (
-    refuse_if_any_session_complete,
     refuse_if_below_completed_prefix,
 )
 from api.services.keep_apart_storage import (
@@ -28,7 +27,11 @@ from api.services.keep_apart_storage import (
 )
 from api.services.roster_diff import apply_renames, diff_rosters
 from api.services.roster_gate import ShortfallError, check_shortfalls
-from api.services.program_solve import SolveFailed, solve_program
+from api.services.program_solve import (
+    SolveFailed,
+    solve_program,
+    solve_around_completed_sessions,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -180,7 +183,7 @@ async def generate_from_roster(
     # Refuse before any work or write. The floor check goes first so the more
     # specific message wins for a coordinator shrinking the program.
     refuse_if_below_completed_prefix(completion, program_id, data.num_sessions)
-    refuse_if_any_session_complete(completion, program_id)
+    completed_through = completion.get_completed_through(program_id)
 
     participants = roster_service.get_roster(program_id)
     if not participants:
@@ -248,6 +251,15 @@ async def generate_from_roster(
                 "message": "Roster saved. No rebuild needed.",
             }
 
+    if completed_through >= data.num_sessions:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Every session is complete, so there is nothing to rebuild. "
+                "Reopen the last session first if you need to change it."
+            ),
+        )
+
     # Shortfall gate - arithmetic only, no solve. It sits after the rename fast
     # path on purpose: the gate exists to name what is short before we run the
     # solver, and a rename never reaches the solver. Running it first refused a
@@ -260,24 +272,43 @@ async def generate_from_roster(
     # Absences carry across every rebuild, always - there is no checkbox,
     # because forgetting one silently seats someone who is away.
     absence_map = {}
+    head = None
     if current_set_id:
-        version = storage.get_version(program_id, current_set_id)
-        for session in (version or {}).get("assignments", []):
+        head = storage.get_version(program_id, current_set_id)
+        for session in (head or {}).get("assignments", []):
             absent = session.get("absentParticipants") or []
             if absent:
                 absence_map[int(session["session"])] = absent
 
     # Still nothing written.
     try:
-        assignments, metadata = solve_program(
-            participants=participant_list,
-            num_tables=data.num_tables,
-            num_sessions=data.num_sessions,
-            absence_map=absence_map,
-            max_time_seconds=120,
-        )
+        if completed_through:
+            frozen_sessions = [
+                s
+                for s in (head or {}).get("assignments", [])
+                if int(s["session"]) <= completed_through
+            ]
+            assignments, metadata = solve_around_completed_sessions(
+                participants=participant_list,
+                num_tables=data.num_tables,
+                num_sessions=data.num_sessions,
+                completed_through=completed_through,
+                frozen_sessions=frozen_sessions,
+                absence_map=absence_map,
+                max_time_seconds=120,
+            )
+        else:
+            assignments, metadata = solve_program(
+                participants=participant_list,
+                num_tables=data.num_tables,
+                num_sessions=data.num_sessions,
+                absence_map=absence_map,
+                max_time_seconds=120,
+            )
     except SolveFailed as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    provisional = current_set is not None
 
     # Commit: mint the set and write its first version together.
     try:
@@ -294,6 +325,8 @@ async def generate_from_roster(
             num_tables=data.num_tables,
             num_sessions=data.num_sessions,
             make_current=False,
+            accepted=not provisional,
+            previous_set_id=current_set_id if provisional else None,
         )
         storage.save_version(
             program_id=program_id,

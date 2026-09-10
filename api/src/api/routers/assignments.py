@@ -964,6 +964,8 @@ async def get_assignment_set_metadata(
         "num_sessions": assignment_set.get("num_sessions"),
         "created_at": created_at_unix,
         "has_results": storage.get_version(program_id, set_id) is not None,
+        "accepted": assignment_set.get("accepted", True),
+        "previous_set_id": assignment_set.get("previous_set_id"),
     }
 
 
