@@ -223,7 +223,7 @@ optional = false
 python-versions = "^3.10"
 groups = ["main"]
 files = []
-develop = false
+develop = true
 
 [package.dependencies]
 ortools = "^9.11.4210"
@@ -3351,4 +3351,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "1b36b8c5cb33ba779426eaf409fca397b716d096b36f29002a47ff7ab216bb75"
+content-hash = "8503dcdf7b9e6ef67d82995b1494a42001e56c21d18268f7fb6a70023e4e24e6"
