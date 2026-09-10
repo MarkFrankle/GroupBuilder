@@ -396,9 +396,6 @@ class TestGenerateRefusesCompletedSessions:
 
         assert response.status_code == 200
 
-    @pytest.mark.xfail(
-        strict=True, reason="generate-while-pending guard lands in Task 9"
-    )
     def test_rebuild_while_pending_is_refused_and_does_not_repoint(self, client):
         self._add_participants(client)
         client.post(

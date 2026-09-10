@@ -723,6 +723,45 @@ class TestAcceptAndUndoRebuild:
         r = client.post("/api/assignments/undo-rebuild?program_id=test_org_id")
         assert r.status_code == 400
 
+    def test_shuffle_is_refused_while_pending(self, client):
+        self._mid_program_rebuild(client)
+        r = client.post(
+            "/api/assignments/regenerate/session/2?program_id=test_org_id", json=[]
+        )
+        assert r.status_code == 409
+        assert "Accept or undo" in r.json()["detail"]
+
+    def test_mark_complete_is_refused_while_pending(self, client):
+        self._mid_program_rebuild(client)
+        r = client.post("/api/assignments/completion/2?program_id=test_org_id")
+        assert r.status_code == 409
+
+    def test_save_is_refused_while_pending(self, client):
+        _, _ = self._mid_program_rebuild(client)
+        current = client.get("/api/assignments/results?program_id=test_org_id").json()
+        r = client.post(
+            "/api/assignments/results/save?program_id=test_org_id",
+            json={"assignments": current, "label": "x"},
+        )
+        assert r.status_code == 409
+
+    def test_everything_unlocks_after_accept(self, client):
+        self._mid_program_rebuild(client)
+        client.post("/api/assignments/accept?program_id=test_org_id")
+        r = client.post(
+            "/api/assignments/regenerate/session/2?program_id=test_org_id", json=[]
+        )
+        assert r.status_code == 200
+
+    def test_generate_is_refused_while_pending(self, client):
+        self._mid_program_rebuild(client)
+        r = client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 3, "num_sessions": 4},
+        )
+        assert r.status_code == 409
+        assert "Accept or undo" in r.json()["detail"]
+
 
 class TestRegenerateAllWithAbsences:
     """Test suite for POST /api/assignments/regenerate/with_absences."""

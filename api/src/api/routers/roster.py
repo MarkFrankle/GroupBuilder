@@ -204,6 +204,15 @@ async def generate_from_roster(
         storage.get_set(program_id, current_set_id) if current_set_id else None
     )
 
+    if current_set is not None and current_set.get("accepted", True) is False:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "The last rebuild hasn't been confirmed yet. "
+                "Accept or undo it on the assignments page first."
+            ),
+        )
+
     # A rename-only change propagates and returns without solving. Skipping the
     # rebuild without propagating would leave the old spelling on the
     # Assignments page forever - participants are matched by name everywhere.
