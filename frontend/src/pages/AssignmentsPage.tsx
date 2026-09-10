@@ -10,6 +10,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import SessionCard from '@/components/Assignments/SessionCard'
+import { CoupleSlotsContext } from '@/components/Assignments/coupleSlotsContext'
+import { buildCoupleSlots } from '@/utils/chipPalettes'
 import NoticeStrip, { Notice } from '@/components/Assignments/NoticeStrip'
 import ProgramHeader from '@/components/Assignments/ProgramHeader'
 import ViewBar from '@/components/Assignments/ViewBar'
@@ -186,6 +188,8 @@ const AssignmentsPage: React.FC = () => {
       ),
     [sorted]
   )
+
+  const coupleSlots = useMemo(() => buildCoupleSlots(allParticipants), [allParticipants])
 
   // Collapsing a card reflows everything below it, so the anchor is lost. Put
   // the next thing to do back under the user's eyes.
@@ -731,6 +735,7 @@ const AssignmentsPage: React.FC = () => {
         history={historyMenu}
       />
 
+      <CoupleSlotsContext.Provider value={coupleSlots}>
       <div className="flex flex-col gap-4 px-8">
       <NoticeStrip notice={provisionalNotice ?? notice} onDismiss={() => showNotice(null)} />
 
@@ -841,6 +846,7 @@ const AssignmentsPage: React.FC = () => {
         )}
       </div>
       </div>
+      </CoupleSlotsContext.Provider>
     </div>
   )
 }

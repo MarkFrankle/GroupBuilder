@@ -48,7 +48,7 @@ describe('Chip', () => {
     )
 
     expect(screen.getByRole('button', { name: /Alice/ })).toHaveStyle({
-      backgroundColor: '#FEF0D8',
+      backgroundColor: '#F5E7C4',
     })
   })
 
@@ -94,7 +94,7 @@ describe('Chip', () => {
     it('colours by gender under gender focus', () => {
       render(<Chip participant={alice} selectedName={null} onSelect={jest.fn()} focus="gender" />)
       expect(screen.getByRole('button', { name: /Alice/ })).toHaveStyle({
-        backgroundColor: '#F3E1F0',
+        backgroundColor: '#ECD9E9',
       })
     })
 
