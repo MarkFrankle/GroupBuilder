@@ -165,6 +165,24 @@ class TestSolveAroundCompleted:
         assert meta["label"] == LABEL_REBUILT_AROUND_COMPLETED
         assert meta["solution_quality"] is None
 
+    def test_a_frozen_session_absence_survives_verbatim(self):
+        people = _people(9)
+        frozen_session = _frozen_session_one(
+            {0: ["P1", "P2"], 1: ["P3", "P4", "P5"], 2: ["P6", "P7", "P8"]}
+        )
+        frozen_session["absentParticipants"] = [{"name": "P0"}]
+        assignments, _ = solve_around_completed_sessions(
+            participants=people,
+            num_tables=3,
+            num_sessions=4,
+            completed_through=1,
+            frozen_sessions=[frozen_session],
+            absence_map={},
+            max_time_seconds=5,
+        )
+        assert assignments[0] == frozen_session
+        assert assignments[0]["absentParticipants"] == [{"name": "P0"}]
+
     def test_frozen_pair_is_split_in_the_resolved_sessions(self):
         people = _people(9)
         frozen = [

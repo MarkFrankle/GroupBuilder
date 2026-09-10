@@ -144,7 +144,14 @@ class AssignmentSetStorage:
         ]
 
         current = [s for s in by_recency if s.get("assignment_set_id") == current_id]
-        others = [s for s in by_recency if s.get("assignment_set_id") != current_id]
+        others = [
+            s
+            for s in by_recency
+            if s.get("assignment_set_id") != current_id
+            # An abandoned rebuild - provisional and no longer current - was
+            # explicitly undone. It must not surface in any history window.
+            and s.get("accepted") is not False
+        ]
 
         return (current + others)[:limit]
 

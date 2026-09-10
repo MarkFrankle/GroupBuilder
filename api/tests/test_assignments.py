@@ -717,6 +717,32 @@ class TestAcceptAndUndoRebuild:
         meta = client.get("/api/assignments/metadata?program_id=test_org_id").json()
         assert meta["assignment_set_id"] == first
 
+    def test_undo_rebuild_leaves_no_phantom_history_entry(self, client):
+        first, provisional = self._mid_program_rebuild(client)
+        client.post("/api/assignments/undo-rebuild?program_id=test_org_id")
+
+        meta = client.get("/api/assignments/metadata?program_id=test_org_id").json()
+        assert meta["assignment_set_id"] == first
+
+        versions = client.get(
+            "/api/assignments/results/versions?program_id=test_org_id"
+        )
+        assert versions.status_code == 200
+        entries = versions.json()["versions"]
+        assert entries, "expected the current set's versions to still be listed"
+
+        for entry in entries:
+            assert entry["assignment_set_id"] == first
+            assert entry["assignment_set_id"] != provisional
+            assert entry["not_promotable_reason"] is None
+            assert entry["promotable"] is True
+            r = client.get(
+                "/api/assignments/results?program_id=test_org_id"
+                f"&version={entry['version_id']}"
+                f"&assignment_set_id={entry['assignment_set_id']}"
+            )
+            assert r.status_code == 200
+
     def test_undo_is_refused_on_an_accepted_set(self, client):
         self._mid_program_rebuild(client)
         client.post("/api/assignments/accept?program_id=test_org_id")
