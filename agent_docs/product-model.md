@@ -89,6 +89,12 @@ redesign.
    collapsing a card reflows the page either way, so the two cost the same and arrival-state
    won.
 
+   **Compact is a read-only zoom level on the overview, not a mode and not for print.** It
+   reflows every session — completed ones included, inline, no divider — into side-by-side
+   columns with shrunk chips and the secondary furniture dropped, so the whole program can be
+   scanned at once and one person followed across every session. Click-to-highlight still
+   works; every editing control is gone. Not persisted. Repairs happen at full size.
+
    **A completed session is a snapshot, so later roster edits never reach it.** Deleting a
    participant who sat at a table on a finished night does not remove them from that night —
    the session still shows them, because they were there. Assignments store fully materialized
@@ -107,6 +113,11 @@ redesign.
    Quality numbers are licensed in exactly two places: the person-tracking summary and an
    action's receipt in the banner. Both show the delta in **both** directions — a number that
    only ever appears as good news is decoration.
+
+   The **person-tracking summary line** — shown above the sessions when a person is selected,
+   framed repeats-first ("meets 3 people more than once, one of them 3 times" / "never sits
+   with the same person twice", then coverage) — is the single sanctioned place the product
+   speaks to plan *quality*. Everywhere else it speaks only to contradictions.
 
 4. **Per-session actions live on the session; per-program actions live on Setup.**
    Session-scoped: mark absent, mark present, shuffle, print, mark complete.
