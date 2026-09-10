@@ -281,6 +281,22 @@ function HelpPage() {
             Name colours show religion.
           </p>
 
+          <h3 className="text-xl font-semibold mt-8 mb-2">Full and Compact</h3>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            On the right of the view controls row is a <strong>Full / Compact</strong>{" "}
+            switch. <strong>Compact</strong> shrinks everything and lays the sessions out
+            side by side so you can see the whole program at once — useful for checking it
+            looks right and for following one person across every session. Compact is
+            read-only: the session buttons are hidden and completed sessions show inline
+            with the rest. Switch back to <strong>Full</strong> to change anything. The
+            view is not saved — reloading the page puts you back in Full.
+          </p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            Clicking a person's name (in either view) also shows a line above the sessions
+            summarising how they do: how many people they sit with more than once, and how
+            many of the rest of the group they get to meet at all.
+          </p>
+
           <h3 className="text-xl font-semibold mt-8 mb-2">Marking a session complete</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
             When a meeting night has happened, press <strong>Mark complete</strong> in

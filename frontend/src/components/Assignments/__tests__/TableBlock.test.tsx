@@ -17,6 +17,22 @@ describe('TableBlock', () => {
     expect(screen.getByText('3 people · 2F/1M · 3 religions')).toBeInTheDocument()
   })
 
+  it('hides the per-table stats line in compact mode', () => {
+    render(<TableBlock tableNumber={2} participants={people} selectedName={null} onSelect={jest.fn()} compact />)
+    expect(screen.queryByText(/religions?$/)).not.toBeInTheDocument()
+  })
+
+  it('drops the Facilitators label in compact mode but keeps the facilitator chip', () => {
+    render(<TableBlock tableNumber={2} participants={people} selectedName={null} onSelect={jest.fn()} compact />)
+    expect(screen.queryByText('Facilitators')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Facilitator/ })).toBeInTheDocument()
+  })
+
+  it('still shows the Table N label in compact mode', () => {
+    render(<TableBlock tableNumber={2} participants={people} selectedName={null} onSelect={jest.fn()} compact />)
+    expect(screen.getByText(/Table \d+/)).toBeInTheDocument()
+  })
+
   it('separates facilitators from everyone else', () => {
     render(<TableBlock tableNumber={1} participants={people} selectedName={null} onSelect={jest.fn()} />)
 

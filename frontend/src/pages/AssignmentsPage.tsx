@@ -21,6 +21,7 @@ import {
   shuffleReceipt,
   tableNumbers,
   uniqueTablematesAverage,
+  personTrackingSummary,
 } from '@/utils/assignmentStats'
 import { markAbsent, markPresent } from '@/utils/assignmentEdits'
 import {
@@ -34,7 +35,13 @@ import {
 } from '@/hooks/queries'
 import { useProgram } from '@/contexts/ProgramContext'
 import { useAuth } from '@/contexts/AuthContext'
-import type { Assignment, AttributeFocus, Participant, ResultVersion } from '@/types/assignments'
+import type {
+  Assignment,
+  AttributeFocus,
+  Participant,
+  ResultVersion,
+  ZoomLevel,
+} from '@/types/assignments'
 
 function formatVersionDate(createdAt: number): string {
   return new Date(createdAt * 1000).toLocaleString(undefined, {
@@ -109,6 +116,10 @@ const AssignmentsPage: React.FC = () => {
   const [selectedName, setSelectedName] = useState<string | null>(null)
   // Transient view preference — not persisted; religion is the right landing default.
   const [focus, setFocus] = useState<AttributeFocus>('religion')
+  // A zoom level on the same page, not a persisted preference: reload lands in
+  // Full, the only place the plan can be edited.
+  const [zoom, setZoom] = useState<ZoomLevel>('full')
+  const compact = zoom === 'compact'
   const toggleSelected = (name: string) =>
     setSelectedName(current => (current === name ? null : name))
 
@@ -578,6 +589,9 @@ const AssignmentsPage: React.FC = () => {
 
   const totalSessions = metadata?.num_sessions ?? sorted.length
 
+  const trackingSummary =
+    selectedName !== null ? personTrackingSummary(selectedName, sorted) : null
+
   // Computed, not transient: while the set is provisional this notice must hold
   // the strip against every receipt, so it is passed ahead of `notice` rather
   // than pushed through showNotice. The mutations surface their own failures.
@@ -691,7 +705,7 @@ const AssignmentsPage: React.FC = () => {
         data-testid="selection-announcement"
         className="sr-only"
       >
-        {selectedName ? `${selectedName} selected — showing them across all sessions.` : ''}
+        {trackingSummary ?? ''}
       </div>
       <ProgramHeader
         programName={currentProgram?.name ?? 'Assignments'}
@@ -710,9 +724,44 @@ const AssignmentsPage: React.FC = () => {
       <div className="flex flex-col gap-4 px-8">
       <NoticeStrip notice={provisionalNotice ?? notice} onDismiss={() => showNotice(null)} />
 
-      <ViewBar focus={focus} onFocusChange={setFocus} participants={allParticipants} />
+      <div className="sticky top-11 z-10 -mx-8 border-b bg-white px-8">
+        <ViewBar
+          focus={focus}
+          onFocusChange={setFocus}
+          zoom={zoom}
+          onZoomChange={setZoom}
+          participants={allParticipants}
+        />
+      </div>
 
-      <div className="flex flex-col gap-5">
+      {trackingSummary && (
+        <p className="text-sm text-muted-foreground" data-testid="tracking-summary">
+          {trackingSummary}
+        </p>
+      )}
+
+      <div
+        data-testid="sessions-container"
+        className={compact ? 'flex flex-row flex-wrap items-start gap-4' : 'flex flex-col gap-5'}
+      >
+        {compact ? (
+          sorted.map(assignment => (
+            <SessionCard
+              key={assignment.session}
+              assignment={assignment}
+              compact
+              readOnly={readOnly}
+              selectedName={selectedName}
+              onSelect={toggleSelected}
+              focus={focus}
+              onMarkAbsent={(name: string) => handleMarkAbsent(assignment.session, name)}
+              onMarkPresent={(name: string, tableNumber: number) =>
+                handleMarkPresent(assignment.session, name, tableNumber)
+              }
+            />
+          ))
+        ) : (
+          <>
         {live.map((assignment, index) => (
           <div key={assignment.session} ref={index === 0 ? firstLiveRef : undefined}>
             <SessionCard
@@ -776,6 +825,8 @@ const AssignmentsPage: React.FC = () => {
                 }
               />
             ))}
+          </>
+        )}
           </>
         )}
       </div>

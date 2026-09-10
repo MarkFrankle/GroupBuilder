@@ -475,6 +475,46 @@ describe('AssignmentsPage', () => {
     )
   })
 
+  describe('zoom', () => {
+    it('starts in Full zoom with a column layout', async () => {
+      renderPage()
+
+      await screen.findByText('Session 1')
+      expect(screen.getByRole('button', { name: 'Full' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
+      expect(screen.getByTestId('sessions-container')).toHaveClass('flex-col')
+    })
+
+    it('switches to a wrapping row of sessions when Compact is pressed', async () => {
+      renderPage()
+
+      await screen.findByText('Session 1')
+      fireEvent.click(screen.getByRole('button', { name: 'Compact' }))
+
+      expect(screen.getByTestId('sessions-container')).toHaveClass('flex-row')
+      expect(screen.getByRole('button', { name: 'Compact' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
+    })
+
+    it('renders every session including completed ones in compact (no Completed divider)', async () => {
+      api.completedThrough = 1
+      renderPage()
+
+      await screen.findByText('Session 2')
+      fireEvent.click(screen.getByRole('button', { name: 'Compact' }))
+
+      expect(screen.queryByText('Completed')).not.toBeInTheDocument()
+      const headings = screen
+        .getAllByText(/^Session \d$/)
+        .map(node => node.textContent)
+      expect(headings).toEqual(['Session 1', 'Session 2', 'Session 3'])
+    })
+  })
+
   describe('printing an older version', () => {
     const realConfirm = window.confirm
 
@@ -708,13 +748,27 @@ describe('AssignmentsPage', () => {
       // Scoped by test id, not by role: NoticeStrip's container is a
       // role="status" region as well, and it is always mounted.
       expect(screen.getByTestId('selection-announcement')).toHaveTextContent(
-        'Ann selected \u2014 showing them across all sessions.'
+        /Ann · .* · sits with \d+ of the other \d+ participants/
       )
 
       fireEvent.click(anns[0])
 
       // Empty rather than gone: a region that unmounts stops announcing.
       expect(screen.getByTestId('selection-announcement')).toHaveTextContent('')
+    })
+
+    it('shows the person-tracking summary line when a person is selected', async () => {
+      renderPage()
+      await selectAnn()
+
+      expect(screen.getByTestId('tracking-summary')).toHaveTextContent(
+        /· .* · sits with \d+ of the other \d+ participants/
+      )
+    })
+
+    it('hides the summary line when no one is selected', () => {
+      renderPage()
+      expect(screen.queryByTestId('tracking-summary')).not.toBeInTheDocument()
     })
   })
 
@@ -908,8 +962,9 @@ describe('AssignmentsPage', () => {
       // And said in as many words. Queried by text, not by role: an open Radix
       // menu is modal and aria-hides the rest of the page behind it.
       expect(
-        screen.getByText('Cara selected \u2014 showing them across all sessions.')
-      ).toBeInTheDocument()
+        screen.getAllByText(/Cara · .* · sits with \d+ of the other \d+ participants/)
+          .length
+      ).toBeGreaterThan(0)
     })
 
     it('lets Escape close the picker without losing the selection', async () => {

@@ -78,6 +78,7 @@
   deletes every roster document and rewrites it with fresh uuids, so ids are not durable.
   `partner_id` and the program-level `keep_apart` pairs are both resolved to names before the
   delete and re-resolved after. A third such field must do the same or it silently orphans.
+- **The Assignments view-controls row uses `sticky top-11` — a hardcoded match to the condensed `ProgramHeader`'s height (`py-2.5`, ~44px). If the header's padding changes, this offset must change with it.**
 ## Build & Dev Commands
 
 ### Frontend (`frontend/`) — npm + CRA + craco

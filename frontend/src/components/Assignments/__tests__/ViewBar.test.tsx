@@ -10,15 +10,18 @@ const people: Participant[] = [
 
 function renderBar(overrides: Partial<React.ComponentProps<typeof ViewBar>> = {}) {
   const onFocusChange = jest.fn()
+  const onZoomChange = jest.fn()
   render(
     <ViewBar
       focus="religion"
       onFocusChange={onFocusChange}
       participants={people}
+      zoom="full"
+      onZoomChange={onZoomChange}
       {...overrides}
     />
   )
-  return { onFocusChange }
+  return { onFocusChange, onZoomChange }
 }
 
 describe('ViewBar', () => {
@@ -61,5 +64,22 @@ describe('ViewBar', () => {
   it('renders no legend under couples focus', () => {
     renderBar({ focus: 'couples' })
     expect(screen.queryByTestId('focus-legend')).not.toBeInTheDocument()
+  })
+
+  it('offers Full and Compact with Full pressed by default', () => {
+    renderBar()
+    expect(screen.getByRole('button', { name: 'Full' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Compact' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('reports a zoom change on click', () => {
+    const { onZoomChange } = renderBar()
+    fireEvent.click(screen.getByRole('button', { name: 'Compact' }))
+    expect(onZoomChange).toHaveBeenCalledWith('compact')
+  })
+
+  it('marks Compact pressed when that is the active zoom', () => {
+    renderBar({ zoom: 'compact' })
+    expect(screen.getByRole('button', { name: 'Compact' })).toHaveAttribute('aria-pressed', 'true')
   })
 })
