@@ -294,3 +294,20 @@ class TestSolveAroundCompleted:
                 absence_map={},
                 max_time_seconds=5,
             )
+
+
+class TestExtractPairingsFromSessions:
+    def test_empty_seats_at_a_table_are_skipped(self):
+        """A frozen/completed session can carry ``None`` seats; they are not people."""
+        from api.services.program_solve import extract_pairings_from_sessions
+
+        sessions = [
+            {
+                "session": 1,
+                "tables": {"1": [{"name": "Alice"}, None, {"name": "Bob"}]},
+            }
+        ]
+
+        assert extract_pairings_from_sessions(sessions, exclude_session=-1) == {
+            ("Alice", "Bob")
+        }
