@@ -969,6 +969,34 @@ async def get_assignment_set_metadata(
     }
 
 
+@router.post("/accept")
+async def accept_rebuilt_sessions(
+    program_id: str = Depends(validate_program_access),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+):
+    """Confirm a provisional set (Item 6b). Idempotent."""
+    set_id = _require_current_set_id(storage, program_id)
+    storage.accept_set(program_id, set_id)
+    return {"accepted": True}
+
+
+@router.post("/undo-rebuild")
+async def undo_rebuilt_sessions(
+    program_id: str = Depends(validate_program_access),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+):
+    """Repoint the program back to the set that preceded a provisional rebuild."""
+    set_id = _require_current_set_id(storage, program_id)
+    doc = storage.get_set(program_id, set_id) or {}
+    if doc.get("accepted", True) is not False:
+        raise HTTPException(
+            status_code=400,
+            detail="These sessions are already confirmed - there is nothing to undo.",
+        )
+    previous_set_id = storage.revert_to_previous_set(program_id, set_id)
+    return {"assignment_set_id": previous_set_id}
+
+
 @router.get("/completion")
 async def get_session_completion(
     program_id: str = Depends(validate_program_access),

@@ -651,6 +651,78 @@ class TestAssignmentSetMetadata:
 
         assert response.status_code == 404
 
+    def test_metadata_reports_accepted_state(self, client):
+        for i in range(2):
+            client.put(
+                f"/api/roster/p{i}?program_id=test_org_id",
+                json={
+                    "name": f"P{i}",
+                    "religion": "Christian",
+                    "gender": "Male",
+                    "partner_id": None,
+                },
+            )
+        client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 1, "num_sessions": 3},
+        )
+        meta = client.get("/api/assignments/metadata?program_id=test_org_id").json()
+        assert meta["accepted"] is True
+        assert meta["previous_set_id"] is None
+
+
+class TestAcceptAndUndoRebuild:
+    def _mid_program_rebuild(self, client):
+        for i in range(9):
+            client.put(
+                f"/api/roster/p{i}?program_id=test_org_id",
+                json={
+                    "name": f"P{i}",
+                    "religion": ["Christian", "Jewish", "Muslim"][i % 3],
+                    "gender": ["Male", "Female"][i % 2],
+                    "partner_id": None,
+                },
+            )
+        first = client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 3, "num_sessions": 4},
+        ).json()["assignment_set_id"]
+        client.post("/api/assignments/completion/1?program_id=test_org_id")
+        client.delete("/api/roster/p8?program_id=test_org_id")
+        provisional = client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 3, "num_sessions": 4},
+        ).json()["assignment_set_id"]
+        return first, provisional
+
+    def test_accept_flips_the_flag(self, client):
+        _, provisional = self._mid_program_rebuild(client)
+        r = client.post("/api/assignments/accept?program_id=test_org_id")
+        assert r.status_code == 200
+        meta = client.get("/api/assignments/metadata?program_id=test_org_id").json()
+        assert meta["accepted"] is True
+
+    def test_accept_is_idempotent(self, client):
+        self._mid_program_rebuild(client)
+        client.post("/api/assignments/accept?program_id=test_org_id")
+        assert (
+            client.post("/api/assignments/accept?program_id=test_org_id").status_code
+            == 200
+        )
+
+    def test_undo_repoints_to_the_previous_set(self, client):
+        first, _ = self._mid_program_rebuild(client)
+        r = client.post("/api/assignments/undo-rebuild?program_id=test_org_id")
+        assert r.status_code == 200
+        meta = client.get("/api/assignments/metadata?program_id=test_org_id").json()
+        assert meta["assignment_set_id"] == first
+
+    def test_undo_is_refused_on_an_accepted_set(self, client):
+        self._mid_program_rebuild(client)
+        client.post("/api/assignments/accept?program_id=test_org_id")
+        r = client.post("/api/assignments/undo-rebuild?program_id=test_org_id")
+        assert r.status_code == 400
+
 
 class TestRegenerateAllWithAbsences:
     """Test suite for POST /api/assignments/regenerate/with_absences."""
