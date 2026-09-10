@@ -12,20 +12,20 @@ export interface Swatch {
 }
 
 export const RELIGION_COLORS: Record<string, Swatch> = {
-  Jewish: { bg: '#D6F0FB', fg: '#005F83' },
-  Christian: { bg: '#FDE2E2', fg: '#8B1A1A' },
-  Muslim: { bg: '#E2F2DA', fg: '#3D6625' },
-  Other: { bg: '#FEF0D8', fg: '#7A5410' },
+  Jewish: { bg: '#D3E4F5', fg: '#123A5E' },
+  Christian: { bg: '#F7DDCE', fg: '#7A2E0C' },
+  Muslim: { bg: '#D3E9D6', fg: '#14532D' },
+  Other: { bg: '#F5E7C4', fg: '#5C4409' },
 }
 
 export const GENDER_COLORS: Record<string, Swatch> = {
-  Female: { bg: '#F3E1F0', fg: '#7A2E6E' },
-  Male: { bg: '#E1E9F5', fg: '#2E4A7A' },
-  Other: { bg: '#ECECEC', fg: '#555555' },
+  Female: { bg: '#ECD9E9', fg: '#6A2151' },
+  Male: { bg: '#CFE8E4', fg: '#0F4D46' },
+  Other: { bg: '#E4E4E4', fg: '#333333' },
 }
 
 /** Neutral chip for a person with no partner, in couples focus. */
-export const NO_COUPLE: Swatch = { bg: '#ECECEC', fg: '#555555' }
+export const NO_COUPLE: Swatch = { bg: '#E4E4E4', fg: '#333333' }
 
 /**
  * Colours cycled across couples. They carry no meaning beyond "these two chips
@@ -33,14 +33,14 @@ export const NO_COUPLE: Swatch = { bg: '#ECECEC', fg: '#555555' }
  * table locally and the names disambiguate.
  */
 export const COUPLE_PALETTE: Swatch[] = [
-  { bg: '#D6F0FB', fg: '#005F83' },
-  { bg: '#FDE2E2', fg: '#8B1A1A' },
-  { bg: '#E2F2DA', fg: '#3D6625' },
-  { bg: '#FEF0D8', fg: '#7A5410' },
-  { bg: '#E7E2F7', fg: '#4B3B8F' },
-  { bg: '#FCE3D3', fg: '#9A4A1E' },
-  { bg: '#DDF1EC', fg: '#1F6B5C' },
-  { bg: '#F1E1E9', fg: '#8F3B63' },
+  { bg: '#D3E4F5', fg: '#123A5E' },
+  { bg: '#F7DDCE', fg: '#7A2E0C' },
+  { bg: '#D3E9D6', fg: '#14532D' },
+  { bg: '#ECD9E9', fg: '#6A2151' },
+  { bg: '#F5E7C4', fg: '#5C4409' },
+  { bg: '#CFE8E4', fg: '#0F4D46' },
+  { bg: '#F6D9E1', fg: '#7A2141' },
+  { bg: '#DCDDF0', fg: '#2E2F63' },
 ]
 
 /** Order-independent key for a couple. */
@@ -57,6 +57,30 @@ export function paletteSlot(pairKey: string): number {
   return Math.abs(hash) % COUPLE_PALETTE.length
 }
 
+/**
+ * Assign each couple in the plan its own palette slot, round-robin in a stable
+ * order (couples sorted by their canonical key). With up to COUPLE_PALETTE.length
+ * couples this guarantees no two distinct couples share a colour; beyond that the
+ * palette wraps and far-apart couples may collide — acceptable, names disambiguate.
+ *
+ * Hashing each pair independently (paletteSlot) collided far too often — the
+ * birthday paradox put two unrelated couples on the same colour at the *same
+ * table*, which is exactly the confusion the colour is meant to prevent.
+ */
+export function buildCoupleSlots(
+  participants: Array<{ name: string; partner: string | null }>
+): Map<string, number> {
+  const keys = new Set<string>()
+  for (const p of participants) {
+    if (p.partner) keys.add(canonicalPairKey(p.name, p.partner))
+  }
+  const slots = new Map<string, number>()
+  Array.from(keys)
+    .sort()
+    .forEach((key, i) => slots.set(key, i % COUPLE_PALETTE.length))
+  return slots
+}
+
 interface Colourable {
   religion: string
   gender: string
@@ -64,13 +88,19 @@ interface Colourable {
   partner: string | null
 }
 
-export function chipSwatch(focus: AttributeFocus, participant: Colourable): Swatch {
+export function chipSwatch(
+  focus: AttributeFocus,
+  participant: Colourable,
+  coupleSlots?: Map<string, number>
+): Swatch {
   if (focus === 'gender') {
     return GENDER_COLORS[participant.gender] ?? GENDER_COLORS.Other
   }
   if (focus === 'couples') {
     if (!participant.partner) return NO_COUPLE
-    return COUPLE_PALETTE[paletteSlot(canonicalPairKey(participant.name, participant.partner))]
+    const key = canonicalPairKey(participant.name, participant.partner)
+    const slot = coupleSlots?.get(key) ?? paletteSlot(key)
+    return COUPLE_PALETTE[slot]
   }
   return RELIGION_COLORS[participant.religion] ?? RELIGION_COLORS.Other
 }

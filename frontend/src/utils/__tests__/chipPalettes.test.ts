@@ -6,6 +6,7 @@ import {
   NO_COUPLE,
   paletteSlot,
   RELIGION_COLORS,
+  buildCoupleSlots,
 } from '../chipPalettes'
 
 describe('canonicalPairKey / paletteSlot', () => {
@@ -49,5 +50,27 @@ describe('chipSwatch', () => {
     const bob = { name: 'Bob', religion: 'Jewish', gender: 'Male', partner: 'Alice' }
     const alicePartnered = { ...alice, partner: 'Bob' }
     expect(chipSwatch('couples', bob)).toEqual(chipSwatch('couples', alicePartnered))
+  })
+
+  it('gives distinct couples distinct colours via a slot map', () => {
+    const people = [
+      { name: 'Alice', partner: 'Bob' },
+      { name: 'Bob', partner: 'Alice' },
+      { name: 'Cara', partner: 'Dan' },
+      { name: 'Dan', partner: 'Cara' },
+      { name: 'Eve', partner: 'Finn' },
+      { name: 'Finn', partner: 'Eve' },
+    ]
+    const slots = buildCoupleSlots(people)
+    const swatchOf = (name: string, partner: string) =>
+      chipSwatch('couples', { ...alice, name, partner }, slots)
+    const ab = swatchOf('Alice', 'Bob')
+    const cd = swatchOf('Cara', 'Dan')
+    const ef = swatchOf('Eve', 'Finn')
+    expect(ab).not.toEqual(cd)
+    expect(cd).not.toEqual(ef)
+    expect(ab).not.toEqual(ef)
+    // Partners still match.
+    expect(swatchOf('Bob', 'Alice')).toEqual(ab)
   })
 })

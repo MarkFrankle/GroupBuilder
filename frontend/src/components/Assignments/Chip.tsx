@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link2 } from 'lucide-react'
 import { chipSwatch } from '@/utils/chipPalettes'
+import { useCoupleSlots } from './coupleSlotsContext'
 import type { AttributeFocus, Participant } from '@/types/assignments'
 
 interface ChipProps {
@@ -26,7 +27,8 @@ const Chip: React.FC<ChipProps> = ({
   compact = false,
 }) => {
   const isFacilitator = !!participant.is_facilitator
-  const { bg, fg } = chipSwatch(focus, participant)
+  const coupleSlots = useCoupleSlots()
+  const { bg, fg } = chipSwatch(focus, participant, coupleSlots)
   const partnered = focus === 'couples' && !!participant.partner
 
   const title = isFacilitator
