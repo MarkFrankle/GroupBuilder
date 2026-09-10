@@ -12,6 +12,7 @@ import {
 import SessionCard from '@/components/Assignments/SessionCard'
 import NoticeStrip, { Notice } from '@/components/Assignments/NoticeStrip'
 import ProgramHeader from '@/components/Assignments/ProgramHeader'
+import ViewBar from '@/components/Assignments/ViewBar'
 import { authenticatedFetch } from '@/utils/apiClient'
 import {
   linkedPairCount,
@@ -30,7 +31,7 @@ import {
 } from '@/hooks/queries'
 import { useProgram } from '@/contexts/ProgramContext'
 import { useAuth } from '@/contexts/AuthContext'
-import type { Assignment, ResultVersion } from '@/types/assignments'
+import type { Assignment, AttributeFocus, Participant, ResultVersion } from '@/types/assignments'
 
 function formatVersionDate(createdAt: number): string {
   return new Date(createdAt * 1000).toLocaleString(undefined, {
@@ -104,6 +105,8 @@ const AssignmentsPage: React.FC = () => {
   // Selection is cross-session by design — that is the trust demo, watching one
   // person move every week — so it lives here rather than in a session card.
   const [selectedName, setSelectedName] = useState<string | null>(null)
+  // Transient view preference — not persisted; religion is the right landing default.
+  const [focus, setFocus] = useState<AttributeFocus>('religion')
   const toggleSelected = (name: string) =>
     setSelectedName(current => (current === name ? null : name))
 
@@ -154,6 +157,14 @@ const AssignmentsPage: React.FC = () => {
   )
   const live = sorted.filter(a => a.session > completedThrough)
   const completed = sorted.filter(a => a.session <= completedThrough)
+
+  const allParticipants = useMemo<Participant[]>(
+    () =>
+      sorted.flatMap(a =>
+        tableNumbers(a).flatMap(n => a.tables[n].filter((p): p is Participant => !!p))
+      ),
+    [sorted]
+  )
 
   // Collapsing a card reflows everything below it, so the anchor is lost. Put
   // the next thing to do back under the user's eyes.
@@ -661,6 +672,8 @@ const AssignmentsPage: React.FC = () => {
       <div className="flex flex-col gap-4 px-8">
       <NoticeStrip notice={notice} onDismiss={() => showNotice(null)} />
 
+      <ViewBar focus={focus} onFocusChange={setFocus} participants={allParticipants} />
+
       <div className="flex flex-col gap-5">
         {live.map((assignment, index) => (
           <div key={assignment.session} ref={index === 0 ? firstLiveRef : undefined}>
@@ -670,6 +683,7 @@ const AssignmentsPage: React.FC = () => {
               isShuffling={shufflingSession === assignment.session}
               selectedName={selectedName}
               onSelect={toggleSelected}
+              focus={focus}
               onShuffle={() => shuffleMutation.mutate(assignment.session)}
               onPrint={() => handlePrintSession(assignment.session)}
               onMarkComplete={() =>
@@ -707,6 +721,7 @@ const AssignmentsPage: React.FC = () => {
                 readOnly={readOnly}
                 selectedName={selectedName}
                 onSelect={toggleSelected}
+                focus={focus}
                 onPrint={() => handlePrintSession(assignment.session)}
                 onMarkAbsent={(name: string) => handleMarkAbsent(assignment.session, name)}
                 onMarkPresent={(name: string, tableNumber: number) =>

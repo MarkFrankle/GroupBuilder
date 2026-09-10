@@ -1,33 +1,33 @@
 import React from 'react'
-import type { Participant } from '@/types/assignments'
-
-/**
- * Religion palette, taken from the design mock (`.design/build.py`).
- *
- * Chips are religion-coloured unconditionally. Switching what they are *about*
- * — religion, gender, couples — is Item 12, and lands with the control that
- * drives it rather than here.
- */
-const RELIGION_COLORS: Record<string, { bg: string; fg: string }> = {
-  Jewish: { bg: '#D6F0FB', fg: '#005F83' },
-  Christian: { bg: '#FDE2E2', fg: '#8B1A1A' },
-  Muslim: { bg: '#E2F2DA', fg: '#3D6625' },
-  Other: { bg: '#FEF0D8', fg: '#7A5410' },
-}
+import { Link2 } from 'lucide-react'
+import { chipSwatch } from '@/utils/chipPalettes'
+import type { AttributeFocus, Participant } from '@/types/assignments'
 
 interface ChipProps {
   participant: Participant
   /** The person selected page-wide, or null. Everyone else dims. */
   selectedName: string | null
   onSelect: (name: string) => void
+  /**
+   * What the chip is coloured about — religion, gender, or couples. Program-scoped,
+   * set by the view-controls switch and threaded down the same path as
+   * `selectedName`. Defaults to religion so the many leaf call sites need not pass it.
+   */
+  focus?: AttributeFocus
 }
 
-const Chip: React.FC<ChipProps> = ({ participant, selectedName, onSelect }) => {
+const Chip: React.FC<ChipProps> = ({ participant, selectedName, onSelect, focus = 'religion' }) => {
   const isFacilitator = !!participant.is_facilitator
-  const { bg, fg } = RELIGION_COLORS[participant.religion] ?? RELIGION_COLORS.Other
-  const title = isFacilitator ? `${participant.name} · Facilitator` : participant.name
+  const { bg, fg } = chipSwatch(focus, participant)
+  const partnered = focus === 'couples' && !!participant.partner
 
-  // Colour is spoken for by religion and the amber ring by facilitators, so
+  const title = isFacilitator
+    ? `${participant.name} · Facilitator`
+    : partnered
+      ? `${participant.name} · partner of ${participant.partner}`
+      : participant.name
+
+  // Colour is spoken for by the focus and the amber ring by facilitators, so
   // opacity is the only channel left to say "not this person".
   const dimmed = selectedName !== null && selectedName !== participant.name
 
@@ -48,8 +48,9 @@ const Chip: React.FC<ChipProps> = ({ participant, selectedName, onSelect }) => {
       }}
       className={[
         shape,
-        // `text-left` undoes the button element's centring.
-        'cursor-pointer text-left transition-opacity',
+        // `inline-flex` keeps the couples link icon on the baseline; `text-left`
+        // undoes the button element's centring.
+        'inline-flex items-center gap-1 cursor-pointer text-left transition-opacity',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-1',
         dimmed && 'opacity-50',
       ]
@@ -57,6 +58,7 @@ const Chip: React.FC<ChipProps> = ({ participant, selectedName, onSelect }) => {
         .join(' ')}
       style={{ backgroundColor: bg, color: fg }}
     >
+      {partnered && <Link2 className="h-3 w-3 shrink-0" aria-hidden="true" />}
       {participant.name}
       {isFacilitator && <span className="sr-only"> · Facilitator</span>}
     </button>

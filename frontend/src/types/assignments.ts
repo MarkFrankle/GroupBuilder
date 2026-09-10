@@ -5,6 +5,9 @@
  * that other pages also need to outlive.
  */
 
+/** What the chiclets are coloured *about* — the view-controls focus switch (Item 12). */
+export type AttributeFocus = 'religion' | 'gender' | 'couples'
+
 export interface Participant {
   name: string
   religion: string

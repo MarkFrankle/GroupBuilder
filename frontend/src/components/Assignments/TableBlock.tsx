@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { UserMinus } from 'lucide-react'
 import Chip from './Chip'
 import { personCount } from '@/utils/assignmentStats'
-import type { Participant } from '@/types/assignments'
+import type { AttributeFocus, Participant } from '@/types/assignments'
 
 interface TableBlockProps {
   tableNumber: number
@@ -11,6 +11,8 @@ interface TableBlockProps {
   /** The person selected page-wide, or null. Threaded to Chip. */
   selectedName: string | null
   onSelect: (name: string) => void
+  /** What the chiclets are coloured about. Defaults to religion; the page threads the live value. */
+  focus?: AttributeFocus
   /**
    * Absent when acting is not allowed here — a completed or read-only view.
    * A missing callback rather than a disabled button, matching how Shuffle and
@@ -35,6 +37,7 @@ const TableBlock: React.FC<TableBlockProps> = ({
   participants,
   selectedName,
   onSelect,
+  focus = 'religion',
   onMarkAbsent,
 }) => {
   // Empty seats are stored as null: mark-absent deliberately leaves the gap
@@ -79,7 +82,13 @@ const TableBlock: React.FC<TableBlockProps> = ({
           </span>
           <div className="flex flex-wrap gap-1.5">
             {facilitators.map(p => (
-              <Chip key={p.name} participant={p} selectedName={selectedName} onSelect={onSelect} />
+              <Chip
+                key={p.name}
+                participant={p}
+                selectedName={selectedName}
+                onSelect={onSelect}
+                focus={focus}
+              />
             ))}
           </div>
         </div>
@@ -87,7 +96,13 @@ const TableBlock: React.FC<TableBlockProps> = ({
 
       <div className="flex flex-wrap gap-[5px]">
         {others.map(p => (
-          <Chip key={p.name} participant={p} selectedName={selectedName} onSelect={onSelect} />
+          <Chip
+                key={p.name}
+                participant={p}
+                selectedName={selectedName}
+                onSelect={onSelect}
+                focus={focus}
+              />
         ))}
       </div>
     </div>
