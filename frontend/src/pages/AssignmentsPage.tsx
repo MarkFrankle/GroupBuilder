@@ -13,6 +13,7 @@ import SessionCard from '@/components/Assignments/SessionCard'
 import { CoupleSlotsContext } from '@/components/Assignments/coupleSlotsContext'
 import { buildCoupleSlots } from '@/utils/chipPalettes'
 import NoticeStrip, { Notice } from '@/components/Assignments/NoticeStrip'
+import PlanCheckBand from '@/components/Assignments/PlanCheckBand'
 import ProgramHeader from '@/components/Assignments/ProgramHeader'
 import ViewBar from '@/components/Assignments/ViewBar'
 import { authenticatedFetch } from '@/utils/apiClient'
@@ -26,11 +27,13 @@ import {
   personTrackingSummary,
 } from '@/utils/assignmentStats'
 import { markAbsent, markPresent } from '@/utils/assignmentEdits'
+import { checkPlan, keepApartPairs } from '@/utils/planCheck'
 import {
   resultsQueryKey,
   useAcceptRebuild,
   useAssignmentResults,
   useAssignmentSetMetadata,
+  useCanonicalRoster,
   useResultVersions,
   useSessionCompletion,
   useUndoRebuild,
@@ -178,8 +181,20 @@ const AssignmentsPage: React.FC = () => {
     () => [...assignments].sort((a, b) => a.session - b.session),
     [assignments]
   )
-  const live = sorted.filter(a => a.session > completedThrough)
-  const completed = sorted.filter(a => a.session <= completedThrough)
+  const live = useMemo(
+    () => sorted.filter(a => a.session > completedThrough),
+    [sorted, completedThrough]
+  )
+  const completed = useMemo(
+    () => sorted.filter(a => a.session <= completedThrough),
+    [sorted, completedThrough]
+  )
+
+  const { data: canonicalRoster } = useCanonicalRoster(programId)
+  const planCheck = useMemo(
+    () => checkPlan(live, keepApartPairs(canonicalRoster?.participants ?? [])),
+    [live, canonicalRoster]
+  )
 
   const allParticipants = useMemo<Participant[]>(
     () =>
@@ -741,6 +756,7 @@ const AssignmentsPage: React.FC = () => {
 
       <CoupleSlotsContext.Provider value={coupleSlots}>
       <div className="flex flex-col gap-4 px-8">
+      {live.length > 0 && <PlanCheckBand result={planCheck} />}
       <NoticeStrip notice={provisionalNotice ?? notice} onDismiss={() => showNotice(null)} />
 
       <div className="sticky top-11 z-10 -mx-8 border-b bg-white px-8">

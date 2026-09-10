@@ -275,6 +275,12 @@ function HelpPage() {
             <strong>Rules</strong> line lists the linked pairs you have set up.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
+            Just below that, a banner checks the plan against the rules you set —
+            couples seated apart, anyone you asked to keep apart kept apart, a
+            facilitator at every table — and either tells you it's ready to print
+            or names what to fix and in which session.
+          </p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
             Each session is a card. Inside it, each table lists its facilitators
             first, then everyone else, with a summary on the right: how many people
             are seated, the gender split, and how many religions are represented.
@@ -334,9 +340,9 @@ function HelpPage() {
             out or share them with others.
           </p>
 
-          <h3 className="text-xl font-semibold mb-2">Print Roster</h3>
+          <h3 className="text-xl font-semibold mb-2">Print roster &amp; seating charts</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            Click <strong>"Print Roster"</strong> to open a print-formatted page with
+            Click <strong>"Print roster &amp; seating charts"</strong> to open a print-formatted page with
             every session's table assignments listed out (who's at which table), plus
             circular seating charts showing where each person sits. From there, use
             your browser's Print function (Ctrl+P on Windows, Cmd+P on Mac) or click
@@ -346,7 +352,7 @@ function HelpPage() {
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Saving as PDF to share by email:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             To send the assignments to other facilitators, you can save them as a
-            PDF: click <strong>"Print Roster"</strong>, then in the print dialog
+            PDF: click <strong>"Print roster &amp; seating charts"</strong>, then in the print dialog
             instead of choosing a printer, choose{" "}
             <strong>"Save as PDF."</strong> This will create and download a PDF file
             you can rename if desired and attach to an email or share however you
