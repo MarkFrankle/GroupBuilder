@@ -5,7 +5,12 @@ logger = logging.getLogger(__name__)
 
 
 def handle_generate_assignments(
-    participants_df, numTables, numSessions, use_incremental=None, max_time_seconds=120
+    participants_df,
+    numTables,
+    numSessions,
+    use_incremental=None,
+    max_time_seconds=120,
+    historical_pairings=None,
 ):
     """
     Generate table assignments using the constraint solver.
@@ -20,7 +25,12 @@ def handle_generate_assignments(
     Returns:
         dict: Results with assignments and metadata
     """
-    builder = GroupBuilder(participants_df, numTables, numSessions)
+    builder = GroupBuilder(
+        participants_df,
+        numTables,
+        numSessions,
+        historical_pairings=historical_pairings,
+    )
 
     # Auto-decide whether to use incremental solving
     if use_incremental is None:
