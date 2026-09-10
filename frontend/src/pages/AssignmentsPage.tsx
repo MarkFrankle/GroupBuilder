@@ -294,12 +294,16 @@ const AssignmentsPage: React.FC = () => {
       // The first version in a set has nothing behind it, and a version from an
       // older set cannot be promoted — either way there is nothing to undo to.
       undoTarget.current = versions[0]?.promotable ? versions[0] : null
+      // Absences are solver input and must survive the shuffle — resend the
+      // session's recorded absentees so the solver keeps their seats empty.
+      const absentParticipants =
+        sorted.find(a => a.session === sessionNumber)?.absentParticipants ?? []
       const response = await authenticatedFetch(
         `/api/assignments/regenerate/session/${sessionNumber}?program_id=${programId}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify([]),
+          body: JSON.stringify(absentParticipants),
         }
       )
       if (!response.ok) {
