@@ -1,6 +1,7 @@
 import {
   personCount,
   shuffleReceipt,
+  rebuildReceipt,
   uniqueTablematesAverage,
   linkedPairCount,
   seatedCount,
@@ -113,5 +114,18 @@ describe('personCount', () => {
     expect(personCount(1)).toBe('1 person')
     expect(personCount(2)).toBe('2 people')
     expect(personCount(0)).toBe('0 people')
+  })
+})
+
+describe('rebuildReceipt', () => {
+  it('names what did not move', () => {
+    expect(rebuildReceipt(2, 4)).toBe('Sessions rebuilt. Sessions 1\u20132 unchanged; sessions 3\u20134 have new seating.')
+    expect(rebuildReceipt(1, 3)).toBe('Sessions rebuilt. Session 1 unchanged; sessions 2\u20133 have new seating.')
+  })
+  it('handles a single remaining session', () => {
+    expect(rebuildReceipt(3, 4)).toBe('Sessions rebuilt. Sessions 1\u20133 unchanged; session 4 has new seating.')
+  })
+  it('degrades when nothing is frozen', () => {
+    expect(rebuildReceipt(0, 4)).toBe('Sessions rebuilt.')
   })
 })

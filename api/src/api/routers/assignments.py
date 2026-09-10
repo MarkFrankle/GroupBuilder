@@ -10,7 +10,10 @@ from api.services.session_completion_storage import (
     SessionCompletionStorage,
     get_session_completion_storage,
 )
-from api.services.session_completion_guards import refuse_if_any_session_complete
+from api.services.session_completion_guards import (
+    refuse_if_any_session_complete,
+    refuse_if_not_accepted,
+)
 from api.services.version_promotion import roster_change_reason
 from api.services.program_solve import (
     LABEL_GENERATED,
@@ -566,6 +569,7 @@ async def regenerate_single_session(
     _validate_session_number(storage, program_id, session_number)
 
     set_id, assignment_set = _require_current_set(storage, program_id)
+    refuse_if_not_accepted(storage, program_id, set_id)
 
     try:
         num_tables = assignment_set["num_tables"]
@@ -825,6 +829,7 @@ async def save_edited_assignments(
 ):
     """Save manually edited assignments as a new version, named by the caller."""
     set_id = _require_current_set_id(storage, program_id)
+    refuse_if_not_accepted(storage, program_id, set_id)
 
     assignments = body.get("assignments")
     based_on_version = body.get("based_on_version")
@@ -964,7 +969,37 @@ async def get_assignment_set_metadata(
         "num_sessions": assignment_set.get("num_sessions"),
         "created_at": created_at_unix,
         "has_results": storage.get_version(program_id, set_id) is not None,
+        "accepted": assignment_set.get("accepted", True),
+        "previous_set_id": assignment_set.get("previous_set_id"),
     }
+
+
+@router.post("/accept")
+async def accept_rebuilt_sessions(
+    program_id: str = Depends(validate_program_access),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+):
+    """Confirm a provisional set (Item 6b). Idempotent."""
+    set_id = _require_current_set_id(storage, program_id)
+    storage.accept_set(program_id, set_id)
+    return {"accepted": True}
+
+
+@router.post("/undo-rebuild")
+async def undo_rebuilt_sessions(
+    program_id: str = Depends(validate_program_access),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
+):
+    """Repoint the program back to the set that preceded a provisional rebuild."""
+    set_id = _require_current_set_id(storage, program_id)
+    doc = storage.get_set(program_id, set_id) or {}
+    if doc.get("accepted", True) is not False:
+        raise HTTPException(
+            status_code=400,
+            detail="These sessions are already confirmed - there is nothing to undo.",
+        )
+    previous_set_id = storage.revert_to_previous_set(program_id, set_id)
+    return {"assignment_set_id": previous_set_id}
 
 
 @router.get("/completion")
@@ -988,6 +1023,9 @@ async def mark_session_complete(
 ):
     """Mark one Session complete. Idempotent, and only ever the next one."""
     _validate_session_number(storage, program_id, session_number)
+    refuse_if_not_accepted(
+        storage, program_id, _require_current_set_id(storage, program_id)
+    )
 
     completed_through = completion.get_completed_through(program_id)
     if session_number > completed_through + 1:
@@ -1006,6 +1044,7 @@ async def mark_session_complete(
 async def reopen_session(
     session_number: int = Path(..., description="Session number (1-based)", ge=1),
     program_id: str = Depends(validate_program_access),
+    storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
     completion: SessionCompletionStorage = Depends(get_session_completion_storage),
 ):
     """Reopen the most recently completed Session.
@@ -1015,6 +1054,10 @@ async def reopen_session(
     here — a session number the program does not contain is necessarily above
     ``completed_through``, which is a no-op.
     """
+    refuse_if_not_accepted(
+        storage, program_id, _require_current_set_id(storage, program_id)
+    )
+
     completed_through = completion.get_completed_through(program_id)
     if 0 < session_number < completed_through:
         raise HTTPException(

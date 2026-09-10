@@ -108,3 +108,189 @@ class TestSolveProgram:
                 max_time_seconds=10,
             )
         assert "No solution exists" in str(exc.value)
+
+
+from api.services.program_solve import (
+    solve_around_completed_sessions,
+    LABEL_REBUILT_AROUND_COMPLETED,
+)
+
+
+def _people(n):
+    return [
+        {
+            "id": i + 1,
+            "name": f"P{i}",
+            "religion": "X",
+            "gender": "M",
+            "partner": None,
+            "couple_id": None,
+            "linked_id": None,
+            "is_facilitator": False,
+            "keep_together": False,
+        }
+        for i in range(n)
+    ]
+
+
+def _frozen_session_one(names_by_table):
+    return {
+        "session": 1,
+        "tables": {
+            str(t): [{"name": n} for n in names] for t, names in names_by_table.items()
+        },
+        "absentParticipants": [],
+    }
+
+
+class TestSolveAroundCompleted:
+    def test_frozen_session_is_copied_verbatim(self):
+        people = _people(9)
+        frozen = [
+            _frozen_session_one(
+                {0: ["P0", "P1", "P2"], 1: ["P3", "P4", "P5"], 2: ["P6", "P7", "P8"]}
+            )
+        ]
+        assignments, meta = solve_around_completed_sessions(
+            participants=people,
+            num_tables=3,
+            num_sessions=4,
+            completed_through=1,
+            frozen_sessions=frozen,
+            absence_map={},
+            max_time_seconds=5,
+        )
+        assert assignments[0] == frozen[0]
+        assert [a["session"] for a in assignments] == [1, 2, 3, 4]
+        assert meta["label"] == LABEL_REBUILT_AROUND_COMPLETED
+        assert meta["solution_quality"] is None
+
+    def test_a_frozen_session_absence_survives_verbatim(self):
+        people = _people(9)
+        frozen_session = _frozen_session_one(
+            {0: ["P1", "P2"], 1: ["P3", "P4", "P5"], 2: ["P6", "P7", "P8"]}
+        )
+        frozen_session["absentParticipants"] = [{"name": "P0"}]
+        assignments, _ = solve_around_completed_sessions(
+            participants=people,
+            num_tables=3,
+            num_sessions=4,
+            completed_through=1,
+            frozen_sessions=[frozen_session],
+            absence_map={},
+            max_time_seconds=5,
+        )
+        assert assignments[0] == frozen_session
+        assert assignments[0]["absentParticipants"] == [{"name": "P0"}]
+
+    def test_frozen_pair_is_split_in_the_resolved_sessions(self):
+        people = _people(9)
+        frozen = [
+            _frozen_session_one(
+                {0: ["P0", "P1", "P2"], 1: ["P3", "P4", "P5"], 2: ["P6", "P7", "P8"]}
+            )
+        ]
+        assignments, _ = solve_around_completed_sessions(
+            participants=people,
+            num_tables=3,
+            num_sessions=4,
+            completed_through=1,
+            frozen_sessions=frozen,
+            absence_map={},
+            max_time_seconds=5,
+        )
+        for session in assignments[1:]:
+            for _, seats in session["tables"].items():
+                names = {s["name"] for s in seats}
+                assert not ({"P0", "P1"} <= names)
+                assert not ({"P0", "P2"} <= names)
+
+    def test_a_frozen_pairing_naming_a_departed_person_is_dropped(self):
+        people = _people(8)  # P0..P7
+        frozen = [
+            _frozen_session_one(
+                {0: ["P0", "P1", "P8"], 1: ["P2", "P3", "P4"], 2: ["P5", "P6", "P7"]}
+            )
+        ]
+        assignments, _ = solve_around_completed_sessions(
+            participants=people,
+            num_tables=2,
+            num_sessions=3,
+            completed_through=1,
+            frozen_sessions=frozen,
+            absence_map={},
+            max_time_seconds=5,
+        )
+        assert len(assignments) == 3
+        assert assignments[0] == frozen[0]
+
+    def test_absence_on_an_incomplete_session_is_carried_into_the_rebuild(self):
+        people = _people(9)
+        frozen = [
+            _frozen_session_one(
+                {0: ["P0", "P1", "P2"], 1: ["P3", "P4", "P5"], 2: ["P6", "P7", "P8"]}
+            )
+        ]
+        absence_map = {3: [{"name": "P0"}]}
+        assignments, _ = solve_around_completed_sessions(
+            participants=people,
+            num_tables=3,
+            num_sessions=4,
+            completed_through=1,
+            frozen_sessions=frozen,
+            absence_map=absence_map,
+            max_time_seconds=5,
+        )
+        s3 = next(s for s in assignments if s["session"] == 3)
+        s3_seated = {
+            seat["name"] for _, seats in s3["tables"].items() for seat in seats
+        }
+        assert "P0" not in s3_seated
+        assert s3.get("absentParticipants") == [{"name": "P0"}]
+
+    def test_infeasible_remainder_raises_solvefailed(self):
+        # A couple with only one table to sit at: couples separation is a hard
+        # constraint, so the remainder solve is unsatisfiable. (The plan's
+        # original "3 people / 5 tables" case is NOT infeasible - the solver
+        # seats everyone and drops the empty tables, per TestSolveProgram.)
+        couple = [
+            {
+                "id": 1,
+                "name": "Alice",
+                "religion": "X",
+                "gender": "M",
+                "partner": "Bob",
+                "couple_id": 1,
+                "linked_id": None,
+                "is_facilitator": False,
+                "keep_together": False,
+            },
+            {
+                "id": 2,
+                "name": "Bob",
+                "religion": "X",
+                "gender": "M",
+                "partner": "Alice",
+                "couple_id": 1,
+                "linked_id": None,
+                "is_facilitator": False,
+                "keep_together": False,
+            },
+        ]
+        frozen = [
+            {
+                "session": 1,
+                "tables": {"0": [{"name": "Alice"}, {"name": "Bob"}]},
+                "absentParticipants": [],
+            }
+        ]
+        with pytest.raises(SolveFailed):
+            solve_around_completed_sessions(
+                participants=couple,
+                num_tables=1,
+                num_sessions=3,
+                completed_through=1,
+                frozen_sessions=frozen,
+                absence_map={},
+                max_time_seconds=5,
+            )

@@ -47,6 +47,8 @@ class AssignmentSetStorage:
         num_tables: int,
         num_sessions: int,
         make_current: bool = True,
+        accepted: bool = True,
+        previous_set_id: Optional[str] = None,
     ) -> str:
         """Mint a new assignment set, and by default point the program at it.
 
@@ -55,6 +57,11 @@ class AssignmentSetStorage:
         written. The program pointer is what every read resolves through, so
         moving it before the version exists would publish an empty plan - the
         failure this ordering exists to prevent.
+
+        ``accepted=False`` with ``previous_set_id`` marks a rebuilt set the
+        coordinator has not yet confirmed - see Item 6b. Readers treat a missing
+        ``accepted`` field as ``True`` (sets written before 6b were never
+        provisional).
 
         Returns the new set id.
         """
@@ -69,6 +76,8 @@ class AssignmentSetStorage:
                 "num_tables": num_tables,
                 "num_sessions": num_sessions,
                 "participant_data": _serialize_for_firestore(participant_data),
+                "accepted": accepted,
+                "previous_set_id": previous_set_id,
             }
         )
 
@@ -82,6 +91,24 @@ class AssignmentSetStorage:
         self._program_ref(program_id).set(
             {"current_assignment_set_id": set_id}, merge=True
         )
+
+    def accept_set(self, program_id: str, set_id: str) -> None:
+        """Confirm a provisional set. Idempotent."""
+        self._set_ref(program_id, set_id).set({"accepted": True}, merge=True)
+
+    def revert_to_previous_set(self, program_id: str, set_id: str) -> str:
+        """Repoint the program at ``set_id``'s predecessor. Returns that id.
+
+        The abandoned set is left in Firestore, unreachable - consistent with
+        every rebuild, which already orphans the prior set. Raises if there is
+        no predecessor to fall back to.
+        """
+        doc = self.get_set(program_id, set_id) or {}
+        previous_set_id = doc.get("previous_set_id")
+        if not previous_set_id:
+            raise ValueError("This set has no previous set to revert to.")
+        self.set_current_set_id(program_id, previous_set_id)
+        return previous_set_id
 
     def get_current_set_id(self, program_id: str) -> Optional[str]:
         """Return the program's current assignment set id, or None."""
@@ -117,7 +144,14 @@ class AssignmentSetStorage:
         ]
 
         current = [s for s in by_recency if s.get("assignment_set_id") == current_id]
-        others = [s for s in by_recency if s.get("assignment_set_id") != current_id]
+        others = [
+            s
+            for s in by_recency
+            if s.get("assignment_set_id") != current_id
+            # An abandoned rebuild - provisional and no longer current - was
+            # explicitly undone. It must not surface in any history window.
+            and s.get("accepted") is not False
+        ]
 
         return (current + others)[:limit]
 

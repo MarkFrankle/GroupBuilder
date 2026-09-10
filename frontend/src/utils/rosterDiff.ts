@@ -170,19 +170,30 @@ export function computeChangeset(
     });
   });
 
-  // A rename shows up as exactly one unmatched name on each side. More than
-  // one on either side is ambiguous — we will not pair them up by guesswork,
-  // so it falls through as an add plus a remove, which needs a rebuild.
+  // A rename is an unmatched name on each side whose mixing fields are
+  // identical. Detected pairwise so it still works when the same edit also
+  // adds or removes someone else — as long as the match is unambiguous: for a
+  // given departed name there must be exactly one arrival with the same mixing
+  // tuple, and one departure back. Anything ambiguous falls through as an add
+  // plus a remove, which needs a rebuild.
   const renamed: Rename[] = [];
-  if (added.length === 1 && removed.length === 1) {
-    const before = canonicalByName.get(removed[0])!;
-    const after = draftByName.get(added[0])!;
-    if (sameMixing(before, after)) {
-      renamed.push({ from: before.name, to: after.name });
-      added = [];
-      removed = [];
+  const renamedFrom = new Set<string>();
+  const renamedTo = new Set<string>();
+  [...removed].sort().forEach((old) => {
+    const before = canonicalByName.get(old)!;
+    const matches = added.filter((n) => sameMixing(before, draftByName.get(n)!));
+    if (matches.length !== 1) return;
+    const newName = matches[0];
+    const after = draftByName.get(newName)!;
+    const back = removed.filter((o) => sameMixing(canonicalByName.get(o)!, after));
+    if (back.length === 1) {
+      renamed.push({ from: old, to: newName });
+      renamedFrom.add(old);
+      renamedTo.add(newName);
     }
-  }
+  });
+  added = added.filter((n) => !renamedTo.has(n));
+  removed = removed.filter((n) => !renamedFrom.has(n));
 
   // Renames are applied to the canonical side, which holds the old spellings,
   // so a spelling change reads as the same rule rather than a different one.

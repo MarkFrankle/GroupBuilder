@@ -72,6 +72,10 @@ const metadata = {
 
 interface ApiState {
   completedThrough: number
+  /** Serve metadata with accepted:false and handle accept/undo-rebuild. */
+  provisional?: boolean
+  accepted?: string
+  undoneRebuild?: string
   completionResponse?: { status: number; body: any }
   shuffled?: boolean
   /** Serve the fixture where Cara is absent from session 2 with a gap open. */
@@ -201,11 +205,34 @@ function mockApi() {
       } as Response)
     }
 
+    if (url.includes('/api/assignments/accept')) {
+      api.accepted = url
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+      } as Response)
+    }
+
+    if (url.includes('/api/assignments/undo-rebuild')) {
+      api.undoneRebuild = url
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+      } as Response)
+    }
+
     if (url.includes('/api/assignments/metadata')) {
       return Promise.resolve({
         ok: true,
         status: 200,
-        json: () => Promise.resolve(metadata),
+        json: () =>
+          Promise.resolve(
+            api.provisional
+              ? { ...metadata, accepted: false, previous_set_id: 'set-previous' }
+              : metadata
+          ),
       } as Response)
     }
 
@@ -946,6 +973,55 @@ describe('AssignmentsPage', () => {
         )
       ).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /^undo$/i })).toBeInTheDocument()
+    })
+  })
+  describe('provisional rebuild', () => {
+    it('shows an Accept/Undo banner and locks actions while the set is provisional', async () => {
+      api.provisional = true
+      api.completedThrough = 2
+      renderPage()
+
+      expect(
+        await screen.findByText(
+          /Sessions 1\u20132 unchanged; session 3 has new seating/
+        )
+      ).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Accept' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: /shuffle/i })
+      ).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: /mark complete/i })
+      ).not.toBeInTheDocument()
+    })
+
+    it('calls accept when Accept is pressed', async () => {
+      api.provisional = true
+      renderPage()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Accept' }))
+
+      await waitFor(() =>
+        expect(mockAuthenticatedFetch).toHaveBeenCalledWith(
+          expect.stringContaining('/api/assignments/accept'),
+          expect.objectContaining({ method: 'POST' })
+        )
+      )
+    })
+
+    it('calls undo-rebuild when Undo is pressed', async () => {
+      api.provisional = true
+      renderPage()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Undo' }))
+
+      await waitFor(() =>
+        expect(mockAuthenticatedFetch).toHaveBeenCalledWith(
+          expect.stringContaining('/api/assignments/undo-rebuild'),
+          expect.objectContaining({ method: 'POST' })
+        )
+      )
     })
   })
 })

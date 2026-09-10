@@ -20,7 +20,7 @@ slowapi = "^0.1.9"
 firebase-admin = "^6.5.0"
 google-cloud-firestore = "^2.16.0"
 email-validator = "^2.1.0"
-assignment-logic = {path = "../assignment_logic"}
+assignment-logic = {path = "../assignment_logic", develop = true}
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.9"

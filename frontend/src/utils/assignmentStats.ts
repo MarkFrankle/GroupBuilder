@@ -163,3 +163,20 @@ export function linkedPairCount(assignments: Assignment[]): number {
   })
   return pairs.size
 }
+
+/**
+ * A mid-program rebuild keeps completed sessions and re-seats the rest. The
+ * receipt names both halves so a coordinator can see nothing already run was
+ * disturbed.
+ */
+export function rebuildReceipt(k: number, total: number): string {
+  if (k <= 0) return 'Sessions rebuilt.'
+  const resolvedFrom = k + 1
+  const unchangedPhrase =
+    k === 1 ? 'Session 1 unchanged' : `Sessions 1\u2013${k} unchanged`
+  const newPhrase =
+    total - k === 1
+      ? `session ${resolvedFrom} has new seating`
+      : `sessions ${resolvedFrom}\u2013${total} have new seating`
+  return `Sessions rebuilt. ${unchangedPhrase}; ${newPhrase}.`
+}

@@ -386,27 +386,6 @@ class TestGenerateRefusesCompletedSessions:
                 },
             )
 
-    def test_generate_is_refused_when_a_session_is_complete(self, client):
-        self._add_participants(client)
-        client.post(
-            "/api/roster/generate?program_id=test_org_id",
-            json={"num_tables": 1, "num_sessions": 6},
-        )
-        assert (
-            client.post(
-                "/api/assignments/completion/1?program_id=test_org_id"
-            ).status_code
-            == 200
-        )
-
-        response = client.post(
-            "/api/roster/generate?program_id=test_org_id",
-            json={"num_tables": 1, "num_sessions": 3},
-        )
-
-        assert response.status_code == 409
-        assert "Session 1 is already complete" in response.json()["detail"]
-
     def test_generate_still_works_when_nothing_is_complete(self, client):
         self._add_participants(client)
 
@@ -417,23 +396,219 @@ class TestGenerateRefusesCompletedSessions:
 
         assert response.status_code == 200
 
-    def test_refusal_does_not_repoint_the_program(self, client):
-        """The guard must run before the Firestore write, not after."""
+    def test_rebuild_while_pending_is_refused_and_does_not_repoint(self, client):
         self._add_participants(client)
-        first = client.post(
+        client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 1, "num_sessions": 6},
+        )
+        client.post("/api/assignments/completion/1?program_id=test_org_id")
+
+        provisional = client.post(
             "/api/roster/generate?program_id=test_org_id",
             json={"num_tables": 1, "num_sessions": 6},
         ).json()["assignment_set_id"]
-        client.post("/api/assignments/completion/1?program_id=test_org_id")
 
-        client.post(
+        again = client.post(
             "/api/roster/generate?program_id=test_org_id",
-            json={"num_tables": 1, "num_sessions": 3},
+            json={"num_tables": 1, "num_sessions": 6},
         )
+        assert again.status_code == 409
 
         from api.services.assignment_set_storage import AssignmentSetStorage
 
+        assert AssignmentSetStorage().get_current_set_id("test_org_id") == provisional
+
+
+class TestGenerateCarriesCompletedSessionsForward:
+    """Item 6b: a mid-program rebuild freezes completed sessions."""
+
+    def _seed_program(self, client, people=9, tables=3, sessions=4):
+        for i in range(people):
+            client.put(
+                f"/api/roster/p{i}?program_id=test_org_id",
+                json={
+                    "name": f"P{i}",
+                    "religion": ["Christian", "Jewish", "Muslim"][i % 3],
+                    "gender": ["Male", "Female"][i % 2],
+                    "partner_id": None,
+                },
+            )
+        r = client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": tables, "num_sessions": sessions},
+        )
+        assert r.status_code == 200
+        return r.json()["assignment_set_id"]
+
+    def test_completed_session_is_frozen_across_the_rebuild(self, client):
+        self._seed_program(client)
+        client.post("/api/assignments/completion/1?program_id=test_org_id")
+
+        before = client.get("/api/assignments/results?program_id=test_org_id").json()
+        session_one_before = next(s for s in before if s["session"] == 1)
+
+        client.delete("/api/roster/p8?program_id=test_org_id")
+        r = client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 3, "num_sessions": 4},
+        )
+        assert r.status_code == 200, r.json()
+
+        after = client.get("/api/assignments/results?program_id=test_org_id").json()
+        session_one_after = next(s for s in after if s["session"] == 1)
+        assert session_one_after["tables"] == session_one_before["tables"]
+        assert session_one_after.get("absentParticipants") == session_one_before.get(
+            "absentParticipants"
+        )
+
+    def test_a_rename_alongside_a_removal_propagates_into_the_frozen_session(
+        self, client
+    ):
+        self._seed_program(client)
+        client.post("/api/assignments/completion/1?program_id=test_org_id")
+        client.put(
+            "/api/roster/p0?program_id=test_org_id",
+            json={
+                "name": "P0renamed",
+                "religion": "Christian",
+                "gender": "Male",
+                "partner_id": None,
+            },
+        )
+        client.delete("/api/roster/p8?program_id=test_org_id")
+        r = client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 3, "num_sessions": 4},
+        )
+        assert r.status_code == 200, r.json()
+        after = client.get("/api/assignments/results?program_id=test_org_id").json()
+        session_one = next(s for s in after if s["session"] == 1)
+        names = {
+            seat["name"] for _, seats in session_one["tables"].items() for seat in seats
+        }
+        assert "P0renamed" in names
+        assert "P0" not in names
+
+    def test_a_participant_added_after_completion_appears_only_in_resolved_sessions(
+        self, client
+    ):
+        self._seed_program(client)
+        client.post("/api/assignments/completion/1?program_id=test_org_id")
+        client.put(
+            "/api/roster/p9?program_id=test_org_id",
+            json={
+                "name": "P9new",
+                "religion": "Jewish",
+                "gender": "Female",
+                "partner_id": None,
+            },
+        )
+        r = client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 3, "num_sessions": 4},
+        )
+        assert r.status_code == 200, r.json()
+        after = client.get("/api/assignments/results?program_id=test_org_id").json()
+        s1 = next(s for s in after if s["session"] == 1)
+        s1_names = {seat["name"] for _, seats in s1["tables"].items() for seat in seats}
+        assert "P9new" not in s1_names
+        later_names = {
+            seat["name"]
+            for s in after
+            if s["session"] > 1
+            for _, seats in s["tables"].items()
+            for seat in seats
+        }
+        assert "P9new" in later_names
+
+    def test_infeasible_rebuild_leaves_the_old_plan_current(self, client):
+        first = self._seed_program(client)
+        client.post("/api/assignments/completion/1?program_id=test_org_id")
+        # Link P0 and P1 as a couple, then demand a single table: couples
+        # separation is a hard constraint, so the remainder solve is infeasible.
+        client.put(
+            "/api/roster/p0?program_id=test_org_id",
+            json={
+                "name": "P0",
+                "religion": "Christian",
+                "gender": "Male",
+                "partner_id": "p1",
+            },
+        )
+        client.put(
+            "/api/roster/p1?program_id=test_org_id",
+            json={
+                "name": "P1",
+                "religion": "Jewish",
+                "gender": "Female",
+                "partner_id": "p0",
+            },
+        )
+        r = client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 1, "num_sessions": 4},
+        )
+        assert r.status_code == 400, r.json()
+        from api.services.assignment_set_storage import AssignmentSetStorage
+
         assert AssignmentSetStorage().get_current_set_id("test_org_id") == first
+        meta = client.get("/api/assignments/metadata?program_id=test_org_id").json()
+        assert meta["accepted"] is not False
+
+    def test_the_rebuilt_set_is_provisional(self, client):
+        self._seed_program(client)
+        client.post("/api/assignments/completion/1?program_id=test_org_id")
+        client.delete("/api/roster/p8?program_id=test_org_id")
+        client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 3, "num_sessions": 4},
+        )
+
+        meta = client.get("/api/assignments/metadata?program_id=test_org_id").json()
+        assert meta["accepted"] is False
+        assert meta["previous_set_id"] is not None
+
+    def test_rebuild_with_every_session_complete_is_refused(self, client):
+        self._seed_program(client, sessions=2)
+        client.post("/api/assignments/completion/1?program_id=test_org_id")
+        client.post("/api/assignments/completion/2?program_id=test_org_id")
+        client.delete("/api/roster/p8?program_id=test_org_id")
+
+        r = client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 3, "num_sessions": 2},
+        )
+        assert r.status_code == 409
+        assert "every session is complete" in r.json()["detail"].lower()
+
+    def test_rename_only_change_is_allowed_when_all_sessions_complete(self, client):
+        self._seed_program(client, sessions=2)
+        client.post("/api/assignments/completion/1?program_id=test_org_id")
+        client.post("/api/assignments/completion/2?program_id=test_org_id")
+        client.put(
+            "/api/roster/p0?program_id=test_org_id",
+            json={
+                "name": "P0x",
+                "religion": "Christian",
+                "gender": "Male",
+                "partner_id": None,
+            },
+        )
+        r = client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 3, "num_sessions": 2},
+        )
+        assert r.status_code == 200
+        assert r.json()["rebuilt"] is False
+        after = client.get("/api/assignments/results?program_id=test_org_id").json()
+        names = {
+            s["name"]
+            for sess in after
+            for _, seats in sess["tables"].items()
+            for s in seats
+        }
+        assert "P0x" in names and "P0" not in names
 
 
 class TestCanonicalRoster:
@@ -797,6 +972,12 @@ class TestRebuild:
         assert (
             client.post(
                 "/api/assignments/completion/1?program_id=test_org_id"
+            ).status_code
+            == 200
+        )
+        assert (
+            client.post(
+                "/api/assignments/completion/2?program_id=test_org_id"
             ).status_code
             == 200
         )

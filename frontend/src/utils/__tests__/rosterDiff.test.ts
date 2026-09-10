@@ -67,6 +67,24 @@ describe('computeChangeset', () => {
     expect(result.needsRebuild).toBe(true);
   });
 
+  // Mirrors the backend's test_a_rename_alongside_a_removal_is_still_detected:
+  // a typo fix in the same edit that also drops someone else. The rename is
+  // unambiguous by mixing fields, so it is still paired up; the removal still
+  // forces the rebuild.
+  it('still detects a rename alongside an unrelated removal', () => {
+    const result = computeChangeset(
+      [person('Kathrine', { religion: 'Jewish' }), person('Bob', { religion: 'Muslim' })],
+      [person('Katherine', { religion: 'Jewish' })],
+      { tables: 2, sessions: 3 },
+      { tables: 2, sessions: 3 },
+    );
+
+    expect(result.renamed).toEqual([{ from: 'Kathrine', to: 'Katherine' }]);
+    expect(result.added).toEqual([]);
+    expect(result.removed).toEqual(['Bob']);
+    expect(result.needsRebuild).toBe(true);
+  });
+
   it('treats a lone unmatched pair with different mixing fields as an add and a remove', () => {
     const result = computeChangeset(
       [person('Kathrine')],

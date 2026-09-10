@@ -196,3 +196,85 @@ def test_update_participant_data_replaces_the_canonical_roster(storage):
     assert [p["name"] for p in data["participant_data"]] == ["Carol"]
     assert data["num_tables"] == 2
     assert data["filename"] == "roster"
+
+
+class TestProvisionalSets:
+    def _pd(self):
+        return [{"id": 1, "name": "A", "religion": "X", "gender": "M"}]
+
+    def test_a_set_is_accepted_by_default(self, storage):
+        set_id = storage.create_set(
+            program_id=PROGRAM,
+            user_id="u",
+            participant_data=self._pd(),
+            filename="roster",
+            num_tables=1,
+            num_sessions=3,
+        )
+        assert storage.get_set(PROGRAM, set_id)["accepted"] is True
+        assert storage.get_set(PROGRAM, set_id).get("previous_set_id") is None
+
+    def test_a_provisional_set_records_its_predecessor(self, storage):
+        first = storage.create_set(
+            program_id=PROGRAM,
+            user_id="u",
+            participant_data=self._pd(),
+            filename="roster",
+            num_tables=1,
+            num_sessions=3,
+        )
+        second = storage.create_set(
+            program_id=PROGRAM,
+            user_id="u",
+            participant_data=self._pd(),
+            filename="roster",
+            num_tables=1,
+            num_sessions=3,
+            accepted=False,
+            previous_set_id=first,
+        )
+        doc = storage.get_set(PROGRAM, second)
+        assert doc["accepted"] is False
+        assert doc["previous_set_id"] == first
+
+    def test_accept_set_flips_the_flag_and_is_idempotent(self, storage):
+        set_id = storage.create_set(
+            program_id=PROGRAM,
+            user_id="u",
+            participant_data=self._pd(),
+            filename="roster",
+            num_tables=1,
+            num_sessions=3,
+            accepted=False,
+            previous_set_id="old",
+        )
+        storage.accept_set(PROGRAM, set_id)
+        assert storage.get_set(PROGRAM, set_id)["accepted"] is True
+        storage.accept_set(PROGRAM, set_id)  # no error second time
+        assert storage.get_set(PROGRAM, set_id)["accepted"] is True
+
+    def test_revert_points_the_program_back(self, storage):
+        first = storage.create_set(
+            program_id=PROGRAM,
+            user_id="u",
+            participant_data=self._pd(),
+            filename="roster",
+            num_tables=1,
+            num_sessions=3,
+        )
+        second = storage.create_set(
+            program_id=PROGRAM,
+            user_id="u",
+            participant_data=self._pd(),
+            filename="roster",
+            num_tables=1,
+            num_sessions=3,
+            make_current=True,
+            accepted=False,
+            previous_set_id=first,
+        )
+        assert storage.get_current_set_id(PROGRAM) == second
+        storage.revert_to_previous_set(PROGRAM, second)
+        assert storage.get_current_set_id(PROGRAM) == first
+        # the abandoned set still exists, just unreachable
+        assert storage.get_set(PROGRAM, second) is not None

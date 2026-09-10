@@ -99,14 +99,28 @@ def diff_rosters(
     # a Session is complete, rewriting a name would rewrite who attended a night
     # that already happened, and telling a typo from a replacement would become
     # load-bearing.
+    # A rename is an unmatched name on each side whose mixing fields are
+    # identical. Detected pairwise so it still works when the same edit also
+    # adds or removes someone else - as long as the match is unambiguous: for a
+    # given departed name there must be exactly one arrival with the same
+    # mixing tuple, and vice versa. Anything ambiguous falls through as a
+    # rebuild rather than being paired by guesswork.
     renames: Dict[str, str] = {}
-    if len(added) == 1 and len(removed) == 1:
-        old, new = removed.pop(), added.pop()
-        if _normalise(canonical_by_name[old]) == _normalise(draft_by_name[new]):
-            renames = {old: new}
-            added, removed = set(), set()
-        else:
-            added, removed = {new}, {old}
+    for old in sorted(removed):
+        old_sig = _normalise(canonical_by_name[old])
+        matches = [n for n in added if _normalise(draft_by_name[n]) == old_sig]
+        if len(matches) != 1:
+            continue
+        new = matches[0]
+        back = [
+            o
+            for o in removed
+            if _normalise(canonical_by_name[o]) == _normalise(draft_by_name[new])
+        ]
+        if len(back) == 1:
+            renames[old] = new
+    added = added - set(renames.values())
+    removed = removed - set(renames)
 
     # Renames are applied to the canonical side so a spelling change reads as
     # the same rule, not a different one. Removing a rule needs a rebuild too:

@@ -172,7 +172,9 @@ class GroupBuilder:
         """
         all_assignments = []
         locked = {}
-        historical_pairings = set()  # Track ALL pairings from previous batches
+        # Seeded from prior completed sessions (Item 6b) so batch 1 already
+        # knows who has met; batches then add their own.
+        historical_pairings = set(self.historical_pairings)
         total_sessions = len(self.sessions)
         total_solve_time = 0
         total_branches = 0

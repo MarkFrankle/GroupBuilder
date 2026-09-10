@@ -75,6 +75,22 @@ class TestDiffRosters:
         assert result.needs_rebuild is True
         assert result.renames == {}
 
+    def test_a_rename_alongside_a_removal_is_still_detected(self):
+        """A typo fix in the same edit that drops someone else: the rename is
+        still paired up (unambiguous by mixing fields) so its new spelling
+        propagates into the carried-forward sessions, while the removal still
+        forces the rebuild."""
+        result = diff_rosters(
+            canonical=[
+                _canonical("Kathrine", religion="Jewish"),
+                _canonical("Bob", religion="Muslim"),
+            ],
+            draft=[_canonical("Katherine", religion="Jewish")],
+        )
+
+        assert result.needs_rebuild is True
+        assert result.renames == {"Kathrine": "Katherine"}
+
     def test_a_like_for_like_replacement_is_treated_as_a_rename_on_purpose(self):
         """Ellen drops out, Priya joins, every mixing field the same.
 

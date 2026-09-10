@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 # decides which one a solve earned; the router imports them.
 LABEL_GENERATED = "Sessions generated"
 LABEL_REBUILT_WITH_ABSENCES = "Sessions rebuilt with absences"
+LABEL_REBUILT_AROUND_COMPLETED = "Sessions rebuilt around completed sessions"
 
 NO_SOLUTION = "No solution exists with the given constraints."
 
@@ -76,13 +77,18 @@ def solve_program(
     absence_map: Dict[int, List[Dict[str, Any]]],
     max_time_seconds: int = 120,
     label_when_clean: str = LABEL_GENERATED,
+    _historical_seed=None,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """Solve every session, then re-solve the ones with absences.
 
     Returns ``(assignments, metadata)``. Never writes anything.
     """
     results = handle_generate_assignments(
-        participants, num_tables, num_sessions, max_time_seconds=max_time_seconds
+        participants,
+        num_tables,
+        num_sessions,
+        max_time_seconds=max_time_seconds,
+        historical_pairings=_historical_seed,
     )
     if results["status"] != "success":
         logger.error("Solver failed: %s", results.get("error"))
@@ -152,3 +158,57 @@ def solve_program(
     }
 
     return assignments, metadata
+
+
+def solve_around_completed_sessions(
+    participants: List[Dict[str, Any]],
+    num_tables: int,
+    num_sessions: int,
+    completed_through: int,
+    frozen_sessions: List[Dict[str, Any]],
+    absence_map: Dict[int, List[Dict[str, Any]]],
+    max_time_seconds: int = 120,
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """Freeze sessions 1..k, re-solve k+1..N around them (Item 6b).
+
+    ``frozen_sessions`` is copied into the result untouched - it keeps seating
+    people no longer on ``participants`` and never gains people added since.
+    Pairings from the frozen sessions seed the solver so repeats stay
+    penalised; a pairing naming someone absent from the current roster is
+    dropped, because they are not in the sessions being solved.
+    """
+    remainder = num_sessions - completed_through
+    if remainder < 1:
+        raise SolveFailed(NO_SOLUTION)
+
+    name_to_id = {p["name"]: p["id"] for p in participants}
+    seed_ids = set()
+    for a, b in extract_pairings_from_sessions(frozen_sessions, exclude_session=-1):
+        if a in name_to_id and b in name_to_id:
+            seed_ids.add(tuple(sorted([name_to_id[a], name_to_id[b]])))
+
+    remainder_absences = {
+        (s - completed_through): absent
+        for s, absent in absence_map.items()
+        if completed_through < s <= num_sessions
+    }
+
+    resolved, meta = solve_program(
+        participants=participants,
+        num_tables=num_tables,
+        num_sessions=remainder,
+        absence_map=remainder_absences,
+        max_time_seconds=max_time_seconds,
+        label_when_clean=LABEL_REBUILT_AROUND_COMPLETED,
+        _historical_seed=seed_ids,
+    )
+
+    for i, session in enumerate(resolved):
+        session["session"] = completed_through + i + 1
+
+    assignments = list(frozen_sessions) + resolved
+    meta["label"] = LABEL_REBUILT_AROUND_COMPLETED
+    meta["solution_quality"] = None
+    meta["solve_time"] = None
+    meta["total_deviation"] = None
+    return assignments, meta
