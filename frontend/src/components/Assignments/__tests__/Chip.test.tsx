@@ -11,6 +11,13 @@ const alice: Participant = {
 }
 
 describe('Chip', () => {
+  it('uses denser padding and smaller text in compact mode', () => {
+    render(<Chip participant={alice} selectedName={null} onSelect={jest.fn()} compact />)
+    const chip = screen.getByRole('button', { name: /Alice/ })
+    expect(chip).toHaveClass('text-[11px]')
+    expect(chip).toHaveClass('px-1.5')
+  })
+
   it('renders the participant name', () => {
     render(<Chip participant={alice} selectedName={null} onSelect={jest.fn()} />)
 

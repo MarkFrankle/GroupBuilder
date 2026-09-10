@@ -18,7 +18,13 @@ interface ChipProps {
   compact?: boolean
 }
 
-const Chip: React.FC<ChipProps> = ({ participant, selectedName, onSelect, focus = 'religion' }) => {
+const Chip: React.FC<ChipProps> = ({
+  participant,
+  selectedName,
+  onSelect,
+  focus = 'religion',
+  compact = false,
+}) => {
   const isFacilitator = !!participant.is_facilitator
   const { bg, fg } = chipSwatch(focus, participant)
   const partnered = focus === 'couples' && !!participant.partner
@@ -34,8 +40,12 @@ const Chip: React.FC<ChipProps> = ({ participant, selectedName, onSelect, focus 
   const dimmed = selectedName !== null && selectedName !== participant.name
 
   const shape = isFacilitator
-    ? 'rounded px-2.5 py-[5px] text-[13px] font-semibold ring-1 ring-amber-400'
-    : 'rounded px-2 py-1 text-xs font-medium'
+    ? compact
+      ? 'rounded px-1.5 py-0.5 text-[11px] font-semibold ring-1 ring-amber-400'
+      : 'rounded px-2.5 py-[5px] text-[13px] font-semibold ring-1 ring-amber-400'
+    : compact
+      ? 'rounded px-1.5 py-0.5 text-[11px] font-medium'
+      : 'rounded px-2 py-1 text-xs font-medium'
 
   return (
     <button
