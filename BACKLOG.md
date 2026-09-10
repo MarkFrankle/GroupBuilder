@@ -17,7 +17,7 @@ Ideas, feature requests, and wishlist items. Not prioritized, not committed to.
 
 - ~~**Improve Regenerate All Sessions modal copy**~~ — OBSOLETE (2026-09): full regeneration is being removed entirely. See `agent_docs/product-model.md`. Original note: — Current copy undersells destruction: says "a completely new set of assignments" and "your current version will be saved" without explicitly naming that saved absences are lost. Should say so plainly. (2026-06)
 
-- **Worked examples in Help page** — FOLDED INTO the HelpPage rewrite in the 2026-09 redesign; scenarios (2) and (3) are now first-class flows rather than workarounds. Original note: — Three real mid-flight scenarios users struggle with: (1) saving absences then regenerating a session, (2) discovering partner/linking requirements after sessions are generated, (3) discovering participants need to be separated after sessions are generated. Show the step-by-step correct flow for each. (2026-06)
+- **Worked examples in Help page** — FOLDED INTO the HelpPage rewrite in the 2026-09 redesign; scenarios (2) and (3) are now first-class flows rather than workarounds. **Item 6b (2026-09-10):** the mid-program rebuild and its Accept/Undo confirmation window are undocumented and need covering when Item 14's HelpPage rewrite happens. Original note: — Three real mid-flight scenarios users struggle with: (1) saving absences then regenerating a session, (2) discovering partner/linking requirements after sessions are generated, (3) discovering participants need to be separated after sessions are generated. Show the step-by-step correct flow for each. (2026-06)
 
 ## Chores
 

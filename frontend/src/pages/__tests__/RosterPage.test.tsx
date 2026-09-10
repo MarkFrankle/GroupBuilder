@@ -445,6 +445,23 @@ describe('rebuilding from the roster', () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
+  test('navigates to the provisional plan when the rebuild lands', async () => {
+    mockProgram({
+      draft: [alice, bob, cara, dan],
+      canonical: [alice, bob, cara],
+      generate: { body: { assignment_set_id: 'x', rebuilt: true, message: 'Sessions rebuilt.' } },
+    });
+    renderPage();
+
+    const btn = await screen.findByRole('button', { name: /save and rebuild sessions/i });
+    await waitFor(() => expect(btn).toBeEnabled());
+    await userEvent.click(btn);
+
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith('/table-assignments?program=test-program-id'),
+    );
+  });
+
   // computeChangeset reports a brand-new program as clean — there is no
   // canonical roster to differ from — so gating the button on dirtiness alone
   // would hide it on exactly the program that needs it most.
