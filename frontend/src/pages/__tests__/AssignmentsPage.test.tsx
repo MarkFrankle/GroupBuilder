@@ -78,6 +78,7 @@ interface ApiState {
   undoneRebuild?: string
   completionResponse?: { status: number; body: any }
   shuffled?: boolean
+  shuffleBody?: any
   /** Serve the fixture where Cara is absent from session 2 with a gap open. */
   absence?: boolean
   promoted?: string
@@ -125,6 +126,7 @@ function mockApi() {
 
     if (url.includes('/api/assignments/regenerate/session/')) {
       api.shuffled = true
+      api.shuffleBody = JSON.parse(options?.body ?? 'null')
       return Promise.resolve({
         ok: true,
         status: 200,
@@ -357,6 +359,19 @@ describe('AssignmentsPage', () => {
     expect(
       await screen.findByText(/Session 1 is still open/)
     ).toBeInTheDocument()
+  })
+
+  it('resends the session\'s recorded absentees so the shuffle keeps their seats empty', async () => {
+    api.absence = true
+    renderPage()
+
+    const session2 = await screen.findByRole('region', { name: 'Session 2' })
+    await userEvent.click(within(session2).getByRole('button', { name: /shuffle/i }))
+
+    await screen.findByText(/Session 2 shuffled\./)
+    expect(api.shuffleBody).toEqual([
+      expect.objectContaining({ name: 'Cara' }),
+    ])
   })
 
   it('reports a shuffle with a receipt', async () => {
