@@ -55,11 +55,14 @@ def extract_pairings_from_sessions(
 
         # Extract pairings from each table in this session
         for table_num, participants in session_data["tables"].items():
+            # A frozen or completed session can carry ``None`` seats (an empty
+            # chair); those are not people and never form a pairing.
+            seated = [p for p in participants if p]
             # Create pairs for all participants at this table
-            for i in range(len(participants)):
-                for j in range(i + 1, len(participants)):
-                    p1 = participants[i]["name"]
-                    p2 = participants[j]["name"]
+            for i in range(len(seated)):
+                for j in range(i + 1, len(seated)):
+                    p1 = seated[i]["name"]
+                    p2 = seated[j]["name"]
                     # Use sorted tuple so (Alice, Bob) == (Bob, Alice)
                     pair_key = tuple(sorted([p1, p2]))
                     historical_pairings.add(pair_key)

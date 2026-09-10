@@ -78,7 +78,16 @@ def test_one_person_can_be_in_several_pairs(storage):
 def test_malformed_entries_are_not_rules(storage):
     """Junk in the stored array is dropped on read, never read as a pair."""
     storage._program_ref(PROGRAM).set(
-        {"keep_apart": [["a", "b"], "cd", ["x", "y", "z"], ["p", None], None, 7]},
+        {
+            "keep_apart": [
+                {"a": "a", "b": "b"},
+                "cd",
+                {"a": "x"},
+                {"a": "p", "b": None},
+                None,
+                7,
+            ]
+        },
         merge=True,
     )
     assert storage.get_pairs(PROGRAM) == [("a", "b")]
@@ -96,3 +105,10 @@ def test_adding_a_pair_does_not_clobber_the_program_document(
     assert program["current_assignment_set_id"] == set_id
     assert program["name"] == "Test Organization"
     assert program["active"] is True
+
+
+def test_stored_pairs_are_not_nested_arrays(storage):
+    """Firestore forbids arrays-of-arrays, so the stored shape must be flat."""
+    storage.add_pair(PROGRAM, "a", "b")
+    raw = storage._program_ref(PROGRAM).get().to_dict()["keep_apart"]
+    assert all(not isinstance(entry, list) for entry in raw)

@@ -28,6 +28,23 @@ slowapi.Limiter.limit = _no_op_decorator
 
 
 # Mock Firestore client for tests
+def _reject_nested_arrays(value, _inside_array=False):
+    """Mirror Firestore's "nested arrays are not allowed" 400.
+
+    Real Firestore rejects an array whose elements are arrays. The mock stored
+    them happily, which let a keep-apart bug (list-of-lists) pass CI and only
+    500 in production.
+    """
+    if isinstance(value, (list, tuple)):
+        if _inside_array:
+            raise ValueError("400 Nested arrays are not allowed")
+        for item in value:
+            _reject_nested_arrays(item, _inside_array=True)
+    elif isinstance(value, dict):
+        for item in value.values():
+            _reject_nested_arrays(item, _inside_array=False)
+
+
 class MockFirestoreDocumentReference:
     """Mock Firestore document reference."""
 
@@ -40,6 +57,7 @@ class MockFirestoreDocumentReference:
 
     def set(self, data, merge=False):
         """Set document data."""
+        _reject_nested_arrays(data)
         if merge and self.id in self._collection._documents:
             existing = self._collection._documents[self.id]
             existing.update(data)
