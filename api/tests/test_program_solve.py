@@ -206,6 +206,30 @@ class TestSolveAroundCompleted:
         assert len(assignments) == 3
         assert assignments[0] == frozen[0]
 
+    def test_absence_on_an_incomplete_session_is_carried_into_the_rebuild(self):
+        people = _people(9)
+        frozen = [
+            _frozen_session_one(
+                {0: ["P0", "P1", "P2"], 1: ["P3", "P4", "P5"], 2: ["P6", "P7", "P8"]}
+            )
+        ]
+        absence_map = {3: [{"name": "P0"}]}
+        assignments, _ = solve_around_completed_sessions(
+            participants=people,
+            num_tables=3,
+            num_sessions=4,
+            completed_through=1,
+            frozen_sessions=frozen,
+            absence_map=absence_map,
+            max_time_seconds=5,
+        )
+        s3 = next(s for s in assignments if s["session"] == 3)
+        s3_seated = {
+            seat["name"] for _, seats in s3["tables"].items() for seat in seats
+        }
+        assert "P0" not in s3_seated
+        assert s3.get("absentParticipants") == [{"name": "P0"}]
+
     def test_infeasible_remainder_raises_solvefailed(self):
         # A couple with only one table to sit at: couples separation is a hard
         # constraint, so the remainder solve is unsatisfiable. (The plan's

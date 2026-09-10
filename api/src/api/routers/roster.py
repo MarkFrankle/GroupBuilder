@@ -19,6 +19,7 @@ from api.services.session_completion_storage import (
     get_session_completion_storage,
 )
 from api.services.session_completion_guards import (
+    not_accepted_refusal,
     refuse_if_below_completed_prefix,
 )
 from api.services.keep_apart_storage import (
@@ -205,13 +206,7 @@ async def generate_from_roster(
     )
 
     if current_set is not None and current_set.get("accepted", True) is False:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "The last rebuild hasn't been confirmed yet. "
-                "Accept or undo it on the assignments page first."
-            ),
-        )
+        raise HTTPException(status_code=409, detail=not_accepted_refusal())
 
     # A rename-only change propagates and returns without solving. Skipping the
     # rebuild without propagating would leave the old spelling on the
@@ -297,6 +292,23 @@ async def generate_from_roster(
                 for s in (head or {}).get("assignments", [])
                 if int(s["session"]) <= completed_through
             ]
+            # A short list means we could not read every completed session -
+            # carrying it forward would silently save the wrong session count.
+            if len(frozen_sessions) != completed_through:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Couldn't read the completed sessions to carry them "
+                        "forward. Please try again."
+                    ),
+                )
+            # A rename made in the same edit as a structural change never hits
+            # the fast path, so propagate it into the frozen copy here: the
+            # seed resolves by new name, and the frozen/resolved boundary stays
+            # one spelling. ``diff`` exists only when a current set does, which
+            # a nonzero ``completed_through`` implies - guarded anyway.
+            if current_set is not None and diff.renames:
+                frozen_sessions, _ = apply_renames(frozen_sessions, [], diff.renames)
             assignments, metadata = solve_around_completed_sessions(
                 participants=participant_list,
                 num_tables=data.num_tables,

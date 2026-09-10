@@ -458,6 +458,103 @@ class TestGenerateCarriesCompletedSessionsForward:
         after = client.get("/api/assignments/results?program_id=test_org_id").json()
         session_one_after = next(s for s in after if s["session"] == 1)
         assert session_one_after["tables"] == session_one_before["tables"]
+        assert session_one_after.get("absentParticipants") == session_one_before.get(
+            "absentParticipants"
+        )
+
+    def test_a_rename_alongside_a_removal_propagates_into_the_frozen_session(
+        self, client
+    ):
+        self._seed_program(client)
+        client.post("/api/assignments/completion/1?program_id=test_org_id")
+        client.put(
+            "/api/roster/p0?program_id=test_org_id",
+            json={
+                "name": "P0renamed",
+                "religion": "Christian",
+                "gender": "Male",
+                "partner_id": None,
+            },
+        )
+        client.delete("/api/roster/p8?program_id=test_org_id")
+        r = client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 3, "num_sessions": 4},
+        )
+        assert r.status_code == 200, r.json()
+        after = client.get("/api/assignments/results?program_id=test_org_id").json()
+        session_one = next(s for s in after if s["session"] == 1)
+        names = {
+            seat["name"] for _, seats in session_one["tables"].items() for seat in seats
+        }
+        assert "P0renamed" in names
+        assert "P0" not in names
+
+    def test_a_participant_added_after_completion_appears_only_in_resolved_sessions(
+        self, client
+    ):
+        self._seed_program(client)
+        client.post("/api/assignments/completion/1?program_id=test_org_id")
+        client.put(
+            "/api/roster/p9?program_id=test_org_id",
+            json={
+                "name": "P9new",
+                "religion": "Jewish",
+                "gender": "Female",
+                "partner_id": None,
+            },
+        )
+        r = client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 3, "num_sessions": 4},
+        )
+        assert r.status_code == 200, r.json()
+        after = client.get("/api/assignments/results?program_id=test_org_id").json()
+        s1 = next(s for s in after if s["session"] == 1)
+        s1_names = {seat["name"] for _, seats in s1["tables"].items() for seat in seats}
+        assert "P9new" not in s1_names
+        later_names = {
+            seat["name"]
+            for s in after
+            if s["session"] > 1
+            for _, seats in s["tables"].items()
+            for seat in seats
+        }
+        assert "P9new" in later_names
+
+    def test_infeasible_rebuild_leaves_the_old_plan_current(self, client):
+        first = self._seed_program(client)
+        client.post("/api/assignments/completion/1?program_id=test_org_id")
+        # Link P0 and P1 as a couple, then demand a single table: couples
+        # separation is a hard constraint, so the remainder solve is infeasible.
+        client.put(
+            "/api/roster/p0?program_id=test_org_id",
+            json={
+                "name": "P0",
+                "religion": "Christian",
+                "gender": "Male",
+                "partner_id": "p1",
+            },
+        )
+        client.put(
+            "/api/roster/p1?program_id=test_org_id",
+            json={
+                "name": "P1",
+                "religion": "Jewish",
+                "gender": "Female",
+                "partner_id": "p0",
+            },
+        )
+        r = client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 1, "num_sessions": 4},
+        )
+        assert r.status_code == 400, r.json()
+        from api.services.assignment_set_storage import AssignmentSetStorage
+
+        assert AssignmentSetStorage().get_current_set_id("test_org_id") == first
+        meta = client.get("/api/assignments/metadata?program_id=test_org_id").json()
+        assert meta["accepted"] is not False
 
     def test_the_rebuilt_set_is_provisional(self, client):
         self._seed_program(client)
