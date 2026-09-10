@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { authenticatedFetch } from '@/utils/apiClient'
 import type { ResultVersion } from '@/types/assignments'
 
@@ -79,5 +79,41 @@ export function useSessionCompletion(programId: string | null) {
       return data.completed_through ?? 0
     },
     enabled: !!programId,
+  })
+}
+
+export function useAcceptRebuild(programId: string | null) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const res = await authenticatedFetch(
+        `/api/assignments/accept?program_id=${programId}`,
+        { method: 'POST' }
+      )
+      if (!res.ok) throw new Error((await res.json()).detail || 'Failed to accept')
+      return res.json()
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['assignment-set-metadata', programId] })
+    },
+  })
+}
+
+export function useUndoRebuild(programId: string | null) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const res = await authenticatedFetch(
+        `/api/assignments/undo-rebuild?program_id=${programId}`,
+        { method: 'POST' }
+      )
+      if (!res.ok) throw new Error((await res.json()).detail || 'Failed to undo')
+      return res.json()
+    },
+    onSuccess: () => {
+      ;['assignment-set-metadata', 'versions', 'results', 'completion', 'canonical-roster'].forEach(
+        (k) => qc.invalidateQueries({ queryKey: [k, programId] })
+      )
+    },
   })
 }
