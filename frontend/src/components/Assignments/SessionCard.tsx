@@ -21,7 +21,7 @@ import Chip from './Chip'
 import TableBlock from './TableBlock'
 import { tablesWithOpenSeat } from '@/utils/assignmentEdits'
 import { personCount, seatedCount, tableNumbers } from '@/utils/assignmentStats'
-import type { Assignment, Participant } from '@/types/assignments'
+import type { Assignment, AttributeFocus, Participant } from '@/types/assignments'
 
 interface SessionCardProps {
   assignment: Assignment
@@ -38,6 +38,8 @@ interface SessionCardProps {
   /** Pass-throughs to TableBlock. */
   selectedName: string | null
   onSelect: (name: string) => void
+  /** What the chiclets are coloured about. Program-scoped, from the page's view switch. */
+  focus?: AttributeFocus
   /**
    * Required, and passed by the page to completed cards too: the card already
    * gates the button on `actionable`, so the suppression lives in one place and
@@ -60,6 +62,7 @@ const SessionCard: React.FC<SessionCardProps> = ({
   onReopen,
   selectedName,
   onSelect,
+  focus = 'religion',
   onMarkAbsent,
   onMarkPresent,
 }) => {
@@ -181,6 +184,7 @@ const SessionCard: React.FC<SessionCardProps> = ({
             participants={assignment.tables[n]}
             selectedName={selectedName}
             onSelect={onSelect}
+            focus={focus}
             onMarkAbsent={actionable ? onMarkAbsent : undefined}
           />
         ))}
@@ -193,6 +197,7 @@ const SessionCard: React.FC<SessionCardProps> = ({
                 participant={person}
                 selectedName={selectedName}
                 onSelect={onSelect}
+                focus={focus}
               />
             ))}
             {actionable && absentSelected && (

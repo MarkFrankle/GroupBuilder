@@ -82,4 +82,64 @@ describe('Chip', () => {
     expect(chip).not.toHaveClass('opacity-50')
     expect(chip).toHaveAttribute('aria-pressed', 'true')
   })
+
+  describe('attribute focus', () => {
+    it('colours by gender under gender focus', () => {
+      render(<Chip participant={alice} selectedName={null} onSelect={jest.fn()} focus="gender" />)
+      expect(screen.getByRole('button', { name: /Alice/ })).toHaveStyle({
+        backgroundColor: '#F3E1F0',
+      })
+    })
+
+    it('gives both partners the same colour under couples focus', () => {
+      const { rerender } = render(
+        <Chip
+          participant={{ ...alice, partner: 'Bob' }}
+          selectedName={null}
+          onSelect={jest.fn()}
+          focus="couples"
+        />
+      )
+      const aliceBg = screen.getByRole('button', { name: /Alice/ }).style.backgroundColor
+      rerender(
+        <Chip
+          participant={{ name: 'Bob', religion: 'Jewish', gender: 'Male', partner: 'Alice' }}
+          selectedName={null}
+          onSelect={jest.fn()}
+          focus="couples"
+        />
+      )
+      expect(screen.getByRole('button', { name: /Bob/ }).style.backgroundColor).toBe(aliceBg)
+    })
+
+    it('names the partner in the title only for a partnered chip under couples focus', () => {
+      const { rerender } = render(
+        <Chip
+          participant={{ ...alice, partner: 'Bob' }}
+          selectedName={null}
+          onSelect={jest.fn()}
+          focus="couples"
+        />
+      )
+      expect(screen.getByRole('button', { name: /Alice/ })).toHaveAttribute(
+        'title',
+        'Alice · partner of Bob'
+      )
+
+      rerender(<Chip participant={alice} selectedName={null} onSelect={jest.fn()} focus="couples" />)
+      expect(screen.getByRole('button', { name: /Alice/ })).toHaveAttribute('title', 'Alice')
+    })
+
+    it('keeps the facilitator ring across focuses', () => {
+      render(
+        <Chip
+          participant={{ ...alice, is_facilitator: true }}
+          selectedName={null}
+          onSelect={jest.fn()}
+          focus="gender"
+        />
+      )
+      expect(screen.getByRole('button', { name: /Alice/ })).toHaveClass('ring-amber-400')
+    })
+  })
 })
