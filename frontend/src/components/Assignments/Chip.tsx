@@ -14,6 +14,8 @@ interface ChipProps {
    * `selectedName`. Defaults to religion so the many leaf call sites need not pass it.
    */
   focus?: AttributeFocus
+  /** Item 11 compact zoom — styling implemented in a later task. */
+  compact?: boolean
 }
 
 const Chip: React.FC<ChipProps> = ({ participant, selectedName, onSelect, focus = 'religion' }) => {

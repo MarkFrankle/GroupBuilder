@@ -19,6 +19,8 @@ interface TableBlockProps {
    * Mark complete are suppressed.
    */
   onMarkAbsent?: (name: string) => void
+  /** Item 11 compact zoom — styling implemented in a later task. */
+  compact?: boolean
 }
 
 /** "6 people · 4F/2M · 3 religions" — the mock's per-table line. */

@@ -118,6 +118,50 @@ describe('SessionCard — a completed session', () => {
   })
 })
 
+describe('SessionCard — compact', () => {
+  const renderCard = (props: Partial<React.ComponentProps<typeof SessionCard>> = {}) =>
+    render(
+      <SessionCard
+        assignment={assignment}
+        selectedName={null}
+        onSelect={jest.fn()}
+        onShuffle={jest.fn()}
+        onPrint={jest.fn()}
+        onMarkComplete={jest.fn()}
+        onMarkAbsent={jest.fn()}
+        onMarkPresent={jest.fn()}
+        {...props}
+      />
+    )
+
+  it('renders the session name but not the header actions', () => {
+    renderCard({ compact: true })
+    expect(screen.getByRole('heading', { name: /Session \d+/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Shuffle/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Mark complete/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Print$/ })).not.toBeInTheDocument()
+  })
+
+  it('still lets a chip be clicked to select', () => {
+    const onSelect = jest.fn()
+    renderCard({ compact: true, onSelect })
+    fireEvent.click(screen.getByRole('button', { name: 'Ben' }))
+    expect(onSelect).toHaveBeenCalledWith('Ben')
+  })
+
+  it('does not offer Mark absent even when the selected person sits here', () => {
+    renderCard({ compact: true, selectedName: 'Ben' })
+    expect(screen.queryByRole('button', { name: /Mark .* absent/ })).not.toBeInTheDocument()
+  })
+
+  it('shows a completed session inline with no collapse toggle', () => {
+    renderCard({ compact: true, completed: true })
+    expect(screen.getByRole('heading', { name: /Session \d+/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Expand session/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Collapse session/ })).not.toBeInTheDocument()
+  })
+})
+
 describe('SessionCard — the absent row', () => {
   // Radix scrolls the focused menu item into view on open, and jsdom has no
   // implementation of it.

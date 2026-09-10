@@ -110,6 +110,48 @@ const SessionCard: React.FC<SessionCardProps> = ({
     </Button>
   )
 
+  if (compact) {
+    const absentPeople = assignment.absentParticipants ?? []
+    return (
+      <section
+        aria-label={`Session ${assignment.session}`}
+        className="w-[19rem] shrink-0 overflow-hidden rounded-lg border border-black bg-white"
+      >
+        <div className="border-b border-black bg-[#f3f4f6] px-3 py-2">
+          <h3 className="text-sm font-semibold">Session {assignment.session}</h3>
+        </div>
+        <div className="flex flex-col gap-2.5 p-3">
+          {tableNumbers(assignment).map(n => (
+            <TableBlock
+              key={n}
+              tableNumber={n}
+              participants={assignment.tables[n]}
+              selectedName={selectedName}
+              onSelect={onSelect}
+              focus={focus}
+              compact
+            />
+          ))}
+          {absentPeople.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1 border-t pt-2">
+              <span className="text-[11px] text-muted-foreground">Absent:</span>
+              {absentPeople.map((person: Participant) => (
+                <Chip
+                  key={person.name}
+                  participant={person}
+                  selectedName={selectedName}
+                  onSelect={onSelect}
+                  focus={focus}
+                  compact
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+    )
+  }
+
   if (completed && !expanded) {
     return (
       <section
