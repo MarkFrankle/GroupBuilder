@@ -7,7 +7,7 @@ import { useIsAdmin } from "./hooks/queries"
 import { ProgramProvider, useProgram } from "./contexts/ProgramContext"
 import LoginPage from "./pages/LoginPage"
 import AuthVerifyPage from "./pages/AuthVerifyPage"
-import LandingPage from "./pages/LandingPage"
+import RootDispatch from "./pages/RootDispatch"
 import HomePage from "./pages/HomePage"
 import AssignmentsPage from "./pages/AssignmentsPage"
 import SeatingChartPage from "./pages/SeatingChartPage"
@@ -119,7 +119,7 @@ const App: React.FC = () => {
                 path="/"
                 element={
                   <ProtectedRoute>
-                    <LandingPage />
+                    <RootDispatch />
                   </ProtectedRoute>
                 }
               />
