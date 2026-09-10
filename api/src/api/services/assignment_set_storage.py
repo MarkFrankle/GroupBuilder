@@ -92,6 +92,24 @@ class AssignmentSetStorage:
             {"current_assignment_set_id": set_id}, merge=True
         )
 
+    def accept_set(self, program_id: str, set_id: str) -> None:
+        """Confirm a provisional set. Idempotent."""
+        self._set_ref(program_id, set_id).set({"accepted": True}, merge=True)
+
+    def revert_to_previous_set(self, program_id: str, set_id: str) -> str:
+        """Repoint the program at ``set_id``'s predecessor. Returns that id.
+
+        The abandoned set is left in Firestore, unreachable - consistent with
+        every rebuild, which already orphans the prior set. Raises if there is
+        no predecessor to fall back to.
+        """
+        doc = self.get_set(program_id, set_id) or {}
+        previous_set_id = doc.get("previous_set_id")
+        if not previous_set_id:
+            raise ValueError("This set has no previous set to revert to.")
+        self.set_current_set_id(program_id, previous_set_id)
+        return previous_set_id
+
     def get_current_set_id(self, program_id: str) -> Optional[str]:
         """Return the program's current assignment set id, or None."""
         doc = self._program_ref(program_id).get()
