@@ -5,6 +5,7 @@ import {
   uniqueTablematesAverage,
   linkedPairCount,
   seatedCount,
+  personTrackingSummary,
 } from '../assignmentStats'
 import type { Assignment, Participant } from '@/types/assignments'
 
@@ -114,6 +115,58 @@ describe('personCount', () => {
     expect(personCount(1)).toBe('1 person')
     expect(personCount(2)).toBe('2 people')
     expect(personCount(0)).toBe('0 people')
+  })
+})
+
+describe('personTrackingSummary', () => {
+  const plane: Assignment[] = [
+    { session: 1, tables: { 1: [p('A'), p('B'), p('C')], 2: [p('D'), p('E'), p('F')], 3: [p('G'), p('H'), p('I')] } },
+    { session: 2, tables: { 1: [p('A'), p('D'), p('G')], 2: [p('B'), p('E'), p('H')], 3: [p('C'), p('F'), p('I')] } },
+    { session: 3, tables: { 1: [p('A'), p('E'), p('I')], 2: [p('B'), p('F'), p('G')], 3: [p('C'), p('D'), p('H')] } },
+    { session: 4, tables: { 1: [p('A'), p('F'), p('H')], 2: [p('B'), p('D'), p('I')], 3: [p('C'), p('E'), p('G')] } },
+  ]
+
+  it('reports no repeats when every pair meets once', () => {
+    expect(personTrackingSummary('A', plane)).toContain('A · never sits with the same person twice')
+  })
+
+  it('reports full coverage', () => {
+    expect(personTrackingSummary('A', plane)).toContain('sits with 8 of the other 8 participants')
+  })
+
+  it('counts repeat partners when a pair meets more than once', () => {
+    const withRepeat: Assignment[] = [
+      plane[0],
+      { session: 2, tables: { 1: [p('A'), p('D'), p('E')], 2: [p('B'), p('H'), p('G')], 3: [p('C'), p('F'), p('I')] } },
+      plane[2],
+      plane[3],
+    ]
+    expect(personTrackingSummary('A', withRepeat)).toContain('meets 1 person more than once')
+  })
+
+  it('names the worst pair only when someone is met 3+ times', () => {
+    const thrice: Assignment[] = [
+      { session: 1, tables: { 1: [p('A'), p('B'), p('C')], 2: [p('D'), p('E'), p('F')] } },
+      { session: 2, tables: { 1: [p('A'), p('B'), p('C')], 2: [p('D'), p('E'), p('F')] } },
+      { session: 3, tables: { 1: [p('A'), p('B'), p('C')], 2: [p('D'), p('E'), p('F')] } },
+    ]
+    expect(personTrackingSummary('A', thrice)).toContain('meets 2 people more than once, two of them 3 times')
+  })
+
+  it('handles participants whose names contain spaces', () => {
+    const spaced: Assignment[] = [
+      { session: 1, tables: { 1: [p('Kathy Veit'), p('Bob Smith')], 2: [p('Al Green'), p('Di Ross')] } },
+      { session: 2, tables: { 1: [p('Kathy Veit'), p('Bob Smith')], 2: [p('Al Green'), p('Di Ross')] } },
+    ]
+    expect(personTrackingSummary('Kathy Veit', spaced)).toBe('Kathy Veit · meets 1 person more than once · sits with 1 of the other 3 participants')
+  })
+
+  it('does not add the worst-pair clause when the max is only 2', () => {
+    const twice: Assignment[] = [
+      { session: 1, tables: { 1: [p('A'), p('B')], 2: [p('C'), p('D')] } },
+      { session: 2, tables: { 1: [p('A'), p('B')], 2: [p('C'), p('D')] } },
+    ]
+    expect(personTrackingSummary('A', twice)).toBe('A · meets 1 person more than once · sits with 1 of the other 3 participants')
   })
 })
 

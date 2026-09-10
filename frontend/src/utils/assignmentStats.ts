@@ -62,7 +62,7 @@ function pairCounts(assignments: Assignment[]): Map<string, number> {
         .map(p => p.name)
       for (let i = 0; i < names.length; i += 1) {
         for (let j = i + 1; j < names.length; j += 1) {
-          const key = [names[i], names[j]].sort().join(' ')
+          const key = [names[i], names[j]].sort().join('\x00')
           counts.set(key, (counts.get(key) ?? 0) + 1)
         }
       }
@@ -151,6 +151,59 @@ export function uniqueTablematesAverage(assignments: Assignment[]): number {
     total += seen.size
   })
   return Math.round((total / met.size) * 10) / 10
+}
+
+/**
+ * Item 11's person-tracking line, shown above the sessions when a person is
+ * selected. Framed repeats-first, coverage-second: repeats is the number that
+ * makes a coordinator reach for shuffle, so it leads. This is the one place the
+ * product speaks about quality rather than contradictions — see the redesign
+ * notes, "Person tracking".
+ *
+ * "Kathy Veit · meets 5 people more than once, one of them 3 times · sits with
+ * 19 of the other 23 participants"
+ */
+export function personTrackingSummary(name: string, assignments: Assignment[]): string {
+  const everyone = new Set<string>()
+  assignments.forEach(a => {
+    tableNumbers(a).forEach(n => {
+      a.tables[n].forEach(person => {
+        if (person && person.name !== name) everyone.add(person.name)
+      })
+    })
+  })
+
+  const meetings: number[] = []
+  let distinctMet = 0
+  pairCounts(assignments).forEach((count, key) => {
+    const [a, b] = key.split('\x00')
+    if (a !== name && b !== name) return
+    distinctMet += 1
+    meetings.push(count)
+  })
+
+  const repeats = meetings.filter(c => c > 1)
+  const maxMeetings = meetings.length > 0 ? Math.max(...meetings) : 0
+  const atMax = meetings.filter(c => c === maxMeetings).length
+
+  const totalOthers = everyone.size
+  const coverage = `sits with ${distinctMet} of the other ${totalOthers} ${
+    totalOthers === 1 ? 'participant' : 'participants'
+  }`
+
+  if (repeats.length === 0) {
+    return `${name} · never sits with the same person twice · ${coverage}`
+  }
+
+  let repeatClause = `meets ${repeats.length} ${
+    repeats.length === 1 ? 'person' : 'people'
+  } more than once`
+  if (maxMeetings >= 3) {
+    const word = atMax === 1 ? 'one' : atMax === 2 ? 'two' : String(atMax)
+    repeatClause += `, ${word} of them ${maxMeetings} times`
+  }
+
+  return `${name} · ${repeatClause} · ${coverage}`
 }
 
 /** Distinct linked partnerships in the roster, counted once each. */
