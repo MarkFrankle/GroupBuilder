@@ -56,8 +56,10 @@ describe('RosterGrid', () => {
   test('calls onUpdate when name is changed and blurred', async () => {
     render(<RosterGrid {...defaultProps} />);
     const nameInput = screen.getByDisplayValue('Alice');
-    await userEvent.clear(nameInput);
-    await userEvent.type(nameInput, 'Alicia');
+    // One change event, not six keystrokes: the input's onChange reads
+    // e.target.value wholesale, so typing character by character exercises
+    // nothing extra and user-event v13 spends seconds on it.
+    fireEvent.change(nameInput, { target: { value: 'Alicia' } });
     fireEvent.blur(nameInput);
     expect(defaultProps.onUpdate).toHaveBeenCalledWith('p1', expect.objectContaining({
       name: 'Alicia',
@@ -68,8 +70,12 @@ describe('RosterGrid', () => {
     render(<RosterGrid {...defaultProps} />);
     const emptyNameInputs = screen.getAllByPlaceholderText('Name');
     const emptyRow = emptyNameInputs[2];
-    await userEvent.type(emptyRow, 'Charlie');
-    // Click outside the row to trigger blur → deferred commit
+    // Focus first: the commit hangs off the *row's* onBlur, which checks
+    // document.activeElement, so the input has to genuinely hold focus and then
+    // lose it. One change event replaces seven keystrokes; the click stays
+    // because it is what actually moves focus out of the row.
+    emptyRow.focus();
+    fireEvent.change(emptyRow, { target: { value: 'Charlie' } });
     await userEvent.click(document.body);
     // Flush the deferred setTimeout(0) handler
     await act(async () => { await new Promise(r => setTimeout(r, 10)); });

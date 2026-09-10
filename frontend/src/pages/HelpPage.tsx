@@ -387,6 +387,32 @@ function HelpPage() {
             arrangement back through History.
           </p>
 
+          <h3 className="text-xl font-semibold mt-8 mb-2">
+            Someone didn't come
+          </h3>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            Click a person's name anywhere on the page and they light up in every
+            session, so you can see where they sit all series. While they are lit up,
+            a <strong>Mark [name] absent</strong> button appears above their table.
+            Press it and they move to the Absent list under that session.
+          </p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            Their chair is left empty rather than filled in — the app will not reshuffle
+            the table behind your back. Only that one session changes, and the line at
+            the top says so, with an <strong>Undo</strong> if you clicked the wrong
+            person. Click anywhere else, or press Escape, to stop highlighting someone.
+          </p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            If they turn up after all — or you marked the wrong person — click their
+            name in the <strong>Absent</strong> list and press{" "}
+            <strong>Mark present</strong>. You will be asked which table to seat them
+            at. The app suggests the empty chair their absence left, but it asks rather
+            than deciding, because it cannot know where they actually sat. Filing
+            someone at the wrong table is not a cosmetic mistake: later sessions are
+            mixed to avoid repeating tablemates, so a wrong table means the app spends
+            the rest of the series keeping them away from people they never met.
+          </p>
+
           <h3 className="text-xl font-semibold mt-8 mb-2">Earlier versions</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Every change is saved as a new version, and nothing is overwritten. Press{" "}

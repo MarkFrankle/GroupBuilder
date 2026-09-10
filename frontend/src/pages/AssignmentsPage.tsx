@@ -17,8 +17,10 @@ import {
   linkedPairCount,
   seatedCount,
   shuffleReceipt,
+  tableNumbers,
   uniqueTablematesAverage,
 } from '@/utils/assignmentStats'
+import { markAbsent, markPresent } from '@/utils/assignmentEdits'
 import {
   resultsQueryKey,
   useAssignmentResults,
@@ -99,6 +101,12 @@ const AssignmentsPage: React.FC = () => {
   const [viewing, setViewing] = useState<ResultVersion | null>(null)
   const readOnly = viewing !== null
 
+  // Selection is cross-session by design — that is the trust demo, watching one
+  // person move every week — so it lives here rather than in a session card.
+  const [selectedName, setSelectedName] = useState<string | null>(null)
+  const toggleSelected = (name: string) =>
+    setSelectedName(current => (current === name ? null : name))
+
   const { data: metadata } = useAssignmentSetMetadata(programId)
   const { data: fetchedAssignments, isLoading } = useAssignmentResults(
     programId,
@@ -123,6 +131,13 @@ const AssignmentsPage: React.FC = () => {
   // The version that was current when Shuffle was pressed — captured up front,
   // because undo must not depend on an invalidated version list having
   // resettled, nor on no other tab having written in between.
+  //
+  // Shared with editMutation, which writes it too: an edit landing while a
+  // shuffle is still in flight would overwrite the shuffle's undo target, and
+  // its Undo would then rewind to the wrong version. Left as one ref knowingly
+  // — both mutations take about a second and the UI gives no way to start the
+  // second before the first has settled. Split it per mutation if a path ever
+  // appears that can.
   const undoTarget = useRef<ResultVersion | null>(null)
 
   // Held so a shuffle can be diffed against what was on screen before it ran.
@@ -166,6 +181,24 @@ const AssignmentsPage: React.FC = () => {
     // Fires once per program load; the flag stops it from returning.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid, sorted.length])
+
+  // Three dismissals, deliberately over-provided: the chip again, any non-chip
+  // click, and Escape. A user who has just dimmed the whole page needs an
+  // obvious way back, and any one of these is the one someone will not try.
+  useEffect(() => {
+    if (selectedName === null) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      // Radix does not stop Escape propagating out of an open menu, so without
+      // this one keystroke both backs out of the table picker and clears the
+      // selection the picker is gated on — the user loses their place instead of
+      // reconsidering a table. Inside a menu, Escape belongs to the menu.
+      if ((event.target as HTMLElement | null)?.closest?.('[role="menu"]')) return
+      setSelectedName(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [selectedName])
 
   const invalidateAll = () => {
     // A prefix, deliberately not resultsQueryKey: this must match every
@@ -262,6 +295,105 @@ const AssignmentsPage: React.FC = () => {
       showNotice({ tone: 'error', message: error.message })
     },
   })
+
+  /**
+   * A manual edit is a version write, so undo is "promote the previous version"
+   * with no new machinery — unlike completion, which is not a version write and
+   * is why its own undo is still an open question.
+   */
+  const editMutation = useMutation({
+    mutationFn: async ({
+      assignments: edited,
+      label,
+    }: {
+      assignments: Assignment[]
+      label: string
+      receipt: string
+    }) => {
+      undoTarget.current = versions[0]?.promotable ? versions[0] : null
+      const response = await authenticatedFetch(
+        `/api/assignments/results/save?program_id=${programId}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assignments: edited, label }),
+        }
+      )
+      if (!response.ok) {
+        throw new Error(
+          await refusalDetail(response, 'Could not save this change. Please try again.')
+        )
+      }
+      return response.json()
+    },
+    onSuccess: (_data, { receipt }) => {
+      invalidateAll()
+      setSelectedName(null)
+      const target = undoTarget.current
+      showNotice({
+        tone: 'info',
+        message: receipt,
+        // The control that was just pressed is gone — Mark absent unmounts with
+        // the selection, and choosing a table unmounts the whole picker — so
+        // focus has nowhere to fall back to. The receipt takes it, which is also
+        // where the Undo is.
+        focusOnAppear: true,
+        actions: target
+          ? [{ label: 'Undo', onClick: () => promoteMutation.mutate({ version: target }) }]
+          : undefined,
+      })
+    },
+    onError: (error: Error) => showNotice({ tone: 'error', message: error.message }),
+  })
+
+  /**
+   * "other sessions unchanged" is the trust clause, and the reason the banner
+   * exists. It is truthful here by construction: the edit touches one session's
+   * array and nothing else.
+   *
+   * The receipt is computed here, before the mutation, because the counts it
+   * states are about the array being sent — waiting for a refetch would let the
+   * sentence and the plan disagree.
+   */
+  const handleMarkAbsent = (sessionNumber: number, name: string) => {
+    const before = sorted.find(a => a.session === sessionNumber)
+    const edited = markAbsent(sorted, sessionNumber, name)
+    const session = edited.find(a => a.session === sessionNumber)
+    if (!before || !session) return
+
+    const table = tableNumbers(before).find(n =>
+      before.tables[n].some(seat => seat?.name === name)
+    )
+    if (table === undefined) return
+    const seats = session.tables[table].filter(Boolean).length
+
+    editMutation.mutate({
+      assignments: edited,
+      label: `${name} marked absent from Session ${sessionNumber}`,
+      receipt:
+        `${name} marked absent from Session ${sessionNumber} · ` +
+        `Table ${table} now seats ${seats} · other sessions unchanged.`,
+    })
+  }
+
+  /**
+   * The table comes from the user, never from the app: filing a corrected
+   * attendance at the wrong table teaches the solver a history that did not
+   * happen. See the picker in SessionCard for why nothing is auto-placed.
+   */
+  const handleMarkPresent = (
+    sessionNumber: number,
+    name: string,
+    tableNumber: number
+  ) => {
+    editMutation.mutate({
+      assignments: markPresent(sorted, sessionNumber, name, tableNumber),
+      label: `${name} marked present in Session ${sessionNumber}`,
+      receipt:
+        `${name} marked present in Session ${sessionNumber} · ` +
+        `seated at Table ${tableNumber} · other sessions unchanged.`,
+    })
+  }
 
   /**
    * Promotion is not a rewind: the server writes the old content as a new
@@ -494,7 +626,24 @@ const AssignmentsPage: React.FC = () => {
   )
 
   return (
-    <div className="flex flex-col pb-10">
+    <div className="flex flex-col pb-10" onClick={() => setSelectedName(null)}>
+      {/*
+        Selecting a person dims 100+ chips across every session, and that has no
+        non-visual equivalent — a chip cannot announce it, because a chip does
+        not know the others dimmed. It belongs to the page that owns the state.
+        Rendered empty rather than unmounted: a region that unmounts stops being
+        announced on the next selection in some screen readers.
+      */}
+      <div
+        role="status"
+        aria-live="polite"
+        // NoticeStrip's container is a role="status" region too, and it is now
+        // always mounted, so the two are told apart by this rather than by role.
+        data-testid="selection-announcement"
+        className="sr-only"
+      >
+        {selectedName ? `${selectedName} selected — showing them across all sessions.` : ''}
+      </div>
       <ProgramHeader
         programName={currentProgram?.name ?? 'Assignments'}
         facts={{
@@ -519,6 +668,8 @@ const AssignmentsPage: React.FC = () => {
               assignment={assignment}
               readOnly={readOnly}
               isShuffling={shufflingSession === assignment.session}
+              selectedName={selectedName}
+              onSelect={toggleSelected}
               onShuffle={() => shuffleMutation.mutate(assignment.session)}
               onPrint={() => handlePrintSession(assignment.session)}
               onMarkComplete={() =>
@@ -526,6 +677,10 @@ const AssignmentsPage: React.FC = () => {
                   sessionNumber: assignment.session,
                   method: 'POST',
                 })
+              }
+              onMarkAbsent={(name: string) => handleMarkAbsent(assignment.session, name)}
+              onMarkPresent={(name: string, tableNumber: number) =>
+                handleMarkPresent(assignment.session, name, tableNumber)
               }
             />
           </div>
@@ -550,7 +705,13 @@ const AssignmentsPage: React.FC = () => {
                 assignment={assignment}
                 completed
                 readOnly={readOnly}
+                selectedName={selectedName}
+                onSelect={toggleSelected}
                 onPrint={() => handlePrintSession(assignment.session)}
+                onMarkAbsent={(name: string) => handleMarkAbsent(assignment.session, name)}
+                onMarkPresent={(name: string, tableNumber: number) =>
+                  handleMarkPresent(assignment.session, name, tableNumber)
+                }
                 onReopen={
                   assignment.session === completedThrough
                     ? () =>

@@ -47,6 +47,10 @@ ASSIGNMENTS_MALFORMED = (
 LABEL_REBUILT = "Sessions rebuilt"
 LABEL_MANUAL_EDIT = "Manual edit"
 
+# A caller-supplied label is truncated to this, never rejected: the frontend
+# writes these strings, so a cap a user cannot trip needs no error message.
+LABEL_MAX_LENGTH = 200
+
 
 def _require_current_set_id(storage: AssignmentSetStorage, program_id: str) -> str:
     """Resolve the program's current assignment set, or 404."""
@@ -819,11 +823,21 @@ async def save_edited_assignments(
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
     completion: SessionCompletionStorage = Depends(get_session_completion_storage),
 ):
-    """Save manually edited assignments as a new version."""
+    """Save manually edited assignments as a new version, named by the caller."""
     set_id = _require_current_set_id(storage, program_id)
 
     assignments = body.get("assignments")
     based_on_version = body.get("based_on_version")
+
+    # "label" is what History shows for this version, written by the caller
+    # because only it knows what the edit did. Like the labels above it names a
+    # completed action in the past tense, naming who and where:
+    # "Kathy Veit marked absent from Session 1", not "Mark absent". Anything
+    # blank or not a string falls back rather than leaving an empty History row.
+    label = body.get("label")
+    label = label[:LABEL_MAX_LENGTH].strip() if isinstance(label, str) else ""
+    if not label:
+        label = LABEL_MANUAL_EDIT
 
     if not assignments:
         raise HTTPException(status_code=400, detail="assignments is required")
@@ -842,7 +856,7 @@ async def save_edited_assignments(
         metadata = {
             "source": "manual_edit",
             "based_on": based_on_version,
-            "label": LABEL_MANUAL_EDIT,
+            "label": label,
         }
 
         storage.save_version(

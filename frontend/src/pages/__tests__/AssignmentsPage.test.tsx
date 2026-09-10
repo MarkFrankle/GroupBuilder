@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import AssignmentsPage from '../AssignmentsPage'
@@ -44,6 +44,24 @@ const assignments = [1, 2, 3].map(session => ({
   },
 }))
 
+/**
+ * The same three sessions, but with Cara absent from session 2 and the gap she
+ * left still open at table 2 — the fixture a mark-present needs. Sessions 1 and
+ * 3 are the shared objects, so the trust clause can be checked by identity.
+ */
+const withAbsence = [
+  assignments[0],
+  {
+    session: 2,
+    tables: {
+      1: [person('Ann'), person('Ben', 'Male')],
+      2: [null, person('Dan', 'Male')],
+    },
+    absentParticipants: [person('Cara')],
+  },
+  assignments[2],
+]
+
 const metadata = {
   created_at: 1740000000,
   num_participants: 4,
@@ -56,8 +74,12 @@ interface ApiState {
   completedThrough: number
   completionResponse?: { status: number; body: any }
   shuffled?: boolean
+  /** Serve the fixture where Cara is absent from session 2 with a gap open. */
+  absence?: boolean
   promoted?: string
   promoteResponse?: { status: number; body: any }
+  saved?: { assignments: any[]; label?: string }
+  saveResponse?: { status: number; body: any }
 }
 
 let api: ApiState
@@ -103,6 +125,23 @@ function mockApi() {
         ok: true,
         status: 200,
         json: () => Promise.resolve({ version_id: 'v2' }),
+      } as Response)
+    }
+
+    if (url.includes('/api/assignments/results/save')) {
+      api.saved = JSON.parse(options.body)
+      if (api.saveResponse) {
+        const { status, body } = api.saveResponse
+        return Promise.resolve({
+          ok: status < 400,
+          status,
+          json: () => Promise.resolve(body),
+        } as Response)
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ version_id: 'v3' }),
       } as Response)
     }
 
@@ -172,7 +211,9 @@ function mockApi() {
 
     if (url.includes('/api/assignments/results')) {
       // After a shuffle, session 2 comes back with Ann and Cara swapped.
-      const body = api.shuffled
+      const body = api.absence
+        ? withAbsence
+        : api.shuffled
         ? [
             assignments[0],
             {
@@ -585,5 +626,326 @@ describe('AssignmentsPage', () => {
     const unlabelled = await screen.findByRole('menuitem', { name: /Feb 19/ })
     expect(unlabelled).toHaveTextContent(/Feb 19/)
     expect(unlabelled).not.toHaveTextContent(/null/)
+  })
+
+  describe('selection', () => {
+    /** Every chip bearing this person's name, one per session. */
+    const chips = (name: string) => screen.getAllByRole('button', { name })
+
+    async function selectAnn() {
+      const anns = await screen.findAllByRole('button', { name: 'Ann' })
+      fireEvent.click(anns[0])
+      return anns
+    }
+
+    it('highlights the clicked person across every session', async () => {
+      renderPage()
+      await selectAnn()
+
+      chips('Ann').forEach(chip => expect(chip).not.toHaveClass('opacity-50'))
+      chips('Ben').forEach(chip => expect(chip).toHaveClass('opacity-50'))
+      chips('Cara').forEach(chip => expect(chip).toHaveClass('opacity-50'))
+    })
+
+    it('clears the selection when the chip is clicked again', async () => {
+      renderPage()
+      const anns = await selectAnn()
+      fireEvent.click(anns[0])
+
+      // With nobody selected, nothing dims.
+      chips('Ben').forEach(chip => expect(chip).not.toHaveClass('opacity-50'))
+    })
+
+    it('clears the selection on Escape', async () => {
+      renderPage()
+      await selectAnn()
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+
+      chips('Ben').forEach(chip => expect(chip).not.toHaveClass('opacity-50'))
+    })
+
+    it('clears the selection when anything that is not a chip is clicked', async () => {
+      renderPage()
+      await selectAnn()
+
+      fireEvent.click(screen.getAllByText('Table 1')[0])
+
+      chips('Ben').forEach(chip => expect(chip).not.toHaveClass('opacity-50'))
+    })
+
+    it('announces the selection for a screen reader', async () => {
+      renderPage()
+      const anns = await selectAnn()
+
+      // Scoped by test id, not by role: NoticeStrip's container is a
+      // role="status" region as well, and it is always mounted.
+      expect(screen.getByTestId('selection-announcement')).toHaveTextContent(
+        'Ann selected \u2014 showing them across all sessions.'
+      )
+
+      fireEvent.click(anns[0])
+
+      // Empty rather than gone: a region that unmounts stops announcing.
+      expect(screen.getByTestId('selection-announcement')).toHaveTextContent('')
+    })
+  })
+
+  describe('mark absent', () => {
+    /** Selects Ann, then presses Mark absent inside Session 1. */
+    async function markAnnAbsent() {
+      const anns = await screen.findAllByRole('button', { name: 'Ann' })
+      fireEvent.click(anns[0])
+      const session1 = screen.getByRole('region', { name: 'Session 1' })
+      fireEvent.click(
+        within(session1).getByRole('button', { name: /mark ann absent/i })
+      )
+    }
+
+    it('sends the whole program with one session edited, and a label', async () => {
+      renderPage()
+      await markAnnAbsent()
+
+      await waitFor(() => expect(api.saved).toBeDefined())
+      const body = api.saved!
+      expect(body.assignments).toHaveLength(3)
+      expect(body.assignments[0].tables[1]).toEqual([null, person('Ben', 'Male')])
+      expect(body.assignments[0].absentParticipants).toEqual([person('Ann')])
+      // The trust clause, checked rather than asserted in prose: session 2 goes
+      // back exactly as it came.
+      expect(body.assignments[1]).toEqual(assignments[1])
+      expect(body.assignments[2]).toEqual(assignments[2])
+      expect(body.label).toBe('Ann marked absent from Session 1')
+    })
+
+    it('reports the edit with its consequence and an undo', async () => {
+      renderPage()
+      await markAnnAbsent()
+
+      expect(
+        await screen.findByText(
+          'Ann marked absent from Session 1 \u00b7 Table 1 now seats 1 \u00b7 other sessions unchanged.'
+        )
+      ).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^undo$/i })).toBeInTheDocument()
+    })
+
+    it('moves focus to the receipt, so the Undo can be reached', async () => {
+      renderPage()
+      await markAnnAbsent()
+
+      const receipt = await screen.findByText(/^Ann marked absent from Session 1/)
+      // The button that was pressed unmounted with the selection, so focus would
+      // otherwise be on <body> with the Undo nowhere near it.
+      const strip = screen.getByTestId('notice-strip')
+      expect(strip).toContainElement(receipt)
+
+      // Awaited, because focus arrives one step behind the text: the receipt is
+      // in the DOM at commit, and the effect that moves focus runs after it.
+      // findByText can resolve on that commit while the effect is still pending,
+      // which is why a bare assertion here passes or fails with machine load.
+      await waitFor(() => expect(strip).toHaveFocus())
+
+      // And it has to still be there once everything the edit kicked off has
+      // settled: onSuccess invalidates every query, so refetches re-render the
+      // page around the strip a moment later. Awaiting arrival alone would go
+      // green even if that re-render stole focus back or replaced the node —
+      // this is the half that would catch it. `strip` is deliberately the node
+      // captured above, so a replacement fails rather than being re-found.
+      await act(async () => {
+        await new Promise(resolve => setTimeout(resolve, 50))
+      })
+      expect(strip).toHaveFocus()
+      expect(strip).toContainElement(screen.getByRole('button', { name: /^undo$/i }))
+    })
+
+    it('offers no Mark absent inside a completed session', async () => {
+      api.completedThrough = 1
+      api.absence = true
+      renderPage()
+
+      // Expanded first, and before anyone is selected: a collapsed completed
+      // card renders no tables at all, so asserting against one proves nothing —
+      // it passes with the card's gate removed. The chevron's click also reaches
+      // the page's click-outside dismissal, which would undo a selection made
+      // before it.
+      fireEvent.click(
+        await screen.findByRole('button', { name: /expand session 1/i })
+      )
+      const session1 = screen.getByRole('region', { name: 'Session 1' })
+      expect(within(session1).getByText('Table 1')).toBeInTheDocument()
+
+      // Ann is selected from a live session; selection is page-wide.
+      const session2 = screen.getByRole('region', { name: 'Session 2' })
+      fireEvent.click(within(session2).getByRole('button', { name: 'Ann' }))
+
+      // The page passes onMarkAbsent to completed cards too and leans entirely
+      // on the card's own `actionable` gate, so the "never change the past"
+      // guarantee is asserted here, at the layer that does the wiring.
+      expect(
+        within(session1).queryByRole('button', { name: /mark ann absent/i })
+      ).not.toBeInTheDocument()
+      expect(
+        within(session2).getByRole('button', { name: /mark ann absent/i })
+      ).toBeInTheDocument()
+    })
+
+    it('undoes by promoting the version that was current before the edit', async () => {
+      renderPage()
+      await markAnnAbsent()
+
+      fireEvent.click(await screen.findByRole('button', { name: /^undo$/i }))
+
+      await waitFor(() => expect(api.promoted).toContain('/promote/v2'))
+    })
+
+    it('surfaces the server\u2019s refusal rather than writing its own', async () => {
+      api.saveResponse = {
+        status: 409,
+        body: {
+          detail:
+            "Session 1 is complete and can't be changed. Reopen it first if you need to edit it.",
+        },
+      }
+      renderPage()
+      await markAnnAbsent()
+
+      expect(
+        await screen.findByText(/Reopen it first if you need to edit it/)
+      ).toBeInTheDocument()
+    })
+
+    it('marks absent the person who was selected, though the click clears the selection', async () => {
+      renderPage()
+      await markAnnAbsent()
+
+      // The button's click bubbles to the page's click-outside dismissal, so
+      // the selection is gone the moment it is pressed. React runs the button's
+      // own handler first, and the name travels as an argument from there, so
+      // neither the payload nor the receipt can be affected.
+      screen
+        .getAllByRole('button', { name: 'Ben' })
+        .forEach(chip => expect(chip).not.toHaveClass('opacity-50'))
+
+      await waitFor(() => expect(api.saved).toBeDefined())
+      expect(api.saved!.label).toBe('Ann marked absent from Session 1')
+      expect(api.saved!.assignments[0].tables[1]).toEqual([
+        null,
+        person('Ben', 'Male'),
+      ])
+      // Raised from onSuccess, long after the clear.
+      expect(
+        await screen.findByText(/^Ann marked absent from Session 1/)
+      ).toBeInTheDocument()
+    })
+  })
+  describe('mark present', () => {
+    /** Selects Cara, the absentee, inside session 2. */
+    async function selectCara() {
+      const caras = await screen.findAllByRole('button', { name: 'Cara' })
+      // Session 2's chip is the absent-row one; every session renders a Cara,
+      // and selection is page-wide, so any of them opens the picker.
+      fireEvent.click(caras[0])
+      return screen.getByRole('region', { name: 'Session 2' })
+    }
+
+    /**
+     * Drives the trigger the way a mouse does. Radix opens on pointerdown and
+     * lets the following click through, so keyboard activation — the project's
+     * usual Radix rake — cannot see a trigger whose click bubbles away the
+     * selection the picker is gated on.
+     */
+    function openPickerWithMouse(trigger: HTMLElement) {
+      // A real MouseEvent, not fireEvent.pointerDown's init object: jsdom has
+      // no PointerEvent, so `button` would never reach the handler, and Radix
+      // opens only on button 0.
+      fireEvent(
+        trigger,
+        new MouseEvent('pointerdown', { bubbles: true, cancelable: true, button: 0 })
+      )
+      fireEvent.click(trigger)
+    }
+
+    it('keeps the selection when the picker is opened with a mouse', async () => {
+      api.absence = true
+      renderPage()
+      const session2 = await selectCara()
+
+      openPickerWithMouse(
+        within(session2).getByRole('button', { name: 'Mark present' })
+      )
+
+      // The menu is the proof: it is gated on the selection, so an open menu
+      // means the trigger's click did not reach the page's dismissal.
+      expect(await screen.findByText('Seat Cara at\u2026')).toBeInTheDocument()
+      // And said in as many words. Queried by text, not by role: an open Radix
+      // menu is modal and aria-hides the rest of the page behind it.
+      expect(
+        screen.getByText('Cara selected \u2014 showing them across all sessions.')
+      ).toBeInTheDocument()
+    })
+
+    it('lets Escape close the picker without losing the selection', async () => {
+      api.absence = true
+      renderPage()
+      const session2 = await selectCara()
+
+      openPickerWithMouse(
+        within(session2).getByRole('button', { name: 'Mark present' })
+      )
+      const item = await screen.findByRole('menuitem', { name: /Table 2/ })
+
+      fireEvent.keyDown(item, { key: 'Escape' })
+
+      // The menu is gone, and the trigger that opens it is still there — so the
+      // one keystroke did one thing.
+      await waitFor(() =>
+        expect(screen.queryByText('Seat Cara at\u2026')).not.toBeInTheDocument()
+      )
+      expect(
+        within(session2).getByRole('button', { name: 'Mark present' })
+      ).toBeInTheDocument()
+    })
+
+    it('seats the person at the chosen table and clears the absence', async () => {
+      api.absence = true
+      renderPage()
+      const session2 = await selectCara()
+
+      openPickerWithMouse(
+        within(session2).getByRole('button', { name: 'Mark present' })
+      )
+      fireEvent.click(await screen.findByRole('menuitem', { name: /Table 2/ }))
+
+      await waitFor(() => expect(api.saved).toBeDefined())
+      const body = api.saved!
+      expect(body.assignments).toHaveLength(3)
+      expect(body.assignments[1].tables[2]).toEqual([
+        person('Cara'),
+        person('Dan', 'Male'),
+      ])
+      expect(body.assignments[1].absentParticipants).toEqual([])
+      // The trust clause: session 3 goes back exactly as it came.
+      expect(body.assignments[2]).toEqual(withAbsence[2])
+      expect(body.label).toBe('Cara marked present in Session 2')
+    })
+
+    it('reports the seating with an undo', async () => {
+      api.absence = true
+      renderPage()
+      const session2 = await selectCara()
+
+      openPickerWithMouse(
+        within(session2).getByRole('button', { name: 'Mark present' })
+      )
+      fireEvent.click(await screen.findByRole('menuitem', { name: /Table 2/ }))
+
+      expect(
+        await screen.findByText(
+          'Cara marked present in Session 2 \u00b7 seated at Table 2 \u00b7 other sessions unchanged.'
+        )
+      ).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^undo$/i })).toBeInTheDocument()
+    })
   })
 })

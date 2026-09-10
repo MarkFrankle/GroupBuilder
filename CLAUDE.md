@@ -33,12 +33,41 @@
   outside a module" — a config problem that looks like a code problem.
 - **Mock `@/utils/apiClient` in frontend tests** — don't mock Firebase SDK internals. Example: `jest.mock('@/utils/apiClient', () => ({ authenticatedFetch: (...args) => fetch(...args) }))`
 
-- **`user-event` v13 cannot drive a Radix `Select`.** `userEvent.click` on an option leaves the
-  trigger unchanged, even with `skipPointerEventsCheck`, and a synthesized `pointerUp` does not
-  select either. Use `fireEvent.keyDown(trigger, { key: 'Enter' })` to open and
-  `fireEvent.click(option)` to choose. Tests touching a Select also need
-  `Element.prototype.scrollIntoView` stubbed — Radix calls it on open. See
-  `KeepApartSection.test.tsx`.
+- **`user-event` v13 cannot drive a Radix `Select` or `DropdownMenu`.** `userEvent.click` on an
+  option leaves the trigger unchanged, even with `skipPointerEventsCheck`, and a synthesized
+  `pointerUp` does not select either. Use `fireEvent.keyDown(trigger, { key: 'Enter' })` to open and
+  `fireEvent.click(option)` to choose. **`fireEvent.click` on the trigger does not open either one** —
+  confirmed for `DropdownMenu` in `SessionCard.test.tsx`, so reach for `keyDown` first rather than
+  treating it as a fallback. Tests touching either need `Element.prototype.scrollIntoView` stubbed —
+  Radix calls it on open. See `KeepApartSection.test.tsx` and `SessionCard.test.tsx`.
+- **`userEvent.type` is slow enough to blow Jest's 5s timeout.** Seven characters means seven
+  keystrokes, each with its own React state update. `RosterGrid.test.tsx` timed out on
+  `userEvent.type(input, 'Charlie')`, and because the timeout aborts mid-`await`, teardown left React
+  broken and the **next two tests** rendered `<body><div /></body>` — a failure that looks like a
+  broken component and is really a corpse. Prefer `fireEvent.change(input, { target: { value } })`:
+  inputs read `e.target.value` wholesale, so per-keystroke typing exercises nothing extra. That one
+  swap took the suite from 33s to 7.5s. **But check what the value change is supposed to trigger** —
+  `fireEvent.change` does not focus, so a commit hanging off blur needs an explicit `.focus()` first
+  and a real click away to move focus out.
+- **Don't interpolate into a Radix menu label you plan to query as one string.**
+  `<DropdownMenuLabel>Seat {name} at…</DropdownMenuLabel>` renders three text nodes, so
+  `getByText('Seat Cara at…')` fails with "the text is broken up by multiple elements". Use a single
+  template literal in the component rather than weakening the test to a function matcher.
+- **`aria-live="polite"` alone is not `role="status"`.** Only `<output>` implies that role, so
+  `getByRole('status')` cannot find a bare `aria-live` div — add an explicit `role="status"` if you
+  want to query the live region by role. Note `NoticeStrip` also renders `role="status"`, so a page
+  can have two.
+- **A Radix trigger's click bubbles.** Radix opens a `DropdownMenu` on *pointerdown* and
+  does not stop the subsequent `click`, so a trigger inside a container with an `onClick`
+  fires that container's handler too. Verified on `AssignmentsPage`: a mouse-open of the
+  History menu clears `selectedName` via the page's click-outside dismissal; a
+  keyboard-open (`keyDown` Enter) does not. Any trigger whose own rendering depends on that
+  state needs `onPointerDown`/`onClick` `stopPropagation`.
+- **To test that mouse path, dispatch a real `MouseEvent`.** jsdom has no `PointerEvent`, so
+  `fireEvent.pointerDown(el, { button: 0 })` never delivers `button` and Radix ignores it. Use
+  `fireEvent(el, new MouseEvent('pointerdown', { bubbles: true, cancelable: true, button: 0 }))`
+  then `fireEvent.click(el)`. The keyboard open masks trigger-propagation bugs entirely — it
+  hid a live one where the Mark present picker unmounted the instant it opened.
 - **Anything stored as a roster document id must survive `POST /roster/discard`.** Discard
   deletes every roster document and rewrites it with fresh uuids, so ids are not durable.
   `partner_id` and the program-level `keep_apart` pairs are both resolved to names before the

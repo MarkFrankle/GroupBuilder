@@ -514,6 +514,106 @@ class TestSaveEditedAssignments:
 
         assert response.status_code == 400
 
+    def test_save_honours_a_supplied_label(
+        self,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+    ):
+        """History must be able to say what happened, not just that something did."""
+        add_assignment_set_to_firestore(sample_set_data)
+
+        response = client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json={
+                "assignments": sample_assignments_result["assignments"],
+                "label": "Kathy Veit marked absent from Session 1",
+            },
+        )
+
+        assert response.status_code == 200
+
+        versions = client.get(
+            f"/api/assignments/results/versions?program_id={PROGRAM}"
+        ).json()["versions"]
+        assert versions[0]["label"] == "Kathy Veit marked absent from Session 1"
+
+    def test_save_trims_the_label(
+        self,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+    ):
+        """Padding would render as padding in the History menu."""
+        add_assignment_set_to_firestore(sample_set_data)
+
+        client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json={
+                "assignments": sample_assignments_result["assignments"],
+                "label": "  Kathy Veit marked absent from Session 1  ",
+            },
+        )
+
+        versions = client.get(
+            f"/api/assignments/results/versions?program_id={PROGRAM}"
+        ).json()["versions"]
+        assert versions[0]["label"] == "Kathy Veit marked absent from Session 1"
+
+    def test_save_caps_a_long_label(
+        self,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+    ):
+        """A runaway label is truncated, not refused — no user typed it."""
+        add_assignment_set_to_firestore(sample_set_data)
+
+        response = client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}",
+            json={
+                "assignments": sample_assignments_result["assignments"],
+                "label": "K" * 500,
+            },
+        )
+
+        assert response.status_code == 200
+
+        versions = client.get(
+            f"/api/assignments/results/versions?program_id={PROGRAM}"
+        ).json()["versions"]
+        assert versions[0]["label"] == "K" * 200
+
+    @pytest.mark.parametrize("label", [None, "   ", 123])
+    def test_save_falls_back_to_the_manual_edit_label(
+        self,
+        label,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+    ):
+        """No usable label is no label; History says Manual edit, never nothing."""
+        add_assignment_set_to_firestore(sample_set_data)
+
+        body = {"assignments": sample_assignments_result["assignments"]}
+        if label is not None:
+            body["label"] = label
+
+        response = client.post(
+            f"/api/assignments/results/save?program_id={PROGRAM}", json=body
+        )
+
+        assert response.status_code == 200
+
+        versions = client.get(
+            f"/api/assignments/results/versions?program_id={PROGRAM}"
+        ).json()["versions"]
+        assert versions[0]["label"] == "Manual edit"
+
 
 class TestListAssignmentSets:
     """The Previous Groups shim is gone; the route must 404."""
