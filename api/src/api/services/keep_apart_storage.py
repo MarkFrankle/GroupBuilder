@@ -1,8 +1,10 @@
 """Keep-apart rules: which pairs of people must never share a table.
 
-Stored on the Program document as ``keep_apart``, a list of two-element lists of
-roster document ids. Ids rather than names, following ``partner_id``: the roster
-document id is stable, so a rename needs no work here at all.
+Stored on the Program document as ``keep_apart``, a list of ``{"a": id, "b":
+id}`` maps of roster document ids. Maps rather than two-element lists because
+Firestore forbids an array whose elements are arrays ("nested arrays are not
+allowed"). Ids rather than names, following ``partner_id``: the roster document
+id is stable, so a rename needs no work here at all.
 
 A program-level list rather than a field on each participant, because the
 relationship is one-to-many. ``couple_id`` and ``linked_id`` are integers
@@ -28,18 +30,30 @@ def _normalise(a_id: str, b_id: str) -> Tuple[str, str]:
 def _is_pair(entry: Any) -> bool:
     """Is this stored entry a rule at all?
 
-    Deliberately strict. A bare ``len(entry) == 2`` admits the string ``"ab"``
-    and would fabricate the pair ``("a", "b")`` out of nothing, while ``None``
-    or an int raises out of ``len()``. Junk is not a rule, so it is dropped on
-    read — and because a write rewrites the whole array, the next write erases
-    it for good. That is the intended outcome now that only genuine junk falls
-    through here.
+    Deliberately strict: a genuine ``{"a": id, "b": id}`` map with both ids
+    present as strings. Junk is not a rule, so it is dropped on read — and
+    because a write rewrites the whole array, the next write erases it for
+    good.
+
+    A two-element ``[id, id]`` list is also accepted, for the brief window
+    before every emulator/dev document has been rewritten in the map shape.
+    Production never stored the list form: every such write hit Firestore's
+    "nested arrays are not allowed" and 500'd.
     """
+    if isinstance(entry, dict):
+        return isinstance(entry.get("a"), str) and isinstance(entry.get("b"), str)
     return (
         isinstance(entry, list)
         and len(entry) == 2
         and all(isinstance(x, str) for x in entry)
     )
+
+
+def _pair_ids(entry: Any) -> Tuple[str, str]:
+    """The two ids out of a stored entry that ``_is_pair`` has accepted."""
+    if isinstance(entry, dict):
+        return entry["a"], entry["b"]
+    return entry[0], entry[1]
 
 
 class KeepApartStorage:
@@ -57,7 +71,7 @@ class KeepApartStorage:
         if not doc.exists:
             return []
         raw = (doc.to_dict() or {}).get("keep_apart") or []
-        return [_normalise(*entry) for entry in raw if _is_pair(entry)]
+        return [_normalise(*_pair_ids(entry)) for entry in raw if _is_pair(entry)]
 
     def add_pair(self, program_id: str, a_id: str, b_id: str) -> List[Tuple[str, str]]:
         """Keep these two apart. Returns the new list of pairs.
@@ -97,7 +111,7 @@ class KeepApartStorage:
     ) -> List[Tuple[str, str]]:
         normalised = [_normalise(*p) for p in pairs]
         self._program_ref(program_id).set(
-            {"keep_apart": [list(p) for p in normalised]}, merge=True
+            {"keep_apart": [{"a": lo, "b": hi} for lo, hi in normalised]}, merge=True
         )
         return normalised
 
