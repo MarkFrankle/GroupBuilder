@@ -263,12 +263,22 @@ const AssignmentsPage: React.FC = () => {
       // Completion does not move anyone, so `sorted` is still the right seating
       // to count from — nothing has to refetch before the sentence is true.
       const seated = sorted.find(a => a.session === sessionNumber)
+      // Undo here is not "promote the previous version" — completion is not a
+      // version write. It is the plain inverse verb on the same idempotent
+      // endpoint, mirroring the button that also sits on the session card.
+      const inverse: 'POST' | 'DELETE' = method === 'POST' ? 'DELETE' : 'POST'
       showNotice({
         tone: 'info',
         message:
           method === 'POST'
             ? completionReceipt(sessionNumber, seated ? seatedCount(seated) : 0)
             : reopenReceipt(sessionNumber),
+        actions: [
+          {
+            label: 'Undo',
+            onClick: () => completionMutation.mutate({ sessionNumber, method: inverse }),
+          },
+        ],
       })
       invalidateAll()
       scrollToFirstLive()

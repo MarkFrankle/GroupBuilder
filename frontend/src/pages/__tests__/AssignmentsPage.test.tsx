@@ -620,6 +620,25 @@ describe('AssignmentsPage', () => {
     expect(receipt).toHaveTextContent('Session 1 stays complete')
   })
 
+  it('offers Undo on the completion receipt, reversing the freeze', async () => {
+    renderPage()
+
+    const session1 = await screen.findByRole('region', { name: 'Session 1' })
+    await userEvent.click(
+      within(session1).getByRole('button', { name: /mark complete/i })
+    )
+
+    await screen.findByText(/Session 1 marked complete/)
+    const strip = screen.getByTestId('notice-strip')
+    await userEvent.click(within(strip).getByRole('button', { name: 'Undo' }))
+
+    expect(mockAuthenticatedFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/assignments/completion/1'),
+      expect.objectContaining({ method: 'DELETE' })
+    )
+    expect(await screen.findByText(/Session 1 reopened/)).toBeInTheDocument()
+  })
+
   describe('undo', () => {
     /** Shuffles session 2 and returns the receipt strip. */
     async function shuffleSession2() {
