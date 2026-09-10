@@ -8,6 +8,7 @@ import { ProgramProvider, useProgram } from "./contexts/ProgramContext"
 import LoginPage from "./pages/LoginPage"
 import AuthVerifyPage from "./pages/AuthVerifyPage"
 import LandingPage from "./pages/LandingPage"
+import HomePage from "./pages/HomePage"
 import AssignmentsPage from "./pages/AssignmentsPage"
 import SeatingChartPage from "./pages/SeatingChartPage"
 import { RosterPage } from "./pages/RosterPage"
@@ -119,6 +120,14 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <LandingPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/home"
+                element={
+                  <ProtectedRoute>
+                    <HomePage />
                   </ProtectedRoute>
                 }
               />
