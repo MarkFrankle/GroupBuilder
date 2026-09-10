@@ -25,7 +25,7 @@ const ProgramContext = createContext<ProgramContextType | undefined>(undefined);
 const PROGRAM_STORAGE_KEY = 'groupbuilder_current_program';
 
 export function ProgramProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [currentProgram, setCurrentProgramState] = useState<Program | null>(null);
   const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,15 +100,17 @@ export function ProgramProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // Clear program data when user logs out
+  // Clear program data on a real sign-out — not during the initial auth-loading
+  // window, which on every reload briefly has user === null and would otherwise
+  // delete the stored program before fetchPrograms can restore it.
   useEffect(() => {
-    if (!user) {
+    if (!authLoading && !user) {
       setPrograms([]);
       setCurrentProgramState(null);
       setNeedsProgramSelection(false);
       localStorage.removeItem(PROGRAM_STORAGE_KEY);
     }
-  }, [user]);
+  }, [authLoading, user]);
 
   const setCurrentProgram = (program: Program) => {
     setCurrentProgramState(program);

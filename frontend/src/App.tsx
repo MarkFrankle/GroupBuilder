@@ -3,11 +3,12 @@ import { BrowserRouter as Router, Route, Routes, useLocation, Link } from "react
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { AuthProvider, useAuth } from "./contexts/AuthContext"
-import { useIsAdmin } from "./hooks/queries"
+import { useIsAdmin, useAssignmentSetMetadata } from "./hooks/queries"
 import { ProgramProvider, useProgram } from "./contexts/ProgramContext"
 import LoginPage from "./pages/LoginPage"
 import AuthVerifyPage from "./pages/AuthVerifyPage"
-import LandingPage from "./pages/LandingPage"
+import RootDispatch from "./pages/RootDispatch"
+import HomePage from "./pages/HomePage"
 import AssignmentsPage from "./pages/AssignmentsPage"
 import SeatingChartPage from "./pages/SeatingChartPage"
 import { RosterPage } from "./pages/RosterPage"
@@ -29,10 +30,11 @@ function useShowChrome() {
   return !hiddenPaths.some(p => location.pathname.startsWith(p));
 }
 
-function NavBar() {
+export function NavBar() {
   const { user, signOut } = useAuth();
-  const { currentProgram } = useProgram();
+  const { currentProgram, programs } = useProgram();
   const { data: isAdmin } = useIsAdmin(!!user);
+  const { data: assignmentMeta } = useAssignmentSetMetadata(currentProgram?.id ?? null);
   const location = useLocation();
   if (!user) return null;
   const hasProgram = !!currentProgram;
@@ -41,10 +43,15 @@ function NavBar() {
   return (
     <nav className="no-print border-b px-4 py-2 flex gap-4 text-sm items-center">
       {(hasProgram || isAdminPage || isHelpPage) && <>
-        <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
+        <Link to="/home" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
         <Link to="/roster" className="text-muted-foreground hover:text-foreground transition-colors">Roster</Link>
-        <Link to="/table-assignments" className="text-muted-foreground hover:text-foreground transition-colors">Assignments</Link>
+        {assignmentMeta && (
+          <Link to="/table-assignments" className="text-muted-foreground hover:text-foreground transition-colors">Assignments</Link>
+        )}
         <Link to="/help" className="text-muted-foreground hover:text-foreground transition-colors">Help</Link>
+        {programs.length > 1 && (
+          <Link to="/select-program" className="text-muted-foreground hover:text-foreground transition-colors">Programs</Link>
+        )}
       </>}
       <div className="ml-auto flex gap-4 items-center">
         {isAdmin && <Link to="/admin" className="text-muted-foreground hover:text-foreground transition-colors">Admin</Link>}
@@ -118,7 +125,15 @@ const App: React.FC = () => {
                 path="/"
                 element={
                   <ProtectedRoute>
-                    <LandingPage />
+                    <RootDispatch />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/home"
+                element={
+                  <ProtectedRoute>
+                    <HomePage />
                   </ProtectedRoute>
                 }
               />

@@ -2,7 +2,7 @@
  * Program selector page for users who belong to multiple programs
  */
 import React from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useProgram } from '../contexts/ProgramContext';
 import { locationToPath } from '../utils/safeRedirect';
 
@@ -14,6 +14,12 @@ export default function ProgramSelectorPage() {
   // ProtectedRoute stashes the location it redirected away from. Send the user
   // back there (query string included) so shared links survive the detour.
   const from = locationToPath((location.state as { from?: unknown } | null)?.from) ?? '/';
+
+  // Reachable directly from the "Programs" nav link. A facilitator with nothing
+  // to choose between is sent back to the dispatcher rather than shown a list of one.
+  if (programs.length <= 1) {
+    return <Navigate to={from} replace />;
+  }
 
   const handleSelectProgram = (program: any) => {
     setCurrentProgram(program);

@@ -33,6 +33,12 @@
   outside a module" — a config problem that looks like a code problem.
 - **Mock `@/utils/apiClient` in frontend tests** — don't mock Firebase SDK internals. Example: `jest.mock('@/utils/apiClient', () => ({ authenticatedFetch: (...args) => fetch(...args) }))`
 
+- **Importing anything from `App.tsx` in a test drags in the whole route tree.** `NavBar` is
+  exported from `App.tsx`, so `NavBar.test.tsx` pulls in `RosterPage` → the ESM-only `uuid`
+  package, which craco's Jest does not transform. Add `jest.mock('uuid', () => ({ v4: () =>
+  'mock-uuid' }))` (as `RosterPage.test.tsx` already does). Mock `@/contexts/AuthContext`,
+  `@/contexts/ProgramContext`, and `@/hooks/queries` so the render doesn't need providers.
+
 - **`user-event` v13 cannot drive a Radix `Select` or `DropdownMenu`.** `userEvent.click` on an
   option leaves the trigger unchanged, even with `skipPointerEventsCheck`, and a synthesized
   `pointerUp` does not select either. Use `fireEvent.keyDown(trigger, { key: 'Enter' })` to open and
