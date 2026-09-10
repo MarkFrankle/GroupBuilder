@@ -309,7 +309,8 @@ function HelpPage() {
             A completed session cannot be changed. Shuffling it, editing it, or
             rebuilding the program are all refused — the past stays as it happened.
             If you marked one complete by mistake, press <strong>Reopen</strong> on
-            it.
+            it, or press <strong>Undo</strong> on the line that appears at the top
+            right after you mark complete — both put the session back the way it was.
           </p>
 
           <InfoCallout>
