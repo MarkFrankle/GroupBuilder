@@ -275,6 +275,12 @@ function HelpPage() {
             <strong>Rules</strong> line lists the linked pairs you have set up.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
+            Just below that, a banner checks the plan against the rules you set —
+            couples kept apart, people you asked to keep apart, a facilitator at
+            every table — and either tells you it's ready to print or names what
+            to fix and in which session.
+          </p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
             Each session is a card. Inside it, each table lists its facilitators
             first, then everyone else, with a summary on the right: how many people
             are seated, the gender split, and how many religions are represented.
