@@ -47,6 +47,8 @@ class AssignmentSetStorage:
         num_tables: int,
         num_sessions: int,
         make_current: bool = True,
+        accepted: bool = True,
+        previous_set_id: Optional[str] = None,
     ) -> str:
         """Mint a new assignment set, and by default point the program at it.
 
@@ -55,6 +57,11 @@ class AssignmentSetStorage:
         written. The program pointer is what every read resolves through, so
         moving it before the version exists would publish an empty plan - the
         failure this ordering exists to prevent.
+
+        ``accepted=False`` with ``previous_set_id`` marks a rebuilt set the
+        coordinator has not yet confirmed - see Item 6b. Readers treat a missing
+        ``accepted`` field as ``True`` (sets written before 6b were never
+        provisional).
 
         Returns the new set id.
         """
@@ -69,6 +76,8 @@ class AssignmentSetStorage:
                 "num_tables": num_tables,
                 "num_sessions": num_sessions,
                 "participant_data": _serialize_for_firestore(participant_data),
+                "accepted": accepted,
+                "previous_set_id": previous_set_id,
             }
         )
 
