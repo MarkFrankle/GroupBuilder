@@ -68,3 +68,20 @@ def refuse_if_below_completed_prefix(
         raise HTTPException(
             status_code=409, detail=session_count_floor_refusal(completed_through)
         )
+
+
+def not_accepted_refusal() -> str:
+    return (
+        "The rebuilt sessions haven't been confirmed yet. "
+        "Accept or undo them on the assignments page first."
+    )
+
+
+def refuse_if_not_accepted(storage, program_id: str, set_id: str) -> None:
+    """Mutations are refused while a rebuilt set is still provisional (Item 6b).
+
+    ``accepted`` missing means a set written before 6b - never provisional.
+    """
+    doc = storage.get_set(program_id, set_id) or {}
+    if doc.get("accepted", True) is False:
+        raise HTTPException(status_code=409, detail=not_accepted_refusal())
