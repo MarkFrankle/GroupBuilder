@@ -77,7 +77,12 @@ const TableBlock: React.FC<TableBlockProps> = ({
             click just made.
           */}
           {selectedHere && onMarkAbsent && (
-            <Button variant="outline" size="sm" onClick={() => onMarkAbsent(selectedHere)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2.5 text-xs"
+              onClick={() => onMarkAbsent(selectedHere)}
+            >
               <UserMinus className="mr-1.5 h-3.5 w-3.5" />
               Mark {selectedHere} absent
             </Button>
