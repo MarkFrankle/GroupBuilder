@@ -1,4 +1,5 @@
 from collections import defaultdict
+from itertools import combinations
 from ortools.sat.python import cp_model
 import logging
 import os
@@ -22,6 +23,8 @@ class GroupBuilder:
         total_program_sessions=None,
         historical_meeting_counts=None,
         pairwise_cap=None,
+        table_overlap_cap=None,
+        historical_tables=None,
     ):
         """
         Initialize the GroupBuilder.
@@ -74,6 +77,8 @@ class GroupBuilder:
         # the caller (capacity_search.find_feasible_plan) escalates from the
         # floor rather than this class trusting it as a hard truth.
         self.pairwise_cap = pairwise_cap
+        self.table_overlap_cap = table_overlap_cap
+        self.historical_tables = historical_tables or []
 
         # Configurable solver parameters (can be overridden by env vars or constructor args)
         self.pairing_window_size = pairing_window_size or int(
@@ -643,6 +648,45 @@ class GroupBuilder:
                             penalty_count += self.participant_table_assignments[
                                 (p_id, 0, current_table)
                             ]
+
+        # WHOLE-TABLE OVERLAP: cap how many people any two tables can share,
+        # whether both tables are in this solve (compared across every pair
+        # of distinct sessions - same-session tables can't overlap, a person
+        # sits at exactly one table per session) or one is from outside this
+        # solve entirely (historical_tables, for single-session regeneration
+        # against sessions this solve doesn't get to re-derive).
+        if self.table_overlap_cap is not None:
+            for s1, s2 in combinations(self.sessions, 2):
+                for t1 in self.tables:
+                    for t2 in self.tables:
+                        both_slots = []
+                        for p in self.participants:
+                            both = self.model.NewBoolVar(
+                                f'overlap_{p["id"]}_s{s1}t{t1}_s{s2}t{t2}'
+                            )
+                            self.model.AddMultiplicationEquality(
+                                both,
+                                [
+                                    self.participant_table_assignments[
+                                        (p["id"], s1, t1)
+                                    ],
+                                    self.participant_table_assignments[
+                                        (p["id"], s2, t2)
+                                    ],
+                                ],
+                            )
+                            both_slots.append(both)
+                        self.model.Add(sum(both_slots) <= self.table_overlap_cap)
+
+            for s in self.sessions:
+                for t in self.tables:
+                    for hist_table in self.historical_tables:
+                        overlap_count = sum(
+                            self.participant_table_assignments[(p["id"], s, t)]
+                            for p in self.participants
+                            if p["id"] in hist_table
+                        )
+                        self.model.Add(overlap_count <= self.table_overlap_cap)
 
         self.model.Minimize(penalty_count)
 
