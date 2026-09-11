@@ -205,6 +205,46 @@ class TestSolveAroundCompleted:
                 assert not ({"P0", "P1"} <= names)
                 assert not ({"P0", "P2"} <= names)
 
+    def test_a_pair_who_already_spent_their_whole_program_budget_never_meets_again(
+        self,
+    ):
+        """9 people / 3 tables / 5 sessions puts the whole-program pairwise
+        cap at 2 (compute_pairwise_cap). Freezing 2 sessions with P0 and P1
+        seated together in both spends their entire budget before the
+        remainder is even solved - the fix this test pins is that the real
+        count (2), not just membership, reaches the hard cap's budget
+        subtraction. See extract_pairings_from_sessions and the
+        dual-cap-solver plan's Task 8 notes."""
+        people = _people(9)
+        frozen = [
+            _frozen_session_one(
+                {0: ["P0", "P1", "P2"], 1: ["P3", "P4", "P5"], 2: ["P6", "P7", "P8"]}
+            ),
+            {
+                "session": 2,
+                "tables": {
+                    "0": [{"name": "P0"}, {"name": "P1"}, {"name": "P3"}],
+                    "1": [{"name": "P2"}, {"name": "P4"}, {"name": "P5"}],
+                    "2": [{"name": "P6"}, {"name": "P7"}, {"name": "P8"}],
+                },
+                "absentParticipants": [],
+            },
+        ]
+        assignments, _ = solve_around_completed_sessions(
+            participants=people,
+            num_tables=3,
+            num_sessions=5,
+            completed_through=2,
+            frozen_sessions=frozen,
+            absence_map={},
+            max_time_seconds=10,
+        )
+        assert len(assignments) == 5
+        for session in assignments[2:]:
+            for _, seats in session["tables"].items():
+                names = {s["name"] for s in seats}
+                assert not ({"P0", "P1"} <= names)
+
     def test_a_frozen_pairing_naming_a_departed_person_is_dropped(self):
         people = _people(8)  # P0..P7
         frozen = [
@@ -309,5 +349,20 @@ class TestExtractPairingsFromSessions:
         ]
 
         assert extract_pairings_from_sessions(sessions, exclude_session=-1) == {
-            ("Alice", "Bob")
+            ("Alice", "Bob"): 1
+        }
+
+    def test_a_pair_meeting_twice_is_counted_not_just_membership(self):
+        """The count matters, not just whether they ever met: a pair's
+        remaining hard-cap budget depends on how many times they've already
+        spent it, not merely whether they've spent it at all."""
+        from api.services.program_solve import extract_pairings_from_sessions
+
+        sessions = [
+            {"session": 1, "tables": {"1": [{"name": "Alice"}, {"name": "Bob"}]}},
+            {"session": 2, "tables": {"1": [{"name": "Alice"}, {"name": "Bob"}]}},
+        ]
+
+        assert extract_pairings_from_sessions(sessions, exclude_session=-1) == {
+            ("Alice", "Bob"): 2
         }

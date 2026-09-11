@@ -11,6 +11,7 @@ def handle_generate_assignments(
     numSessions,
     max_time_seconds=120,
     historical_pairings=None,
+    historical_meeting_counts=None,
     total_program_sessions=None,
     historical_tables=None,
 ):
@@ -35,6 +36,7 @@ def handle_generate_assignments(
         numSessions,
         probe_seconds=probe_seconds,
         historical_pairings=historical_pairings,
+        historical_meeting_counts=historical_meeting_counts,
         total_program_sessions=total_program_sessions,
         historical_tables=historical_tables,
     )
