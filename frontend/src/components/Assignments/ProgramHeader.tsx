@@ -78,7 +78,7 @@ const ProgramHeader: React.FC<ProgramHeaderProps> = ({
         data-testid="program-header"
         className={
           condensed
-            ? 'sticky top-0 z-10 flex items-center justify-between gap-6 border-b bg-white px-8 py-2.5'
+            ? 'sticky top-0 z-10 flex h-14 items-center justify-between gap-6 border-b bg-white px-8'
             : 'flex items-start justify-between gap-6 px-8 pb-3 pt-6'
         }
       >

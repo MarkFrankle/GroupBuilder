@@ -805,19 +805,6 @@ describe('AssignmentsPage', () => {
       expect(screen.getByTestId('selection-announcement')).toHaveTextContent('')
     })
 
-    it('shows the person-tracking summary line when a person is selected', async () => {
-      renderPage()
-      await selectAnn()
-
-      expect(screen.getByTestId('tracking-summary')).toHaveTextContent(
-        /· .* · sits with \d+ of the other \d+ participants/
-      )
-    })
-
-    it('hides the summary line when no one is selected', () => {
-      renderPage()
-      expect(screen.queryByTestId('tracking-summary')).not.toBeInTheDocument()
-    })
   })
 
   describe('mark absent', () => {

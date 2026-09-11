@@ -307,9 +307,9 @@ function HelpPage() {
             view is not saved — reloading the page puts you back in Full.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            Clicking a person's name (in either view) also shows a line above the sessions
-            summarising how they do: how many people they sit with more than once, and how
-            many of the rest of the group they get to meet at all.
+            Clicking a person's name (in either view) highlights them everywhere they
+            appear across every session, so you can trace who they sit with over the
+            course of the program.
           </p>
 
           <h3 className="text-xl font-semibold mt-8 mb-2">Marking a session complete</h3>

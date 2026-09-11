@@ -78,7 +78,7 @@
   deletes every roster document and rewrites it with fresh uuids, so ids are not durable.
   `partner_id` and the program-level `keep_apart` pairs are both resolved to names before the
   delete and re-resolved after. A third such field must do the same or it silently orphans.
-- **The Assignments view-controls row uses `sticky top-11` — a hardcoded match to the condensed `ProgramHeader`'s height (`py-2.5`, ~44px). If the header's padding changes, this offset must change with it.**
+- **The Assignments view-controls row uses `sticky top-14` — a hardcoded match to the condensed `ProgramHeader`'s explicit `h-14` (56px, chosen to fit the `h-9` action buttons). If the header's height class changes, this offset must change with it.**
 - **`GET /api/roster/canonical` already returns each participant with `keep_apart` as a resolved list of *names*** (the backend resolves the id pairs at generate time and freezes them on the assignment set). Consumers that need keep-apart on the assignments side — e.g. `planCheck.ts` — read it straight off `useCanonicalRoster`; no `useKeepApart` + id→name resolution needed. `partner` on that payload is likewise a name.
 - **`GET /api/roster/canonical` also returns `absent_sessions` per participant** — derived at
   request time from the current version's per-session `absentParticipants`, not stored on
