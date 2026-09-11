@@ -13,9 +13,8 @@ describe('HelpPage', () => {
   test('renders table of contents with all section links', () => {
     renderPage();
     const sectionNames = [
-      'Getting Started',
+      'Welcome to Group Builder',
       'Creating Your Roster',
-      'Generating Groups',
       'Viewing Your Assignments',
       'Printing & Sharing',
       'Changing a Session',
@@ -29,9 +28,8 @@ describe('HelpPage', () => {
   test('renders all section headings', () => {
     renderPage();
     const headings = [
-      'Getting Started',
+      'Welcome to Group Builder',
       'Creating Your Roster',
-      'Generating Groups',
       'Viewing Your Assignments',
       'Printing & Sharing',
       'Changing a Session',
@@ -51,7 +49,5 @@ describe('HelpPage', () => {
     renderPage();
     // Info callout explaining that completion runs in order
     expect(screen.getAllByText(/only complete the next session/).length).toBeGreaterThan(0);
-    // Warning callout in generating section
-    expect(screen.getAllByText(/Need at least N facilitators/).length).toBeGreaterThan(0);
   });
 });
