@@ -435,6 +435,29 @@ class GroupBuilder:
                     f"Added HARD constraints: {len(self.current_table_assignments)} participants "
                     f"CANNOT be assigned to their previous tables"
                 )
+
+                # The per-participant constraint above only forbids each
+                # person's own previous table *index* - it does nothing to
+                # stop a whole table's membership from moving verbatim to a
+                # different index, which reads as "nothing changed" even
+                # though it technically satisfies the constraint. Forbid
+                # each previous table's full membership from landing
+                # together at any table in the new session.
+                previous_tables = defaultdict(list)
+                for p_id, table_number in self.current_table_assignments.items():
+                    previous_tables[table_number].append(p_id)
+                if 0 in self.sessions:
+                    for members in previous_tables.values():
+                        if len(members) < 2:
+                            continue
+                        for t in self.tables:
+                            self.model.Add(
+                                sum(
+                                    self.participant_table_assignments[(p_id, 0, t)]
+                                    for p_id in members
+                                )
+                                <= len(members) - 1
+                            )
             else:
                 # SOFT CONSTRAINT: Penalize same table assignments
                 # This gives users the feeling that "something happened" when they click regenerate
