@@ -19,8 +19,8 @@ export const RELIGION_COLORS: Record<string, Swatch> = {
 }
 
 export const GENDER_COLORS: Record<string, Swatch> = {
-  Female: { bg: '#ECD9E9', fg: '#6A2151' },
-  Male: { bg: '#CFE8E4', fg: '#0F4D46' },
+  Female: { bg: '#FBD5E6', fg: '#9A2159' },
+  Male: { bg: '#CFE0F7', fg: '#1E4E8C' },
   Other: { bg: '#E4E4E4', fg: '#333333' },
 }
 

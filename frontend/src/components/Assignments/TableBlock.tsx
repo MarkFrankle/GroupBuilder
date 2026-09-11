@@ -56,19 +56,22 @@ const TableBlock: React.FC<TableBlockProps> = ({
     selectedName !== null && people.some(p => p.name === selectedName) ? selectedName : null
 
   return (
-    <div className={compact ? 'flex flex-col gap-1' : 'flex flex-col gap-1.5'}>
+    <div
+      className={
+        compact
+          ? 'flex flex-col gap-1'
+          : 'flex flex-col gap-1.5 rounded-md border bg-white p-3'
+      }
+    >
       {compact ? (
         <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           Table {tableNumber}
         </div>
       ) : (
-      <div className="flex min-h-9 items-center justify-between border-b pb-1">
+      <div className="flex min-h-9 items-center justify-between gap-2 border-b pb-1.5">
         <div className="flex items-center gap-2">
-          <div className="text-base font-semibold">Table {tableNumber}</div>
+          <div className="whitespace-nowrap text-base font-semibold">Table {tableNumber}</div>
           {/*
-            Left slot, so the stats on the right never move while a person is
-            selected.
-
             Invisible until a person is selected, not present-and-disabled: an
             appearing control explains itself by appearing in response to the
             click just made.
@@ -80,7 +83,9 @@ const TableBlock: React.FC<TableBlockProps> = ({
             </Button>
           )}
         </div>
-        <div className="text-base text-muted-foreground">{tableStats(people)}</div>
+        <div className="whitespace-nowrap text-sm text-muted-foreground">
+          {tableStats(people)}
+        </div>
       </div>
       )}
 
