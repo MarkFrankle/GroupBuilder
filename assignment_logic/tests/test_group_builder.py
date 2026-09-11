@@ -1,4 +1,5 @@
 import pytest
+from itertools import combinations
 from assignment_logic.group_builder import GroupBuilder
 
 
@@ -495,6 +496,66 @@ class TestGroupBuilder:
         # With hard constraint and couple separation, this should fail
         # (swapping would put the couple together, which violates couple constraint)
         assert result["status"] == "failure"
+
+    def test_require_different_assignments_forbids_table_rotation(self):
+        """A hard-constraint shuffle must not be satisfiable by just moving
+        a table's whole membership to a different index - that trick passes
+        the old per-participant "not my previous table index" check while
+        leaving every pairing exactly as it was.
+
+        Cross-group pairings are pinned at their pairwise cap (already met
+        elsewhere), so the *only* way to satisfy "not my previous index"
+        without introducing a forbidden new pairing is to move each
+        previous table's three people, as a block, to one of the other two
+        tables - i.e. the rotation trick. Before this fix that trick made
+        the old hard constraint trivially satisfiable; this asserts the
+        solver now correctly reports it as infeasible instead of silently
+        handing back the same groupings under new table numbers.
+        """
+        participants = [
+            {
+                "id": i,
+                "name": f"P{i}",
+                "religion": "Christian",
+                "gender": "Male",
+                "couple_id": None,
+            }
+            for i in range(1, 10)
+        ]
+        groups = [[4, 5, 6], [7, 8, 9], [1, 2, 3]]  # tables 0, 1, 2
+
+        # Symmetry breaking pins participant id 1 to table 0, so id 1's
+        # previous table must not be 0 or that alone conflicts.
+        current_table_assignments = {
+            p_id: table for table, members in enumerate(groups) for p_id in members
+        }
+
+        # Forbid any pairing across different previous groups: mark them as
+        # already met at the pairwise cap. Same-group pairs are left at 0
+        # historical meetings, so re-seating a group together is still
+        # legal on its own - only mixing groups is closed off.
+        historical_meeting_counts = {}
+        for g1, g2 in combinations(groups, 2):
+            for p1 in g1:
+                for p2 in g2:
+                    historical_meeting_counts[tuple(sorted((p1, p2)))] = 1
+
+        builder = GroupBuilder(
+            participants,
+            num_tables=3,
+            num_sessions=1,
+            current_table_assignments=current_table_assignments,
+            require_different_assignments=True,
+            historical_meeting_counts=historical_meeting_counts,
+            pairwise_cap=1,
+        )
+        result = builder.generate_assignments(max_time_seconds=10)
+
+        assert result["status"] == "failure", (
+            "Rotation was the only assignment satisfying both the old "
+            "hard constraint and the pairwise cap - the solver should "
+            "report that as infeasible, not silently return it."
+        )
 
     def test_soft_constraint_allows_same_assignments(self):
         """Test that without require_different_assignments, same assignments are allowed if optimal"""
