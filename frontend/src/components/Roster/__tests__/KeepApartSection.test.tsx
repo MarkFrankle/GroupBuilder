@@ -37,7 +37,7 @@ describe('KeepApartSection', () => {
     render(<KeepApartSection {...defaultProps} />);
     expect(screen.getByText('Keep apart')).toBeInTheDocument();
     expect(screen.getByText(
-      'Nobody is being kept apart yet. People here will never be seated at the same table.',
+      'People here will never be seated at the same table.',
     )).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add a pair' })).toBeInTheDocument();
   });
@@ -57,7 +57,7 @@ describe('KeepApartSection', () => {
     click(screen.getByRole('button', { name: 'Add a pair' }));
     expect(screen.getAllByRole('combobox')).toHaveLength(2);
     expect(screen.getByText(
-      'Nobody is being kept apart yet. People here will never be seated at the same table.',
+      'People here will never be seated at the same table.',
     )).toBeInTheDocument();
   });
 

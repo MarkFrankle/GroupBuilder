@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -9,6 +10,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { RosterGrid } from '@/components/RosterGrid/RosterGrid';
 import { PopulationStats } from '@/components/Roster/PopulationStats';
 import { ChangesetPanel } from '@/components/Roster/ChangesetPanel';
@@ -26,7 +30,7 @@ import { computeChangeset, CanonicalParticipant } from '@/utils/rosterDiff';
 import { useProgram } from '@/contexts/ProgramContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { MAX_TABLES, MAX_SESSIONS } from '@/constants';
-import { AlertCircle, Loader2, Pencil } from 'lucide-react';
+import { AlertCircle, HelpCircle, Loader2, Pencil } from 'lucide-react';
 import { movePartnerAdjacent, sortPartnersAdjacent } from '@/utils/sortWithPartnerAdjacency';
 import { generateTestParticipants } from '@/utils/seedTestRoster';
 
@@ -128,6 +132,15 @@ export function RosterPage() {
   // Deliberately not persisted: "I pressed Edit but changed nothing" is not
   // worth remembering, and a reload should put the guard back.
   const [armed, setArmed] = useState(false);
+
+  // "Add test data" renders into the top nav bar (next to Admin) so it's out
+  // of the way of roster screenshots. The slot div is in NavBar (App.tsx) and
+  // doesn't exist in the DOM on RosterPage's first render pass, so grab it
+  // after mount.
+  const [navActionsSlot, setNavActionsSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setNavActionsSlot(document.getElementById('nav-actions-slot'));
+  }, []);
 
   // The selects have to start on the plan's real shape, or a program built as
   // anything other than the 4x5 default would read as changed forever.
@@ -373,7 +386,8 @@ export function RosterPage() {
   // Matches check_shortfalls on the server: a table with one person is not a
   // discussion group. Disagreeing meant enabling the button and refusing the
   // request a round trip later.
-  const canGenerate = participants.length >= parseInt(numTables) * 2;
+  const minParticipants = parseInt(numTables) * 2;
+  const canGenerate = participants.length >= minParticipants;
   // computeChangeset reports a brand-new program as clean - there is no
   // canonical roster to differ from - so dirtiness alone would hide the button
   // on exactly the program that needs it.
@@ -422,14 +436,16 @@ export function RosterPage() {
                   Edit roster
                 </Button>
               )}
-              {process.env.NODE_ENV === 'development' && !locked && (
-                <Button variant="outline" size="sm" onClick={handleSeedTestData}>
-                  Add test data
-                </Button>
-              )}
             </div>
           </div>
         </CardHeader>
+        {process.env.NODE_ENV === 'development' && !locked && navActionsSlot &&
+          createPortal(
+            <Button variant="outline" size="sm" onClick={handleSeedTestData}>
+              Add test data
+            </Button>,
+            navActionsSlot,
+          )}
         <CardContent className="space-y-6">
           <PopulationStats participants={participants} keepApartPairs={keepApartPairs} />
 
@@ -523,15 +539,36 @@ export function RosterPage() {
               </p>
             </div>
           ) : showActions && (
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={handleRebuild}
-                disabled={!canGenerate}
-              >
-                {hasAssignmentSet ? 'Save and rebuild sessions' : 'Generate assignments'}
-              </Button>
+            <div className="flex gap-3 items-center">
+              <div className="flex-1 flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={handleRebuild}
+                  disabled={!canGenerate}
+                >
+                  {hasAssignmentSet ? 'Save and rebuild sessions' : 'Generate assignments'}
+                </Button>
+                {!canGenerate && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:text-foreground"
+                          aria-label="Why is this disabled?"
+                        >
+                          <HelpCircle className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Need at least {minParticipants} participants for {numTables} tables
+                        — you have {participants.length}.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
               {hasAssignmentSet && (
                 <Button variant="outline" onClick={handleDiscard}>
                   Discard changes

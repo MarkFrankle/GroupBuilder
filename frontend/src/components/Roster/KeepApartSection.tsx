@@ -108,37 +108,41 @@ export function KeepApartSection({
 
   return (
     <div className="space-y-2" role="group" aria-labelledby={HEADING_ID}>
-      <h3 id={HEADING_ID} className="text-sm font-medium">Keep apart</h3>
+      <div className="space-y-1">
+        <h3 id={HEADING_ID} className="text-base font-semibold">Keep apart</h3>
 
-      {/* Permanent, not an empty state: this sentence is the only place the
-          feature is explained, and it is as needed a week later as on day one. */}
-      <p className="text-sm text-muted-foreground">
-        {(pairs.length === 0 ? 'Nobody is being kept apart yet. ' : '') +
-          'People here will never be seated at the same table.'}
-      </p>
+        {/* Permanent, not an empty state: this sentence is the only place the
+            feature is explained, and it is as needed a week later as on day one. */}
+        <p className="text-sm text-muted-foreground">
+          People here will never be seated at the same table.
+        </p>
+      </div>
 
-      {pairs.map(([aId, bId]) => {
-        const aName = nameOf(aId) ?? MISSING;
-        const bName = nameOf(bId) ?? MISSING;
-        return (
-          <div key={`${aId}-${bId}`} className="flex items-center gap-2">
-            <span className="text-sm">{`${aName} and ${bName}`}</span>
-            {!readOnly && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onRemove(aId, bId)}
-                aria-label={`Stop keeping ${aName} and ${bName} apart`}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        );
-      })}
+      <div className="flex flex-wrap items-center gap-2">
+        {pairs.map(([aId, bId]) => {
+          const aName = nameOf(aId) ?? MISSING;
+          const bName = nameOf(bId) ?? MISSING;
+          return (
+            <span
+              key={`${aId}-${bId}`}
+              className="inline-flex items-center gap-1.5 rounded-full border bg-muted/40 py-1 pl-3 pr-1.5 text-sm"
+            >
+              {`${aName} and ${bName}`}
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={() => onRemove(aId, bId)}
+                  aria-label={`Stop keeping ${aName} and ${bName} apart`}
+                  className="rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </span>
+          );
+        })}
 
-      {!readOnly && draft && (
-        <div className="space-y-1">
+        {!readOnly && draft && (
           <div className="flex items-center gap-2">
             {personSelect('a', 'First person')}
             <span className="text-sm text-muted-foreground">and</span>
@@ -152,20 +156,21 @@ export function KeepApartSection({
               <X className="h-4 w-4" />
             </Button>
           </div>
-          {draft.error && (
-            <p id={ERROR_ID} role="alert" className="text-sm text-destructive">
-              {draft.error}
-            </p>
-          )}
-        </div>
-      )}
+        )}
 
-      {/* One row at a time: the button comes back when this one is done. */}
-      {!readOnly && !draft && (
-        <Button variant="outline" size="sm" onClick={() => setDraft({ ...EMPTY_DRAFT })}>
-          <Plus className="h-4 w-4 mr-1" />
-          Add a pair
-        </Button>
+        {/* One row at a time: the button comes back when this one is done. */}
+        {!readOnly && !draft && (
+          <Button variant="outline" size="sm" onClick={() => setDraft({ ...EMPTY_DRAFT })}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add a pair
+          </Button>
+        )}
+      </div>
+
+      {draft?.error && (
+        <p id={ERROR_ID} role="alert" className="text-sm text-destructive">
+          {draft.error}
+        </p>
       )}
     </div>
   );

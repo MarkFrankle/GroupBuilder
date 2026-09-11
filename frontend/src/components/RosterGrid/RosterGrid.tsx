@@ -175,7 +175,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
               <TableHead className="w-[120px]">Gender</TableHead>
               <TableHead className="w-[200px]">Partner</TableHead>
               <TableHead className="w-[90px]">Facilitator</TableHead>
-              <TableHead className="w-[160px]">Away</TableHead>
+              <TableHead className="w-[160px]">Absences</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -219,7 +219,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
                         disabled={readOnly}
                         onValueChange={v => handleFieldChange(p, 'partner_id', v)}
                       >
-                        <SelectTrigger className="min-w-0"><SelectValue placeholder="None" /></SelectTrigger>
+                        <SelectTrigger className="min-w-0 [&>span]:flex-1 [&>span]:truncate [&>span]:text-left"><SelectValue placeholder="None" /></SelectTrigger>
                         <SelectContent className="max-h-60 overflow-y-auto border shadow-md">
                           <SelectItem value="none">None</SelectItem>
                           {[...participants]
@@ -230,6 +230,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
                             ))}
                         </SelectContent>
                       </Select>
+                      <span className="flex w-5 shrink-0 items-center justify-center">
                       {p.partner_id && (
                         <button
                           onClick={() => onKeepTogetherToggle(p.id)}
@@ -244,6 +245,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
                           )}
                         </button>
                       )}
+                      </span>
                     </div>
                   </TableCell>
                   <TableCell className="p-1 text-center">

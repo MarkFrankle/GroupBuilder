@@ -35,7 +35,7 @@ describe('WelcomePage', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: /learn how it works/i }))
     expect(mockOnDismiss).toHaveBeenCalled()
-    expect(mockNavigate).toHaveBeenCalledWith('/help')
+    expect(mockNavigate).toHaveBeenCalledWith('/help#creating-your-roster')
   })
 
   it('navigates to roster and calls onDismiss when "Get started" is clicked', () => {
