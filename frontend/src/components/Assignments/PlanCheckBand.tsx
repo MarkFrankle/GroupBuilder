@@ -54,7 +54,7 @@ const RepeatWorstDetail: React.FC<{ label: string; lines: string[] }> = ({ label
           <HelpCircle className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
       </TooltipTrigger>
-      <TooltipContent>
+      <TooltipContent side="right" align="start">
         <ul className="space-y-0.5">
           {lines.map(line => (
             <li key={line}>{line}</li>
@@ -143,7 +143,7 @@ const PlanCheckBand: React.FC<PlanCheckBandProps> = ({ result }) => {
               <RepeatWorstDetail
                 label="Who has the repeat facilitator"
                 lines={r.facilitatorRepeatWorst.map(
-                  w => `${w.participant} — same facilitator as ${w.facilitator}, ${w.count} sessions`
+                  w => `Facilitator ${w.facilitator} sits with ${w.participant} ${w.count} times`
                 )}
               />
             )}
