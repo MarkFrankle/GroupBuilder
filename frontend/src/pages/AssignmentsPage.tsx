@@ -656,7 +656,10 @@ const AssignmentsPage: React.FC = () => {
           History
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent
+        align="end"
+        className="max-h-[70vh] overflow-y-auto"
+      >
         <DropdownMenuItem
           disabled={!readOnly}
           onSelect={() => {
