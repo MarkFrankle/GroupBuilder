@@ -222,17 +222,19 @@ const SessionCard: React.FC<SessionCardProps> = ({
       </div>
 
       <div className="flex flex-col gap-4 p-4">
-        {tableNumbers(assignment).map(n => (
-          <TableBlock
-            key={n}
-            tableNumber={n}
-            participants={assignment.tables[n]}
-            selectedName={selectedName}
-            onSelect={onSelect}
-            focus={focus}
-            onMarkAbsent={actionable ? onMarkAbsent : undefined}
-          />
-        ))}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {tableNumbers(assignment).map(n => (
+            <TableBlock
+              key={n}
+              tableNumber={n}
+              participants={assignment.tables[n]}
+              selectedName={selectedName}
+              onSelect={onSelect}
+              focus={focus}
+              onMarkAbsent={actionable ? onMarkAbsent : undefined}
+            />
+          ))}
+        </div>
         {absent.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 border-t pt-2">
             <span className="text-base text-muted-foreground">Absent:</span>

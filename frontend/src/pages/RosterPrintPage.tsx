@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Printer } from 'lucide-react'
@@ -42,6 +42,13 @@ const RosterPrintPage: React.FC = () => {
 
   const handleBack = () => navigate(-1)
   const handlePrint = () => window.print()
+
+  useLayoutEffect(() => {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual'
+    }
+    window.scrollTo(0, 0)
+  }, [])
 
   useEffect(() => {
     if (!state?.assignments || !state?.programId) return
@@ -92,7 +99,6 @@ const RosterPrintPage: React.FC = () => {
   }
 
   const { assignments } = state
-  const isMultiSession = assignments.length > 1
   const today = new Date().toLocaleDateString()
 
   return (
@@ -115,9 +121,7 @@ const RosterPrintPage: React.FC = () => {
       <div className="container mx-auto p-8 max-w-3xl">
         {assignments.map((assignment) => {
           const absent = assignment.absentParticipants || []
-          const title = isMultiSession
-            ? `Session ${assignment.session} Roster`
-            : 'Roster'
+          const title = `Session ${assignment.session} Roster`
           const tableNumbers = Object.keys(assignment.tables)
             .map(Number)
             .sort((a, b) => a - b)
@@ -190,9 +194,7 @@ const RosterPrintPage: React.FC = () => {
             {assignments.map((assignment) => {
               const seating = seatingBySession[assignment.session]
               if (!seating) return null
-              const seatingTitle = isMultiSession
-                ? `Session ${assignment.session} Seating Chart`
-                : 'Seating Chart'
+              const seatingTitle = `Session ${assignment.session} Seating Chart`
               const tableCount = seating.tables.length
               const gridCols = tableCount >= 6 ? 'grid-cols-3' : 'grid-cols-2'
 
