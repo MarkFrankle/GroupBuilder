@@ -71,11 +71,27 @@ function pairCounts(assignments: Assignment[]): Map<string, number> {
   return counts
 }
 
-/** Pairs who sat together more than once. */
-function repeatPairs(assignments: Assignment[]): number {
+/**
+ * Of the pairs seated together in one session, how many have met elsewhere in the
+ * program. Program-wide repeat counts can stay flat across a shuffle when the
+ * change is offset by other sessions; this answers the question a shuffle
+ * receipt actually needs to: did the pairs this shuffle just seated together
+ * improve?
+ */
+function sessionRepeatPairs(assignments: Assignment[], sessionNumber: number): number {
+  const target = assignments.find(a => a.session === sessionNumber)
+  if (!target) return 0
+
+  const counts = pairCounts(assignments)
   let repeats = 0
-  pairCounts(assignments).forEach(count => {
-    if (count > 1) repeats += 1
+  tableNumbers(target).forEach(n => {
+    const names = target.tables[n].filter((p): p is Participant => !!p).map(p => p.name)
+    for (let i = 0; i < names.length; i += 1) {
+      for (let j = i + 1; j < names.length; j += 1) {
+        const key = [names[i], names[j]].sort().join('\x00')
+        if ((counts.get(key) ?? 0) > 1) repeats += 1
+      }
+    }
   })
   return repeats
 }
@@ -88,8 +104,12 @@ function repeatPairs(assignments: Assignment[]): number {
  * return something close to what was there, and this degrades honestly:
  * "2 of 24 moved" is the truth, and tells the user to shuffle again.
  *
- * The quality delta is reported in both directions, including when it gets
- * worse. A number that only ever appears as good news is decoration.
+ * The quality delta is scoped to the shuffled session, not the whole program:
+ * a program-wide repeat count can stay flat across a shuffle when the change
+ * is offset elsewhere, which reads as "nothing happened" even when the
+ * session in question genuinely improved. It's reported in both directions,
+ * including when it gets worse — a number that only ever appears as good
+ * news is decoration.
  */
 export function shuffleReceipt(
   before: Assignment[],
@@ -118,10 +138,10 @@ export function shuffleReceipt(
     clauses.push(`sessions ${untouched.join(', ')} unchanged`)
   }
 
-  const wasRepeats = repeatPairs(before)
-  const nowRepeats = repeatPairs(after)
+  const wasSessionRepeats = sessionRepeatPairs(before, sessionNumber)
+  const nowSessionRepeats = sessionRepeatPairs(after, sessionNumber)
   clauses.push(
-    `${nowRepeats} repeat ${nowRepeats === 1 ? 'pair' : 'pairs'} across the program (was ${wasRepeats})`
+    `${nowSessionRepeats} ${nowSessionRepeats === 1 ? 'pair' : 'pairs'} at session ${sessionNumber}'s tables have already met elsewhere (was ${wasSessionRepeats})`
   )
 
   return `Session ${sessionNumber} shuffled. ${clauses.join(' · ')}.`
