@@ -67,10 +67,10 @@ const PlanCheckBand: React.FC<PlanCheckBandProps> = ({ result }) => {
         ) : (
           <AlertTriangle className="h-6 w-6 flex-shrink-0 text-amber-600" aria-hidden="true" />
         )}
-        <h2 className="text-xl font-bold">{headline}</h2>
+        <h2 className="text-2xl font-bold">{headline}</h2>
       </div>
 
-      <ul className="mt-3 space-y-1.5 text-[15px]">
+      <ul className="mt-3 space-y-1.5 text-base">
         {violations.map(v => (
           <ProblemLine key={`${v.kind}-${v.session}-${v.table ?? ''}`}>{v.message}</ProblemLine>
         ))}

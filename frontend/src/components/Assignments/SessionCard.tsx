@@ -166,9 +166,9 @@ const SessionCard: React.FC<SessionCardProps> = ({
         >
           <ChevronRight className="h-4 w-4" />
         </button>
-        <span className="text-sm font-semibold">Session {assignment.session}</span>
-        <span className="text-sm text-muted-foreground">· completed</span>
-        <span className="text-sm text-muted-foreground">
+        <span className="text-base font-semibold">Session {assignment.session}</span>
+        <span className="text-base text-muted-foreground">· completed</span>
+        <span className="text-base text-muted-foreground">
           · {seatedCount(assignment)} seated
         </span>
         <div className="ml-auto">{reopenButton}</div>
@@ -193,9 +193,9 @@ const SessionCard: React.FC<SessionCardProps> = ({
               <ChevronDown className="h-4 w-4" />
             </button>
           )}
-          <h3 className="text-base font-semibold">Session {assignment.session}</h3>
+          <h3 className="text-lg font-semibold">Session {assignment.session}</h3>
           {completed && (
-            <span className="text-sm text-muted-foreground">· completed</span>
+            <span className="text-base text-muted-foreground">· completed</span>
           )}
         </div>
 
@@ -235,7 +235,7 @@ const SessionCard: React.FC<SessionCardProps> = ({
         ))}
         {absent.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 border-t pt-2">
-            <span className="text-xs text-muted-foreground">Absent:</span>
+            <span className="text-base text-muted-foreground">Absent:</span>
             {absent.map((person: Participant) => (
               <Chip
                 key={person.name}

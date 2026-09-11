@@ -90,9 +90,9 @@ const ProgramHeader: React.FC<ProgramHeaderProps> = ({
         ) : (
           <div className="flex flex-col gap-2">
             <h1 className="text-3xl font-bold tracking-tight">{programName}</h1>
-            <div className="text-sm text-muted-foreground">{factsLine(facts)}</div>
+            <div className="text-lg text-muted-foreground">{factsLine(facts)}</div>
             {linkedPairs > 0 && (
-              <div className="text-[13px]">
+              <div className="text-base">
                 <span className="font-semibold">Rules</span>
                 <span className="px-2 text-muted-foreground">·</span>
                 <span>

@@ -74,7 +74,7 @@ const NoticeStrip: React.FC<NoticeStripProps> = ({ notice, onDismiss }) => {
     >
       {notice && (
         <>
-          <div className="text-sm font-medium">{notice.message}</div>
+          <div className="text-base font-medium">{notice.message}</div>
           <div className="flex items-center gap-2">
             {notice.actions?.map(action => (
               <Button key={action.label} variant="outline" size="sm" onClick={action.onClick}>
