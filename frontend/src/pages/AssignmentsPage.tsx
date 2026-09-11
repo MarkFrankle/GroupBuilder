@@ -764,7 +764,7 @@ const AssignmentsPage: React.FC = () => {
       {live.length > 0 && <PlanCheckBand result={planCheck} />}
       <NoticeStrip notice={provisionalNotice ?? notice} onDismiss={() => showNotice(null)} />
 
-      <div className="sticky top-11 z-10 -mx-8 border-b bg-white px-8">
+      <div className="sticky top-14 z-10 -mx-8 border-b bg-white px-8">
         <ViewBar
           focus={focus}
           onFocusChange={setFocus}
