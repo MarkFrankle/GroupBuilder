@@ -43,6 +43,8 @@ export interface PlanCheckResult {
     maxPairRepeat: number
     /** Most sessions any participant shares a table with one same facilitator. 0 = no facilitators. */
     maxFacilitatorRepeat: number
+    /** Everyone tied for maxFacilitatorRepeat, named — empty when at or under the floor. */
+    facilitatorRepeatWorst: { participant: string; facilitator: string; count: number }[]
   }
 }
 
@@ -113,8 +115,14 @@ function worstPairRepeat(assignments: Assignment[]): number {
   return worst
 }
 
-/** Most sessions any one participant shares a table with one same facilitator. */
-function worstFacilitatorRepeat(assignments: Assignment[]): number {
+/**
+ * Most sessions any one participant shares a table with one same facilitator,
+ * plus everyone tied for that worst count, named.
+ */
+function worstFacilitatorRepeat(assignments: Assignment[]): {
+  worst: number
+  details: { participant: string; facilitator: string; count: number }[]
+} {
   const counts = new Map<string, number>()
   assignments.forEach(a =>
     seatedTables(a).forEach(({ people }) => {
@@ -132,7 +140,13 @@ function worstFacilitatorRepeat(assignments: Assignment[]): number {
   counts.forEach(count => {
     worst = Math.max(worst, count)
   })
-  return worst
+  const details: { participant: string; facilitator: string; count: number }[] = []
+  counts.forEach((count, key) => {
+    if (count !== worst) return
+    const [participant, facilitator] = key.split('\x00')
+    details.push({ participant, facilitator, count })
+  })
+  return { worst, details }
 }
 
 /**
@@ -168,6 +182,7 @@ export function checkPlan(
   incompleteAssignments: Assignment[],
   keepApart: [string, string][]
 ): PlanCheckResult {
+  const facilitatorRepeat = worstFacilitatorRepeat(incompleteAssignments)
   const violations: Violation[] = []
   const everyone = incompleteAssignments.flatMap(a => seatedTables(a).flatMap(t => t.people))
   const hasCouples = everyone.some(person => person.partner && !person.keep_together)
@@ -230,9 +245,8 @@ export function checkPlan(
         : undefined,
       balanceEven: balanceHeldToRosterFloor(incompleteAssignments),
       maxPairRepeat: worstPairRepeat(incompleteAssignments),
-      maxFacilitatorRepeat: hasFacilitators
-        ? worstFacilitatorRepeat(incompleteAssignments)
-        : 0,
+      maxFacilitatorRepeat: hasFacilitators ? facilitatorRepeat.worst : 0,
+      facilitatorRepeatWorst: hasFacilitators ? facilitatorRepeat.details : [],
     },
   }
 }

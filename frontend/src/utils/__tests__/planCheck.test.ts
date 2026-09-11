@@ -159,6 +159,28 @@ describe('checkPlan — reassurances', () => {
     expect(checkPlan(plan, []).reassurances.maxFacilitatorRepeat).toBe(3)
   })
 
+  it('names who is tied for the worst facilitator repeat', () => {
+    const plan: Assignment[] = [1, 2, 3].map(session => ({
+      session,
+      tables: {
+        1: [p('F', { is_facilitator: true }), p('X')],
+        2: [p('G', { is_facilitator: true }), p('Y')],
+      },
+    }))
+    const { reassurances } = checkPlan(plan, [])
+    expect(reassurances.facilitatorRepeatWorst).toEqual(
+      expect.arrayContaining([
+        { participant: 'X', facilitator: 'F', count: 3 },
+        { participant: 'Y', facilitator: 'G', count: 3 },
+      ])
+    )
+    expect(reassurances.facilitatorRepeatWorst).toHaveLength(2)
+  })
+
+  it('reports an empty facilitatorRepeatWorst when there is no repeat', () => {
+    expect(checkPlan(cleanPlan(), []).reassurances.facilitatorRepeatWorst).toEqual([])
+  })
+
   it('balanceEven is true when the solver holds every table to the roster floor', () => {
     // cleanPlan is all-Christian all-Female → single-value → trivially even.
     expect(checkPlan(cleanPlan(), []).reassurances.balanceEven).toBe(true)

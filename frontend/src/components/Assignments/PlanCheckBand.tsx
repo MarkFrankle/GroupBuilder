@@ -1,6 +1,12 @@
 import React from 'react'
-import { CheckCircle2, AlertTriangle } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, HelpCircle } from 'lucide-react'
 import type { PlanCheckResult } from '@/utils/planCheck'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 interface PlanCheckBandProps {
   result: PlanCheckResult
@@ -33,6 +39,33 @@ const ProblemLine: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <span className="sr-only">Needs attention: </span>
     <span>{children}</span>
   </li>
+)
+
+const FacilitatorRepeatDetail: React.FC<{
+  worst: { participant: string; facilitator: string; count: number }[]
+}> = ({ worst }) => (
+  <TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className="ml-1 inline-flex align-middle text-muted-foreground hover:text-foreground"
+          aria-label="Who has the repeat facilitator"
+        >
+          <HelpCircle className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <ul className="space-y-0.5">
+          {worst.map(w => (
+            <li key={`${w.participant}\x00${w.facilitator}`}>
+              {`${w.participant} — same facilitator as ${w.facilitator}, ${w.count} sessions`}
+            </li>
+          ))}
+        </ul>
+      </TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
 )
 
 const NoteLine: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -99,6 +132,9 @@ const PlanCheckBand: React.FC<PlanCheckBandProps> = ({ result }) => {
         {multiSession && r.maxFacilitatorRepeat > REPEAT_FLOOR && (
           <NoteLine>
             {`One person has the same facilitator ${r.maxFacilitatorRepeat} of ${incompleteSessionCount} sessions`}
+            {r.facilitatorRepeatWorst.length > 0 && (
+              <FacilitatorRepeatDetail worst={r.facilitatorRepeatWorst} />
+            )}
           </NoteLine>
         )}
       </ul>

@@ -14,6 +14,7 @@ const base: PlanCheckResult = {
     balanceEven: true,
     maxPairRepeat: 2,
     maxFacilitatorRepeat: 2,
+    facilitatorRepeatWorst: [],
   },
 }
 
@@ -68,11 +69,37 @@ describe('PlanCheckBand — worst-case notes', () => {
   it('replaces the facilitator reassurance with a factual note above the floor', () => {
     withResult({
       incompleteSessionCount: 5,
-      reassurances: { ...base.reassurances, maxFacilitatorRepeat: 4 },
+      reassurances: {
+        ...base.reassurances,
+        maxFacilitatorRepeat: 4,
+        facilitatorRepeatWorst: [{ participant: 'Priya', facilitator: 'Sam', count: 4 }],
+      },
     })
     expect(
       screen.getByText('One person has the same facilitator 4 of 5 sessions')
     ).toBeInTheDocument()
+  })
+
+  it('names the tied worst cases in the hoverable detail', async () => {
+    withResult({
+      incompleteSessionCount: 5,
+      reassurances: {
+        ...base.reassurances,
+        maxFacilitatorRepeat: 4,
+        facilitatorRepeatWorst: [
+          { participant: 'Priya', facilitator: 'Sam', count: 4 },
+          { participant: 'Dara', facilitator: 'Erin', count: 4 },
+        ],
+      },
+    })
+    const trigger = screen.getByRole('button', { name: /who/i })
+    trigger.focus()
+    expect(
+      (await screen.findAllByText('Priya — same facilitator as Sam, 4 sessions')).length
+    ).toBeGreaterThan(0)
+    expect(screen.getAllByText('Dara — same facilitator as Erin, 4 sessions').length).toBeGreaterThan(
+      0
+    )
   })
 })
 
