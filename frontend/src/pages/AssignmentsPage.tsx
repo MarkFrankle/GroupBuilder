@@ -190,8 +190,14 @@ const AssignmentsPage: React.FC = () => {
 
   const { data: canonicalRoster } = useCanonicalRoster(programId)
   const planCheck = useMemo(
-    () => checkPlan(live, keepApartPairs(canonicalRoster?.participants ?? [])),
-    [live, canonicalRoster]
+    () =>
+      checkPlan(
+        live,
+        keepApartPairs(canonicalRoster?.participants ?? []),
+        metadata?.pairwise_cap,
+        metadata?.table_overlap_cap
+      ),
+    [live, canonicalRoster, metadata?.pairwise_cap, metadata?.table_overlap_cap]
   )
 
   const allParticipants = useMemo<Participant[]>(
@@ -733,11 +739,7 @@ const AssignmentsPage: React.FC = () => {
       <CoupleSlotsContext.Provider value={coupleSlots}>
       <div className="flex flex-col gap-4 px-8">
       {live.length > 0 && (
-        <PlanCheckBand
-          result={planCheck}
-          pairwiseCap={metadata?.pairwise_cap}
-          overlapCap={metadata?.table_overlap_cap}
-        />
+        <PlanCheckBand result={planCheck} />
       )}
       <NoticeStrip notice={provisionalNotice ?? notice} onDismiss={() => showNotice(null)} />
 

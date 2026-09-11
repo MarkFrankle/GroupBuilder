@@ -13,27 +13,40 @@ const base: PlanCheckResult = {
     facilitatorCoverage: true,
     balanceEven: true,
     maxPairRepeat: 2,
+    pairRepeatFloor: 2,
     pairRepeatWorst: [],
     maxFacilitatorRepeat: 2,
+    facilitatorRepeatFloor: 2,
     facilitatorRepeatWorst: [],
     maxTableOverlap: 1,
+    tableOverlapCap: null,
     tableOverlapWorst: [],
   },
 }
 
 const withResult = (
-  overrides: Partial<PlanCheckResult>,
-  caps: { pairwiseCap?: number | null; overlapCap?: number | null } = {}
-) => render(<PlanCheckBand result={{ ...base, ...overrides }} {...caps} />)
+  overrides: Partial<Omit<PlanCheckResult, 'reassurances'>> & {
+    reassurances?: Partial<PlanCheckResult['reassurances']>
+  } = {}
+) =>
+  render(
+    <PlanCheckBand
+      result={{
+        ...base,
+        ...overrides,
+        reassurances: { ...base.reassurances, ...overrides.reassurances },
+      }}
+    />
+  )
 
 describe('PlanCheckBand — green state', () => {
   it('shows the ready-to-print headline', () => {
-    withResult({})
+    withResult()
     expect(screen.getByText('Looks good — ready to print and hand out')).toBeInTheDocument()
   })
 
   it('shows a line only for features the roster uses', () => {
-    withResult({})
+    withResult()
     expect(screen.getByText('All couples are seated apart')).toBeInTheDocument()
     expect(screen.getByText('Every table has a facilitator, every session')).toBeInTheDocument()
     expect(
@@ -42,16 +55,16 @@ describe('PlanCheckBand — green state', () => {
   })
 
   it('shows the reassuring repeat lines when at or below the floor', () => {
-    withResult({})
+    withResult()
     expect(screen.getByText('No one sits with the same person more than twice')).toBeInTheDocument()
     expect(screen.getByText('Everyone sees a variety of facilitators')).toBeInTheDocument()
   })
 
-  it('hides the balance line when the solver did worse than the roster allows', () => {
-    withResult({ reassurances: { ...base.reassurances, balanceEven: false } })
+  it('shows the balance reassurance when the solver held the roster floor', () => {
+    withResult()
     expect(
-      screen.queryByText('Faiths and genders are mixed as evenly as this roster allows')
-    ).not.toBeInTheDocument()
+      screen.getByText('Faiths and genders are mixed as evenly as this roster allows')
+    ).toBeInTheDocument()
   })
 
   it('hides the repeat lines entirely for a single-session program', () => {
@@ -61,25 +74,33 @@ describe('PlanCheckBand — green state', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('uses the solver\'s real pairwise cap instead of the hardcoded floor', () => {
-    withResult({ reassurances: { ...base.reassurances, maxPairRepeat: 3 } }, { pairwiseCap: 3 })
+  it("uses the solver's real pairwise cap instead of the hardcoded floor", () => {
+    withResult({ reassurances: { maxPairRepeat: 3, pairRepeatFloor: 3 } })
     expect(
       screen.getByText('No one sits with the same person more than three times')
     ).toBeInTheDocument()
   })
 
   it('shows the table-overlap line only once a cap is known', () => {
-    withResult({})
+    withResult()
     expect(screen.queryByText(/No two tables share/)).not.toBeInTheDocument()
 
-    withResult({}, { overlapCap: 1 })
+    withResult({ reassurances: { tableOverlapCap: 1 } })
     expect(screen.getByText('No two tables share more than 1 person')).toBeInTheDocument()
   })
 })
 
-describe('PlanCheckBand — worst-case notes', () => {
+describe('PlanCheckBand — less-than-ideal state', () => {
+  it('shows the not-ideal headline when a soft signal runs past its floor', () => {
+    withResult({
+      verdict: 'lessThanIdeal',
+      reassurances: { maxPairRepeat: 3 },
+    })
+    expect(screen.getByText('Good enough to print, but not ideal')).toBeInTheDocument()
+  })
+
   it('replaces the pair reassurance with a factual note above the floor', () => {
-    withResult({ reassurances: { ...base.reassurances, maxPairRepeat: 3 } })
+    withResult({ verdict: 'lessThanIdeal', reassurances: { maxPairRepeat: 3 } })
     expect(
       screen.queryByText('No one sits with the same person more than twice')
     ).not.toBeInTheDocument()
@@ -87,10 +108,10 @@ describe('PlanCheckBand — worst-case notes', () => {
   })
 
   it('replaces the overlap reassurance with a factual note above the cap', () => {
-    withResult(
-      { reassurances: { ...base.reassurances, maxTableOverlap: 2 } },
-      { overlapCap: 1 }
-    )
+    withResult({
+      verdict: 'lessThanIdeal',
+      reassurances: { maxTableOverlap: 2, tableOverlapCap: 1 },
+    })
     expect(
       screen.queryByText('No two tables share more than 1 person')
     ).not.toBeInTheDocument()
@@ -98,18 +119,14 @@ describe('PlanCheckBand — worst-case notes', () => {
   })
 
   it('names the worst overlapping tables in the hoverable detail', async () => {
-    withResult(
-      {
-        reassurances: {
-          ...base.reassurances,
-          maxTableOverlap: 2,
-          tableOverlapWorst: [
-            { sessions: [1, 3], tables: [1, 2], names: ['Ann', 'Bea'] },
-          ],
-        },
+    withResult({
+      verdict: 'lessThanIdeal',
+      reassurances: {
+        maxTableOverlap: 2,
+        tableOverlapCap: 1,
+        tableOverlapWorst: [{ sessions: [1, 3], tables: [1, 2], names: ['Ann', 'Bea'] }],
       },
-      { overlapCap: 1 }
-    )
+    })
     const trigger = screen.getByRole('button', { name: /which tables overlap/i })
     trigger.focus()
     expect(
@@ -119,8 +136,8 @@ describe('PlanCheckBand — worst-case notes', () => {
 
   it('names the tied worst pairs in the hoverable detail', async () => {
     withResult({
+      verdict: 'lessThanIdeal',
       reassurances: {
-        ...base.reassurances,
         maxPairRepeat: 3,
         pairRepeatWorst: [
           { names: ['Ann', 'Bea'], count: 3 },
@@ -138,9 +155,9 @@ describe('PlanCheckBand — worst-case notes', () => {
 
   it('replaces the facilitator reassurance with a factual note above the floor', () => {
     withResult({
+      verdict: 'lessThanIdeal',
       incompleteSessionCount: 5,
       reassurances: {
-        ...base.reassurances,
         maxFacilitatorRepeat: 4,
         facilitatorRepeatWorst: [{ participant: 'Priya', facilitator: 'Sam', count: 4 }],
       },
@@ -152,9 +169,9 @@ describe('PlanCheckBand — worst-case notes', () => {
 
   it('names the tied worst cases in the hoverable detail', async () => {
     withResult({
+      verdict: 'lessThanIdeal',
       incompleteSessionCount: 5,
       reassurances: {
-        ...base.reassurances,
         maxFacilitatorRepeat: 4,
         facilitatorRepeatWorst: [
           { participant: 'Priya', facilitator: 'Sam', count: 4 },
@@ -214,5 +231,26 @@ describe('PlanCheckBand — attention state', () => {
       />
     )
     expect(screen.getByText('A few things to check before you print')).toBeInTheDocument()
+  })
+
+  it('flags a balance violation with the same treatment as other hard violations', () => {
+    render(
+      <PlanCheckBand
+        result={{
+          ...base,
+          verdict: 'attention',
+          violations: [
+            {
+              kind: 'balance',
+              session: 2,
+              message: "Session 2 isn't mixed as evenly by religion as this roster allows",
+            },
+          ],
+        }}
+      />
+    )
+    expect(
+      screen.getByText("Session 2 isn't mixed as evenly by religion as this roster allows")
+    ).toBeInTheDocument()
   })
 })
