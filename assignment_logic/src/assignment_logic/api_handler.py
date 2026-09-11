@@ -44,6 +44,8 @@ def handle_generate_assignments(
         logger.info(
             f"Solved with pairwise_cap={pairwise_cap}, table_overlap_cap={overlap_cap}"
         )
+        result["pairwise_cap"] = pairwise_cap
+        result["table_overlap_cap"] = overlap_cap
     else:
         logger.error("No feasible pair of caps found within the search budget")
     return result

@@ -47,6 +47,14 @@ export interface PlanCheckResult {
     maxFacilitatorRepeat: number
     /** Everyone tied for maxFacilitatorRepeat, named — empty when at or under the floor. */
     facilitatorRepeatWorst: { participant: string; facilitator: string; count: number }[]
+    /** Most people any two tables from different sessions have in common. */
+    maxTableOverlap: number
+    /** Every pair of tables tied for maxTableOverlap, named — empty when at or under the floor. */
+    tableOverlapWorst: {
+      sessions: [number, number]
+      tables: [number, number]
+      names: string[]
+    }[]
   }
 }
 
@@ -165,6 +173,56 @@ function worstFacilitatorRepeat(assignments: Assignment[]): {
 }
 
 /**
+ * Most people any two tables from different sessions have in common, plus
+ * every pair of tables tied for that worst count, named. Same-session tables
+ * can never overlap — a person sits at exactly one table per session — so
+ * this only compares tables across distinct sessions, matching the hard cap
+ * `group_builder.py` enforces server-side.
+ */
+function worstTableOverlap(assignments: Assignment[]): {
+  worst: number
+  details: { sessions: [number, number]; tables: [number, number]; names: string[] }[]
+} {
+  const allTables = assignments.flatMap(a =>
+    seatedTables(a).map(t => ({
+      session: a.session,
+      table: t.table,
+      names: new Set(t.people.map(p => p.name)),
+    }))
+  )
+
+  let worst = 0
+  const overlaps: {
+    sessions: [number, number]
+    tables: [number, number]
+    names: string[]
+  }[] = []
+
+  for (let i = 0; i < allTables.length; i += 1) {
+    for (let j = i + 1; j < allTables.length; j += 1) {
+      const a = allTables[i]
+      const b = allTables[j]
+      if (a.session === b.session) continue
+      const shared = Array.from(a.names).filter(name => b.names.has(name))
+      if (shared.length === 0) continue
+      if (shared.length > worst) {
+        worst = shared.length
+        overlaps.length = 0
+      }
+      if (shared.length === worst) {
+        overlaps.push({
+          sessions: [a.session, b.session],
+          tables: [a.table, b.table],
+          names: shared,
+        })
+      }
+    }
+  }
+
+  return { worst, details: overlaps }
+}
+
+/**
  * True when the solver held every table, for both religion and gender, to the
  * minimum spread the roster composition allows. When it did worse the line just
  * does not appear — we do not say what is wrong, because the coordinator cannot
@@ -199,6 +257,7 @@ export function checkPlan(
 ): PlanCheckResult {
   const facilitatorRepeat = worstFacilitatorRepeat(incompleteAssignments)
   const pairRepeat = worstPairRepeat(incompleteAssignments)
+  const tableOverlap = worstTableOverlap(incompleteAssignments)
   const violations: Violation[] = []
   const everyone = incompleteAssignments.flatMap(a => seatedTables(a).flatMap(t => t.people))
   const hasCouples = everyone.some(person => person.partner && !person.keep_together)
@@ -264,6 +323,8 @@ export function checkPlan(
       pairRepeatWorst: pairRepeat.details,
       maxFacilitatorRepeat: hasFacilitators ? facilitatorRepeat.worst : 0,
       facilitatorRepeatWorst: hasFacilitators ? facilitatorRepeat.details : [],
+      maxTableOverlap: tableOverlap.worst,
+      tableOverlapWorst: tableOverlap.details,
     },
   }
 }

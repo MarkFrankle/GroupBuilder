@@ -732,7 +732,13 @@ const AssignmentsPage: React.FC = () => {
 
       <CoupleSlotsContext.Provider value={coupleSlots}>
       <div className="flex flex-col gap-4 px-8">
-      {live.length > 0 && <PlanCheckBand result={planCheck} />}
+      {live.length > 0 && (
+        <PlanCheckBand
+          result={planCheck}
+          pairwiseCap={metadata?.pairwise_cap}
+          overlapCap={metadata?.table_overlap_cap}
+        />
+      )}
       <NoticeStrip notice={provisionalNotice ?? notice} onDismiss={() => showNotice(null)} />
 
       <div className="sticky top-14 z-10 -mx-8 border-b bg-white px-8">

@@ -199,6 +199,14 @@ def solve_program(
         else results.get("solution_quality"),
         "solve_time": None if absences_applied else results.get("solve_time"),
         "total_deviation": None if absences_applied else results.get("total_deviation"),
+        # A per-session absence re-solve bypasses find_feasible_plan (plain
+        # GroupBuilder, no cap search), so it doesn't reconfirm either cap
+        # against the sessions actually saved - null both rather than report
+        # a number that no longer describes this result.
+        "pairwise_cap": None if absences_applied else results.get("pairwise_cap"),
+        "table_overlap_cap": None
+        if absences_applied
+        else results.get("table_overlap_cap"),
     }
 
     return assignments, metadata
