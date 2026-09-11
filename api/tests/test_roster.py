@@ -62,6 +62,21 @@ class TestRosterToParticipantList:
         assert result[0]["couple_id"] is None
         assert result[0]["linked_id"] is None
 
+    def test_carries_absent_sessions(self):
+        participants = [
+            {
+                "id": "a",
+                "name": "Alice",
+                "religion": "Christian",
+                "gender": "Female",
+                "absent_sessions": [4, 2],
+            },
+            {"id": "b", "name": "Bob", "religion": "Jewish", "gender": "Male"},
+        ]
+        result = _roster_to_participant_list(participants)
+        assert result[0]["absent_sessions"] == [2, 4]
+        assert result[1]["absent_sessions"] == []
+
 
 class TestGetRoster:
     def test_returns_empty_roster(self, client):
@@ -643,6 +658,30 @@ class TestCanonicalRoster:
         assert body["num_sessions"] == 3
         assert [p["name"] for p in body["participants"]] == ["Alice"]
 
+    def test_derives_absent_sessions_from_the_current_version(
+        self, client, add_assignment_set_to_firestore, add_version_to_firestore
+    ):
+        set_id = add_assignment_set_to_firestore(
+            {"participant_data": _canonical(4), "num_tables": 2, "num_sessions": 2}
+        )
+        add_version_to_firestore(
+            set_id,
+            "v1",
+            [
+                {"session": 1, "tables": {"1": [], "2": []}},
+                {
+                    "session": 2,
+                    "tables": {"1": [], "2": []},
+                    "absentParticipants": [{"name": "Person3"}],
+                },
+            ],
+        )
+
+        body = client.get("/api/roster/canonical?program_id=test_org_id").json()
+        by_name = {p["name"]: p for p in body["participants"]}
+        assert by_name["Person3"]["absent_sessions"] == [2]
+        assert by_name["Person0"]["absent_sessions"] == []
+
     def test_no_assignment_set_yet_is_a_normal_state(self, client):
         """A program before its first generate has no canonical roster. That is
         not an error - it is the first-run state, and the page renders unlocked."""
@@ -962,6 +1001,42 @@ class TestRebuild:
         ]
         assert "Person7" not in seated
 
+    def test_first_build_applies_prebuild_absences(
+        self, client, add_roster_to_firestore
+    ):
+        """No assignment set yet: the per-participant ``absent_sessions`` on the
+        live roster is the only source, and it must reach the first solve."""
+        from api.services.assignment_set_storage import AssignmentSetStorage
+
+        roster = _draft(6)
+        roster[5]["absent_sessions"] = [2]
+        add_roster_to_firestore(roster)
+
+        response = client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 2, "num_sessions": 2},
+        )
+        assert response.status_code == 200
+        set_id = response.json()["assignment_set_id"]
+        version = AssignmentSetStorage().get_version("test_org_id", set_id)
+
+        session_one, session_two = version["assignments"]
+        assert [p["name"] for p in session_two.get("absentParticipants", [])] == [
+            "Person5"
+        ]
+        seated_two = [
+            person["name"]
+            for seats in session_two["tables"].values()
+            for person in seats
+        ]
+        seated_one = [
+            person["name"]
+            for seats in session_one["tables"].values()
+            for person in seats
+        ]
+        assert "Person5" not in seated_two
+        assert "Person5" in seated_one
+
     def test_completion_refusals_still_fire(
         self, client, add_assignment_set_to_firestore, add_roster_to_firestore
     ):
@@ -1041,6 +1116,42 @@ class TestDiscard:
 
         # The ids are new, and that is the point of the name matching above.
         assert not ({p["id"] for p in roster} & {p["id"] for p in draft})
+
+    def test_reseeds_absent_sessions_from_the_discarded_set(
+        self,
+        client,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+        add_roster_to_firestore,
+    ):
+        """The assignment set owns absences post-build, so discard writes them
+        back onto the fresh roster docs - by name, since the ids are new."""
+        from api.services.roster_service import RosterService
+
+        set_id = add_assignment_set_to_firestore(
+            {"participant_data": _canonical(4), "num_tables": 2, "num_sessions": 2}
+        )
+        add_version_to_firestore(
+            set_id,
+            "v1",
+            [
+                {"session": 1, "tables": {"1": [], "2": []}},
+                {
+                    "session": 2,
+                    "tables": {"1": [], "2": []},
+                    "absentParticipants": [{"name": "Person1"}],
+                },
+            ],
+        )
+        add_roster_to_firestore(_draft(6))
+
+        assert (
+            client.post("/api/roster/discard?program_id=test_org_id").status_code == 200
+        )
+
+        by_name = {p["name"]: p for p in RosterService().get_roster("test_org_id")}
+        assert by_name["Person1"]["absent_sessions"] == [2]
+        assert by_name["Person0"]["absent_sessions"] == []
 
     def _add_keep_apart(self, client, a_id, b_id):
         response = client.post(

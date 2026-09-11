@@ -158,6 +158,15 @@ function HelpPage() {
             you have 6 facilitators for 4 tables, some tables will get two.
           </p>
 
+          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Recording absences ahead of time:</p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            If you already know someone will miss a session or two, use the{" "}
+            <strong>Away</strong> column on their row and tick the sessions they'll
+            miss. The first build works around those absences. After you've built your
+            sessions, absences are managed per session on the Assignments page instead,
+            and the Away column becomes a read-only summary.
+          </p>
+
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Deleting a participant:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Hover over a participant's row and a trash icon will appear on the right.

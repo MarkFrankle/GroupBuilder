@@ -761,3 +761,85 @@ describe('the Keep apart block', () => {
     });
   });
 });
+
+/**
+ * The Away column. Editable before the first build (autosaves like every other
+ * field); a read-only, inert mirror of the assignment set's per-session
+ * absences afterward — same as every other locked field.
+ */
+describe('the Away column', () => {
+  const alice = {
+    id: 'p1', name: 'Alice', religion: 'Christian', gender: 'Female',
+    partner_id: null, is_facilitator: false, keep_together: false,
+  };
+  const bob = {
+    id: 'p2', name: 'Bob', religion: 'Jewish', gender: 'Male',
+    partner_id: null, is_facilitator: false, keep_together: false,
+  };
+
+  const mockProgram = (opts: {
+    draft: any[];
+    canonical: any[] | null;
+    canonicalAbsences?: Record<string, number[]>;
+  }) => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('/api/roster/canonical')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => opts.canonical
+            ? {
+                participants: opts.canonical.map(p => ({
+                  name: p.name, religion: p.religion, gender: p.gender,
+                  partner: null, is_facilitator: false, keep_together: false,
+                  absent_sessions: opts.canonicalAbsences?.[p.name] ?? [],
+                })),
+                num_tables: 2, num_sessions: 3,
+              }
+            : { participants: [], num_tables: null, num_sessions: null },
+        } as Response);
+      }
+      if (url.includes('/api/assignments/metadata')) {
+        return opts.canonical
+          ? Promise.resolve({ ok: true, json: async () => ({ assignment_set_id: 's1', num_tables: 2, num_sessions: 3 }) } as Response)
+          : Promise.resolve({ ok: false, status: 404, json: async () => ({}) } as Response);
+      }
+      if (url.includes('/api/assignments/results')) {
+        return Promise.resolve({ ok: true, json: async () => [] } as Response);
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ participants: opts.draft }) } as Response);
+    });
+  };
+
+  beforeEach(() => jest.clearAllMocks());
+
+  test('pre-build: ticking a session autosaves', async () => {
+    mockProgram({ draft: [{ ...alice, absent_sessions: [1] }, bob], canonical: null });
+    renderPage();
+
+    const awayCell = await screen.findByRole('button', { name: 'Misses session 1' });
+    fireEvent.keyDown(awayCell, { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Session 2' }));
+
+    await waitFor(() => {
+      const puts = mockFetch.mock.calls.filter(
+        ([url, init]) => String(url).includes('/api/roster/p1')
+          && (init as RequestInit | undefined)?.method === 'PUT'
+          && JSON.parse(String((init as RequestInit).body)).absent_sessions?.includes(2)
+      );
+      expect(puts.length).toBeGreaterThan(0);
+    });
+  });
+
+  test('post-build: the cell mirrors the set and stays inert', async () => {
+    mockProgram({
+      draft: [alice, bob],
+      canonical: [alice, bob],
+      canonicalAbsences: { Alice: [2] },
+    });
+    renderPage();
+
+    const cell = await screen.findByText('Misses session 2');
+    fireEvent.click(cell);
+    expect(screen.queryByRole('menuitemcheckbox')).toBeNull();
+  });
+});

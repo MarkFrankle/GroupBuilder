@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/select';
 import { Trash2, Link, Unlink } from 'lucide-react';
 import { RosterParticipant, Religion, Gender, RELIGIONS, GENDERS } from '@/types/roster';
+import { AwayCell } from './AwayCell';
 
 interface RosterGridProps {
   participants: RosterParticipant[];
@@ -16,6 +17,9 @@ interface RosterGridProps {
   onDelete: (id: string) => void;
   onAdd: (data: Omit<RosterParticipant, 'id'>) => void;
   onKeepTogetherToggle: (id: string) => void;
+  /** The current Number of Sessions value — drives the Away popover's checkbox
+   * count and which marks the Away cell shows. */
+  numSessions: number;
   /** Locked: the assignments were built from this roster and editing it would
    * invalidate them. Every field is inert and the add-row is gone. */
   readOnly?: boolean;
@@ -33,7 +37,7 @@ const EMPTY_ROW: EmptyRowState = {
   name: '', religion: 'Other', gender: 'Other', partner_id: null, is_facilitator: false,
 };
 
-export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepTogetherToggle, readOnly = false }: RosterGridProps) {
+export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepTogetherToggle, numSessions, readOnly = false }: RosterGridProps) {
 
   const [editingNames, setEditingNames] = useState<Record<string, string>>({});
   const [emptyRow, setEmptyRow] = useState<EmptyRowState>({ ...EMPTY_ROW });
@@ -52,6 +56,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
         partner_id: participant.partner_id,
         is_facilitator: participant.is_facilitator ?? false,
         keep_together: participant.keep_together,
+        absent_sessions: participant.absent_sessions ?? [],
       });
     }
     setEditingNames(prev => {
@@ -74,6 +79,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
       partner_id: partnerValue,
       is_facilitator: participant.is_facilitator ?? false,
       keep_together: participant.keep_together,
+      absent_sessions: participant.absent_sessions ?? [],
     });
   };
 
@@ -85,6 +91,19 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
       partner_id: participant.partner_id,
       is_facilitator: checked,
       keep_together: participant.keep_together,
+      absent_sessions: participant.absent_sessions ?? [],
+    });
+  };
+
+  const handleAwayChange = (participant: RosterParticipant, next: number[]) => {
+    onUpdate(participant.id, {
+      name: editingNames[participant.id] ?? participant.name,
+      religion: participant.religion,
+      gender: participant.gender,
+      partner_id: participant.partner_id,
+      is_facilitator: participant.is_facilitator ?? false,
+      keep_together: participant.keep_together,
+      absent_sessions: next,
     });
   };
 
@@ -156,6 +175,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
               <TableHead className="w-[120px]">Gender</TableHead>
               <TableHead className="w-[200px]">Partner</TableHead>
               <TableHead className="w-[90px]">Facilitator</TableHead>
+              <TableHead className="w-[160px]">Away</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -237,6 +257,15 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
                     />
                   </TableCell>
                   <TableCell className="p-1">
+                    <AwayCell
+                      name={p.name}
+                      absentSessions={p.absent_sessions ?? []}
+                      numSessions={numSessions}
+                      readOnly={readOnly}
+                      onChange={next => handleAwayChange(p, next)}
+                    />
+                  </TableCell>
+                  <TableCell className="p-1">
                     {!readOnly && (
                     <Button
                       variant="ghost"
@@ -290,6 +319,9 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
                   aria-label="Facilitator (save name first)"
                   onChange={() => {}}
                 />
+              </TableCell>
+              <TableCell className="p-1">
+                <span className="text-sm text-muted-foreground px-3">—</span>
               </TableCell>
               <TableCell className="p-1"></TableCell>
             </TableRow>

@@ -80,6 +80,15 @@
   delete and re-resolved after. A third such field must do the same or it silently orphans.
 - **The Assignments view-controls row uses `sticky top-11` — a hardcoded match to the condensed `ProgramHeader`'s height (`py-2.5`, ~44px). If the header's padding changes, this offset must change with it.**
 - **`GET /api/roster/canonical` already returns each participant with `keep_apart` as a resolved list of *names*** (the backend resolves the id pairs at generate time and freezes them on the assignment set). Consumers that need keep-apart on the assignments side — e.g. `planCheck.ts` — read it straight off `useCanonicalRoster`; no `useKeepApart` + id→name resolution needed. `partner` on that payload is likewise a name.
+- **`GET /api/roster/canonical` also returns `absent_sessions` per participant** — derived at
+  request time from the current version's per-session `absentParticipants`, not stored on
+  `participant_data`. The Roster page's locked "Away" column mirrors this; the dormant
+  roster-document `absent_sessions` field is not read while a set exists and may drift.
+- **A multi-select popover with checkboxes: use `DropdownMenu` + `DropdownMenuCheckboxItem`,
+  not a new Popover dep.** `@radix-ui/react-popover` isn't installed. Give each checkbox item
+  `onSelect={e => e.preventDefault()}` or the menu closes on the first tick. Opens in tests
+  with `fireEvent.keyDown(trigger, { key: 'Enter' })`; items are `role="menuitemcheckbox"`.
+  See `AwayCell.tsx`.
 ## Build & Dev Commands
 
 ### Frontend (`frontend/`) — npm + CRA + craco

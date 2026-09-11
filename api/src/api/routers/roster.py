@@ -46,6 +46,7 @@ class ParticipantData(BaseModel):
     partner_id: Optional[str] = None
     is_facilitator: bool = False
     keep_together: bool = False
+    absent_sessions: list[int] = Field(default_factory=list)
 
 
 @router.get("/")
@@ -57,6 +58,20 @@ async def get_roster(
 ):
     participants = roster_service.get_roster(program_id)
     return {"participants": participants}
+
+
+def _absent_sessions_by_name(head: dict | None) -> dict[str, list[int]]:
+    """Invert a version's per-session ``absentParticipants`` into name -> [session#].
+
+    The assignment set owns absences once it exists; this is how the Roster page
+    (locked column) and ``POST /roster/discard`` read them back out.
+    """
+    result: dict[str, list[int]] = {}
+    for session in (head or {}).get("assignments", []):
+        session_number = int(session["session"])
+        for person in session.get("absentParticipants") or []:
+            result.setdefault(person["name"], []).append(session_number)
+    return {name: sorted(nums) for name, nums in result.items()}
 
 
 @router.get("/canonical")
@@ -76,8 +91,13 @@ async def get_canonical_roster(
         return {"participants": [], "num_tables": None, "num_sessions": None}
 
     assignment_set = storage.get_set(program_id, set_id) or {}
+    absent_by_name = _absent_sessions_by_name(storage.get_version(program_id, set_id))
+    participants = [
+        {**p, "absent_sessions": absent_by_name.get(p["name"], [])}
+        for p in assignment_set.get("participant_data", [])
+    ]
     return {
-        "participants": assignment_set.get("participant_data", []),
+        "participants": participants,
         "num_tables": assignment_set.get("num_tables"),
         "num_sessions": assignment_set.get("num_sessions"),
     }
@@ -111,6 +131,7 @@ def _roster_to_participant_list(
                 "linked_id": None,
                 "is_facilitator": p.get("is_facilitator", False),
                 "keep_together": p.get("keep_together", False),
+                "absent_sessions": sorted(p.get("absent_sessions") or []),
             }
         )
 
@@ -283,6 +304,15 @@ async def generate_from_roster(
             absent = session.get("absentParticipants") or []
             if absent:
                 absence_map[int(session["session"])] = absent
+    else:
+        # First build: there is no assignment set to read absences off, so the
+        # per-participant ``absent_sessions`` recorded on the Roster page is the
+        # only source. Entries outside 1..num_sessions are dropped here - a mark
+        # left over from a since-reduced session count is not an error.
+        for p in participant_list:
+            for n in p.get("absent_sessions") or []:
+                if 1 <= int(n) <= data.num_sessions:
+                    absence_map.setdefault(int(n), []).append(p)
 
     # Still nothing written.
     try:
@@ -399,6 +429,7 @@ async def discard_roster_changes(
 
     assignment_set = storage.get_set(program_id, set_id) or {}
     canonical = assignment_set.get("participant_data") or []
+    absent_by_name = _absent_sessions_by_name(storage.get_version(program_id, set_id))
 
     live_roster = roster_service.get_roster(program_id)
     live_names = {p["id"]: p["name"] for p in live_roster}
@@ -424,6 +455,7 @@ async def discard_roster_changes(
                 "partner_id": new_ids.get(partner_name) if partner_name else None,
                 "is_facilitator": p.get("is_facilitator", False),
                 "keep_together": p.get("keep_together", False),
+                "absent_sessions": absent_by_name.get(p["name"], []),
             },
         )
 

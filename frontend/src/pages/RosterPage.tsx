@@ -332,6 +332,20 @@ export function RosterPage() {
   // matches the one it was built from, and the coordinator hasn't asked to edit.
   const locked = !!currentSet && !changeset.isDirty && !armed;
 
+  // Post-build the assignment set owns absences, so the locked Away column is a
+  // mirror of the set's per-session absences (served on the canonical roster),
+  // not of the dormant roster-document field, which is allowed to drift.
+  const gridParticipants = (() => {
+    if (!locked) return participants;
+    const absentByName = new Map(
+      (canonical?.participants ?? []).map(p => [p.name, p.absent_sessions ?? []]),
+    );
+    return participants.map(p => ({
+      ...p,
+      absent_sessions: absentByName.get(p.name) ?? [],
+    }));
+  })();
+
   // Matches check_shortfalls on the server: a table with one person is not a
   // discussion group. Disagreeing meant enabling the button and refusing the
   // request a round trip later.
@@ -388,11 +402,12 @@ export function RosterPage() {
           <PopulationStats participants={participants} keepApartPairs={keepApartPairs} />
 
           <RosterGrid
-            participants={participants}
+            participants={gridParticipants}
             onUpdate={handleUpdate}
             onDelete={handleDelete}
             onAdd={handleAdd}
             onKeepTogetherToggle={handleKeepTogetherToggle}
+            numSessions={parseInt(numSessions)}
             readOnly={locked}
           />
 
