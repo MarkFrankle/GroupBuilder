@@ -41,6 +41,8 @@ export interface PlanCheckResult {
     balanceEven: boolean
     /** Most times any non-partner pair shares a table. */
     maxPairRepeat: number
+    /** Every non-partner pair tied for maxPairRepeat, named — empty when at or under the floor. */
+    pairRepeatWorst: { names: [string, string]; count: number }[]
     /** Most sessions any participant shares a table with one same facilitator. 0 = no facilitators. */
     maxFacilitatorRepeat: number
     /** Everyone tied for maxFacilitatorRepeat, named — empty when at or under the floor. */
@@ -88,8 +90,14 @@ function countBy(people: Participant[], key: 'religion' | 'gender'): Record<stri
   return counts
 }
 
-/** Most times any non-partner pair shares a table across the given sessions. */
-function worstPairRepeat(assignments: Assignment[]): number {
+/**
+ * Most times any non-partner pair shares a table across the given sessions,
+ * plus every pair tied for that worst count, named.
+ */
+function worstPairRepeat(assignments: Assignment[]): {
+  worst: number
+  details: { names: [string, string]; count: number }[]
+} {
   const partnerOf = new Map<string, string>()
   const counts = new Map<string, number>()
   assignments.forEach(a =>
@@ -112,7 +120,14 @@ function worstPairRepeat(assignments: Assignment[]): number {
     if (partnerOf.get(x) === y || partnerOf.get(y) === x) return
     worst = Math.max(worst, count)
   })
-  return worst
+  const details: { names: [string, string]; count: number }[] = []
+  counts.forEach((count, key) => {
+    if (count !== worst) return
+    const [x, y] = key.split('\x00') as [string, string]
+    if (partnerOf.get(x) === y || partnerOf.get(y) === x) return
+    details.push({ names: [x, y], count })
+  })
+  return { worst, details }
 }
 
 /**
@@ -183,6 +198,7 @@ export function checkPlan(
   keepApart: [string, string][]
 ): PlanCheckResult {
   const facilitatorRepeat = worstFacilitatorRepeat(incompleteAssignments)
+  const pairRepeat = worstPairRepeat(incompleteAssignments)
   const violations: Violation[] = []
   const everyone = incompleteAssignments.flatMap(a => seatedTables(a).flatMap(t => t.people))
   const hasCouples = everyone.some(person => person.partner && !person.keep_together)
@@ -244,7 +260,8 @@ export function checkPlan(
         ? !violations.some(v => v.kind === 'facilitatorCoverage')
         : undefined,
       balanceEven: balanceHeldToRosterFloor(incompleteAssignments),
-      maxPairRepeat: worstPairRepeat(incompleteAssignments),
+      maxPairRepeat: pairRepeat.worst,
+      pairRepeatWorst: pairRepeat.details,
       maxFacilitatorRepeat: hasFacilitators ? facilitatorRepeat.worst : 0,
       facilitatorRepeatWorst: hasFacilitators ? facilitatorRepeat.details : [],
     },

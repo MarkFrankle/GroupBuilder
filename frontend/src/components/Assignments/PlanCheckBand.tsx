@@ -41,26 +41,23 @@ const ProblemLine: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   </li>
 )
 
-const FacilitatorRepeatDetail: React.FC<{
-  worst: { participant: string; facilitator: string; count: number }[]
-}> = ({ worst }) => (
+/** The (?) next to a worst-case note — hover or focus to see who, named, one per line. */
+const RepeatWorstDetail: React.FC<{ label: string; lines: string[] }> = ({ label, lines }) => (
   <TooltipProvider>
     <Tooltip>
       <TooltipTrigger asChild>
         <button
           type="button"
           className="ml-1 inline-flex align-middle text-muted-foreground hover:text-foreground"
-          aria-label="Who has the repeat facilitator"
+          aria-label={label}
         >
           <HelpCircle className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
       </TooltipTrigger>
       <TooltipContent>
         <ul className="space-y-0.5">
-          {worst.map(w => (
-            <li key={`${w.participant}\x00${w.facilitator}`}>
-              {`${w.participant} — same facilitator as ${w.facilitator}, ${w.count} sessions`}
-            </li>
+          {lines.map(line => (
+            <li key={line}>{line}</li>
           ))}
         </ul>
       </TooltipContent>
@@ -123,7 +120,17 @@ const PlanCheckBand: React.FC<PlanCheckBandProps> = ({ result }) => {
           <CheckLine>No one sits with the same person more than twice</CheckLine>
         )}
         {multiSession && r.maxPairRepeat > REPEAT_FLOOR && (
-          <NoteLine>{pairRepeatNote(r.maxPairRepeat)}</NoteLine>
+          <NoteLine>
+            {pairRepeatNote(r.maxPairRepeat)}
+            {r.pairRepeatWorst.length > 0 && (
+              <RepeatWorstDetail
+                label="Who sits together repeatedly"
+                lines={r.pairRepeatWorst.map(
+                  w => `${w.names[0]} & ${w.names[1]} — ${w.count} sessions together`
+                )}
+              />
+            )}
+          </NoteLine>
         )}
 
         {multiSession && r.maxFacilitatorRepeat > 0 && r.maxFacilitatorRepeat <= REPEAT_FLOOR && (
@@ -133,7 +140,12 @@ const PlanCheckBand: React.FC<PlanCheckBandProps> = ({ result }) => {
           <NoteLine>
             {`One person has the same facilitator ${r.maxFacilitatorRepeat} of ${incompleteSessionCount} sessions`}
             {r.facilitatorRepeatWorst.length > 0 && (
-              <FacilitatorRepeatDetail worst={r.facilitatorRepeatWorst} />
+              <RepeatWorstDetail
+                label="Who has the repeat facilitator"
+                lines={r.facilitatorRepeatWorst.map(
+                  w => `${w.participant} — same facilitator as ${w.facilitator}, ${w.count} sessions`
+                )}
+              />
             )}
           </NoteLine>
         )}

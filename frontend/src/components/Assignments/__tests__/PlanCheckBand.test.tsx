@@ -13,6 +13,7 @@ const base: PlanCheckResult = {
     facilitatorCoverage: true,
     balanceEven: true,
     maxPairRepeat: 2,
+    pairRepeatWorst: [],
     maxFacilitatorRepeat: 2,
     facilitatorRepeatWorst: [],
   },
@@ -64,6 +65,25 @@ describe('PlanCheckBand — worst-case notes', () => {
       screen.queryByText('No one sits with the same person more than twice')
     ).not.toBeInTheDocument()
     expect(screen.getByText('One pair sits together three times')).toBeInTheDocument()
+  })
+
+  it('names the tied worst pairs in the hoverable detail', async () => {
+    withResult({
+      reassurances: {
+        ...base.reassurances,
+        maxPairRepeat: 3,
+        pairRepeatWorst: [
+          { names: ['Ann', 'Bea'], count: 3 },
+          { names: ['Cid', 'Dee'], count: 3 },
+        ],
+      },
+    })
+    const trigger = screen.getByRole('button', { name: /who sits together/i })
+    trigger.focus()
+    expect(
+      (await screen.findAllByText('Ann & Bea — 3 sessions together')).length
+    ).toBeGreaterThan(0)
+    expect(screen.getAllByText('Cid & Dee — 3 sessions together').length).toBeGreaterThan(0)
   })
 
   it('replaces the facilitator reassurance with a factual note above the floor', () => {

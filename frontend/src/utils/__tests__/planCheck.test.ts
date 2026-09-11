@@ -235,6 +235,45 @@ describe('checkPlan — soft signals never flip the verdict', () => {
   })
 })
 
+describe('checkPlan — pair-repeat worst-case names', () => {
+  it('names the pair(s) tied for the worst repeat', () => {
+    const plan: Assignment[] = [1, 2, 3].map(session => ({
+      session,
+      tables: { 1: [p('A'), p('B'), p('C')] },
+    }))
+    const { reassurances } = checkPlan(plan, [])
+    // A+B, A+C, B+C all repeat 3 times.
+    expect(reassurances.pairRepeatWorst).toEqual(
+      expect.arrayContaining([
+        { names: ['A', 'B'], count: 3 },
+        { names: ['A', 'C'], count: 3 },
+        { names: ['B', 'C'], count: 3 },
+      ])
+    )
+    expect(reassurances.pairRepeatWorst).toHaveLength(3)
+  })
+
+  it('excludes partner pairs from the named worst case', () => {
+    const twoSessionsSamePeople: Assignment[] = [1, 2].map(session => ({
+      session,
+      tables: { 1: [p('A', { partner: 'B' }), p('B', { partner: 'A' }), p('C')] },
+    }))
+    // A+B share twice but are partners; A+C and B+C also share twice and should be named.
+    const { reassurances } = checkPlan(twoSessionsSamePeople, [])
+    expect(reassurances.pairRepeatWorst).toEqual(
+      expect.arrayContaining([
+        { names: ['A', 'C'], count: 2 },
+        { names: ['B', 'C'], count: 2 },
+      ])
+    )
+    expect(reassurances.pairRepeatWorst).toHaveLength(2)
+  })
+
+  it('reports an empty pairRepeatWorst when nobody ever shares a table', () => {
+    expect(checkPlan([], []).reassurances.pairRepeatWorst).toEqual([])
+  })
+})
+
 describe('checkPlan — pair-repeat excludes facilitators', () => {
   it('does not count a participant sitting with the same facilitator every session', () => {
     const plan: Assignment[] = [1, 2, 3].map(session => ({
