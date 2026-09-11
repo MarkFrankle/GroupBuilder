@@ -62,7 +62,7 @@ const TableBlock: React.FC<TableBlockProps> = ({
           Table {tableNumber}
         </div>
       ) : (
-      <div className="flex min-h-[26px] items-center justify-between border-b pb-1">
+      <div className="flex min-h-9 items-center justify-between border-b pb-1">
         <div className="flex items-center gap-2">
           <div className="text-base font-semibold">Table {tableNumber}</div>
           {/*
