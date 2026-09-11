@@ -14,9 +14,9 @@ const base = {
 beforeEach(() => jest.clearAllMocks());
 
 describe('AwayCell label', () => {
-  test('empty reads All sessions', () => {
+  test('empty reads Attends all sessions', () => {
     render(<AwayCell {...base} absentSessions={[]} />);
-    expect(screen.getByText('All sessions')).toBeInTheDocument();
+    expect(screen.getByText('Attends all sessions')).toBeInTheDocument();
   });
 
   test('a single session reads Misses session 2', () => {
@@ -36,7 +36,7 @@ describe('AwayCell label', () => {
 
   test('a mark above the current session count is ignored', () => {
     render(<AwayCell {...base} numSessions={3} absentSessions={[4]} />);
-    expect(screen.getByText('All sessions')).toBeInTheDocument();
+    expect(screen.getByText('Attends all sessions')).toBeInTheDocument();
   });
 });
 

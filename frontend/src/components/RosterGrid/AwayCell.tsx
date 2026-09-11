@@ -21,7 +21,7 @@ interface AwayCellProps {
 }
 
 function label(visible: number[], numSessions: number): string {
-  if (visible.length === 0) return 'All sessions';
+  if (visible.length === 0) return 'Attends all sessions';
   if (visible.length >= numSessions) return 'Misses all sessions';
   return `Misses session${visible.length === 1 ? '' : 's'} ${visible.join(', ')}`;
 }
