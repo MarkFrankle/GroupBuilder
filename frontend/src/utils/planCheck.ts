@@ -170,7 +170,7 @@ export function checkPlan(
 ): PlanCheckResult {
   const violations: Violation[] = []
   const everyone = incompleteAssignments.flatMap(a => seatedTables(a).flatMap(t => t.people))
-  const hasCouples = everyone.some(person => person.partner)
+  const hasCouples = everyone.some(person => person.partner && !person.keep_together)
   const hasFacilitators = everyone.some(person => person.is_facilitator)
 
   incompleteAssignments.forEach(a => {
@@ -179,7 +179,9 @@ export function checkPlan(
 
       const flaggedCouples = new Set<string>()
       people.forEach(person => {
-        if (!person.partner || !names.has(person.partner)) return
+        // `partner` also names linked pairs (must sit together, keep_together
+        // true) — only a couple (must sit apart) seated together is a violation.
+        if (!person.partner || person.keep_together || !names.has(person.partner)) return
         const pair = [person.name, person.partner].sort() as [string, string]
         const key = pair.join('\x00')
         if (flaggedCouples.has(key)) return

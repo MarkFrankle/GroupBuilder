@@ -3,13 +3,20 @@ import type { Assignment } from '@/types/assignments'
 
 const p = (
   name: string,
-  opts: Partial<{ religion: string; gender: string; partner: string | null; is_facilitator: boolean }> = {}
+  opts: Partial<{
+    religion: string
+    gender: string
+    partner: string | null
+    is_facilitator: boolean
+    keep_together: boolean
+  }> = {}
 ) => ({
   name,
   religion: opts.religion ?? 'Christian',
   gender: opts.gender ?? 'Female',
   partner: opts.partner ?? null,
   is_facilitator: opts.is_facilitator ?? false,
+  keep_together: opts.keep_together ?? false,
 })
 
 /**
@@ -74,6 +81,29 @@ describe('checkPlan — verdict', () => {
     expect(result.verdict).toBe('attention')
     expect(result.violations.some(v => v.kind === 'couple' && v.session === 1)).toBe(true)
     expect(result.violations[0].message).toMatch(/A & B together/)
+  })
+
+  it('does not flag linked partners seated together — they are supposed to sit together', () => {
+    const plan = cleanPlan()
+    // Force A and B to be linked partners (keep_together), not a couple kept apart.
+    plan.forEach(a =>
+      Object.values(a.tables).forEach(seats =>
+        seats.forEach(seat => {
+          if (!seat) return
+          if (seat.name === 'A') {
+            seat.partner = 'B'
+            seat.keep_together = true
+          }
+          if (seat.name === 'B') {
+            seat.partner = 'A'
+            seat.keep_together = true
+          }
+        })
+      )
+    )
+    const result = checkPlan(plan, [])
+    expect(result.violations.some(v => v.kind === 'couple')).toBe(false)
+    expect(result.verdict).toBe('ok')
   })
 
   it('flags a keep-apart pair seated together', () => {
