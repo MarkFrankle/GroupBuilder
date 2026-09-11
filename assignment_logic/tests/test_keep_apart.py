@@ -71,27 +71,3 @@ def test_a_rule_naming_someone_off_the_roster_is_dropped():
     result = GroupBuilder(participants, 3, 3).generate_assignments(max_time_seconds=10)
 
     assert result["status"] == "success"
-
-
-def test_keep_apart_survives_the_incremental_solve_path():
-    # generate_assignments_incremental builds a fresh GroupBuilder per batch.
-    # The constraint only survives because the participant dicts - keep_apart
-    # and all - are passed through verbatim to each one. Four sessions is what
-    # handle_generate_assignments auto-selects the incremental path at.
-    participants = [_person(i) for i in range(1, 10)]
-    participants[0]["keep_apart"] = ["P2"]
-    participants[1]["keep_apart"] = ["P1"]
-
-    result = GroupBuilder(participants, 3, 4).generate_assignments_incremental(
-        batch_size=2, max_time_seconds=20
-    )
-
-    assert result["status"] == "success"
-    # Proof the batched path really ran, rather than falling through to the
-    # single-shot solver: only the incremental return carries this quality.
-    assert result["solution_quality"] == "incremental"
-    assert len(result["assignments"]) == 4
-    for session in result["assignments"]:
-        for table in session["tables"].values():
-            names = {p["name"] for p in table}
-            assert not {"P1", "P2"} <= names

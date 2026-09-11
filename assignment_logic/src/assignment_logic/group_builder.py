@@ -13,7 +13,6 @@ class GroupBuilder:
         participants,
         num_tables,
         num_sessions,
-        locked_assignments=None,
         historical_pairings=None,
         current_table_assignments=None,
         pairing_window_size=None,
@@ -33,7 +32,6 @@ class GroupBuilder:
             participants: List of participant dictionaries
             num_tables: Number of tables per session
             num_sessions: Number of sessions
-            locked_assignments: Pre-assigned participant placements (optional)
             historical_pairings: Set of participant pairs from previous batches (optional)
             current_table_assignments: Dict mapping participant_id -> table_number for current assignments (optional)
                                        Used to require different table assignments when regenerating
@@ -55,7 +53,6 @@ class GroupBuilder:
         self.facilitator_ids = [
             p["id"] for p in participants if p.get("is_facilitator", False)
         ]
-        self.locked_assignments = locked_assignments or {}
         self.historical_pairings = (
             historical_pairings or set()
         )  # Pairings from previous batches
@@ -106,201 +103,6 @@ class GroupBuilder:
         logger.info("Running solver")
         return self._run_solver(max_time_seconds=max_time_seconds)
 
-    def _calculate_batch_timeouts(
-        self, total_sessions: int, batch_size: int, max_time_seconds: float
-    ) -> list[float]:
-        """
-        Calculate timeout allocation for each batch.
-        First batch gets 50% of time (typically hardest), rest distributed evenly.
-        """
-        num_batches = (
-            total_sessions + batch_size - 1
-        ) // batch_size  # Ceiling division
-
-        if num_batches == 1:
-            return [max_time_seconds]
-
-        first_batch_time = max_time_seconds * 0.5
-        remaining_time = max_time_seconds - first_batch_time
-        other_batch_time = remaining_time / (num_batches - 1)
-        return [first_batch_time] + [other_batch_time] * (num_batches - 1)
-
-    def _track_historical_pairings(
-        self,
-        assignment: dict,
-        batch_start: int,
-        batch_end: int,
-        historical_pairings: set,
-    ) -> None:
-        """
-        Track all pairings from newly solved sessions for future batch constraints.
-        """
-        session_idx = assignment["session"] - 1  # Convert to 0-indexed
-
-        # Only track pairings from newly solved sessions (not locked ones)
-        if batch_start <= session_idx < batch_end:
-            for table_num, participants in assignment["tables"].items():
-                # Get all pairs at this table
-                for i, p1_data in enumerate(participants):
-                    for p2_data in participants[i + 1 :]:
-                        p1_id = next(
-                            p["id"]
-                            for p in self.participants
-                            if p["name"] == p1_data["name"]
-                        )
-                        p2_id = next(
-                            p["id"]
-                            for p in self.participants
-                            if p["name"] == p2_data["name"]
-                        )
-                        pair_key = tuple(sorted([p1_id, p2_id]))
-                        historical_pairings.add(pair_key)
-
-    def _lock_batch_assignments(self, assignment: dict, locked: dict) -> None:
-        """
-        Lock participant assignments for all sessions to prevent changes in future batches.
-        """
-        session_idx = assignment["session"] - 1  # Convert to 0-indexed
-
-        for table_num, participants in assignment["tables"].items():
-            table_idx = table_num - 1  # Convert to 0-indexed
-            for p_data in participants:
-                # Find participant ID from name
-                participant_id = next(
-                    p["id"] for p in self.participants if p["name"] == p_data["name"]
-                )
-                locked[(participant_id, session_idx, table_idx)] = True
-
-                # Also lock this participant to NOT be at other tables
-                for other_table in self.tables:
-                    if other_table != table_idx:
-                        locked[(participant_id, session_idx, other_table)] = False
-
-    def generate_assignments_incremental(
-        self, batch_size=2, max_time_seconds=120
-    ) -> dict:
-        """
-        Generate assignments incrementally by solving sessions in batches.
-        This dramatically reduces solve time by breaking the problem into smaller pieces.
-
-        Args:
-            batch_size: Number of sessions to solve at a time (default: 2)
-            max_time_seconds: Total time budget to distribute across all batches (default: 120)
-
-        Returns:
-            dict: Same format as generate_assignments()
-        """
-        all_assignments = []
-        locked = {}
-        # Seeded from prior completed sessions (Item 6b) so batch 1 already
-        # knows who has met; batches then add their own.
-        historical_pairings = set(self.historical_pairings)
-        total_sessions = len(self.sessions)
-        total_solve_time = 0
-        total_branches = 0
-        total_conflicts = 0
-
-        # Calculate timeout distribution
-        batch_timeouts = self._calculate_batch_timeouts(
-            total_sessions, batch_size, max_time_seconds
-        )
-        num_batches = len(batch_timeouts)
-
-        logger.info(
-            f"Starting incremental solve: {len(self.participants)} participants, "
-            f"{len(self.tables)} tables, {total_sessions} sessions "
-            f"(batch size: {batch_size}, {num_batches} batches, "
-            f"timeout: {max_time_seconds}s total)"
-        )
-        logger.info(f"Batch timeouts: {', '.join(f'{t:.1f}s' for t in batch_timeouts)}")
-
-        for batch_idx, batch_start in enumerate(range(0, total_sessions, batch_size)):
-            batch_end = min(batch_start + batch_size, total_sessions)
-            batch_timeout = batch_timeouts[batch_idx]
-
-            logger.info(
-                f"=== Batch {batch_idx + 1}/{num_batches}: "
-                f"Sessions {batch_start + 1}-{batch_end} "
-                f"({batch_start} locked, {batch_end - batch_start} free, "
-                f"{len(historical_pairings)} historical pairings, "
-                f"timeout: {batch_timeout:.1f}s) ==="
-            )
-
-            # Create a new GroupBuilder for sessions 0 through batch_end
-            # This includes all previous sessions (locked) plus current batch (free)
-            gb = GroupBuilder(
-                self.participants,
-                len(self.tables),
-                batch_end,  # Only model up to end of current batch
-                locked_assignments=locked,
-                historical_pairings=historical_pairings,
-            )
-
-            result = gb.generate_assignments(max_time_seconds=batch_timeout)
-
-            if result["status"] != "success":
-                logger.error(
-                    f"Batch {batch_idx + 1} failed: {result.get('error', 'Unknown error')}"
-                )
-                return result
-
-            # Accumulate stats
-            batch_time = result.get("solve_time", 0)
-            batch_branches = result.get("num_branches", 0)
-            batch_conflicts = result.get("num_conflicts", 0)
-            batch_quality = result.get("solution_quality", "unknown")
-            batch_deviation = result.get("total_deviation")
-
-            total_solve_time += batch_time
-            total_branches += batch_branches
-            total_conflicts += batch_conflicts
-
-            # Extract assignments for this batch only (not the locked ones we already have)
-            batch_assignments = [
-                a
-                for a in result["assignments"]
-                if batch_start <= a["session"] - 1 < batch_end
-            ]
-            all_assignments.extend(batch_assignments)
-
-            # Enhanced logging with full solver stats
-            deviation_str = (
-                f"deviation: {batch_deviation}"
-                if batch_deviation is not None
-                else "deviation: N/A"
-            )
-            logger.info(
-                f"Batch {batch_idx + 1} complete: "
-                f"{batch_quality.upper()} in {batch_time:.2f}s | "
-                f"{deviation_str} | "
-                f"{batch_branches:,} branches | "
-                f"{batch_conflicts:,} conflicts"
-            )
-
-            # Lock ALL sessions we've solved so far AND track historical pairings
-            for assignment in result["assignments"]:
-                self._track_historical_pairings(
-                    assignment, batch_start, batch_end, historical_pairings
-                )
-                self._lock_batch_assignments(assignment, locked)
-
-        logger.info(
-            f"Incremental solve complete: {total_solve_time:.2f}s total "
-            f"({total_branches:,} branches, {total_conflicts:,} conflicts, "
-            f"{len(historical_pairings)} unique pairings tracked)"
-        )
-
-        # Return combined results
-        return {
-            "status": "success",
-            "solution_quality": "incremental",
-            "total_deviation": None,  # Not meaningful across incremental batches
-            "solve_time": total_solve_time,
-            "num_branches": total_branches,
-            "num_conflicts": total_conflicts,
-            "assignments": all_assignments,
-        }
-
     def setup_model(self):
         self.model = cp_model.CpModel()
 
@@ -316,9 +118,6 @@ class GroupBuilder:
                     ] = self.model.NewBoolVar(
                         f"assign_p{participant['id']}_s{session}_t{table}"
                     )
-
-        # Apply locked assignments from previous batches
-        self._apply_locked_assignments()
 
         # Log historical pairings tracking
         if self.historical_pairings:
@@ -702,26 +501,6 @@ class GroupBuilder:
                 self.participant_table_assignments[(first_participant_id, 0, 0)] == 1
             )
 
-    def _apply_locked_assignments(self):
-        """Fix variables for locked sessions based on pre-assigned seating."""
-        if not self.locked_assignments:
-            return
-
-        locked_count = 0
-        for (p_id, s, t), value in self.locked_assignments.items():
-            if (p_id, s, t) in self.participant_table_assignments:
-                self.model.Add(
-                    self.participant_table_assignments[(p_id, s, t)]
-                    == (1 if value else 0)
-                )
-                if value:
-                    locked_count += 1
-
-        if locked_count > 0:
-            logger.info(
-                f"Applied {locked_count} locked assignments from previous batches"
-            )
-
     def _run_solver(self, max_time_seconds=120):
         import random
 
@@ -806,7 +585,6 @@ class GroupBuilder:
 
 
 if __name__ == "__main__":
-    # Set up logging to see the incremental progress
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
     data = [
@@ -883,21 +661,22 @@ if __name__ == "__main__":
     ]
 
     print("\n" + "=" * 60)
-    print("TESTING INCREMENTAL SOLVER")
+    print("TESTING SOLVER")
     print("=" * 60)
 
     gb = GroupBuilder(data, 4, 6)
-    result = gb.generate_assignments_incremental(batch_size=2)
+    result = gb.generate_assignments()
 
     print("\n" + "=" * 60)
     print("RESULTS")
     print("=" * 60)
     print(f"Status: {result['status']}")
-    print(f"Solution quality: {result['solution_quality']}")
-    print(f"Total solve time: {result['solve_time']:.2f}s")
-    print(f"Total branches: {result['num_branches']:,}")
-    print(f"Total conflicts: {result['num_conflicts']:,}")
-    print(f"Sessions generated: {len(result['assignments'])}")
+    if result["status"] == "success":
+        print(f"Solution quality: {result['solution_quality']}")
+        print(f"Total solve time: {result['solve_time']:.2f}s")
+        print(f"Total branches: {result['num_branches']:,}")
+        print(f"Total conflicts: {result['num_conflicts']:,}")
+        print(f"Sessions generated: {len(result['assignments'])}")
 
     # Show first session as a sanity check
     if result["assignments"]:

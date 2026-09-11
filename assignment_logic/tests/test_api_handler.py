@@ -29,20 +29,3 @@ def test_seeded_pairing_is_avoided_when_slack_exists():
     for _, seats in tables.items():
         names = {s["name"] for s in seats}
         assert not ({"P0", "P1"} <= names), "seeded pair should be split"
-
-
-def test_seed_threads_through_the_incremental_path():
-    people = _people(9)
-    seed = {(1, 2)}
-    result = handle_generate_assignments(
-        people,
-        numTables=3,
-        numSessions=4,
-        max_time_seconds=5,
-        historical_pairings=seed,
-    )
-    assert result["status"] == "success"
-    first = result["assignments"][0]["tables"]
-    for _, seats in first.items():
-        names = {s["name"] for s in seats}
-        assert not ({"P0", "P1"} <= names)
