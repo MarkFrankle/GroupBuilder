@@ -774,12 +774,6 @@ const AssignmentsPage: React.FC = () => {
         />
       </div>
 
-      {trackingSummary && (
-        <p className="text-sm text-muted-foreground" data-testid="tracking-summary">
-          {trackingSummary}
-        </p>
-      )}
-
       <div
         data-testid="sessions-container"
         className={compact ? 'flex flex-row flex-wrap items-start gap-4' : 'flex flex-col gap-5'}
