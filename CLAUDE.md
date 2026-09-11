@@ -25,6 +25,28 @@
   9 people at 3 tables over 4 sessions is the affine plane AG(2,3), where every pair meets
   exactly once.
 - **Run `poetry run black src tests` before committing Python changes.**
+- **The solver enforces two hard caps, not soft penalties: a pairwise-repeat cap and a
+  whole-table overlap cap.** `assignment_logic/capacity.py` computes a pigeonhole *floor*
+  for each (`compute_pairwise_cap`, `compute_overlap_lower_bound`) — a valid lower bound,
+  but **not guaranteed achievable**, especially once couples/linked pairs/keep-apart rules
+  reduce the roster's real degrees of freedom. `GroupBuilder` never trusts a floor as a hard
+  constraint by itself — it only accepts `pairwise_cap`/`table_overlap_cap` as *external*
+  constructor params (skipped when `None`). `capacity_search.find_feasible_plan` is the only
+  thing that turns a floor into an enforced cap: it escalates pairwise cap (outer loop) and
+  overlap cap (inner loop) from their floors, solving fresh each combination, until one
+  succeeds or the search exhausts. `handle_generate_assignments` and the single-session
+  shuffle (`regenerate_single_session`) both go through it now — there is no other path that
+  hard-codes a computed cap.
+- **The overlap-cap probe budget (`probe_seconds`, `max_pairwise_tries`, `max_overlap_tries`
+  in `capacity_search.py`) is a first pass, not validated beyond the shapes in
+  `docs/plans/2026-09-11-dual-cap-solver.md`'s Context section (laptop timings on the
+  standard ~24-person BBT shape).** Never validated against Cloud Run directly. If solves
+  start timing out in prod, this is the first place to look.
+- **`historical_meeting_counts` must be real counts, not just membership.** A pair that met
+  twice elsewhere has less remaining pairwise budget than a pair that met once; collapsing
+  that down to a bare set of pairs under-restricts a downstream solve once a program's cap is
+  above 1. `api/services/program_solve.extract_pairings_from_sessions` returns counts for
+  this reason — don't reintroduce a `set()` at a call site that feeds a hard cap.
 - **All buttons use `variant="outline"`.** This is the app's visual style — no filled/default buttons. Use `size="sm"` for toolbars, icon + label for actions.
 - **The solver never runs without an explicit user action.** No auto-resolve, no silent rebalance. The app may flag a problem; changing the plan is always something the user pressed.
 - **Never modify a completed session.** Completion freezes the past — every rebuild is scoped to incomplete sessions only.
