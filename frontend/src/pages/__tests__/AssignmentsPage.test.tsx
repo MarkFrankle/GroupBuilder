@@ -546,6 +546,7 @@ describe('AssignmentsPage', () => {
 
     afterEach(() => {
       window.confirm = realConfirm
+      window.history.pushState({}, '', '/')
     })
 
     /** Clicks Print on the first session card. */
@@ -564,12 +565,7 @@ describe('AssignmentsPage', () => {
       expect(window.confirm).toHaveBeenCalledWith(
         expect.stringContaining('older version')
       )
-      await waitFor(() =>
-        expect(mockAuthenticatedFetch).not.toHaveBeenCalledWith(
-          expect.stringContaining('/api/assignments/seating/'),
-          expect.anything()
-        )
-      )
+      expect(window.location.pathname).not.toBe('/table-assignments/roster-print')
     })
 
     it('prints when the confirm is accepted', async () => {
@@ -583,10 +579,7 @@ describe('AssignmentsPage', () => {
         expect.stringContaining('older version')
       )
       await waitFor(() =>
-        expect(mockAuthenticatedFetch).toHaveBeenCalledWith(
-          expect.stringContaining('/api/assignments/seating/1'),
-          expect.objectContaining({ method: 'POST' })
-        )
+        expect(window.location.pathname).toBe('/table-assignments/roster-print')
       )
     })
 
@@ -597,10 +590,7 @@ describe('AssignmentsPage', () => {
       await clickPrint()
 
       await waitFor(() =>
-        expect(mockAuthenticatedFetch).toHaveBeenCalledWith(
-          expect.stringContaining('/api/assignments/seating/1'),
-          expect.objectContaining({ method: 'POST' })
-        )
+        expect(window.location.pathname).toBe('/table-assignments/roster-print')
       )
       expect(window.confirm).not.toHaveBeenCalled()
     })

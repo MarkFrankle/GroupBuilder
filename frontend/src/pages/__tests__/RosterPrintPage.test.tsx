@@ -77,10 +77,9 @@ describe('RosterPrintPage', () => {
     expect(screen.getByText(/Bob Smith/)).toBeInTheDocument()
   })
 
-  test('omits Session N prefix when only one session', () => {
+  test('includes the session name even when there is only one session', () => {
     renderWithState({ assignments: mockAssignments, programId: 'test-program-id' })
-    expect(screen.getByText('Roster')).toBeInTheDocument()
-    expect(screen.queryByText(/Session 1 Roster/)).not.toBeInTheDocument()
+    expect(screen.getByText('Session 1 Roster')).toBeInTheDocument()
   })
 
   test('fetches and renders seating charts', async () => {
