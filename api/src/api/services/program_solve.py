@@ -83,6 +83,26 @@ def extract_pairings_from_sessions(
     return historical_pairings
 
 
+def extract_historical_tables(
+    assignments: List[Dict[str, Any]], exclude_session: int
+) -> List[frozenset]:
+    """
+    Table memberships (by participant name) from every session except the
+    one being regenerated - the whole-table overlap cap's counterpart to
+    extract_pairings_from_sessions. Lets a single-session solve respect the
+    program's overlap cap against tables it doesn't get to re-derive.
+    """
+    tables = []
+    for session_data in assignments:
+        if session_data["session"] == exclude_session:
+            continue
+        for table_num, participants in session_data["tables"].items():
+            seated = {p["name"] for p in participants if p}
+            if seated:
+                tables.append(frozenset(seated))
+    return tables
+
+
 def solve_program(
     participants: List[Dict[str, Any]],
     num_tables: int,
