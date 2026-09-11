@@ -22,7 +22,7 @@ export function InviteAcceptPage() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { refreshPrograms } = useProgram();
+  const { refreshPrograms, setCurrentProgram } = useProgram();
 
   const [inviteDetails, setInviteDetails] = useState<InviteDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -91,7 +91,7 @@ export function InviteAcceptPage() {
   }, [inviteDetails, user, token, navigate]);
 
   const handleAcceptInvite = async () => {
-    if (!token || !user) return;
+    if (!token || !user || !inviteDetails) return;
 
     setAccepting(true);
     setError(null);
@@ -109,6 +109,11 @@ export function InviteAcceptPage() {
 
       // Refresh programs to get the newly joined program
       await refreshPrograms();
+
+      // fetchPrograms() keeps whatever program is stored in localStorage if
+      // it's still valid, so without this the user lands back in the program
+      // they were in before accepting the invite instead of the new one.
+      setCurrentProgram({ id: inviteDetails.program_id, name: inviteDetails.program_name });
 
       // Redirect to home after 2 seconds
       setTimeout(() => {

@@ -28,6 +28,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { MAX_TABLES, MAX_SESSIONS } from '@/constants';
 import { AlertCircle, Loader2, Pencil } from 'lucide-react';
 import { movePartnerAdjacent, sortPartnersAdjacent } from '@/utils/sortWithPartnerAdjacency';
+import { generateTestParticipants } from '@/utils/seedTestRoster';
 
 type SaveStatus = 'saved' | 'saving' | 'error';
 
@@ -207,6 +208,29 @@ export function RosterPage() {
     }
   }, [currentProgram]);
 
+  /** Dev-only convenience: bulk-adds fake participants so the roster can be
+   * exercised locally without hand-typing rows. Never rendered outside
+   * `npm start` (NODE_ENV === 'development'). */
+  const handleSeedTestData = useCallback(async () => {
+    const raw = window.prompt('How many test participants to add?', '20');
+    if (raw === null) return;
+    const count = parseInt(raw, 10);
+    if (!Number.isFinite(count) || count <= 0) return;
+
+    setSaveStatus('saving');
+    try {
+      const existingNames = new Set(participants.map(p => p.name));
+      for (const data of generateTestParticipants(count, existingNames)) {
+        const newId = uuidv4();
+        setParticipants(prev => [...prev, { id: newId, ...data }]);
+        await upsertParticipant(currentProgram!.id, newId, data);
+      }
+      setSaveStatus('saved');
+    } catch {
+      setSaveStatus('error');
+    }
+  }, [currentProgram, participants]);
+
   const handleKeepTogetherToggle = useCallback(async (id: string) => {
     const participant = participants.find(p => p.id === id);
     if (!participant?.partner_id) return;
@@ -370,7 +394,10 @@ export function RosterPage() {
 
   return (
     <div className="container mx-auto p-4">
-      <Card className="w-full max-w-4xl mx-auto">
+      <Card
+        className={`w-full max-w-4xl mx-auto ${generating ? 'pointer-events-none opacity-60' : ''}`}
+        aria-busy={generating}
+      >
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -393,6 +420,11 @@ export function RosterPage() {
                 <Button variant="outline" size="sm" onClick={() => setArmed(true)}>
                   <Pencil className="h-4 w-4 mr-2" />
                   Edit roster
+                </Button>
+              )}
+              {process.env.NODE_ENV === 'development' && !locked && (
+                <Button variant="outline" size="sm" onClick={handleSeedTestData}>
+                  Add test data
                 </Button>
               )}
             </div>
@@ -487,7 +519,7 @@ export function RosterPage() {
             <div className="flex flex-col items-center justify-center gap-3 rounded-md border p-8 text-center">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                Rebuilding your sessions… this can take up to two minutes.
+                {hasAssignmentSet ? 'Rebuilding' : 'Building'} your sessions… this can take up to two minutes.
               </p>
             </div>
           ) : showActions && (
