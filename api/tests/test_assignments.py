@@ -670,6 +670,36 @@ class TestAssignmentSetMetadata:
         assert meta["accepted"] is True
         assert meta["previous_set_id"] is None
 
+    def test_metadata_reports_the_solved_caps(
+        self, client, sample_set_data, add_assignment_set_to_firestore
+    ):
+        """No solve yet: caps are null, not missing."""
+        add_assignment_set_to_firestore(sample_set_data)
+
+        meta = client.get(f"/api/assignments/metadata?program_id={PROGRAM}").json()
+
+        assert meta["pairwise_cap"] is None
+        assert meta["table_overlap_cap"] is None
+
+    def test_metadata_reports_the_solved_caps_after_a_real_generate(self, client):
+        for i in range(9):
+            client.put(
+                f"/api/roster/p{i}?program_id=test_org_id",
+                json={
+                    "name": f"P{i}",
+                    "religion": "Christian",
+                    "gender": "Male",
+                    "partner_id": None,
+                },
+            )
+        client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 3, "num_sessions": 4},
+        )
+        meta = client.get("/api/assignments/metadata?program_id=test_org_id").json()
+        assert isinstance(meta["pairwise_cap"], int)
+        assert isinstance(meta["table_overlap_cap"], int)
+
 
 class TestAcceptAndUndoRebuild:
     def _mid_program_rebuild(self, client):

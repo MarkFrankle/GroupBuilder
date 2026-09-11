@@ -10,6 +10,13 @@ import {
 
 interface PlanCheckBandProps {
   result: PlanCheckResult
+  /** The solver's real pairwise-repeat cap for this program. Null when no
+   *  solve has reported one yet (older data, or an absence re-solve that
+   *  bypassed the cap search) — falls back to the old hardcoded floor of 2. */
+  pairwiseCap?: number | null
+  /** The solver's real table-overlap cap for this program. Null omits the
+   *  overlap line entirely — there is no prior hardcoded line to fall back to. */
+  overlapCap?: number | null
 }
 
 /**
@@ -18,12 +25,23 @@ interface PlanCheckBandProps {
  * yes/no; the only number shown is a worst-case fact when a soft signal is past
  * its floor. Presentational — all logic lives in `planCheck.ts`.
  */
-const REPEAT_FLOOR = 2
+const DEFAULT_PAIRWISE_FLOOR = 2
+
+function timesWord(n: number): string {
+  if (n === 1) return 'once'
+  if (n === 2) return 'twice'
+  const word =
+    n === 3 ? 'three' : n === 4 ? 'four' : n === 5 ? 'five' : n === 6 ? 'six' : String(n)
+  return `${word} times`
+}
 
 function pairRepeatNote(max: number): string {
-  const word =
-    max === 3 ? 'three' : max === 4 ? 'four' : max === 5 ? 'five' : max === 6 ? 'six' : String(max)
-  return `At least one pair sits together ${word} times`
+  return `At least one pair sits together ${timesWord(max)}`
+}
+
+function tableOverlapNote(max: number): string {
+  const people = max === 1 ? 'person' : 'people'
+  return `At least two tables share ${max} ${people}`
 }
 
 const CheckLine: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -72,10 +90,13 @@ const NoteLine: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   </li>
 )
 
-const PlanCheckBand: React.FC<PlanCheckBandProps> = ({ result }) => {
+const FACILITATOR_REPEAT_FLOOR = 2
+
+const PlanCheckBand: React.FC<PlanCheckBandProps> = ({ result, pairwiseCap, overlapCap }) => {
   const { verdict, violations, incompleteSessionCount, reassurances: r } = result
   const ok = verdict === 'ok'
   const multiSession = incompleteSessionCount >= 2
+  const pairRepeatFloor = pairwiseCap ?? DEFAULT_PAIRWISE_FLOOR
 
   const headline = ok
     ? 'Looks good — ready to print and hand out'
@@ -116,10 +137,10 @@ const PlanCheckBand: React.FC<PlanCheckBandProps> = ({ result }) => {
           <CheckLine>Faiths and genders are mixed as evenly as this roster allows</CheckLine>
         )}
 
-        {multiSession && r.maxPairRepeat <= REPEAT_FLOOR && (
-          <CheckLine>No one sits with the same person more than twice</CheckLine>
+        {multiSession && r.maxPairRepeat <= pairRepeatFloor && (
+          <CheckLine>{`No one sits with the same person more than ${timesWord(pairRepeatFloor)}`}</CheckLine>
         )}
-        {multiSession && r.maxPairRepeat > REPEAT_FLOOR && (
+        {multiSession && r.maxPairRepeat > pairRepeatFloor && (
           <NoteLine>
             {pairRepeatNote(r.maxPairRepeat)}
             {r.pairRepeatWorst.length > 0 && (
@@ -133,10 +154,30 @@ const PlanCheckBand: React.FC<PlanCheckBandProps> = ({ result }) => {
           </NoteLine>
         )}
 
-        {multiSession && r.maxFacilitatorRepeat > 0 && r.maxFacilitatorRepeat <= REPEAT_FLOOR && (
+        {multiSession && overlapCap != null && r.maxTableOverlap <= overlapCap && (
+          <CheckLine>{`No two tables share more than ${overlapCap} ${
+            overlapCap === 1 ? 'person' : 'people'
+          }`}</CheckLine>
+        )}
+        {multiSession && overlapCap != null && r.maxTableOverlap > overlapCap && (
+          <NoteLine>
+            {tableOverlapNote(r.maxTableOverlap)}
+            {r.tableOverlapWorst.length > 0 && (
+              <RepeatWorstDetail
+                label="Which tables overlap"
+                lines={r.tableOverlapWorst.map(
+                  w =>
+                    `Session ${w.sessions[0]} Table ${w.tables[0]} & Session ${w.sessions[1]} Table ${w.tables[1]} — ${w.names.join(', ')}`
+                )}
+              />
+            )}
+          </NoteLine>
+        )}
+
+        {multiSession && r.maxFacilitatorRepeat > 0 && r.maxFacilitatorRepeat <= FACILITATOR_REPEAT_FLOOR && (
           <CheckLine>Everyone sees a variety of facilitators</CheckLine>
         )}
-        {multiSession && r.maxFacilitatorRepeat > REPEAT_FLOOR && (
+        {multiSession && r.maxFacilitatorRepeat > FACILITATOR_REPEAT_FLOOR && (
           <NoteLine>
             {`At least one person has the same facilitator ${r.maxFacilitatorRepeat} of ${incompleteSessionCount} sessions`}
             {r.facilitatorRepeatWorst.length > 0 && (

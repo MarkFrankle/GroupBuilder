@@ -60,3 +60,13 @@ def test_handler_returns_a_plan_within_the_computed_pairwise_cap():
                     key = (names[i], names[j])
                     meetings[key] = meetings.get(key, 0) + 1
     assert max(meetings.values()) <= cap
+
+
+def test_handler_reports_the_caps_it_actually_solved_with():
+    people = _people(9)
+    result = handle_generate_assignments(
+        people, numTables=3, numSessions=4, max_time_seconds=30
+    )
+    assert result["status"] == "success"
+    assert result["pairwise_cap"] is not None
+    assert result["table_overlap_cap"] is not None

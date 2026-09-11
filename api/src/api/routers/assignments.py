@@ -353,6 +353,8 @@ def _generate_assignments_internal(
         "total_deviation": results.get("total_deviation"),
         "max_time_seconds": max_time_seconds,
         "label": LABEL_REBUILT if mark_regenerated else LABEL_GENERATED,
+        "pairwise_cap": results.get("pairwise_cap"),
+        "table_overlap_cap": results.get("table_overlap_cap"),
     }
 
     if mark_regenerated:
@@ -725,6 +727,8 @@ async def regenerate_single_session(
             "regenerated_session": session_number,
             "label": f"Session {session_number} shuffled",
             "assignments_unchanged": assignments_unchanged,  # Flag if same assignments returned
+            "pairwise_cap": pairwise_cap,
+            "table_overlap_cap": overlap_cap,
         }
 
         new_version_id = _next_version_id(storage, program_id, set_id)
@@ -988,6 +992,9 @@ async def get_assignment_set_metadata(
     created_at = assignment_set.get("created_at")
     created_at_unix = created_at.timestamp() if created_at else None
 
+    latest_version = storage.get_version(program_id, set_id)
+    latest_metadata = (latest_version or {}).get("metadata", {})
+
     return {
         "assignment_set_id": set_id,
         "filename": assignment_set.get("filename", "Unknown"),
@@ -995,9 +1002,11 @@ async def get_assignment_set_metadata(
         "num_tables": assignment_set.get("num_tables"),
         "num_sessions": assignment_set.get("num_sessions"),
         "created_at": created_at_unix,
-        "has_results": storage.get_version(program_id, set_id) is not None,
+        "has_results": latest_version is not None,
         "accepted": assignment_set.get("accepted", True),
         "previous_set_id": assignment_set.get("previous_set_id"),
+        "pairwise_cap": latest_metadata.get("pairwise_cap"),
+        "table_overlap_cap": latest_metadata.get("table_overlap_cap"),
     }
 
 

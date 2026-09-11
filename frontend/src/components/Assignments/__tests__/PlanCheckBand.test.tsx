@@ -16,11 +16,15 @@ const base: PlanCheckResult = {
     pairRepeatWorst: [],
     maxFacilitatorRepeat: 2,
     facilitatorRepeatWorst: [],
+    maxTableOverlap: 1,
+    tableOverlapWorst: [],
   },
 }
 
-const withResult = (overrides: Partial<PlanCheckResult>) =>
-  render(<PlanCheckBand result={{ ...base, ...overrides }} />)
+const withResult = (
+  overrides: Partial<PlanCheckResult>,
+  caps: { pairwiseCap?: number | null; overlapCap?: number | null } = {}
+) => render(<PlanCheckBand result={{ ...base, ...overrides }} {...caps} />)
 
 describe('PlanCheckBand — green state', () => {
   it('shows the ready-to-print headline', () => {
@@ -56,6 +60,21 @@ describe('PlanCheckBand — green state', () => {
       screen.queryByText('No one sits with the same person more than twice')
     ).not.toBeInTheDocument()
   })
+
+  it('uses the solver\'s real pairwise cap instead of the hardcoded floor', () => {
+    withResult({ reassurances: { ...base.reassurances, maxPairRepeat: 3 } }, { pairwiseCap: 3 })
+    expect(
+      screen.getByText('No one sits with the same person more than three times')
+    ).toBeInTheDocument()
+  })
+
+  it('shows the table-overlap line only once a cap is known', () => {
+    withResult({})
+    expect(screen.queryByText(/No two tables share/)).not.toBeInTheDocument()
+
+    withResult({}, { overlapCap: 1 })
+    expect(screen.getByText('No two tables share more than 1 person')).toBeInTheDocument()
+  })
 })
 
 describe('PlanCheckBand — worst-case notes', () => {
@@ -65,6 +84,37 @@ describe('PlanCheckBand — worst-case notes', () => {
       screen.queryByText('No one sits with the same person more than twice')
     ).not.toBeInTheDocument()
     expect(screen.getByText('At least one pair sits together three times')).toBeInTheDocument()
+  })
+
+  it('replaces the overlap reassurance with a factual note above the cap', () => {
+    withResult(
+      { reassurances: { ...base.reassurances, maxTableOverlap: 2 } },
+      { overlapCap: 1 }
+    )
+    expect(
+      screen.queryByText('No two tables share more than 1 person')
+    ).not.toBeInTheDocument()
+    expect(screen.getByText('At least two tables share 2 people')).toBeInTheDocument()
+  })
+
+  it('names the worst overlapping tables in the hoverable detail', async () => {
+    withResult(
+      {
+        reassurances: {
+          ...base.reassurances,
+          maxTableOverlap: 2,
+          tableOverlapWorst: [
+            { sessions: [1, 3], tables: [1, 2], names: ['Ann', 'Bea'] },
+          ],
+        },
+      },
+      { overlapCap: 1 }
+    )
+    const trigger = screen.getByRole('button', { name: /which tables overlap/i })
+    trigger.focus()
+    expect(
+      (await screen.findAllByText('Session 1 Table 1 & Session 3 Table 2 — Ann, Bea')).length
+    ).toBeGreaterThan(0)
   })
 
   it('names the tied worst pairs in the hoverable detail', async () => {
