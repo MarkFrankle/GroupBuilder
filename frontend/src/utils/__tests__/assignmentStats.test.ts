@@ -44,15 +44,40 @@ describe('shuffleReceipt', () => {
     expect(shuffleReceipt(before, before, 2)).toContain('0 of 4 people moved')
   })
 
-  it('reports the repeat-pair delta', () => {
-    // Before: Ann-Ben twice and Cara-Dan twice — two repeat pairs.
-    // After:  Ann-Cara and Ben-Dan twice each — still two.
-    expect(shuffleReceipt(before, after, 2)).toContain('2 repeat pairs across the program (was 2)')
+  it('reports the session-scoped repeat-pair delta', () => {
+    // Session 2 before: Ann-Ben, Cara-Dan — both already met in session 1, so both repeats.
+    // Session 2 after: Ann-Cara, Ben-Dan — both also meet again in session 3, so still repeats.
+    expect(shuffleReceipt(before, after, 2)).toContain(
+      "2 pairs at session 2's tables have already met elsewhere (was 2)"
+    )
   })
 
   it('reports the delta when it gets worse', () => {
     const worse: Assignment[] = [before[0], before[0] && { ...before[0], session: 2 }, before[2]]
-    expect(shuffleReceipt(after, worse, 2)).toMatch(/repeat pairs across the program \(was \d+\)/)
+    expect(shuffleReceipt(after, worse, 2)).toMatch(
+      /pairs at session 2's tables have already met elsewhere \(was \d+\)/
+    )
+  })
+
+  it('shows session-scoped improvement even when the program-wide count stays flat', () => {
+    // Session 3 before repeats session 1's exact pairs (Ann-Ben, Cara-Dan) — both already
+    // met in session 2 as well, so both are repeats going into the shuffle.
+    const flatBefore: Assignment[] = [
+      { session: 1, tables: { 1: [p('Ann'), p('Ben')], 2: [p('Cara'), p('Dan')] } },
+      { session: 2, tables: { 1: [p('Ann'), p('Ben')], 2: [p('Cara'), p('Dan')] } },
+      { session: 3, tables: { 1: [p('Ann'), p('Ben')], 2: [p('Cara'), p('Dan')] } },
+    ]
+    // Session 3 after swaps to brand-new pairs (Ann-Cara, Ben-Dan) — neither has met before,
+    // so the session-scoped count drops to zero. The program-wide count (Ann-Ben and
+    // Cara-Dan still repeat from sessions 1-2) stays at 2 either way.
+    const flatAfter: Assignment[] = [
+      flatBefore[0],
+      flatBefore[1],
+      { session: 3, tables: { 1: [p('Ann'), p('Cara')], 2: [p('Ben'), p('Dan')] } },
+    ]
+    expect(shuffleReceipt(flatBefore, flatAfter, 3)).toContain(
+      "0 pairs at session 3's tables have already met elsewhere (was 2)"
+    )
   })
 
   it('omits the unchanged clause for a one-session program', () => {
