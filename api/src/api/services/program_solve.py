@@ -33,18 +33,26 @@ class SolveFailed(Exception):
 
 def extract_pairings_from_sessions(
     assignments: List[Dict[str, Any]], exclude_session: int
-) -> set:
+) -> Dict[Any, int]:
     """
-    Extract all participant pairings from sessions except the one being regenerated.
+    Count how many times each pair met in sessions other than the one being
+    regenerated.
+
+    Returns counts, not just membership: a pair that already met twice
+    elsewhere has less remaining budget under the solver's hard pairwise
+    cap than a pair that met once, and a bare set collapses that
+    distinction back down to "met at least once" - silently letting a
+    downstream solve allow one more meeting than the whole program's cap
+    actually permits. See the dual-cap-solver plan's Task 8 notes.
 
     Args:
         assignments: List of session assignments
         exclude_session: Session number to exclude (the one being regenerated)
 
     Returns:
-        Set of tuples representing pairs that have met in other sessions
+        Dict mapping a pair (sorted tuple) to how many sessions they shared a table in.
     """
-    historical_pairings = set()
+    historical_pairings: Dict[Any, int] = {}
 
     for session_data in assignments:
         session_num = session_data["session"]
@@ -65,12 +73,34 @@ def extract_pairings_from_sessions(
                     p2 = seated[j]["name"]
                     # Use sorted tuple so (Alice, Bob) == (Bob, Alice)
                     pair_key = tuple(sorted([p1, p2]))
-                    historical_pairings.add(pair_key)
+                    historical_pairings[pair_key] = (
+                        historical_pairings.get(pair_key, 0) + 1
+                    )
 
     logger.info(
         f"Extracted {len(historical_pairings)} historical pairings from {len(assignments) - 1} sessions"
     )
     return historical_pairings
+
+
+def extract_historical_tables(
+    assignments: List[Dict[str, Any]], exclude_session: int
+) -> List[frozenset]:
+    """
+    Table memberships (by participant name) from every session except the
+    one being regenerated - the whole-table overlap cap's counterpart to
+    extract_pairings_from_sessions. Lets a single-session solve respect the
+    program's overlap cap against tables it doesn't get to re-derive.
+    """
+    tables = []
+    for session_data in assignments:
+        if session_data["session"] == exclude_session:
+            continue
+        for table_num, participants in session_data["tables"].items():
+            seated = {p["name"] for p in participants if p}
+            if seated:
+                tables.append(frozenset(seated))
+    return tables
 
 
 def solve_program(
@@ -81,8 +111,18 @@ def solve_program(
     max_time_seconds: int = 120,
     label_when_clean: str = LABEL_GENERATED,
     _historical_seed=None,
+    _total_program_sessions=None,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """Solve every session, then re-solve the ones with absences.
+
+    ``_historical_seed``, when given, is a dict of real meeting counts (not
+    just a set of pairs) from sessions outside this solve - e.g. frozen
+    sessions a rebuild-around-completed call is re-solving the remainder
+    for. It's passed through as the hard pairwise cap's budget, not the
+    soft penalty: a pair that already spent its whole-program budget in a
+    frozen session must be forbidden here, not merely discouraged.
+    ``_total_program_sessions`` lets that cap be computed against the
+    whole program even when ``num_sessions`` here is just the remainder.
 
     Returns ``(assignments, metadata)``. Never writes anything.
     """
@@ -91,7 +131,8 @@ def solve_program(
         num_tables,
         num_sessions,
         max_time_seconds=max_time_seconds,
-        historical_pairings=_historical_seed,
+        historical_meeting_counts=_historical_seed,
+        total_program_sessions=_total_program_sessions,
     )
     if results["status"] != "success":
         logger.error("Solver failed: %s", results.get("error"))
@@ -176,19 +217,26 @@ def solve_around_completed_sessions(
 
     ``frozen_sessions`` is copied into the result untouched - it keeps seating
     people no longer on ``participants`` and never gains people added since.
-    Pairings from the frozen sessions seed the solver so repeats stay
-    penalised; a pairing naming someone absent from the current roster is
-    dropped, because they are not in the sessions being solved.
+    Real meeting counts from the frozen sessions seed the solver's hard
+    pairwise cap (not just a soft penalty) - a pair that already spent its
+    whole-program budget in a frozen session must be forbidden from meeting
+    again in the remainder, not merely discouraged. The cap itself is
+    computed against ``num_sessions`` (the whole program), not ``remainder``,
+    via ``_total_program_sessions``. A pairing naming someone absent from the
+    current roster is dropped, because they are not in the sessions being
+    solved.
     """
     remainder = num_sessions - completed_through
     if remainder < 1:
         raise SolveFailed(NO_SOLUTION)
 
     name_to_id = {p["name"]: p["id"] for p in participants}
-    seed_ids = set()
-    for a, b in extract_pairings_from_sessions(frozen_sessions, exclude_session=-1):
+    seed_counts: Dict[Any, int] = {}
+    for (a, b), count in extract_pairings_from_sessions(
+        frozen_sessions, exclude_session=-1
+    ).items():
         if a in name_to_id and b in name_to_id:
-            seed_ids.add(tuple(sorted([name_to_id[a], name_to_id[b]])))
+            seed_counts[tuple(sorted([name_to_id[a], name_to_id[b]]))] = count
 
     remainder_absences = {
         (s - completed_through): absent
@@ -203,7 +251,8 @@ def solve_around_completed_sessions(
         absence_map=remainder_absences,
         max_time_seconds=max_time_seconds,
         label_when_clean=LABEL_REBUILT_AROUND_COMPLETED,
-        _historical_seed=seed_ids,
+        _historical_seed=seed_counts,
+        _total_program_sessions=num_sessions,
     )
 
     for i, session in enumerate(resolved):

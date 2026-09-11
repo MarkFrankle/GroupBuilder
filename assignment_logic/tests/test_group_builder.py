@@ -755,6 +755,42 @@ def _count_meetings(result):
     return meetings
 
 
+def _twenty_four_participants_with_relations():
+    """24 people at the standard BBT program shape (4 tables, 5 sessions),
+    with 6 facilitators, 2 couples, 1 linked pair, and 2 keep-apart pairs -
+    the shape the 2026-09-11 spike validated the dual-cap design against
+    (pairwise floor 2, overlap floor 2-3, both reachable in 5-20s)."""
+    religions = ["Jewish", "Christian", "Muslim", "Interfaith"]
+    people = []
+    for i in range(24):
+        people.append(
+            {
+                "id": f"p{i}",
+                "name": f"P{i}",
+                "religion": religions[i % len(religions)],
+                "gender": "F" if i % 2 == 0 else "M",
+                "couple_id": None,
+                "linked_id": None,
+                "keep_apart": [],
+                "is_facilitator": i < 6,
+            }
+        )
+    # 2 couples: kept apart every session.
+    people[6]["couple_id"] = "c1"
+    people[7]["couple_id"] = "c1"
+    people[8]["couple_id"] = "c2"
+    people[9]["couple_id"] = "c2"
+    # 1 linked pair: kept together every session.
+    people[10]["linked_id"] = "l1"
+    people[11]["linked_id"] = "l1"
+    # 2 keep-apart pairs: by name, symmetric.
+    people[12]["keep_apart"] = ["P13"]
+    people[13]["keep_apart"] = ["P12"]
+    people[14]["keep_apart"] = ["P15"]
+    people[15]["keep_apart"] = ["P14"]
+    return people
+
+
 def _nine_participants():
     """Nine people who are alike in every way the solver constrains on.
 
@@ -775,27 +811,73 @@ def _nine_participants():
     ]
 
 
-def test_repeat_pairings_are_penalised_beyond_the_rolling_window():
-    """A pair meeting in sessions 1 and 3 is free under the rolling window alone.
+def test_pairwise_repeats_never_exceed_an_explicit_cap():
+    """The cap is now a hard constraint the caller must supply (it's a
+    search parameter owned by capacity_search, not something GroupBuilder
+    derives for itself - see the dual-cap-solver plan's revision after the
+    pigeonhole floor proved infeasible for constrained rosters). When the
+    caller does supply one, GroupBuilder must hold the line exactly."""
+    from assignment_logic.capacity import compute_pairwise_cap
 
-    Nine people at three tables of three over four sessions is the one size where
-    a perfect answer provably exists: 4 sessions x 3 tables x 3 pairs = 36 = every
-    one of the 36 pairs meeting exactly once. The window is narrowed to 1 so it
-    only charges for back-to-back sessions, which leaves "sessions 1 and 3"
-    costing nothing at all. Only the global penalty rules that out.
-    """
+    people = _nine_participants()
+    expected_cap = compute_pairwise_cap(people, num_tables=3, num_sessions=4)
+    assert expected_cap == 1  # AG(2,3): every pair meets exactly once
+
     builder = GroupBuilder(
-        _nine_participants(),
-        num_tables=3,
-        num_sessions=4,
-        pairing_window_size=1,
+        people, num_tables=3, num_sessions=4, pairwise_cap=expected_cap
     )
     result = builder.generate_assignments(max_time_seconds=30)
 
     assert result["status"] == "success"
     meetings = _count_meetings(result)
-    worst = max(meetings.values())
-    assert worst == 1, f"a pair met {worst} times when every pair could meet once"
+    assert max(meetings.values()) == expected_cap
+
+
+def test_historical_meeting_counts_forbid_a_pair_that_already_hit_the_cap():
+    """A single-session regeneration must not let a pair meet again if
+    they've already used up their whole-program budget elsewhere."""
+    people = _nine_participants()
+    # Whole program's cap for this shape is 1 (see above). P0 & P1
+    # already met once in another session -> forbidden here.
+    builder = GroupBuilder(
+        people,
+        num_tables=3,
+        num_sessions=1,
+        pairwise_cap=1,
+        historical_meeting_counts={("p0", "p1"): 1},
+    )
+    result = builder.generate_assignments(max_time_seconds=15)
+    assert result["status"] == "success"
+    tables = result["assignments"][0]["tables"]
+    for seats in tables.values():
+        names = {s["name"] for s in seats}
+        assert not ({"P0", "P1"} <= names)
+
+
+def test_table_overlap_never_exceeds_the_configured_cap():
+    from itertools import combinations
+
+    people = _twenty_four_participants_with_relations()
+    builder = GroupBuilder(people, num_tables=4, num_sessions=5, table_overlap_cap=3)
+    result = builder.generate_assignments(max_time_seconds=20)
+    assert result["status"] == "success"
+
+    tables = []
+    for session in result["assignments"]:
+        for people_at_table in session["tables"].values():
+            tables.append(frozenset(p["name"] for p in people_at_table))
+    for a, b in combinations(tables, 2):
+        assert len(a & b) <= 3
+
+
+def test_overlap_cap_too_tight_is_reported_infeasible_not_silently_ignored():
+    people = _twenty_four_participants_with_relations()
+    builder = GroupBuilder(
+        people, num_tables=4, num_sessions=5, table_overlap_cap=1
+    )  # 1 is below the proven floor for this shape
+    result = builder.generate_assignments(max_time_seconds=20)
+    assert result["status"] == "failure"
+    assert "No solution exists" in result["error"]
 
 
 if __name__ == "__main__":

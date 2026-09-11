@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Path, Request, Body, Depends
 from assignment_logic.api_handler import handle_generate_assignments
-from assignment_logic.group_builder import GroupBuilder
+from assignment_logic.capacity_search import find_feasible_plan
 from api.dependencies import validate_program_access
 from api.services.assignment_set_storage import (
     AssignmentSetStorage,
@@ -18,6 +18,7 @@ from api.services.version_promotion import roster_change_reason
 from api.services.program_solve import (
     LABEL_GENERATED,
     SolveFailed,
+    extract_historical_tables,
     extract_pairings_from_sessions,
     solve_program,
 )
@@ -585,10 +586,31 @@ async def regenerate_single_session(
 
         existing_assignments = current_result["assignments"]
 
-        # 3. Extract historical pairings from OTHER sessions
-        historical_pairings = extract_pairings_from_sessions(
+        # 3. Extract real historical meeting counts and table memberships
+        # from OTHER sessions, converted from names to ids (GroupBuilder's
+        # pair keys are id-based). Counts, not just membership: this session
+        # must respect the same whole-program pairwise/overlap caps the rest
+        # of the program was built under, not just avoid repeats it happens
+        # to remember - see the dual-cap-solver plan's Task 8 notes on why
+        # the shuffle feature's quality regressed without this.
+        name_to_id = {p["name"]: p["id"] for p in all_participants}
+        historical_counts_by_name = extract_pairings_from_sessions(
             existing_assignments, exclude_session=session_number
         )
+        historical_meeting_counts = {}
+        for (n1, n2), count in historical_counts_by_name.items():
+            if n1 in name_to_id and n2 in name_to_id:
+                key = tuple(sorted([name_to_id[n1], name_to_id[n2]]))
+                historical_meeting_counts[key] = count
+
+        historical_tables = [
+            frozenset(name_to_id[n] for n in table if n in name_to_id)
+            for table in extract_historical_tables(
+                existing_assignments, exclude_session=session_number
+            )
+        ]
+
+        total_program_sessions = assignment_set["num_sessions"]
 
         # 4. Extract current table assignments to prefer variety
         session_assignment = existing_assignments[session_number - 1]
@@ -612,27 +634,34 @@ async def regenerate_single_session(
         logger.info(
             f"Regenerating session {session_number} for program {program_id}: "
             f"{len(active_participants)} active participants, {num_tables} tables, "
-            f"{len(historical_pairings)} historical pairings to avoid, "
+            f"{len(historical_meeting_counts)} historical pairings to respect, "
             f"{len(current_table_assignments)} current assignments to FORBID (hard constraint), "
             f"max_time={max_time_seconds}s"
         )
+
+        # find_feasible_plan can run up to max_pairwise_tries * max_overlap_tries
+        # probes (12 with its defaults) - divide the caller's budget across
+        # the worst case rather than handing the full budget to every probe.
+        probe_seconds = max(5, max_time_seconds / 12)
 
         # 6. Try to solve with HARD constraint: participants cannot be assigned to same tables
         logger.info(
             "Attempt 1: Solving with HARD constraint (must generate different assignments)"
         )
-        builder = GroupBuilder(
-            participants=active_participants,
-            num_tables=num_tables,
-            num_sessions=1,  # Only regenerating one session
-            historical_pairings=historical_pairings,  # Pass existing pairings
+        result, pairwise_cap, overlap_cap = find_feasible_plan(
+            active_participants,
+            num_tables,
+            1,  # Only regenerating one session
+            probe_seconds=probe_seconds,
+            historical_meeting_counts=historical_meeting_counts,
+            total_program_sessions=total_program_sessions,
+            historical_tables=historical_tables,
             current_table_assignments=current_table_assignments,  # FORBID same assignments
             pairing_window_size=assignment_set.get("pairing_window_size"),
             solver_num_workers=4,
             require_different_assignments=True,  # HARD CONSTRAINT
         )
 
-        result = builder.generate_assignments(max_time_seconds=max_time_seconds)
         assignments_unchanged = False
 
         # If hard constraint fails, try again without it (current assignments may be optimal)
@@ -645,20 +674,18 @@ async def regenerate_single_session(
                 "Attempt 2: Solving WITHOUT hard constraint (may return same assignments)"
             )
 
-            # Retry without hard constraint
-            builder_fallback = GroupBuilder(
-                participants=active_participants,
-                num_tables=num_tables,
-                num_sessions=1,
-                historical_pairings=historical_pairings,
+            result, pairwise_cap, overlap_cap = find_feasible_plan(
+                active_participants,
+                num_tables,
+                1,
+                probe_seconds=probe_seconds,
+                historical_meeting_counts=historical_meeting_counts,
+                total_program_sessions=total_program_sessions,
+                historical_tables=historical_tables,
                 current_table_assignments=current_table_assignments,  # Soft penalty, not forbidden
                 pairing_window_size=assignment_set.get("pairing_window_size"),
                 solver_num_workers=4,
                 require_different_assignments=False,  # SOFT CONSTRAINT (allow same assignments)
-            )
-
-            result = builder_fallback.generate_assignments(
-                max_time_seconds=max_time_seconds
             )
 
             if result["status"] != "success":

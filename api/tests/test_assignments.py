@@ -822,8 +822,8 @@ class TestRegenerateAllWithAbsences:
         versions = storage.list_versions(PROGRAM, set_id)
         return storage.get_version(PROGRAM, set_id, versions[0]["version_id"])
 
-    @patch("api.routers.assignments.GroupBuilder")
-    @patch("api.routers.assignments.handle_generate_assignments")
+    @patch("api.services.program_solve.GroupBuilder")
+    @patch("api.services.program_solve.handle_generate_assignments")
     def test_absences_recorded_and_stale_metrics_dropped(
         self,
         mock_generate,
@@ -866,8 +866,8 @@ class TestRegenerateAllWithAbsences:
         assert metadata["total_deviation"] is None
         assert metadata["regenerated"] is True
 
-    @patch("api.routers.assignments.GroupBuilder")
-    @patch("api.routers.assignments.handle_generate_assignments")
+    @patch("api.services.program_solve.GroupBuilder")
+    @patch("api.services.program_solve.handle_generate_assignments")
     def test_absences_survive_a_failed_resolve(
         self,
         mock_generate,
@@ -907,10 +907,10 @@ class TestRegenerateAllWithAbsences:
 class TestRegenerateSingleSession:
     """Test suite for POST /api/assignments/regenerate/session/{session_number}."""
 
-    @patch("api.routers.assignments.GroupBuilder")
+    @patch("api.routers.assignments.find_feasible_plan")
     def test_regenerate_single_session_success(
         self,
-        mock_builder_class,
+        mock_find_feasible_plan,
         client,
         sample_set_data,
         sample_assignments_result,
@@ -927,49 +927,51 @@ class TestRegenerateSingleSession:
         )
 
         # Mock the solver to return new assignments for session 1
-        mock_builder = MagicMock()
-        mock_builder_class.return_value = mock_builder
-        mock_builder.generate_assignments.return_value = {
-            "status": "success",
-            "solution_quality": "optimal",
-            "solve_time": 2.0,
-            "total_deviation": 5,
-            "assignments": [
-                {
-                    "session": 1,
-                    "tables": {
-                        "1": [
-                            {
-                                "name": "Charlie",
-                                "religion": "Muslim",
-                                "gender": "Male",
-                                "partner": None,
-                            },
-                            {
-                                "name": "Diana",
-                                "religion": "Christian",
-                                "gender": "Female",
-                                "partner": None,
-                            },
-                        ],
-                        "2": [
-                            {
-                                "name": "Alice",
-                                "religion": "Christian",
-                                "gender": "Female",
-                                "partner": None,
-                            },
-                            {
-                                "name": "Bob",
-                                "religion": "Jewish",
-                                "gender": "Male",
-                                "partner": None,
-                            },
-                        ],
-                    },
-                }
-            ],
-        }
+        mock_find_feasible_plan.return_value = (
+            {
+                "status": "success",
+                "solution_quality": "optimal",
+                "solve_time": 2.0,
+                "total_deviation": 5,
+                "assignments": [
+                    {
+                        "session": 1,
+                        "tables": {
+                            "1": [
+                                {
+                                    "name": "Charlie",
+                                    "religion": "Muslim",
+                                    "gender": "Male",
+                                    "partner": None,
+                                },
+                                {
+                                    "name": "Diana",
+                                    "religion": "Christian",
+                                    "gender": "Female",
+                                    "partner": None,
+                                },
+                            ],
+                            "2": [
+                                {
+                                    "name": "Alice",
+                                    "religion": "Christian",
+                                    "gender": "Female",
+                                    "partner": None,
+                                },
+                                {
+                                    "name": "Bob",
+                                    "religion": "Jewish",
+                                    "gender": "Male",
+                                    "partner": None,
+                                },
+                            ],
+                        },
+                    }
+                ],
+            },
+            2,  # pairwise_cap
+            2,  # overlap_cap
+        )
 
         response = client.post(
             f"/api/assignments/regenerate/session/1"
@@ -993,17 +995,18 @@ class TestRegenerateSingleSession:
         assert data["assignments"][0]["session"] == 1
         assert data["assignments"][1]["session"] == 2
 
-        # Verify GroupBuilder was called with require_different_assignments=True
-        mock_builder_class.assert_called()
-        call_kwargs = mock_builder_class.call_args[1]
+        # Verify find_feasible_plan was called with require_different_assignments=True
+        mock_find_feasible_plan.assert_called()
+        call_args, call_kwargs = mock_find_feasible_plan.call_args
         assert call_kwargs["require_different_assignments"] is True
-        assert call_kwargs["num_sessions"] == 1
+        assert call_args[2] == 1  # num_sessions positional arg
         assert call_kwargs["current_table_assignments"] is not None
+        assert call_kwargs["total_program_sessions"] == 2
 
-    @patch("api.routers.assignments.GroupBuilder")
+    @patch("api.routers.assignments.find_feasible_plan")
     def test_regenerate_single_session_with_absent_participants(
         self,
-        mock_builder_class,
+        mock_find_feasible_plan,
         client,
         sample_set_data,
         sample_assignments_result,
@@ -1019,37 +1022,39 @@ class TestRegenerateSingleSession:
             {"solution_quality": "optimal"},
         )
 
-        mock_builder = MagicMock()
-        mock_builder_class.return_value = mock_builder
-        mock_builder.generate_assignments.return_value = {
-            "status": "success",
-            "solution_quality": "optimal",
-            "solve_time": 1.0,
-            "total_deviation": 0,
-            "assignments": [
-                {
-                    "session": 1,
-                    "tables": {
-                        "1": [
-                            {
-                                "name": "Charlie",
-                                "religion": "Muslim",
-                                "gender": "Male",
-                                "partner": None,
-                            }
-                        ],
-                        "2": [
-                            {
-                                "name": "Diana",
-                                "religion": "Christian",
-                                "gender": "Female",
-                                "partner": None,
-                            }
-                        ],
-                    },
-                }
-            ],
-        }
+        mock_find_feasible_plan.return_value = (
+            {
+                "status": "success",
+                "solution_quality": "optimal",
+                "solve_time": 1.0,
+                "total_deviation": 0,
+                "assignments": [
+                    {
+                        "session": 1,
+                        "tables": {
+                            "1": [
+                                {
+                                    "name": "Charlie",
+                                    "religion": "Muslim",
+                                    "gender": "Male",
+                                    "partner": None,
+                                }
+                            ],
+                            "2": [
+                                {
+                                    "name": "Diana",
+                                    "religion": "Christian",
+                                    "gender": "Female",
+                                    "partner": None,
+                                }
+                            ],
+                        },
+                    }
+                ],
+            },
+            1,
+            1,
+        )
 
         # Mark Alice and Bob as absent
         absent_participants = [
@@ -1074,15 +1079,15 @@ class TestRegenerateSingleSession:
         assert "absentParticipants" in data["assignments"][0]
         assert len(data["assignments"][0]["absentParticipants"]) == 2
 
-        # Verify GroupBuilder was called with only 2 active participants
-        mock_builder_class.assert_called()
-        call_kwargs = mock_builder_class.call_args[1]
-        assert len(call_kwargs["participants"]) == 2  # Only Charlie and Diana
+        # Verify find_feasible_plan was called with only 2 active participants
+        mock_find_feasible_plan.assert_called()
+        call_args, _ = mock_find_feasible_plan.call_args
+        assert len(call_args[0]) == 2  # Only Charlie and Diana
 
-    @patch("api.routers.assignments.GroupBuilder")
+    @patch("api.routers.assignments.find_feasible_plan")
     def test_regenerate_single_session_fallback_when_impossible(
         self,
-        mock_builder_class,
+        mock_find_feasible_plan,
         client,
         sample_set_data,
         sample_assignments_result,
@@ -1099,22 +1104,21 @@ class TestRegenerateSingleSession:
         )
 
         # First call (hard constraint) fails, second call (soft constraint) succeeds
-        mock_builder_hard = MagicMock()
-        mock_builder_soft = MagicMock()
-        mock_builder_class.side_effect = [mock_builder_hard, mock_builder_soft]
-
-        mock_builder_hard.generate_assignments.return_value = {
-            "status": "failure",
-            "error": "Infeasible",
-        }
-        mock_builder_soft.generate_assignments.return_value = {
-            "status": "success",
-            "solution_quality": "optimal",
-            "solve_time": 1.0,
-            "assignments": sample_assignments_result["assignments"][
-                :1
-            ],  # Return session 1
-        }
+        mock_find_feasible_plan.side_effect = [
+            ({"status": "failure", "error": "Infeasible"}, None, None),
+            (
+                {
+                    "status": "success",
+                    "solution_quality": "optimal",
+                    "solve_time": 1.0,
+                    "assignments": sample_assignments_result["assignments"][
+                        :1
+                    ],  # Return session 1
+                },
+                1,
+                1,
+            ),
+        ]
 
         response = client.post(
             f"/api/assignments/regenerate/session/1?program_id={PROGRAM}", json=[]
@@ -1126,8 +1130,8 @@ class TestRegenerateSingleSession:
         # Verify assignments_unchanged flag is set
         assert data["assignments_unchanged"] is True
 
-        # Verify GroupBuilder was called twice (hard then soft)
-        assert mock_builder_class.call_count == 2
+        # Verify find_feasible_plan was called twice (hard then soft)
+        assert mock_find_feasible_plan.call_count == 2
 
     def test_regenerate_single_session_no_assignment_set(self, client):
         """Regenerating in a program with no assignment set returns 404."""
@@ -1175,10 +1179,10 @@ class TestRegenerateSingleSession:
         )
         assert response.status_code == 422
 
-    @patch("api.routers.assignments.GroupBuilder")
+    @patch("api.routers.assignments.find_feasible_plan")
     def test_regenerate_single_session_metadata_persistence(
         self,
-        mock_builder_class,
+        mock_find_feasible_plan,
         client,
         sample_set_data,
         sample_assignments_result,
@@ -1194,15 +1198,17 @@ class TestRegenerateSingleSession:
             metadata={"max_time_seconds": 120},
         )
 
-        mock_builder = MagicMock()
-        mock_builder_class.return_value = mock_builder
-        mock_builder.generate_assignments.return_value = {
-            "status": "success",
-            "solution_quality": "optimal",
-            "solve_time": 1.5,
-            "total_deviation": 3,
-            "assignments": sample_assignments_result["assignments"][:1],
-        }
+        mock_find_feasible_plan.return_value = (
+            {
+                "status": "success",
+                "solution_quality": "optimal",
+                "solve_time": 1.5,
+                "total_deviation": 3,
+                "assignments": sample_assignments_result["assignments"][:1],
+            },
+            1,
+            1,
+        )
 
         response = client.post(
             f"/api/assignments/regenerate/session/1"
@@ -1227,6 +1233,78 @@ class TestRegenerateSingleSession:
         assert stored_result["metadata"]["max_time_seconds"] == 60
         assert stored_result["metadata"]["regenerated"] is True
         assert stored_result["metadata"]["regenerated_session"] == 1
+
+    def test_shuffle_respects_the_whole_program_pairwise_cap(
+        self, client, add_assignment_set_to_firestore, add_version_to_firestore
+    ):
+        """End-to-end (no mocking): a pair that already spent its whole-
+        program pairwise budget in other sessions must not be reseated
+        together by the shuffle, even though shuffling session 2 alone has
+        no way to know that on its own. This is the real fix behind the
+        'shuffle quality' regression - the endpoint used to only avoid
+        exact-repeat *tables*, with no visibility into the program's hard
+        repeat cap at all.
+
+        9 identical people / 3 tables / 3 sessions puts the whole-program
+        pairwise cap at 1 (compute_pairwise_cap) - any prior meeting spends
+        the whole budget.
+        """
+
+        def _people(n):
+            return [
+                {
+                    "id": i,
+                    "name": f"P{i}",
+                    "religion": "X",
+                    "gender": "M",
+                    "couple_id": None,
+                    "linked_id": None,
+                }
+                for i in range(n)
+            ]
+
+        def _session(num, groups):
+            return {
+                "session": num,
+                "tables": {
+                    str(t + 1): [{"name": n} for n in names]
+                    for t, names in enumerate(groups)
+                },
+            }
+
+        set_data = {
+            "participant_data": _people(9),
+            "num_tables": 3,
+            "num_sessions": 3,
+            "filename": "test.xlsx",
+        }
+        set_id = add_assignment_set_to_firestore(set_data)
+        assignments = [
+            # Session 1: P0 and P1 meet - this is the entire pairwise
+            # budget they get for the whole program.
+            _session(1, [["P0", "P1", "P2"], ["P3", "P4", "P5"], ["P6", "P7", "P8"]]),
+            # Session 2: the one being regenerated. Its current layout is
+            # irrelevant to the assertion - only that it changes without
+            # reseating P0 and P1 together.
+            _session(2, [["P0", "P3", "P6"], ["P1", "P4", "P7"], ["P2", "P5", "P8"]]),
+            _session(3, [["P0", "P4", "P8"], ["P1", "P5", "P6"], ["P2", "P3", "P7"]]),
+        ]
+        add_version_to_firestore(
+            set_id, "v1", assignments, {"solution_quality": "optimal"}
+        )
+
+        response = client.post(
+            f"/api/assignments/regenerate/session/2"
+            f"?program_id={PROGRAM}&max_time_seconds=30",
+            json=[],
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        session_2 = next(s for s in data["assignments"] if s["session"] == 2)
+        for _, seats in session_2["tables"].items():
+            names = {s["name"] for s in seats}
+            assert not ({"P0", "P1"} <= names)
 
 
 class TestAuthProtection:
@@ -1712,10 +1790,10 @@ class TestVersionLabels:
         assert response.status_code == 200
         assert self._labels()[0] == "Manual edit"
 
-    @patch("api.routers.assignments.GroupBuilder")
+    @patch("api.routers.assignments.find_feasible_plan")
     def test_single_session_shuffle_labels_the_version(
         self,
-        mock_builder_class,
+        mock_find_feasible_plan,
         client,
         sample_set_data,
         sample_assignments_result,
@@ -1730,20 +1808,22 @@ class TestVersionLabels:
             {"solution_quality": "optimal"},
         )
 
-        mock_builder = MagicMock()
-        mock_builder_class.return_value = mock_builder
-        mock_builder.generate_assignments.return_value = {
-            "status": "success",
-            "solution_quality": "optimal",
-            "solve_time": 1.0,
-            "total_deviation": 0,
-            "assignments": [
-                {
-                    "session": 1,
-                    "tables": sample_assignments_result["assignments"][0]["tables"],
-                }
-            ],
-        }
+        mock_find_feasible_plan.return_value = (
+            {
+                "status": "success",
+                "solution_quality": "optimal",
+                "solve_time": 1.0,
+                "total_deviation": 0,
+                "assignments": [
+                    {
+                        "session": 1,
+                        "tables": sample_assignments_result["assignments"][0]["tables"],
+                    }
+                ],
+            },
+            1,
+            1,
+        )
 
         response = client.post(
             f"/api/assignments/regenerate/session/1?program_id={PROGRAM}",
@@ -1753,10 +1833,10 @@ class TestVersionLabels:
         assert response.status_code == 200
         assert self._labels()[0] == "Session 1 shuffled"
 
-    @patch("api.routers.assignments.GroupBuilder")
+    @patch("api.routers.assignments.handle_generate_assignments")
     def test_first_generate_labels_the_version(
         self,
-        mock_builder_class,
+        mock_generate,
         client,
         sample_set_data,
         sample_assignments_result,
@@ -1764,9 +1844,7 @@ class TestVersionLabels:
     ):
         add_assignment_set_to_firestore(sample_set_data)
 
-        mock_builder = MagicMock()
-        mock_builder_class.return_value = mock_builder
-        mock_builder.generate_assignments.return_value = sample_assignments_result
+        mock_generate.return_value = sample_assignments_result
 
         response = client.get(f"/api/assignments/?program_id={PROGRAM}")
 
