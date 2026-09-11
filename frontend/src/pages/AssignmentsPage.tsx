@@ -18,12 +18,10 @@ import ProgramHeader from '@/components/Assignments/ProgramHeader'
 import ViewBar from '@/components/Assignments/ViewBar'
 import { authenticatedFetch } from '@/utils/apiClient'
 import {
-  linkedPairCount,
   seatedCount,
   rebuildReceipt,
   shuffleReceipt,
   tableNumbers,
-  uniqueTablematesAverage,
   personTrackingSummary,
 } from '@/utils/assignmentStats'
 import { markAbsent, markPresent } from '@/utils/assignmentEdits'
@@ -747,13 +745,6 @@ const AssignmentsPage: React.FC = () => {
       </div>
       <ProgramHeader
         programName={currentProgram?.name ?? 'Assignments'}
-        facts={{
-          participants: metadata?.num_participants ?? 0,
-          tables: metadata?.num_tables ?? 0,
-          sessions: totalSessions,
-          uniqueTablemates: uniqueTablematesAverage(sorted),
-        }}
-        linkedPairs={linkedPairCount(sorted)}
         onPrintRoster={handlePrintRoster}
         onCopyLink={handleCopyLink}
         history={historyMenu}

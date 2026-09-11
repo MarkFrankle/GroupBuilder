@@ -406,13 +406,10 @@ describe('AssignmentsPage', () => {
     expect(await screen.findByText('All 3 sessions complete.')).toBeInTheDocument()
   })
 
-  it('states the program facts in the header', async () => {
+  it('states the program name in the header', async () => {
     renderPage()
 
     expect(await screen.findByRole('heading', { name: 'Spring 2026 Series' })).toBeInTheDocument()
-    expect(
-      screen.getByText('4 participants · 2 tables · 3 sessions · avg 1 unique tablemates')
-    ).toBeInTheDocument()
   })
 
   it('copies a program-scoped link, never a version-scoped one', async () => {
