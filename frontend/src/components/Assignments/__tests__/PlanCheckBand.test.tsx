@@ -64,7 +64,7 @@ describe('PlanCheckBand — worst-case notes', () => {
     expect(
       screen.queryByText('No one sits with the same person more than twice')
     ).not.toBeInTheDocument()
-    expect(screen.getByText('One pair sits together three times')).toBeInTheDocument()
+    expect(screen.getByText('At least one pair sits together three times')).toBeInTheDocument()
   })
 
   it('names the tied worst pairs in the hoverable detail', async () => {
@@ -96,7 +96,7 @@ describe('PlanCheckBand — worst-case notes', () => {
       },
     })
     expect(
-      screen.getByText('One person has the same facilitator 4 of 5 sessions')
+      screen.getByText('At least one person has the same facilitator 4 of 5 sessions')
     ).toBeInTheDocument()
   })
 

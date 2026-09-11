@@ -23,7 +23,7 @@ const REPEAT_FLOOR = 2
 function pairRepeatNote(max: number): string {
   const word =
     max === 3 ? 'three' : max === 4 ? 'four' : max === 5 ? 'five' : max === 6 ? 'six' : String(max)
-  return `One pair sits together ${word} times`
+  return `At least one pair sits together ${word} times`
 }
 
 const CheckLine: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -138,7 +138,7 @@ const PlanCheckBand: React.FC<PlanCheckBandProps> = ({ result }) => {
         )}
         {multiSession && r.maxFacilitatorRepeat > REPEAT_FLOOR && (
           <NoteLine>
-            {`One person has the same facilitator ${r.maxFacilitatorRepeat} of ${incompleteSessionCount} sessions`}
+            {`At least one person has the same facilitator ${r.maxFacilitatorRepeat} of ${incompleteSessionCount} sessions`}
             {r.facilitatorRepeatWorst.length > 0 && (
               <RepeatWorstDetail
                 label="Who has the repeat facilitator"
