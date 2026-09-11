@@ -775,27 +775,47 @@ def _nine_participants():
     ]
 
 
-def test_repeat_pairings_are_penalised_beyond_the_rolling_window():
-    """A pair meeting in sessions 1 and 3 is free under the rolling window alone.
+def test_pairwise_repeats_never_exceed_an_explicit_cap():
+    """The cap is now a hard constraint the caller must supply (it's a
+    search parameter owned by capacity_search, not something GroupBuilder
+    derives for itself - see the dual-cap-solver plan's revision after the
+    pigeonhole floor proved infeasible for constrained rosters). When the
+    caller does supply one, GroupBuilder must hold the line exactly."""
+    from assignment_logic.capacity import compute_pairwise_cap
 
-    Nine people at three tables of three over four sessions is the one size where
-    a perfect answer provably exists: 4 sessions x 3 tables x 3 pairs = 36 = every
-    one of the 36 pairs meeting exactly once. The window is narrowed to 1 so it
-    only charges for back-to-back sessions, which leaves "sessions 1 and 3"
-    costing nothing at all. Only the global penalty rules that out.
-    """
+    people = _nine_participants()
+    expected_cap = compute_pairwise_cap(people, num_tables=3, num_sessions=4)
+    assert expected_cap == 1  # AG(2,3): every pair meets exactly once
+
     builder = GroupBuilder(
-        _nine_participants(),
-        num_tables=3,
-        num_sessions=4,
-        pairing_window_size=1,
+        people, num_tables=3, num_sessions=4, pairwise_cap=expected_cap
     )
     result = builder.generate_assignments(max_time_seconds=30)
 
     assert result["status"] == "success"
     meetings = _count_meetings(result)
-    worst = max(meetings.values())
-    assert worst == 1, f"a pair met {worst} times when every pair could meet once"
+    assert max(meetings.values()) == expected_cap
+
+
+def test_historical_meeting_counts_forbid_a_pair_that_already_hit_the_cap():
+    """A single-session regeneration must not let a pair meet again if
+    they've already used up their whole-program budget elsewhere."""
+    people = _nine_participants()
+    # Whole program's cap for this shape is 1 (see above). P0 & P1
+    # already met once in another session -> forbidden here.
+    builder = GroupBuilder(
+        people,
+        num_tables=3,
+        num_sessions=1,
+        pairwise_cap=1,
+        historical_meeting_counts={("p0", "p1"): 1},
+    )
+    result = builder.generate_assignments(max_time_seconds=15)
+    assert result["status"] == "success"
+    tables = result["assignments"][0]["tables"]
+    for seats in tables.values():
+        names = {s["name"] for s in seats}
+        assert not ({"P0", "P1"} <= names)
 
 
 if __name__ == "__main__":

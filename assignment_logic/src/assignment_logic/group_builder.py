@@ -19,6 +19,9 @@ class GroupBuilder:
         solver_num_workers=None,
         repeat_penalty_weight=None,
         require_different_assignments=False,
+        total_program_sessions=None,
+        historical_meeting_counts=None,
+        pairwise_cap=None,
     ):
         """
         Initialize the GroupBuilder.
@@ -59,6 +62,18 @@ class GroupBuilder:
         self.require_different_assignments = (
             require_different_assignments  # Hard vs soft constraint
         )
+        self.total_program_sessions = total_program_sessions or len(self.sessions)
+        # Back-compat: a bare set of pairs means "met once each."
+        raw_counts = historical_meeting_counts or {}
+        if isinstance(raw_counts, set):
+            raw_counts = {pair: 1 for pair in raw_counts}
+        self.historical_meeting_counts = raw_counts
+        # Not computed internally: compute_pairwise_cap's pigeonhole floor is
+        # only a provable lower bound for fully symmetric rosters. A roster
+        # with couples/linked pairs can make that exact floor infeasible, so
+        # the caller (capacity_search.find_feasible_plan) escalates from the
+        # floor rather than this class trusting it as a hard truth.
+        self.pairwise_cap = pairwise_cap
 
         # Configurable solver parameters (can be overridden by env vars or constructor args)
         self.pairing_window_size = pairing_window_size or int(
@@ -477,6 +492,12 @@ class GroupBuilder:
                             == self.participant_table_assignments[(p2["id"], s, t)]
                         )
 
+        linked_pair_ids = {
+            tuple(sorted((group[0]["id"], group[1]["id"])))
+            for group in linked.values()
+            if len(group) == 2
+        }
+
         # Keep-apart pairs: the same shape as couples separation above, but
         # driven by an explicit rule rather than by a partnership. Hard, like
         # couples - the tool does not quietly produce a plan that breaks a rule
@@ -565,11 +586,17 @@ class GroupBuilder:
                         )
                         penalty_count += both_sessions
 
-                # TOTAL EXPOSURE: the window above encodes *spacing* - meeting in
-                # sessions 1 and 2 is worse than 1 and 5 - but it cannot see how many
-                # times a pair meets overall, so sessions 1 and 5 cost nothing at all.
-                # Penalize the total superlinearly, so a third meeting costs far more
-                # than a second. A hard cap would risk making a program infeasible.
+                # TOTAL BUDGET: hard-cap how many times this pair can meet at
+                # all, rather than merely penalizing repeats, when the caller
+                # supplies a cap. The value is an external search parameter,
+                # not derived here - capacity.compute_pairwise_cap's floor is
+                # only a valid *lower bound* to start searching from, not a
+                # guaranteed-achievable target once couples/linked pairs
+                # reduce the roster's degrees of freedom. Skipped entirely
+                # when pairwise_cap is None, same as table_overlap_cap.
+                # Linked pairs are exempt - they're pinned together every
+                # session by the hard constraint above, so "meetings" isn't
+                # a meaningful budget for them.
                 total_meetings = self.model.NewIntVar(
                     0, len(self.sessions), f'meetings_{p1["id"]}_{p2["id"]}'
                 )
@@ -577,28 +604,10 @@ class GroupBuilder:
                     total_meetings == sum(pair_meets_session[s] for s in self.sessions)
                 )
 
-                # Two rungs, not a full ladder. Each rung is max(0, total - k),
-                # so the pair's cost runs 0, 0, 1, 2 + W, 3 + 2W ... for 0, 1, 2,
-                # 3, 4 meetings - convex, and the jump at the third meeting is as
-                # large as W is.
-                #
-                # The k=1 rung is the one that fixes the reported bug: it is what
-                # charges for a second meeting *at any distance*, which is exactly
-                # what the rolling window cannot see. The k=2 rung is what makes
-                # the growth superlinear.
-                #
-                # Deliberately stopping at two rungs rather than running k up to
-                # the session count. The full ladder is a smoother curve but costs
-                # (sessions - 1) variables per pair, and at 24 participants that
-                # measurably starved the search - the solver stopped proving
-                # optimality and returned worse plans than it did with no global
-                # penalty at all.
-                for k, weight in ((1, 1), (2, self.repeat_penalty_weight)):
-                    excess = self.model.NewIntVar(
-                        0, len(self.sessions), f'excess_{p1["id"]}_{p2["id"]}_{k}'
-                    )
-                    self.model.AddMaxEquality(excess, [total_meetings - k, 0])
-                    penalty_count += weight * excess
+                if self.pairwise_cap is not None and pair_key not in linked_pair_ids:
+                    already_met = self.historical_meeting_counts.get(pair_key, 0)
+                    remaining_budget = max(0, self.pairwise_cap - already_met)
+                    self.model.Add(total_meetings <= remaining_budget)
 
         # VARIETY-SEEKING: Prevent or penalize same table assignments as current (when regenerating)
         if self.current_table_assignments:
