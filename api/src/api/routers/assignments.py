@@ -614,6 +614,15 @@ async def regenerate_single_session(
 
         total_program_sessions = assignment_set["num_sessions"]
 
+        # This session's roster is usually smaller than the whole program's
+        # (absences, etc.), so its own pigeonhole floor is weaker than the
+        # cap the rest of the program was actually solved and accepted
+        # under. Floor the escalation at the program's existing caps so a
+        # shuffle can't silently loosen the pairwise/overlap budget the
+        # other sessions already respect.
+        min_pairwise_cap = current_result.get("pairwise_cap")
+        min_overlap_cap = current_result.get("table_overlap_cap")
+
         # 4. Extract current table assignments to prefer variety
         session_assignment = existing_assignments[session_number - 1]
         current_table_assignments = _extract_current_table_assignments(
@@ -662,6 +671,8 @@ async def regenerate_single_session(
             pairing_window_size=assignment_set.get("pairing_window_size"),
             solver_num_workers=4,
             require_different_assignments=True,  # HARD CONSTRAINT
+            min_pairwise_cap=min_pairwise_cap,
+            min_overlap_cap=min_overlap_cap,
         )
 
         assignments_unchanged = False
@@ -688,6 +699,8 @@ async def regenerate_single_session(
                 pairing_window_size=assignment_set.get("pairing_window_size"),
                 solver_num_workers=4,
                 require_different_assignments=False,  # SOFT CONSTRAINT (allow same assignments)
+                min_pairwise_cap=min_pairwise_cap,
+                min_overlap_cap=min_overlap_cap,
             )
 
             if result["status"] != "success":

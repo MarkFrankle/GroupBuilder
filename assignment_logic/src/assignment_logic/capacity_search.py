@@ -34,12 +34,22 @@ def find_feasible_plan(
     probe_seconds=20,
     max_pairwise_tries=3,
     max_overlap_tries=4,
+    min_pairwise_cap=None,
+    min_overlap_cap=None,
     **group_builder_kwargs,
 ):
     """
     Returns (result, pairwise_cap_used, table_overlap_cap_used). On
     exhaustion, returns (the last failing result, None, None) so the
     caller can surface a real error rather than a silent None.
+
+    min_pairwise_cap / min_overlap_cap raise the starting point of each
+    escalation above this call's own pigeonhole floor. A caller solving a
+    subset of a program (e.g. a single-session reshuffle) computes a
+    weaker floor than the whole program was built under - without a
+    floor, escalation could converge on a looser cap than the rest of the
+    program is already locked to, silently permitting more repeat
+    meetings than the accepted plan allows.
     """
     total_program_sessions = (
         group_builder_kwargs.get("total_program_sessions") or num_sessions
@@ -47,7 +57,11 @@ def find_feasible_plan(
     pairwise_floor = compute_pairwise_cap(
         participants, num_tables, total_program_sessions
     )
+    if min_pairwise_cap is not None:
+        pairwise_floor = max(pairwise_floor, min_pairwise_cap)
     overlap_floor = compute_overlap_lower_bound(participants, num_tables)
+    if min_overlap_cap is not None:
+        overlap_floor = max(overlap_floor, min_overlap_cap)
 
     last_result = None
     for p_attempt in range(max_pairwise_tries):
