@@ -131,6 +131,37 @@ describe('checkPlan — verdict', () => {
       /Table \d has no facilitator/
     )
   })
+
+  it('flags a session where balance is worse than the roster floor', () => {
+    // 2 tables, roster 2 Jewish / 2 Christian → floor 0, but both Jewish at table 1.
+    const plan: Assignment[] = [
+      {
+        session: 1,
+        tables: {
+          1: [p('A', { religion: 'Jewish' }), p('B', { religion: 'Jewish' })],
+          2: [p('C', { religion: 'Christian' }), p('D', { religion: 'Christian' })],
+        },
+      },
+    ]
+    const result = checkPlan(plan, [])
+    expect(result.verdict).toBe('attention')
+    expect(
+      result.violations.some(v => v.kind === 'balance' && v.session === 1)
+    ).toBe(true)
+    expect(result.violations.find(v => v.kind === 'balance')!.message).toMatch(
+      /Session 1 isn.t mixed as evenly by religion/
+    )
+  })
+
+  it('a hard violation wins over a simultaneous soft overage', () => {
+    // Heavy pair-repeat (3 sessions, same trio) AND a couple seated together.
+    const plan: Assignment[] = [1, 2, 3].map(session => ({
+      session,
+      tables: { 1: [p('A', { partner: 'B' }), p('B', { partner: 'A' }), p('C')] },
+    }))
+    const result = checkPlan(plan, [])
+    expect(result.verdict).toBe('attention')
+  })
 })
 
 describe('checkPlan — reassurances', () => {
@@ -205,33 +236,44 @@ describe('checkPlan — reassurances', () => {
   })
 })
 
-describe('checkPlan — soft signals never flip the verdict', () => {
-  it('stays ok despite a heavy pair repeat, and the soft signal still fires', () => {
-    // Same three non-partnered people together three sessions running.
+describe('checkPlan — soft signals move the verdict to lessThanIdeal', () => {
+  it('flips to lessThanIdeal on a heavy pair repeat past the default floor, with no hard violations', () => {
+    // Same three non-partnered people together three sessions running (default floor 2).
     const plan: Assignment[] = [1, 2, 3].map(session => ({
       session,
       tables: { 1: [p('A'), p('B'), p('C')] },
     }))
     const result = checkPlan(plan, [])
-    expect(result.verdict).toBe('ok')
+    expect(result.verdict).toBe('lessThanIdeal')
     expect(result.violations).toEqual([])
     expect(result.reassurances.maxPairRepeat).toBe(3)
   })
 
-  it('stays ok despite sub-floor balance, and balanceEven still reports false', () => {
-    const plan: Assignment[] = [
-      {
-        session: 1,
-        tables: {
-          1: [p('A', { religion: 'Jewish' }), p('B', { religion: 'Jewish' })],
-          2: [p('C', { religion: 'Christian' }), p('D', { religion: 'Christian' })],
-        },
-      },
-    ]
+  it('stays ok when a pairwiseCap raises the floor to cover the repeat', () => {
+    const plan: Assignment[] = [1, 2, 3].map(session => ({
+      session,
+      tables: { 1: [p('A'), p('B'), p('C')] },
+    }))
+    const result = checkPlan(plan, [], 3)
+    expect(result.verdict).toBe('ok')
+  })
+
+  it('flips to lessThanIdeal when table overlap exceeds a given overlapCap', () => {
+    const plan: Assignment[] = [1, 2].map(session => ({
+      session,
+      tables: { 1: [p('A'), p('B'), p('C')] },
+    }))
+    const result = checkPlan(plan, [], null, 1)
+    expect(result.verdict).toBe('lessThanIdeal')
+  })
+
+  it('stays ok when overlapCap is not provided, even though the tables overlap heavily', () => {
+    const plan: Assignment[] = [1, 2].map(session => ({
+      session,
+      tables: { 1: [p('A'), p('B'), p('C')] },
+    }))
     const result = checkPlan(plan, [])
     expect(result.verdict).toBe('ok')
-    expect(result.violations).toEqual([])
-    expect(result.reassurances.balanceEven).toBe(false)
   })
 })
 

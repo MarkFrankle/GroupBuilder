@@ -1122,6 +1122,20 @@ describe('AssignmentsPage', () => {
 
 describe('AssignmentsPage — plan check band', () => {
   it('shows the green verdict for a clean plan', async () => {
+    // Two sessions, each table 1F/1M so gender balance holds, and the two
+    // sessions use the two different valid pairings so no pair repeats — the
+    // shared `assignments` fixture reuses Ann+Ben/Cara+Dan every session,
+    // which is a real repeat under the new stricter verdict.
+    api.resultsOverride = [
+      {
+        session: 1,
+        tables: { 1: [person('Ann'), person('Ben', 'Male')], 2: [person('Cara'), person('Dan', 'Male')] },
+      },
+      {
+        session: 2,
+        tables: { 1: [person('Ann'), person('Dan', 'Male')], 2: [person('Cara'), person('Ben', 'Male')] },
+      },
+    ]
     renderPage()
 
     expect(

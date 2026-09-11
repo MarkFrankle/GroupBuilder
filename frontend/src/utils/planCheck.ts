@@ -15,7 +15,7 @@ import { expectedWithinTableDeviation, actualWithinTableDeviation } from './bala
 import type { Assignment, Participant } from '@/types/assignments'
 
 export interface Violation {
-  kind: 'couple' | 'keepApart' | 'facilitatorCoverage'
+  kind: 'couple' | 'keepApart' | 'facilitatorCoverage' | 'balance'
   session: number
   table?: number
   /** The two people, sorted — couple and keep-apart only. */
@@ -25,7 +25,14 @@ export interface Violation {
 }
 
 export interface PlanCheckResult {
-  verdict: 'ok' | 'attention'
+  /**
+   * 'attention' — a stated rule broke: couples together, keep-apart together,
+   * a table with no facilitator, or balance worse than the roster's floor.
+   * 'lessThanIdeal' — none of those, but a soft signal (pair-repeat,
+   * facilitator-repeat, table-overlap) ran past its floor.
+   * 'ok' — everything at floor.
+   */
+  verdict: 'ok' | 'lessThanIdeal' | 'attention'
   violations: Violation[]
   /** How many incomplete sessions the check covered — the band hides the
    *  repeat lines below two, where "repeat" is meaningless. */
@@ -41,14 +48,22 @@ export interface PlanCheckResult {
     balanceEven: boolean
     /** Most times any non-partner pair shares a table. */
     maxPairRepeat: number
+    /** The floor maxPairRepeat is compared against — the caller's pairwiseCap
+     *  when given, else the default of 2. */
+    pairRepeatFloor: number
     /** Every non-partner pair tied for maxPairRepeat, named — empty when at or under the floor. */
     pairRepeatWorst: { names: [string, string]; count: number }[]
     /** Most sessions any participant shares a table with one same facilitator. 0 = no facilitators. */
     maxFacilitatorRepeat: number
+    /** The floor maxFacilitatorRepeat is compared against. */
+    facilitatorRepeatFloor: number
     /** Everyone tied for maxFacilitatorRepeat, named — empty when at or under the floor. */
     facilitatorRepeatWorst: { participant: string; facilitator: string; count: number }[]
     /** Most people any two tables from different sessions have in common. */
     maxTableOverlap: number
+    /** The solver's real table-overlap cap, when known — null omits the overlap
+     *  line entirely, matching the caller's overlapCap argument. */
+    tableOverlapCap: number | null
     /** Every pair of tables tied for maxTableOverlap, named — empty when at or under the floor. */
     tableOverlapWorst: {
       sessions: [number, number]
@@ -222,38 +237,58 @@ function worstTableOverlap(assignments: Assignment[]): {
   return { worst, details: overlaps }
 }
 
+const BALANCE_KEYS = ['religion', 'gender'] as const
+const BALANCE_LABEL: Record<(typeof BALANCE_KEYS)[number], string> = {
+  religion: 'religion',
+  gender: 'gender',
+}
+
 /**
- * True when the solver held every table, for both religion and gender, to the
- * minimum spread the roster composition allows. When it did worse the line just
- * does not appear — we do not say what is wrong, because the coordinator cannot
- * act on it (redesign notes, Part 2).
+ * Finds every incomplete session where the solver did worse than the minimum
+ * spread the roster composition allows, for religion and/or gender.
  *
  * The roster population is taken from the first incomplete session; a person
  * absent later still counts, matching the old ValidationStats. This assumes
  * session 1 is full — an absence in session 1 would shrink the floor.
  */
-function balanceHeldToRosterFloor(assignments: Assignment[]): boolean {
-  if (assignments.length === 0) return false
+function balanceFailures(
+  assignments: Assignment[]
+): { session: number; key: (typeof BALANCE_KEYS)[number] }[] {
+  if (assignments.length === 0) return []
   const firstTables = seatedTables(assignments[0])
   const numTables = firstTables.length
-  if (numTables === 0) return false
+  if (numTables === 0) return []
   const roster = firstTables.flatMap(t => t.people)
 
-  return (['religion', 'gender'] as const).every(key => {
+  const failures: { session: number; key: (typeof BALANCE_KEYS)[number] }[] = []
+  BALANCE_KEYS.forEach(key => {
     const rosterCounts = countBy(roster, key)
     const values = Object.keys(rosterCounts)
-    if (values.length <= 1) return true
+    if (values.length <= 1) return
     const floor = expectedWithinTableDeviation(rosterCounts, numTables)
-    return assignments.every(a => {
+    assignments.forEach(a => {
       const tableMaps = seatedTables(a).map(t => countBy(t.people, key))
-      return actualWithinTableDeviation(tableMaps, values) <= floor
+      if (actualWithinTableDeviation(tableMaps, values) > floor) {
+        failures.push({ session: a.session, key })
+      }
     })
   })
+  return failures
 }
+
+const DEFAULT_PAIRWISE_FLOOR = 2
+const FACILITATOR_REPEAT_FLOOR = 2
 
 export function checkPlan(
   incompleteAssignments: Assignment[],
-  keepApart: [string, string][]
+  keepApart: [string, string][],
+  /** The solver's real pairwise-repeat cap for this program. Null/undefined
+   *  falls back to the default floor of 2. */
+  pairwiseCap?: number | null,
+  /** The solver's real table-overlap cap for this program. Null/undefined
+   *  means overlap never contributes to the verdict — there is no fallback
+   *  floor to compare against. */
+  overlapCap?: number | null
 ): PlanCheckResult {
   const facilitatorRepeat = worstFacilitatorRepeat(incompleteAssignments)
   const pairRepeat = worstPairRepeat(incompleteAssignments)
@@ -307,8 +342,22 @@ export function checkPlan(
     })
   })
 
+  balanceFailures(incompleteAssignments).forEach(({ session, key }) => {
+    violations.push({
+      kind: 'balance',
+      session,
+      message: `Session ${session} isn't mixed as evenly by ${BALANCE_LABEL[key]} as this roster allows`,
+    })
+  })
+
+  const pairRepeatFloor = pairwiseCap ?? DEFAULT_PAIRWISE_FLOOR
+  const softOverFloor =
+    pairRepeat.worst > pairRepeatFloor ||
+    (hasFacilitators && facilitatorRepeat.worst > FACILITATOR_REPEAT_FLOOR) ||
+    (overlapCap != null && tableOverlap.worst > overlapCap)
+
   return {
-    verdict: violations.length > 0 ? 'attention' : 'ok',
+    verdict: violations.length > 0 ? 'attention' : softOverFloor ? 'lessThanIdeal' : 'ok',
     violations,
     incompleteSessionCount: incompleteAssignments.length,
     reassurances: {
@@ -318,12 +367,15 @@ export function checkPlan(
       facilitatorCoverage: hasFacilitators
         ? !violations.some(v => v.kind === 'facilitatorCoverage')
         : undefined,
-      balanceEven: balanceHeldToRosterFloor(incompleteAssignments),
+      balanceEven: !violations.some(v => v.kind === 'balance'),
       maxPairRepeat: pairRepeat.worst,
+      pairRepeatFloor,
       pairRepeatWorst: pairRepeat.details,
       maxFacilitatorRepeat: hasFacilitators ? facilitatorRepeat.worst : 0,
+      facilitatorRepeatFloor: FACILITATOR_REPEAT_FLOOR,
       facilitatorRepeatWorst: hasFacilitators ? facilitatorRepeat.details : [],
       maxTableOverlap: tableOverlap.worst,
+      tableOverlapCap: overlapCap ?? null,
       tableOverlapWorst: tableOverlap.details,
     },
   }

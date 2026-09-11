@@ -1,5 +1,5 @@
 import React from 'react'
-import { CheckCircle2, AlertTriangle, HelpCircle } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, Info, HelpCircle } from 'lucide-react'
 import type { PlanCheckResult } from '@/utils/planCheck'
 import {
   Tooltip,
@@ -10,22 +10,15 @@ import {
 
 interface PlanCheckBandProps {
   result: PlanCheckResult
-  /** The solver's real pairwise-repeat cap for this program. Null when no
-   *  solve has reported one yet (older data, or an absence re-solve that
-   *  bypassed the cap search) — falls back to the old hardcoded floor of 2. */
-  pairwiseCap?: number | null
-  /** The solver's real table-overlap cap for this program. Null omits the
-   *  overlap line entirely — there is no prior hardcoded line to fall back to. */
-  overlapCap?: number | null
 }
 
 /**
  * The overview's verdict band: a headline plus a plain-language checklist that
  * lets a coordinator stop scrutinising the page and print. Every line is
  * yes/no; the only number shown is a worst-case fact when a soft signal is past
- * its floor. Presentational — all logic lives in `planCheck.ts`.
+ * its floor. Presentational — all logic, including every floor and cap, lives
+ * in `planCheck.ts`'s `checkPlan()`.
  */
-const DEFAULT_PAIRWISE_FLOOR = 2
 
 function timesWord(n: number): string {
   if (n === 1) return 'once'
@@ -90,34 +83,48 @@ const NoteLine: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   </li>
 )
 
-const FACILITATOR_REPEAT_FLOOR = 2
+const HEADLINE: Record<PlanCheckResult['verdict'], string> = {
+  ok: 'Looks good — ready to print and hand out',
+  lessThanIdeal: 'Good enough to print, but not ideal',
+  attention: '', // computed below — singular/plural depends on violation count
+}
 
-const PlanCheckBand: React.FC<PlanCheckBandProps> = ({ result, pairwiseCap, overlapCap }) => {
+const BAND_STYLES: Record<PlanCheckResult['verdict'], string> = {
+  ok: 'border-green-200 bg-[#f0fdf4]',
+  lessThanIdeal: 'border-slate-200 bg-slate-50',
+  attention: 'border-amber-200 bg-amber-50',
+}
+
+const VerdictIcon: React.FC<{ verdict: PlanCheckResult['verdict'] }> = ({ verdict }) => {
+  if (verdict === 'ok') {
+    return <CheckCircle2 className="h-6 w-6 flex-shrink-0 text-green-600" aria-hidden="true" />
+  }
+  if (verdict === 'lessThanIdeal') {
+    return <Info className="h-6 w-6 flex-shrink-0 text-slate-500" aria-hidden="true" />
+  }
+  return <AlertTriangle className="h-6 w-6 flex-shrink-0 text-amber-600" aria-hidden="true" />
+}
+
+const PlanCheckBand: React.FC<PlanCheckBandProps> = ({ result }) => {
   const { verdict, violations, incompleteSessionCount, reassurances: r } = result
-  const ok = verdict === 'ok'
   const multiSession = incompleteSessionCount >= 2
-  const pairRepeatFloor = pairwiseCap ?? DEFAULT_PAIRWISE_FLOOR
+  const overlapCap = r.tableOverlapCap
 
-  const headline = ok
-    ? 'Looks good — ready to print and hand out'
-    : violations.length === 1
-    ? 'One thing to check before you print'
-    : 'A few things to check before you print'
+  const headline =
+    verdict === 'attention'
+      ? violations.length === 1
+        ? 'One thing to check before you print'
+        : 'A few things to check before you print'
+      : HEADLINE[verdict]
 
   return (
     <section
       data-testid="plan-check-band"
       aria-label="Plan check"
-      className={`rounded-lg border p-4 ${
-        ok ? 'border-green-200 bg-[#f0fdf4]' : 'border-amber-200 bg-amber-50'
-      }`}
+      className={`rounded-lg border p-4 ${BAND_STYLES[verdict]}`}
     >
       <div className="flex items-center gap-2.5">
-        {ok ? (
-          <CheckCircle2 className="h-6 w-6 flex-shrink-0 text-green-600" aria-hidden="true" />
-        ) : (
-          <AlertTriangle className="h-6 w-6 flex-shrink-0 text-amber-600" aria-hidden="true" />
-        )}
+        <VerdictIcon verdict={verdict} />
         <h2 className="text-2xl font-bold">{headline}</h2>
       </div>
 
@@ -137,10 +144,10 @@ const PlanCheckBand: React.FC<PlanCheckBandProps> = ({ result, pairwiseCap, over
           <CheckLine>Faiths and genders are mixed as evenly as this roster allows</CheckLine>
         )}
 
-        {multiSession && r.maxPairRepeat <= pairRepeatFloor && (
-          <CheckLine>{`No one sits with the same person more than ${timesWord(pairRepeatFloor)}`}</CheckLine>
+        {multiSession && r.maxPairRepeat <= r.pairRepeatFloor && (
+          <CheckLine>{`No one sits with the same person more than ${timesWord(r.pairRepeatFloor)}`}</CheckLine>
         )}
-        {multiSession && r.maxPairRepeat > pairRepeatFloor && (
+        {multiSession && r.maxPairRepeat > r.pairRepeatFloor && (
           <NoteLine>
             {pairRepeatNote(r.maxPairRepeat)}
             {r.pairRepeatWorst.length > 0 && (
@@ -174,10 +181,10 @@ const PlanCheckBand: React.FC<PlanCheckBandProps> = ({ result, pairwiseCap, over
           </NoteLine>
         )}
 
-        {multiSession && r.maxFacilitatorRepeat > 0 && r.maxFacilitatorRepeat <= FACILITATOR_REPEAT_FLOOR && (
+        {multiSession && r.maxFacilitatorRepeat > 0 && r.maxFacilitatorRepeat <= r.facilitatorRepeatFloor && (
           <CheckLine>Everyone sees a variety of facilitators</CheckLine>
         )}
-        {multiSession && r.maxFacilitatorRepeat > FACILITATOR_REPEAT_FLOOR && (
+        {multiSession && r.maxFacilitatorRepeat > r.facilitatorRepeatFloor && (
           <NoteLine>
             {`At least one person has the same facilitator ${r.maxFacilitatorRepeat} of ${incompleteSessionCount} sessions`}
             {r.facilitatorRepeatWorst.length > 0 && (
