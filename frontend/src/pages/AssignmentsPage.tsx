@@ -565,33 +565,13 @@ const AssignmentsPage: React.FC = () => {
     })
   }
 
-  const handlePrintSession = async (sessionNumber: number) => {
+  const handlePrintSession = (sessionNumber: number) => {
     const sessionAssignment = sorted.find(a => a.session === sessionNumber)
     if (!sessionAssignment || !programId) return
     if (!confirmPrintingOldVersion()) return
-    try {
-      const response = await authenticatedFetch(
-        `/api/assignments/seating/${sessionNumber}?program_id=${programId}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ assignments: [sessionAssignment] }),
-        }
-      )
-      if (!response.ok) {
-        throw new Error(await refusalDetail(response, 'Could not build the seating chart.'))
-      }
-      const seatingData = await response.json()
-      navigate(
-        `/table-assignments/seating?program=${programId}&sessionNum=${sessionNumber}`,
-        { state: { seatingData } }
-      )
-    } catch (error) {
-      showNotice({
-        tone: 'error',
-        message: error instanceof Error ? error.message : 'Could not build the seating chart.',
-      })
-    }
+    navigate('/table-assignments/roster-print', {
+      state: { assignments: [sessionAssignment], programId },
+    })
   }
 
   if (programLoading || isLoading) {
