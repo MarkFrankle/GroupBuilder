@@ -14,10 +14,10 @@ interface AwayCellProps {
   absentSessions: number[];
   numSessions: number;
   /** Locked: the sessions were built from this roster. The cell shows the
-   * mirror and a click routes the coordinator to the Assignments page. */
+   * mirror as plain text — inert, like every other locked field. Absences are
+   * managed on the Assignments page instead. */
   readOnly: boolean;
   onChange: (next: number[]) => void;
-  onLockedClick: () => void;
 }
 
 function label(visible: number[], numSessions: number): string {
@@ -32,7 +32,6 @@ export function AwayCell({
   numSessions,
   readOnly,
   onChange,
-  onLockedClick,
 }: AwayCellProps) {
   const sessions = Array.from({ length: Math.max(numSessions, 0) }, (_, i) => i + 1);
   const absentSet = new Set(absentSessions);
@@ -40,16 +39,12 @@ export function AwayCell({
   const text = label(visible, numSessions);
   const muted = visible.length === 0;
 
-  const triggerClass = `text-sm px-3 py-1 text-left ${
+  const triggerClass = `flex items-center h-10 px-3 text-sm text-left whitespace-nowrap ${
     muted ? 'text-muted-foreground' : ''
   }`;
 
   if (readOnly) {
-    return (
-      <button type="button" className={triggerClass} onClick={onLockedClick}>
-        {text}
-      </button>
-    );
+    return <span className={triggerClass}>{text}</span>;
   }
 
   const toggle = (n: number) => {

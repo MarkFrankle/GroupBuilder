@@ -257,6 +257,11 @@ const AssignmentsPage: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['results', programId] })
     queryClient.invalidateQueries({ queryKey: ['versions', programId] })
     queryClient.invalidateQueries({ queryKey: ['completion', programId] })
+    // Mark absent/present rewrites this session's absentParticipants, which is
+    // exactly what the Roster page's locked Away column mirrors. Without this,
+    // the canonical roster query (2 min staleTime) keeps serving the old
+    // absences until it happens to refetch on its own.
+    queryClient.invalidateQueries({ queryKey: ['canonical-roster', programId] })
   }
 
   const completionMutation = useMutation({

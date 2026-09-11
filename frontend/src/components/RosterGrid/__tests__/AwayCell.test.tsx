@@ -8,7 +8,6 @@ const base = {
   numSessions: 4,
   readOnly: false,
   onChange: jest.fn(),
-  onLockedClick: jest.fn(),
 };
 
 beforeEach(() => jest.clearAllMocks());
@@ -64,12 +63,13 @@ describe('AwayCell editing', () => {
 });
 
 describe('AwayCell locked', () => {
-  test('shows the mirror text and routes a click, with no popover', () => {
+  test('shows the mirror text as plain, inert text', () => {
     render(<AwayCell {...base} readOnly absentSessions={[2]} />);
     const cell = screen.getByText('Misses session 2');
+    expect(cell.tagName).toBe('SPAN');
     fireEvent.click(cell);
-    expect(base.onLockedClick).toHaveBeenCalled();
     fireEvent.keyDown(cell, { key: 'Enter' });
     expect(screen.queryByRole('menuitemcheckbox')).toBeNull();
+    expect(screen.queryByRole('button')).toBeNull();
   });
 });

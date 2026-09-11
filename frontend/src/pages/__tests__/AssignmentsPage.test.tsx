@@ -888,6 +888,23 @@ describe('AssignmentsPage', () => {
       expect(strip).toContainElement(screen.getByRole('button', { name: /^undo$/i }))
     })
 
+    it('invalidates the canonical roster, so the Roster page picks up the new absence', async () => {
+      renderPage()
+      await screen.findAllByRole('button', { name: 'Ann' })
+      const callsBefore = mockAuthenticatedFetch.mock.calls.filter(
+        ([url]) => String(url).includes('/api/roster/canonical')
+      ).length
+
+      await markAnnAbsent()
+
+      await waitFor(() => {
+        const callsAfter = mockAuthenticatedFetch.mock.calls.filter(
+          ([url]) => String(url).includes('/api/roster/canonical')
+        ).length
+        expect(callsAfter).toBeGreaterThan(callsBefore)
+      })
+    })
+
     it('offers no Mark absent inside a completed session', async () => {
       api.completedThrough = 1
       api.absence = true

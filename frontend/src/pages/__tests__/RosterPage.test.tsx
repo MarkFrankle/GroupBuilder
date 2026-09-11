@@ -764,8 +764,8 @@ describe('the Keep apart block', () => {
 
 /**
  * The Away column. Editable before the first build (autosaves like every other
- * field); a read-only mirror of the assignment set's per-session absences
- * afterward, with a click routing to the Assignments page.
+ * field); a read-only, inert mirror of the assignment set's per-session
+ * absences afterward — same as every other locked field.
  */
 describe('the Away column', () => {
   const alice = {
@@ -830,7 +830,7 @@ describe('the Away column', () => {
     });
   });
 
-  test('post-build: the cell mirrors the set and a click routes to Assignments', async () => {
+  test('post-build: the cell mirrors the set and stays inert', async () => {
     mockProgram({
       draft: [alice, bob],
       canonical: [alice, bob],
@@ -840,7 +840,6 @@ describe('the Away column', () => {
 
     const cell = await screen.findByText('Misses session 2');
     fireEvent.click(cell);
-    expect(await screen.findByText(/use the Assignments page/i)).toBeInTheDocument();
     expect(screen.queryByRole('menuitemcheckbox')).toBeNull();
   });
 });

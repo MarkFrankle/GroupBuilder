@@ -24,7 +24,6 @@ describe('RosterGrid', () => {
     onAdd: jest.fn(),
     onKeepTogetherToggle: jest.fn(),
     numSessions: 4,
-    onAwayLockedClick: jest.fn(),
   };
 
   beforeEach(() => jest.clearAllMocks());
@@ -90,7 +89,7 @@ describe('RosterGrid', () => {
     render(<RosterGrid participants={[
       { id: 'p1', name: 'Alice', religion: 'Christian', gender: 'Female', partner_id: null, is_facilitator: true },
       { id: 'p2', name: 'Bob', religion: 'Jewish', gender: 'Male', partner_id: null, is_facilitator: false },
-    ]} onUpdate={jest.fn()} onDelete={jest.fn()} onAdd={jest.fn()} onKeepTogetherToggle={jest.fn()} numSessions={4} onAwayLockedClick={jest.fn()} />);
+    ]} onUpdate={jest.fn()} onDelete={jest.fn()} onAdd={jest.fn()} onKeepTogetherToggle={jest.fn()} numSessions={4} />);
     const checkboxes = screen.getAllByRole('checkbox');
     // First two are participant checkboxes, third is the disabled empty-row checkbox
     expect(checkboxes[0]).toBeChecked();
@@ -101,7 +100,7 @@ describe('RosterGrid', () => {
     const onUpdate = jest.fn();
     render(<RosterGrid participants={[
       { id: 'p1', name: 'Alice', religion: 'Christian', gender: 'Female', partner_id: null, is_facilitator: false },
-    ]} onUpdate={onUpdate} onDelete={jest.fn()} onAdd={jest.fn()} onKeepTogetherToggle={jest.fn()} numSessions={4} onAwayLockedClick={jest.fn()} />);
+    ]} onUpdate={onUpdate} onDelete={jest.fn()} onAdd={jest.fn()} onKeepTogetherToggle={jest.fn()} numSessions={4} />);
     const checkboxes = screen.getAllByRole('checkbox');
     await userEvent.click(checkboxes[0]);
     expect(onUpdate).toHaveBeenCalledWith('p1', expect.objectContaining({ is_facilitator: true }));

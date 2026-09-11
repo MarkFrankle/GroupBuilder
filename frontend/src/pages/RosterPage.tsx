@@ -408,9 +408,6 @@ export function RosterPage() {
             onAdd={handleAdd}
             onKeepTogetherToggle={handleKeepTogetherToggle}
             numSessions={parseInt(numSessions)}
-            onAwayLockedClick={() =>
-              setNotice('To change who’s away, use the Assignments page.')
-            }
             readOnly={locked}
           />
 

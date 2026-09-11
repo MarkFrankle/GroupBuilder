@@ -20,9 +20,6 @@ interface RosterGridProps {
   /** The current Number of Sessions value — drives the Away popover's checkbox
    * count and which marks the Away cell shows. */
   numSessions: number;
-  /** Fired when the Away cell is clicked while locked. The page routes the
-   * coordinator to the Assignments page. */
-  onAwayLockedClick: () => void;
   /** Locked: the assignments were built from this roster and editing it would
    * invalidate them. Every field is inert and the add-row is gone. */
   readOnly?: boolean;
@@ -40,7 +37,7 @@ const EMPTY_ROW: EmptyRowState = {
   name: '', religion: 'Other', gender: 'Other', partner_id: null, is_facilitator: false,
 };
 
-export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepTogetherToggle, numSessions, onAwayLockedClick, readOnly = false }: RosterGridProps) {
+export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepTogetherToggle, numSessions, readOnly = false }: RosterGridProps) {
 
   const [editingNames, setEditingNames] = useState<Record<string, string>>({});
   const [emptyRow, setEmptyRow] = useState<EmptyRowState>({ ...EMPTY_ROW });
@@ -266,7 +263,6 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
                       numSessions={numSessions}
                       readOnly={readOnly}
                       onChange={next => handleAwayChange(p, next)}
-                      onLockedClick={onAwayLockedClick}
                     />
                   </TableCell>
                   <TableCell className="p-1">
