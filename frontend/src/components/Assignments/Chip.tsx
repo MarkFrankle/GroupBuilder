@@ -44,10 +44,10 @@ const Chip: React.FC<ChipProps> = ({
   const shape = isFacilitator
     ? compact
       ? 'rounded px-1.5 py-0.5 text-[11px] font-semibold ring-1 ring-amber-400'
-      : 'rounded px-2.5 py-[5px] text-[13px] font-semibold ring-1 ring-amber-400'
+      : 'rounded px-3.5 py-2 text-base font-semibold ring-1 ring-amber-400'
     : compact
       ? 'rounded px-1.5 py-0.5 text-[11px] font-medium'
-      : 'rounded px-2 py-1 text-xs font-medium'
+      : 'rounded px-3 py-2 text-base font-medium'
 
   return (
     <button

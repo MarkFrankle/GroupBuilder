@@ -48,7 +48,7 @@ const ViewBar: React.FC<ViewBarProps> = ({
             aria-pressed={focus === value}
             onClick={() => onFocusChange(value)}
             className={[
-              'px-3 py-1 text-xs font-medium transition-colors',
+              'px-3 py-1.5 text-base font-medium transition-colors',
               i > 0 && 'border-l',
               focus === value
                 ? 'bg-slate-900 text-white'
@@ -64,7 +64,7 @@ const ViewBar: React.FC<ViewBarProps> = ({
       <FocusLegend focus={focus} participants={participants} />
     </div>
     <div className="flex items-center gap-2">
-      <span className="text-xs text-muted-foreground">View</span>
+      <span className="text-base text-muted-foreground">View</span>
       <div role="group" aria-label="Zoom level" className="inline-flex rounded-md border">
         {ZOOMS.map(({ value, label }, i) => (
           <button
@@ -73,7 +73,7 @@ const ViewBar: React.FC<ViewBarProps> = ({
             aria-pressed={zoom === value}
             onClick={() => onZoomChange(value)}
             className={[
-              'px-3 py-1 text-xs font-medium transition-colors',
+              'px-3 py-1.5 text-base font-medium transition-colors',
               i > 0 && 'border-l',
               zoom === value
                 ? 'bg-slate-900 text-white'
@@ -91,7 +91,7 @@ const ViewBar: React.FC<ViewBarProps> = ({
 )
 
 const LegendSwatch: React.FC<{ bg: string; label: string }> = ({ bg, label }) => (
-  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+  <span className="inline-flex items-center gap-1.5 text-base text-muted-foreground">
     <span
       aria-hidden="true"
       className="inline-block h-2 w-2 rounded-sm"
