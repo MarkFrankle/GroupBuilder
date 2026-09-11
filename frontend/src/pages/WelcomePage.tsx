@@ -43,7 +43,7 @@ const WelcomePage: React.FC<WelcomePageProps> = ({ onDismiss }) => {
                 className="w-full"
                 onClick={() => {
                   onDismiss()
-                  navigate('/help')
+                  navigate('/help#creating-your-roster')
                 }}
               >
                 <HelpCircle className="h-4 w-4 mr-2" />

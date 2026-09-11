@@ -54,6 +54,7 @@ export function NavBar() {
         )}
       </>}
       <div className="ml-auto flex gap-4 items-center">
+        <div id="nav-actions-slot" className="flex items-center gap-3" />
         {isAdmin && <Link to="/admin" className="text-muted-foreground hover:text-foreground transition-colors">Admin</Link>}
         <span className="text-muted-foreground">{user.email}</span>
         <button onClick={() => signOut()} className="text-muted-foreground hover:text-foreground transition-colors">Logout</button>

@@ -1,10 +1,9 @@
 import { ArrowUp } from "lucide-react";
-import { Screenshot, TipCallout, WarningCallout, InfoCallout } from "../components/HelpCallouts";
+import { Screenshot, WarningCallout, InfoCallout } from "../components/HelpCallouts";
 
 const tocItems = [
-  { id: "getting-started", label: "Getting Started" },
+  { id: "welcome-to-group-builder", label: "Welcome to Group Builder" },
   { id: "creating-your-roster", label: "Creating Your Roster" },
-  { id: "generating-groups", label: "Generating Groups" },
   { id: "viewing-your-groups", label: "Viewing Your Assignments" },
   { id: "printing-and-sharing", label: "Printing & Sharing" },
   { id: "editing-sessions", label: "Changing a Session" },
@@ -42,10 +41,10 @@ function HelpPage() {
           </ul>
         </nav>
 
-        {/* ===================== Section 1: Getting Started ===================== */}
+        {/* ===================== Section 1: Welcome to Group Builder ===================== */}
         <section className="mb-12">
-          <h2 id="getting-started" className="text-2xl font-bold mb-4 scroll-mt-8">
-            Getting Started
+          <h2 id="welcome-to-group-builder" className="text-2xl font-bold mb-4 scroll-mt-8">
+            Welcome to Group Builder
           </h2>
 
           <h3 className="text-xl font-semibold mb-2">What is Group Builder?</h3>
@@ -58,43 +57,23 @@ function HelpPage() {
             diverse and well-led.
           </p>
 
-          <h3 className="text-xl font-semibold mb-2">Signing in for the first time</h3>
-          <p className="mb-2 text-slate-700 leading-relaxed">
-            Your administrator will send you an invitation email. Here's what to expect:
-          </p>
-          <ol className="list-decimal pl-5 space-y-2 text-slate-700 leading-relaxed mb-4">
-            <li>
-              Open the invitation email and click the link inside. This signs you in
-              automatically and takes you to Group Builder.
-            </li>
-            <li>
-              You'll see which program you've been invited to. Click{" "}
-              <strong>"Accept Invite"</strong> and you're in. From now on, you'll stay
-              signed in — you shouldn't need to do this again.
-            </li>
-          </ol>
-
-          <TipCallout>
-            The first time you sign in, you'll see a welcome page where you can
-            choose to read this guide or jump straight to building your roster.
-          </TipCallout>
-
           <h3 className="text-xl font-semibold mb-2">Finding your way around</h3>
           <p className="mb-2 text-slate-700 leading-relaxed">
             Once you're signed in, you'll see a navigation bar at the top of every page
-            with four links:
+            with a few links:
           </p>
           <ul className="list-disc pl-5 space-y-2 text-slate-700 leading-relaxed mb-4">
             <li>
-              <strong>Home</strong> — Your starting point. Three cards link to Roster,
-              Groups, and Help.
+              <strong>Home</strong> — Your starting point. Cards link to Roster,
+              Assignments, and Help.
             </li>
             <li>
               <strong>Roster</strong> — Where you add and edit your list of participants.
             </li>
             <li>
-              <strong>Groups</strong> — Browse all previously created group assignments,
-              sorted by most recent.
+              <strong>Assignments</strong> — Browse the groups Group Builder has generated
+              for you, sorted by session. This link appears once you've built your first
+              set of groups.
             </li>
             <li>
               <strong>Help</strong> — This page.
@@ -113,6 +92,12 @@ function HelpPage() {
             participants are.
           </p>
 
+          <Screenshot
+            src="/images/help/roster-management.png"
+            alt="The roster manager showing several participants with their religion, gender, partner, and facilitator settings"
+            caption="The roster manager with participants, their details, partner links, and facilitator checkboxes"
+          />
+
           <h3 className="text-xl font-semibold mb-2">Using the Roster Manager</h3>
           <p className="mb-2 text-slate-700 leading-relaxed">
             Click <strong>Roster</strong> in the nav bar to open the roster manager.
@@ -122,24 +107,23 @@ function HelpPage() {
 
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Adding a participant:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            There's always an empty row at the bottom of the list. Type a name into it,
-            then press Tab or click somewhere else. The participant is saved automatically.
-            A new empty row appears for the next person.
+            As you enter a participant's information, a new empty row will appear
+            for the next person and the roster will save automatically.
           </p>
 
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Setting details:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Each participant has a <strong>Religion</strong> dropdown (Christian, Jewish,
             Muslim, or Other) and a <strong>Gender</strong> dropdown (Male, Female, or
-            Other). These are used when balancing the tables — every table will
+            Other). These are used when balancing the tables: every table will
             have an even mix of religions and genders.
           </p>
 
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Setting partners (couples):</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             If two participants are a couple, use the <strong>Partner</strong> dropdown
-            on either person's row to link them. You only need to do this on one person —
-            the other person updates automatically. By default, the solver will place
+            on either person's row to link them. You only need to do this on one person.
+            The other person updates automatically. By default, the solver will place
             partners at <em>different</em> tables so they each meet new people.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
@@ -152,19 +136,21 @@ function HelpPage() {
 
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Marking facilitators:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            If someone will be leading table discussions, check the{" "}
-            <strong>Facilitator</strong> box on their row. The solver ensures at least one
-            facilitator at every table. You can mark more facilitators than tables — if
+            Facilitators get added just like regular participants, but should be
+            indicated by checking the <strong>Facilitator</strong> box on their row.
+            The solver ensures at least one facilitator at every table, and you need
+            at least as many facilitators as tables. Building groups is blocked
+            until you have enough. You can mark more facilitators than tables. If
             you have 6 facilitators for 4 tables, some tables will get two.
           </p>
 
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Recording absences ahead of time:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             If you already know someone will miss a session or two, use the{" "}
-            <strong>Away</strong> column on their row and tick the sessions they'll
+            <strong>Absences</strong> column on their row and tick the sessions they'll
             miss. The first build works around those absences. After you've built your
             sessions, absences are managed per session on the Assignments page instead,
-            and the Away column becomes a read-only summary.
+            and the Absences column becomes a read-only summary.
           </p>
 
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Deleting a participant:</p>
@@ -173,98 +159,87 @@ function HelpPage() {
             Click it to remove them.
           </p>
 
-          <InfoCallout>
-            Your roster saves automatically as you type. You'll see a small "Saving..."
-            indicator at the top that changes to "Saved" when everything is up to date.
-          </InfoCallout>
-
-          <Screenshot
-            src="/images/help/roster-management.png"
-            alt="The roster manager showing several participants with their religion, gender, partner, and facilitator settings"
-            caption="The roster manager with participants, their details, partner links, and facilitator checkboxes"
-          />
-
-
-        </section>
-
-        {/* ===================== Section 3: Generating Groups ===================== */}
-        <section className="mb-12">
-          <h2 id="generating-groups" className="text-2xl font-bold mb-4 scroll-mt-8">
-            Generating Groups
-          </h2>
+          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Keeping people apart:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            Once your roster is ready, it's time to create your groups. Scroll to the
-            bottom of the Roster page to find the generation controls.
+            Sometimes two participants shouldn't share a table. Below the table and
+            session counts, find the <strong>Keep apart</strong> section and click{" "}
+            <strong>+ Add a pair</strong>. Choose two people from the dropdowns and
+            they'll never be seated together in any session. Remove a pair you've
+            added by clicking its remove icon. Partners do not appear as options to
+            keep apart because they are kept apart by default.
           </p>
 
-          <h3 className="text-xl font-semibold mb-2">First time: Fresh Start</h3>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            If you haven't generated groups yet, you'll see two dropdowns and a{" "}
-            <strong>Generate Assignments</strong> button.
+          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Generating assignments:</p>
+          <p className="mb-1 text-slate-700 leading-relaxed">
+            Once your roster is ready, scroll to the bottom of the Roster page to
+            find <strong>Number of Tables</strong> and <strong>Number of
+            Sessions</strong>.
           </p>
-
-          <p className="mb-1 text-slate-700 leading-relaxed font-bold">
-            Number of Tables
+          <p className="mb-1 text-slate-700 leading-relaxed">
+            <strong>Number of Tables</strong> is how many groups you want per
+            session. If you have 20 participants and choose 4 tables, each table
+            will have about 5 participants and at least 1 facilitator.
+          </p>
+          <p className="mb-1 text-slate-700 leading-relaxed">
+            <strong>Number of Sessions</strong> is how many rounds of different
+            groupings you need, typically one per week of your program. If your
+            program runs for 5 weeks, choose 5 sessions. Each session will have a
+            completely different arrangement so people meet new tablemates each
+            week.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            This is how many groups you want per session. If you have 20 participants
-            and choose 4 tables, each table will have about 5 participants and at
-            least 1 facilitator.
+            When you're ready, click <strong>Generate assignments</strong>. The
+            solver will spend about 2 minutes working out the best possible
+            arrangement. You'll see a progress indicator while it works. When
+            it's done, you'll be taken to the results page.
           </p>
 
-          <p className="mb-1 text-slate-700 leading-relaxed font-bold">
-            Number of Sessions
+          <h3 className="text-xl font-semibold mb-2">Editing after you've built groups</h3>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            Once you've generated a set of sessions, the roster <strong>locks</strong>:
+            every field goes read-only and the header reads "Locked — these are the
+            people your sessions were built from." This is deliberate. It keeps the
+            roster from silently drifting away from the groups you already built.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            This is how many rounds of different groupings you need — typically one per
-            week of your program. If your program runs for 5 weeks, choose 5 sessions.
-            Each session will have a completely different arrangement so people meet new
-            tablemates each week.
-          </p>
-
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            When you're ready, click <strong>Generate Assignments</strong>. The solver
-            will spend about 2 minutes working out the best possible arrangement. You'll
-            see a progress indicator while it works. When it's done, you'll be taken to
-            the results page.
-          </p>
-
-          <h3 className="text-xl font-semibold mt-8 mb-2">Already have groups: Regenerate or Fresh Start</h3>
-          <p className="mb-2 text-slate-700 leading-relaxed">
-            If you've generated groups before, the Roster page shows two tabs instead
-            of the flat form:
+            To make a change, click <strong>Edit roster</strong> at the top of the
+            page. The grid, the table and session counts, and the Keep apart section
+            all become editable again. As soon as you make a change, two buttons
+            appear at the bottom:
           </p>
           <ul className="list-disc pl-5 space-y-2 text-slate-700 leading-relaxed mb-4">
             <li>
-              <strong>Regenerate</strong> — Re-runs the solver using your existing table
-              and session counts, and carries over any absences you've recorded in your
-              current version. Use this when you want a different arrangement but don't
-              need to change the structure.
+              <strong>Save and rebuild sessions</strong>: Saves your edits and
+              re-runs the solver to fold them into your sessions.
             </li>
             <li>
-              <strong>Fresh Start</strong> — Lets you pick new table and session counts
-              and generates from scratch. Use this when your program structure has changed.
+              <strong>Discard changes</strong>: Throws away everything you changed
+              since unlocking and re-locks the roster, unchanged.
             </li>
           </ul>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            Editing the roster doesn't touch your existing sessions by itself.
+            Nothing changes until you click <strong>Save and rebuild sessions</strong>.
+          </p>
 
-          <WarningCallout>
-            <p className="font-semibold mb-2">If something goes wrong:</p>
-            <ul className="list-disc pl-5 space-y-1.5">
-              <li>
-                <strong>The Generate button is grayed out</strong> — You need more
-                participants than tables. For example, if you chose 4 tables, you need
-                at least 5 participants.
-              </li>
-              <li>
-                <strong>"Need at least N facilitators for N tables"</strong> — You
-                marked fewer facilitators than tables. Either go back and mark more
-                people as facilitators, or reduce the number of tables.
-              </li>
-            </ul>
-          </WarningCallout>
+          <h4 className="text-lg font-semibold mb-2">Rebuilding while the program is ongoing</h4>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            If you've already held at least one session and need to change the
+            roster, you can rebuild your assignments without changing history.
+            Make sure all past sessions are{" "}
+            <a href="#marking-sessions-complete" className="text-blue-600 hover:text-blue-800 underline">
+              marked complete
+            </a>{" "}
+            before clicking <strong>Save and rebuild sessions</strong>. Group
+            Builder will build groups for the remaining sessions using your
+            updated roster, leaving your completed sessions exactly as they
+            were. It still remembers who already sat together in those
+            sessions, so it won't seat the same pair twice just because the
+            rebuild started fresh.
+          </p>
         </section>
 
-        {/* ===================== Section 4: Viewing Your Assignments ===================== */}
+        {/* ===================== Section 3: Viewing Your Assignments ===================== */}
         <section className="mb-12">
           <h2 id="viewing-your-groups" className="text-2xl font-bold mb-4 scroll-mt-8">
             Viewing Your Assignments

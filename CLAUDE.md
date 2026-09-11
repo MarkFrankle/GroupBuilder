@@ -9,6 +9,7 @@
 - When a user mentions a feature idea or wish, add it to `BACKLOG.md`. Don't plan or implement backlog items unless explicitly asked.
 - **Use superpowers skills for planning.** Don't write ad-hoc plans — use the writing-plans skill and save to `docs/plans/`. The user prefers the deliberative back-and-forth of the skill workflow over "here's a plan, shall I start?"
 - **When closing a feature branch**, update the corresponding plan in `docs/plans/` with a status line at the top: `**Status: Implemented** — merged PR #XX`.
+- **No em-dashes in prose Claude writes** (docs, Help copy, commit messages, etc.). Reformulate with a period or a colon instead. Semicolons are also suspect. Prefer splitting into two sentences.
 
 ## Development Rules
 

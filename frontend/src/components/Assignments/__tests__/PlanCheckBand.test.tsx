@@ -115,11 +115,11 @@ describe('PlanCheckBand — worst-case notes', () => {
     const trigger = screen.getByRole('button', { name: /who/i })
     trigger.focus()
     expect(
-      (await screen.findAllByText('Priya — same facilitator as Sam, 4 sessions')).length
+      (await screen.findAllByText('Facilitator Sam sits with Priya 4 times')).length
     ).toBeGreaterThan(0)
-    expect(screen.getAllByText('Dara — same facilitator as Erin, 4 sessions').length).toBeGreaterThan(
-      0
-    )
+    expect(
+      screen.getAllByText('Facilitator Erin sits with Dara 4 times').length
+    ).toBeGreaterThan(0)
   })
 })
 

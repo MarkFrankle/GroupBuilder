@@ -106,11 +106,11 @@ describe('RosterGrid', () => {
     expect(onUpdate).toHaveBeenCalledWith('p1', expect.objectContaining({ is_facilitator: true }));
   });
 
-  test('renders an Away column and a participant\'s current marks', () => {
+  test('renders an Absences column and a participant\'s current marks', () => {
     render(<RosterGrid {...defaultProps} participants={[
       { ...alice, absent_sessions: [2] },
     ]} />);
-    expect(screen.getByText('Away')).toBeInTheDocument();
+    expect(screen.getByText('Absences')).toBeInTheDocument();
     expect(screen.getByText('Misses session 2')).toBeInTheDocument();
   });
 
