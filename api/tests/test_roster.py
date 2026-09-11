@@ -200,6 +200,7 @@ class TestCreateAssignmentSetFromRoster:
                 "religion": "Christian",
                 "gender": "Female",
                 "partner_id": None,
+                "is_facilitator": True,
             },
         )
         client.put(
@@ -231,6 +232,7 @@ class TestCreateAssignmentSetFromRoster:
                 "religion": "Christian",
                 "gender": "Female",
                 "partner_id": None,
+                "is_facilitator": True,
             },
         )
         client.put(
@@ -368,6 +370,7 @@ class TestFullFlow:
                     "religion": ["Christian", "Jewish", "Muslim"][i % 3],
                     "gender": ["Male", "Female"][i % 2],
                     "partner_id": None,
+                    "is_facilitator": i < 3,
                 },
             )
             assert response.status_code == 200
@@ -389,7 +392,7 @@ class TestFullFlow:
 class TestGenerateRefusesCompletedSessions:
     """A whole-program rebuild cannot run once a Session is frozen."""
 
-    def _add_participants(self, client, count=2):
+    def _add_participants(self, client, count=2, facilitators=1):
         for i in range(count):
             client.put(
                 f"/api/roster/p{i}?program_id=test_org_id",
@@ -398,6 +401,7 @@ class TestGenerateRefusesCompletedSessions:
                     "religion": ["Christian", "Jewish", "Muslim"][i % 3],
                     "gender": ["Male", "Female"][i % 2],
                     "partner_id": None,
+                    "is_facilitator": i < facilitators,
                 },
             )
 
@@ -447,6 +451,7 @@ class TestGenerateCarriesCompletedSessionsForward:
                     "religion": ["Christian", "Jewish", "Muslim"][i % 3],
                     "gender": ["Male", "Female"][i % 2],
                     "partner_id": None,
+                    "is_facilitator": i < tables,
                 },
             )
         r = client.post(
@@ -457,7 +462,7 @@ class TestGenerateCarriesCompletedSessionsForward:
         return r.json()["assignment_set_id"]
 
     def test_completed_session_is_frozen_across_the_rebuild(self, client):
-        self._seed_program(client)
+        self._seed_program(client, people=12)
         client.post("/api/assignments/completion/1?program_id=test_org_id")
 
         before = client.get("/api/assignments/results?program_id=test_org_id").json()
@@ -480,7 +485,7 @@ class TestGenerateCarriesCompletedSessionsForward:
     def test_a_rename_alongside_a_removal_propagates_into_the_frozen_session(
         self, client
     ):
-        self._seed_program(client)
+        self._seed_program(client, people=12)
         client.post("/api/assignments/completion/1?program_id=test_org_id")
         client.put(
             "/api/roster/p0?program_id=test_org_id",
@@ -489,6 +494,7 @@ class TestGenerateCarriesCompletedSessionsForward:
                 "religion": "Christian",
                 "gender": "Male",
                 "partner_id": None,
+                "is_facilitator": True,
             },
         )
         client.delete("/api/roster/p8?program_id=test_org_id")
@@ -572,7 +578,7 @@ class TestGenerateCarriesCompletedSessionsForward:
         assert meta["accepted"] is not False
 
     def test_the_rebuilt_set_is_provisional(self, client):
-        self._seed_program(client)
+        self._seed_program(client, people=12)
         client.post("/api/assignments/completion/1?program_id=test_org_id")
         client.delete("/api/roster/p8?program_id=test_org_id")
         client.post(
@@ -608,6 +614,7 @@ class TestGenerateCarriesCompletedSessionsForward:
                 "religion": "Christian",
                 "gender": "Male",
                 "partner_id": None,
+                "is_facilitator": True,
             },
         )
         r = client.post(
@@ -696,7 +703,13 @@ class TestCanonicalRoster:
 
 
 def _draft(count, **overrides):
-    """A roster big enough to clear the shortfall gate and mix cleanly."""
+    """A roster big enough to clear the shortfall gate and mix cleanly.
+
+    The first three people (one per religion) are marked as facilitators, which
+    clears the "at least as many facilitators as tables" gate for every
+    num_tables value used in this file (max 3) without tripping the
+    same-religion-per-table facilitator cap.
+    """
     people = []
     for i in range(count):
         people.append(
@@ -706,6 +719,7 @@ def _draft(count, **overrides):
                 "religion": ["Christian", "Jewish", "Muslim"][i % 3],
                 "gender": ["Male", "Female"][i % 2],
                 "partner_id": None,
+                "is_facilitator": i < 3,
             }
         )
     return people
@@ -780,7 +794,7 @@ class TestRebuild:
                     "religion": "Other",
                     "gender": "Other",
                     "partner_id": None,
-                    "is_facilitator": False,
+                    "is_facilitator": i < 2,
                     "keep_together": False,
                 }
                 for i in range(4)

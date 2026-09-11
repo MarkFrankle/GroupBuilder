@@ -10,9 +10,12 @@ def _person(name, religion="Other", facilitator=False):
 
 
 class TestCheckShortfalls:
-    def test_enough_people_and_no_facilitators_passes(self):
-        """Zero facilitators is legal — the solver skips the whole block."""
-        check_shortfalls([_person(f"P{i}") for i in range(8)], num_tables=4)
+    def test_zero_facilitators_is_a_shortfall(self):
+        with pytest.raises(ShortfallError) as exc:
+            check_shortfalls([_person(f"P{i}") for i in range(8)], num_tables=4)
+        assert str(exc.value) == (
+            "You have 0 facilitators and 4 tables — every table needs one."
+        )
 
     def test_too_few_participants_names_how_many_to_add(self):
         with pytest.raises(ShortfallError) as exc:

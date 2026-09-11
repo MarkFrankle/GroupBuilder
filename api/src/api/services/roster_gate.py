@@ -25,10 +25,6 @@ def check_shortfalls(participants: List[Dict[str, Any]], num_tables: int) -> Non
         raise ShortfallError(f"Add {needed - len(participants)} more participants.")
 
     facilitators = [p for p in participants if p.get("is_facilitator")]
-    # Zero facilitators is legal: the solver skips facilitator coverage entirely.
-    if not facilitators:
-        return
-
     if len(facilitators) < num_tables:
         raise ShortfallError(
             f"You have {len(facilitators)} facilitators and {num_tables} tables — "

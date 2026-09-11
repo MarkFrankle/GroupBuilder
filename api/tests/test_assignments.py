@@ -660,6 +660,7 @@ class TestAssignmentSetMetadata:
                     "religion": "Christian",
                     "gender": "Male",
                     "partner_id": None,
+                    "is_facilitator": i == 0,
                 },
             )
         client.post(
@@ -690,6 +691,7 @@ class TestAssignmentSetMetadata:
                     "religion": "Christian",
                     "gender": "Male",
                     "partner_id": None,
+                    "is_facilitator": i < 3,
                 },
             )
         client.post(
@@ -703,7 +705,7 @@ class TestAssignmentSetMetadata:
 
 class TestAcceptAndUndoRebuild:
     def _mid_program_rebuild(self, client):
-        for i in range(9):
+        for i in range(12):
             client.put(
                 f"/api/roster/p{i}?program_id=test_org_id",
                 json={
@@ -711,6 +713,7 @@ class TestAcceptAndUndoRebuild:
                     "religion": ["Christian", "Jewish", "Muslim"][i % 3],
                     "gender": ["Male", "Female"][i % 2],
                     "partner_id": None,
+                    "is_facilitator": i < 3,
                 },
             )
         first = client.post(
