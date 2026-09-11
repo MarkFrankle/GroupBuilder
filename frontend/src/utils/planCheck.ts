@@ -41,8 +41,12 @@ export interface PlanCheckResult {
     balanceEven: boolean
     /** Most times any non-partner pair shares a table. */
     maxPairRepeat: number
+    /** Every non-partner pair tied for maxPairRepeat, named — empty when at or under the floor. */
+    pairRepeatWorst: { names: [string, string]; count: number }[]
     /** Most sessions any participant shares a table with one same facilitator. 0 = no facilitators. */
     maxFacilitatorRepeat: number
+    /** Everyone tied for maxFacilitatorRepeat, named — empty when at or under the floor. */
+    facilitatorRepeatWorst: { participant: string; facilitator: string; count: number }[]
   }
 }
 
@@ -86,8 +90,14 @@ function countBy(people: Participant[], key: 'religion' | 'gender'): Record<stri
   return counts
 }
 
-/** Most times any non-partner pair shares a table across the given sessions. */
-function worstPairRepeat(assignments: Assignment[]): number {
+/**
+ * Most times any non-partner pair shares a table across the given sessions,
+ * plus every pair tied for that worst count, named.
+ */
+function worstPairRepeat(assignments: Assignment[]): {
+  worst: number
+  details: { names: [string, string]; count: number }[]
+} {
   const partnerOf = new Map<string, string>()
   const counts = new Map<string, number>()
   assignments.forEach(a =>
@@ -110,11 +120,24 @@ function worstPairRepeat(assignments: Assignment[]): number {
     if (partnerOf.get(x) === y || partnerOf.get(y) === x) return
     worst = Math.max(worst, count)
   })
-  return worst
+  const details: { names: [string, string]; count: number }[] = []
+  counts.forEach((count, key) => {
+    if (count !== worst) return
+    const [x, y] = key.split('\x00') as [string, string]
+    if (partnerOf.get(x) === y || partnerOf.get(y) === x) return
+    details.push({ names: [x, y], count })
+  })
+  return { worst, details }
 }
 
-/** Most sessions any one participant shares a table with one same facilitator. */
-function worstFacilitatorRepeat(assignments: Assignment[]): number {
+/**
+ * Most sessions any one participant shares a table with one same facilitator,
+ * plus everyone tied for that worst count, named.
+ */
+function worstFacilitatorRepeat(assignments: Assignment[]): {
+  worst: number
+  details: { participant: string; facilitator: string; count: number }[]
+} {
   const counts = new Map<string, number>()
   assignments.forEach(a =>
     seatedTables(a).forEach(({ people }) => {
@@ -132,7 +155,13 @@ function worstFacilitatorRepeat(assignments: Assignment[]): number {
   counts.forEach(count => {
     worst = Math.max(worst, count)
   })
-  return worst
+  const details: { participant: string; facilitator: string; count: number }[] = []
+  counts.forEach((count, key) => {
+    if (count !== worst) return
+    const [participant, facilitator] = key.split('\x00')
+    details.push({ participant, facilitator, count })
+  })
+  return { worst, details }
 }
 
 /**
@@ -168,9 +197,11 @@ export function checkPlan(
   incompleteAssignments: Assignment[],
   keepApart: [string, string][]
 ): PlanCheckResult {
+  const facilitatorRepeat = worstFacilitatorRepeat(incompleteAssignments)
+  const pairRepeat = worstPairRepeat(incompleteAssignments)
   const violations: Violation[] = []
   const everyone = incompleteAssignments.flatMap(a => seatedTables(a).flatMap(t => t.people))
-  const hasCouples = everyone.some(person => person.partner)
+  const hasCouples = everyone.some(person => person.partner && !person.keep_together)
   const hasFacilitators = everyone.some(person => person.is_facilitator)
 
   incompleteAssignments.forEach(a => {
@@ -179,7 +210,9 @@ export function checkPlan(
 
       const flaggedCouples = new Set<string>()
       people.forEach(person => {
-        if (!person.partner || !names.has(person.partner)) return
+        // `partner` also names linked pairs (must sit together, keep_together
+        // true) — only a couple (must sit apart) seated together is a violation.
+        if (!person.partner || person.keep_together || !names.has(person.partner)) return
         const pair = [person.name, person.partner].sort() as [string, string]
         const key = pair.join('\x00')
         if (flaggedCouples.has(key)) return
@@ -227,10 +260,10 @@ export function checkPlan(
         ? !violations.some(v => v.kind === 'facilitatorCoverage')
         : undefined,
       balanceEven: balanceHeldToRosterFloor(incompleteAssignments),
-      maxPairRepeat: worstPairRepeat(incompleteAssignments),
-      maxFacilitatorRepeat: hasFacilitators
-        ? worstFacilitatorRepeat(incompleteAssignments)
-        : 0,
+      maxPairRepeat: pairRepeat.worst,
+      pairRepeatWorst: pairRepeat.details,
+      maxFacilitatorRepeat: hasFacilitators ? facilitatorRepeat.worst : 0,
+      facilitatorRepeatWorst: hasFacilitators ? facilitatorRepeat.details : [],
     },
   }
 }

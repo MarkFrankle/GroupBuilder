@@ -16,6 +16,9 @@ export interface Participant {
   religion: string
   gender: string
   partner: string | null
+  /** True when `partner` names a linked pair (must sit together) rather than a
+   *  couple (must sit apart) — same underlying field, opposite rule. */
+  keep_together?: boolean
   is_facilitator?: boolean
 }
 

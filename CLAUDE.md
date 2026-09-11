@@ -84,6 +84,12 @@
   request time from the current version's per-session `absentParticipants`, not stored on
   `participant_data`. The Roster page's locked "Away" column mirrors this; the dormant
   roster-document `absent_sessions` field is not read while a set exists and may drift.
+- **`Participant.partner` is one field shared by two opposite rules.** Linked
+  partners (`keep_together: true`) must sit together; couples (`keep_together:
+  false`) must sit apart. Any check keyed off `partner` alone — without also
+  reading `keep_together` — silently applies the wrong rule to half the field's
+  users. `planCheck.ts`'s couple-violation and `hasCouples` checks both gate on
+  `!keep_together` for this reason.
 - **A multi-select popover with checkboxes: use `DropdownMenu` + `DropdownMenuCheckboxItem`,
   not a new Popover dep.** `@radix-ui/react-popover` isn't installed. Give each checkbox item
   `onSelect={e => e.preventDefault()}` or the menu closes on the first tick. Opens in tests

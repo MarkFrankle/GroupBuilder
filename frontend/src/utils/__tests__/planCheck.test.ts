@@ -3,13 +3,20 @@ import type { Assignment } from '@/types/assignments'
 
 const p = (
   name: string,
-  opts: Partial<{ religion: string; gender: string; partner: string | null; is_facilitator: boolean }> = {}
+  opts: Partial<{
+    religion: string
+    gender: string
+    partner: string | null
+    is_facilitator: boolean
+    keep_together: boolean
+  }> = {}
 ) => ({
   name,
   religion: opts.religion ?? 'Christian',
   gender: opts.gender ?? 'Female',
   partner: opts.partner ?? null,
   is_facilitator: opts.is_facilitator ?? false,
+  keep_together: opts.keep_together ?? false,
 })
 
 /**
@@ -76,6 +83,29 @@ describe('checkPlan — verdict', () => {
     expect(result.violations[0].message).toMatch(/A & B together/)
   })
 
+  it('does not flag linked partners seated together — they are supposed to sit together', () => {
+    const plan = cleanPlan()
+    // Force A and B to be linked partners (keep_together), not a couple kept apart.
+    plan.forEach(a =>
+      Object.values(a.tables).forEach(seats =>
+        seats.forEach(seat => {
+          if (!seat) return
+          if (seat.name === 'A') {
+            seat.partner = 'B'
+            seat.keep_together = true
+          }
+          if (seat.name === 'B') {
+            seat.partner = 'A'
+            seat.keep_together = true
+          }
+        })
+      )
+    )
+    const result = checkPlan(plan, [])
+    expect(result.violations.some(v => v.kind === 'couple')).toBe(false)
+    expect(result.verdict).toBe('ok')
+  })
+
   it('flags a keep-apart pair seated together', () => {
     const plan = cleanPlan()
     const result = checkPlan(plan, [['A', 'B']]) // AG(2,3) seats A+B together in session 1
@@ -129,6 +159,28 @@ describe('checkPlan — reassurances', () => {
     expect(checkPlan(plan, []).reassurances.maxFacilitatorRepeat).toBe(3)
   })
 
+  it('names who is tied for the worst facilitator repeat', () => {
+    const plan: Assignment[] = [1, 2, 3].map(session => ({
+      session,
+      tables: {
+        1: [p('F', { is_facilitator: true }), p('X')],
+        2: [p('G', { is_facilitator: true }), p('Y')],
+      },
+    }))
+    const { reassurances } = checkPlan(plan, [])
+    expect(reassurances.facilitatorRepeatWorst).toEqual(
+      expect.arrayContaining([
+        { participant: 'X', facilitator: 'F', count: 3 },
+        { participant: 'Y', facilitator: 'G', count: 3 },
+      ])
+    )
+    expect(reassurances.facilitatorRepeatWorst).toHaveLength(2)
+  })
+
+  it('reports an empty facilitatorRepeatWorst when there is no repeat', () => {
+    expect(checkPlan(cleanPlan(), []).reassurances.facilitatorRepeatWorst).toEqual([])
+  })
+
   it('balanceEven is true when the solver holds every table to the roster floor', () => {
     // cleanPlan is all-Christian all-Female → single-value → trivially even.
     expect(checkPlan(cleanPlan(), []).reassurances.balanceEven).toBe(true)
@@ -180,6 +232,45 @@ describe('checkPlan — soft signals never flip the verdict', () => {
     expect(result.verdict).toBe('ok')
     expect(result.violations).toEqual([])
     expect(result.reassurances.balanceEven).toBe(false)
+  })
+})
+
+describe('checkPlan — pair-repeat worst-case names', () => {
+  it('names the pair(s) tied for the worst repeat', () => {
+    const plan: Assignment[] = [1, 2, 3].map(session => ({
+      session,
+      tables: { 1: [p('A'), p('B'), p('C')] },
+    }))
+    const { reassurances } = checkPlan(plan, [])
+    // A+B, A+C, B+C all repeat 3 times.
+    expect(reassurances.pairRepeatWorst).toEqual(
+      expect.arrayContaining([
+        { names: ['A', 'B'], count: 3 },
+        { names: ['A', 'C'], count: 3 },
+        { names: ['B', 'C'], count: 3 },
+      ])
+    )
+    expect(reassurances.pairRepeatWorst).toHaveLength(3)
+  })
+
+  it('excludes partner pairs from the named worst case', () => {
+    const twoSessionsSamePeople: Assignment[] = [1, 2].map(session => ({
+      session,
+      tables: { 1: [p('A', { partner: 'B' }), p('B', { partner: 'A' }), p('C')] },
+    }))
+    // A+B share twice but are partners; A+C and B+C also share twice and should be named.
+    const { reassurances } = checkPlan(twoSessionsSamePeople, [])
+    expect(reassurances.pairRepeatWorst).toEqual(
+      expect.arrayContaining([
+        { names: ['A', 'C'], count: 2 },
+        { names: ['B', 'C'], count: 2 },
+      ])
+    )
+    expect(reassurances.pairRepeatWorst).toHaveLength(2)
+  })
+
+  it('reports an empty pairRepeatWorst when nobody ever shares a table', () => {
+    expect(checkPlan([], []).reassurances.pairRepeatWorst).toEqual([])
   })
 })
 
