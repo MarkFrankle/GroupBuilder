@@ -3,41 +3,13 @@ import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ProgramHeader from '../ProgramHeader'
 
-const facts = {
-  participants: 24,
-  tables: 4,
-  sessions: 5,
-  uniqueTablemates: 18.5,
-}
-
 describe('ProgramHeader', () => {
-  it('renders the program name and its facts', () => {
-    render(<ProgramHeader programName="Spring 2026 Series" facts={facts} linkedPairs={4} />)
+  it('renders the program name', () => {
+    render(<ProgramHeader programName="Spring 2026 Series" />)
 
     expect(
       screen.getByRole('heading', { name: 'Spring 2026 Series' })
     ).toBeInTheDocument()
-    expect(
-      screen.getByText('24 participants · 4 tables · 5 sessions · avg 18.5 unique tablemates')
-    ).toBeInTheDocument()
-  })
-
-  it('renders the rules line when there are linked pairs', () => {
-    render(<ProgramHeader programName="Spring" facts={facts} linkedPairs={4} />)
-
-    expect(screen.getByText(/4 linked pairs/)).toBeInTheDocument()
-  })
-
-  it('does not pluralise a single linked pair', () => {
-    render(<ProgramHeader programName="Spring" facts={facts} linkedPairs={1} />)
-
-    expect(screen.getByText(/1 linked pair$/)).toBeInTheDocument()
-  })
-
-  it('omits the rules line entirely when there are no rules', () => {
-    render(<ProgramHeader programName="Spring" facts={facts} linkedPairs={0} />)
-
-    expect(screen.queryByText(/Rules/)).not.toBeInTheDocument()
   })
 
   it('offers Print roster & seating charts and Copy Link', async () => {
@@ -45,8 +17,6 @@ describe('ProgramHeader', () => {
     render(
       <ProgramHeader
         programName="Spring"
-        facts={facts}
-        linkedPairs={0}
         onPrintRoster={onPrintRoster}
         onCopyLink={jest.fn()}
       />
@@ -68,26 +38,12 @@ describe('ProgramHeader', () => {
       disconnect() {}
     }
 
-    render(<ProgramHeader programName="Spring 2026 Series" facts={facts} linkedPairs={4} />)
+    render(<ProgramHeader programName="Spring 2026 Series" />)
 
     expect(screen.getByTestId('program-header')).not.toHaveClass('sticky')
 
     act(() => observers[0]([{ isIntersecting: false }]))
 
     expect(screen.getByTestId('program-header')).toHaveClass('sticky')
-  })
-
-  it('does not pluralise a single-session program', () => {
-    render(
-      <ProgramHeader
-        programName="Spring"
-        facts={{ participants: 1, tables: 1, sessions: 1, uniqueTablemates: 0 }}
-        linkedPairs={0}
-      />
-    )
-
-    expect(
-      screen.getByText('1 participant · 1 table · 1 session · avg 0 unique tablemates')
-    ).toBeInTheDocument()
   })
 })
