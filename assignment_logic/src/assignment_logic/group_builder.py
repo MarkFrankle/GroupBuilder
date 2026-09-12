@@ -25,6 +25,7 @@ class GroupBuilder:
         pairwise_cap=None,
         table_overlap_cap=None,
         historical_tables=None,
+        absent_ids_by_session=None,
     ):
         """
         Initialize the GroupBuilder.
@@ -84,6 +85,13 @@ class GroupBuilder:
         self.pairwise_cap = pairwise_cap
         self.table_overlap_cap = table_overlap_cap
         self.historical_tables = historical_tables or []
+        # 0-indexed session -> set of participant ids absent that session.
+        # A missing key means nobody is absent that session. Absent people get
+        # no table-assignment variable at all for that session - there is
+        # nothing to seat, so nothing to patch after the fact. See
+        # program_solve.solve_program for how the router-facing, 1-indexed,
+        # name-based absence_map becomes this shape.
+        self.absent_ids_by_session = absent_ids_by_session or {}
 
         # Configurable solver parameters (can be overridden by env vars or constructor args)
         self.pairing_window_size = pairing_window_size or int(
@@ -98,6 +106,11 @@ class GroupBuilder:
         self.overlap_penalty_weight = overlap_penalty_weight or int(
             os.getenv("SOLVER_OVERLAP_PENALTY_WEIGHT", "5")
         )
+
+    def _present(self, session):
+        """Participants seated in this session (everyone minus that session's absences)."""
+        absent = self.absent_ids_by_session.get(session, set())
+        return [p for p in self.participants if p["id"] not in absent]
 
     def generate_assignments(self, max_time_seconds=120) -> dict:
         logger.info(
@@ -121,8 +134,8 @@ class GroupBuilder:
         # participant_table_assignments[(participant_id, session, table)] -> boolean
         # True if participant is sitting at that table in that session
         self.participant_table_assignments = {}
-        for participant in self.participants:
-            for session in self.sessions:
+        for session in self.sessions:
+            for participant in self._present(session):
                 for table in self.tables:
                     self.participant_table_assignments[
                         (participant["id"], session, table)
@@ -137,9 +150,9 @@ class GroupBuilder:
             )
 
     def _add_constraints_to_model(self):
-        # Each participants sits at one table per session
-        for p in self.participants:
-            for s in self.sessions:
+        # Each present participant sits at one table per session
+        for s in self.sessions:
+            for p in self._present(s):
                 self.model.Add(
                     sum(
                         self.participant_table_assignments[(p["id"], s, t)]

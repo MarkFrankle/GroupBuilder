@@ -1024,5 +1024,34 @@ def test_overlap_cap_too_tight_is_reported_infeasible_not_silently_ignored():
     assert "No solution exists" in result["error"]
 
 
+def test_absent_participant_is_not_seated_in_their_absent_session():
+    """An absent participant gets no seat at all in their absent session, but
+    is seated normally in every other session."""
+    participants = [
+        {
+            "id": f"p{i}",
+            "name": f"P{i}",
+            "religion": "Christian",
+            "gender": "Male",
+            "couple_id": None,
+        }
+        for i in range(6)
+    ]
+    builder = GroupBuilder(
+        participants,
+        num_tables=2,
+        num_sessions=2,
+        absent_ids_by_session={1: {"p5"}},  # P5 absent in session 2 (0-indexed: 1)
+    )
+    result = builder.generate_assignments(max_time_seconds=15)
+
+    assert result["status"] == "success"
+    session_one, session_two = result["assignments"]
+    seated_s1 = {p["name"] for seats in session_one["tables"].values() for p in seats}
+    seated_s2 = {p["name"] for seats in session_two["tables"].values() for p in seats}
+    assert seated_s1 == {f"P{i}" for i in range(6)}
+    assert seated_s2 == {f"P{i}" for i in range(5)}  # P5 missing
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
