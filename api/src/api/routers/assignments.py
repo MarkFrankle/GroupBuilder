@@ -1036,6 +1036,8 @@ async def get_assignment_set_metadata(
         "previous_set_id": assignment_set.get("previous_set_id"),
         "pairwise_cap": latest_metadata.get("pairwise_cap"),
         "table_overlap_cap": latest_metadata.get("table_overlap_cap"),
+        "pairwise_floor": latest_metadata.get("pairwise_floor"),
+        "table_overlap_floor": latest_metadata.get("table_overlap_floor"),
     }
 
 
