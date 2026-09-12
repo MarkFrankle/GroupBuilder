@@ -215,7 +215,7 @@ const SessionCard: React.FC<SessionCardProps> = ({
               title={
                 canImproveByShuffle
                   ? undefined
-                  : "This session isn't where the flagged repeat lives — shuffling it won't clear that note"
+                  : "This session isn't where the flagged repeat lives. Shuffling it won't clear that note."
               }
             >
               {isShuffling ? (

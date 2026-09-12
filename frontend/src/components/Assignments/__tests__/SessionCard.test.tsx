@@ -75,7 +75,7 @@ describe('SessionCard — a live session', () => {
     const button = screen.getByRole('button', { name: /shuffle/i })
     expect(button).toHaveAttribute(
       'title',
-      "This session isn't where the flagged repeat lives — shuffling it won't clear that note"
+      "This session isn't where the flagged repeat lives. Shuffling it won't clear that note."
     )
     expect(button).not.toBeDisabled()
   })
