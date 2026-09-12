@@ -14,6 +14,7 @@ import { CoupleSlotsContext } from '@/components/Assignments/coupleSlotsContext'
 import { buildCoupleSlots } from '@/utils/chipPalettes'
 import NoticeStrip, { Notice } from '@/components/Assignments/NoticeStrip'
 import PlanCheckBand from '@/components/Assignments/PlanCheckBand'
+import PlanCheckCompactRow from '@/components/Assignments/PlanCheckCompactRow'
 import ProgramHeader from '@/components/Assignments/ProgramHeader'
 import ViewBar from '@/components/Assignments/ViewBar'
 import { authenticatedFetch } from '@/utils/apiClient'
@@ -769,6 +770,7 @@ const AssignmentsPage: React.FC = () => {
       <NoticeStrip notice={provisionalNotice ?? notice} onDismiss={() => showNotice(null)} />
 
       <div className="sticky top-14 z-10 -mx-8 border-b bg-white px-8">
+        {live.length > 0 && <PlanCheckCompactRow result={planCheck} />}
         <ViewBar
           focus={focus}
           onFocusChange={setFocus}

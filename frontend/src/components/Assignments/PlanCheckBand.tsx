@@ -58,7 +58,7 @@ const ProblemLine: React.FC<{ children: React.ReactNode }> = ({ children }) => (
  * above any line whose group key differs from the line before it (e.g. grouping
  * the table-overlap list by its first session number).
  */
-const RepeatWorstDetail: React.FC<{
+export const RepeatWorstDetail: React.FC<{
   label: string
   lines: string[]
   groupKeys?: Array<string | number>
