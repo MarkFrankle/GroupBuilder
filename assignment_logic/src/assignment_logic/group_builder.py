@@ -302,15 +302,18 @@ class GroupBuilder:
                 couples[p["couple_id"]].append(p)
 
         for s in self.sessions:
+            absent = self.absent_ids_by_session.get(s, set())
             for t in self.tables:
                 for group in couples.values():
-                    self.model.Add(
-                        sum(
-                            self.participant_table_assignments[(p["id"], s, t)]
-                            for p in group
+                    present_group = [p for p in group if p["id"] not in absent]
+                    if len(present_group) > 1:
+                        self.model.Add(
+                            sum(
+                                self.participant_table_assignments[(p["id"], s, t)]
+                                for p in present_group
+                            )
+                            <= 1
                         )
-                        <= 1
-                    )
 
         # Keep linked partners at the same table
         linked = defaultdict(list)
@@ -319,9 +322,12 @@ class GroupBuilder:
                 linked[p["linked_id"]].append(p)
 
         for s in self.sessions:
+            absent = self.absent_ids_by_session.get(s, set())
             for group in linked.values():
                 if len(group) == 2:
                     p1, p2 = group
+                    if p1["id"] in absent or p2["id"] in absent:
+                        continue
                     for t in self.tables:
                         self.model.Add(
                             self.participant_table_assignments[(p1["id"], s, t)]
@@ -356,8 +362,11 @@ class GroupBuilder:
                 keep_apart_pairs.add(tuple(sorted((p["id"], other_id))))
 
         for s in self.sessions:
+            absent = self.absent_ids_by_session.get(s, set())
             for t in self.tables:
                 for a, b in keep_apart_pairs:
+                    if a in absent or b in absent:
+                        continue
                     self.model.Add(
                         self.participant_table_assignments[(a, s, t)]
                         + self.participant_table_assignments[(b, s, t)]

@@ -1053,5 +1053,57 @@ def test_absent_participant_is_not_seated_in_their_absent_session():
     assert seated_s2 == {f"P{i}" for i in range(5)}  # P5 missing
 
 
+def test_linked_partner_absence_does_not_force_the_present_partner_anywhere():
+    """If one linked partner is absent, the equality constraint pinning them
+    to the same table must not apply that session - there is no variable
+    for the absent partner to be equal to."""
+    participants = [
+        {
+            "id": "p0",
+            "name": "P0",
+            "religion": "Christian",
+            "gender": "Male",
+            "couple_id": None,
+            "linked_id": "l1",
+        },
+        {
+            "id": "p1",
+            "name": "P1",
+            "religion": "Jewish",
+            "gender": "Female",
+            "couple_id": None,
+            "linked_id": "l1",
+        },
+        {
+            "id": "p2",
+            "name": "P2",
+            "religion": "Muslim",
+            "gender": "Male",
+            "couple_id": None,
+        },
+        {
+            "id": "p3",
+            "name": "P3",
+            "religion": "Christian",
+            "gender": "Female",
+            "couple_id": None,
+        },
+    ]
+    builder = GroupBuilder(
+        participants,
+        num_tables=2,
+        num_sessions=1,
+        absent_ids_by_session={0: {"p1"}},  # P1 (linked to P0) absent
+    )
+    result = builder.generate_assignments(max_time_seconds=10)
+    assert result["status"] == "success"
+    seated = {
+        p["name"]
+        for seats in result["assignments"][0]["tables"].values()
+        for p in seats
+    }
+    assert seated == {"P0", "P2", "P3"}
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
