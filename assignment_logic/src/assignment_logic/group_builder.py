@@ -637,7 +637,7 @@ class GroupBuilder:
             for s in self.sessions:
                 session_data = {"session": s + 1, "tables": defaultdict(list)}
                 for t in self.tables:
-                    for p in self.participants:
+                    for p in self._present(s):
                         if self.solver.BooleanValue(
                             self.participant_table_assignments[(p["id"], s, t)]
                         ):
