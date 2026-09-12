@@ -153,6 +153,40 @@ describe('checkPlan — verdict', () => {
     )
   })
 
+  it('does not flag balance in a session with an absence, computed against a fuller session', () => {
+    // Session 1: 3 Jewish / 3 Christian across 2 tables, split evenly (floor 0, met).
+    // Session 2: same roster minus one Jewish person (an absence) — now 2
+    // Jewish / 3 Christian over 2 tables, whose own floor is 1, not 0. The
+    // old floor, computed once from session 1's full (even) roster, would
+    // wrongly demand 0 here too.
+    const plan: Assignment[] = [
+      {
+        session: 1,
+        tables: {
+          1: [
+            p('A', { religion: 'Jewish' }),
+            p('B', { religion: 'Jewish' }),
+            p('C', { religion: 'Christian' }),
+          ],
+          2: [
+            p('D', { religion: 'Jewish' }),
+            p('E', { religion: 'Christian' }),
+            p('F', { religion: 'Christian' }),
+          ],
+        },
+      },
+      {
+        session: 2,
+        tables: {
+          1: [p('A', { religion: 'Jewish' }), p('C', { religion: 'Christian' }), p('E', { religion: 'Christian' })],
+          2: [p('B', { religion: 'Jewish' }), p('F', { religion: 'Christian' })],
+        },
+      },
+    ]
+    const result = checkPlan(plan, [])
+    expect(result.violations.some(v => v.kind === 'balance' && v.session === 2)).toBe(false)
+  })
+
   it('a hard violation wins over a simultaneous soft overage', () => {
     // Heavy pair-repeat (3 sessions, same trio) AND a couple seated together.
     const plan: Assignment[] = [1, 2, 3].map(session => ({
