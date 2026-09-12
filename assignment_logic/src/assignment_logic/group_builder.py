@@ -388,28 +388,40 @@ class GroupBuilder:
                 # For each session, track if this pair meets (across all tables)
                 pair_meets_session = {}
                 for s in self.sessions:
-                    # Did they meet in session s? (at any table)
-                    session_meeting_vars = []
-                    for t in self.tables:
-                        both_at_table = self.model.NewBoolVar(
-                            f'both_{p1["id"]}_{p2["id"]}_s{s}_t{t}'
-                        )
-                        self.model.AddMultiplicationEquality(
-                            both_at_table,
-                            [
-                                self.participant_table_assignments[(p1["id"], s, t)],
-                                self.participant_table_assignments[(p2["id"], s, t)],
-                            ],
-                        )
-                        session_meeting_vars.append(both_at_table)
+                    absent = self.absent_ids_by_session.get(s, set())
+                    if p1["id"] in absent or p2["id"] in absent:
+                        # Either participant is absent this session, so they
+                        # cannot have met - fix to a constant rather than
+                        # building multiplication variables against missing
+                        # (participant, session, table) keys.
+                        pair_meets_session[s] = self.model.NewConstant(0)
+                    else:
+                        # Did they meet in session s? (at any table)
+                        session_meeting_vars = []
+                        for t in self.tables:
+                            both_at_table = self.model.NewBoolVar(
+                                f'both_{p1["id"]}_{p2["id"]}_s{s}_t{t}'
+                            )
+                            self.model.AddMultiplicationEquality(
+                                both_at_table,
+                                [
+                                    self.participant_table_assignments[
+                                        (p1["id"], s, t)
+                                    ],
+                                    self.participant_table_assignments[
+                                        (p2["id"], s, t)
+                                    ],
+                                ],
+                            )
+                            session_meeting_vars.append(both_at_table)
 
-                    # met_in_session = OR of all tables (did they meet at any table?)
-                    pair_meets_session[s] = self.model.NewBoolVar(
-                        f'pair_{p1["id"]}_{p2["id"]}_meets_s{s}'
-                    )
-                    self.model.AddMaxEquality(
-                        pair_meets_session[s], session_meeting_vars
-                    )
+                        # met_in_session = OR of all tables (did they meet at any table?)
+                        pair_meets_session[s] = self.model.NewBoolVar(
+                            f'pair_{p1["id"]}_{p2["id"]}_meets_s{s}'
+                        )
+                        self.model.AddMaxEquality(
+                            pair_meets_session[s], session_meeting_vars
+                        )
 
                     # HISTORY-AWARE: Penalize if this pair met in previous batches
                     if pair_key in self.historical_pairings:

@@ -1105,5 +1105,61 @@ def test_linked_partner_absence_does_not_force_the_present_partner_anywhere():
     assert seated == {"P0", "P2", "P3"}
 
 
+def test_pairwise_cap_is_enforced_correctly_across_an_absent_session():
+    """A pair's hard cap must still be respected globally even when one of
+    their potential meeting sessions has one of them absent - an absent
+    session must count as "did not meet," not raise or silently allow an
+    extra meeting.
+
+    NOTE: the plan's original fixture (6 people, 2 tables, 3 sessions,
+    pairwise_cap=1) is pigeonhole-infeasible even with nobody absent: 2
+    balanced tables of 3 force 6 pair-meetings per session, so 3 sessions
+    demand 18 pair-meetings (16 once one session loses a person to
+    absence) against only C(6,2)=15 distinct pairs, i.e. cap=1 can never
+    be satisfied. Using 9 people / 3 tables / 4 sessions instead (the
+    AG(2,3) shape documented in CLAUDE.md, where a pairwise_cap=1 solve
+    with everyone present is exactly achievable - every pair meets once)
+    keeps enough slack once one person is absent for one session.
+    """
+    participants = [
+        {
+            "id": f"p{i}",
+            "name": f"P{i}",
+            "religion": "Christian",
+            "gender": "Male",
+            "couple_id": None,
+        }
+        for i in range(9)
+    ]
+    builder = GroupBuilder(
+        participants,
+        num_tables=3,
+        num_sessions=4,
+        pairwise_cap=1,
+        absent_ids_by_session={1: {"p0"}},  # P0 absent session 2 (0-indexed 1)
+    )
+    result = builder.generate_assignments(max_time_seconds=20)
+    assert result["status"] == "success"
+
+    from collections import Counter
+    import itertools
+
+    meetings = Counter()
+    for session in result["assignments"]:
+        for people in session["tables"].values():
+            names = sorted(p["name"] for p in people)
+            for pair in itertools.combinations(names, 2):
+                meetings[pair] += 1
+    assert max(meetings.values()) <= 1
+    # P0 was absent one of the four sessions but still shows up in the other three
+    p0_sessions = sum(
+        1
+        for session in result["assignments"]
+        for people in session["tables"].values()
+        if any(p["name"] == "P0" for p in people)
+    )
+    assert p0_sessions == 3
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
