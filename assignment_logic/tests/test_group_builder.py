@@ -971,6 +971,49 @@ def test_table_overlap_never_exceeds_the_configured_cap():
         assert len(a & b) <= 3
 
 
+def test_single_session_solve_prefers_less_overlap_with_a_historical_table():
+    """The whole-table-overlap cap (`table_overlap_cap`) is enforced as a pure
+    hard constraint (`sum(both_slots) <= cap` / `overlap_count <= cap`) with
+    no objective term pushing the solver toward *less* overlap than the cap
+    allows - the same class of bug fixed for pairwise repeats above, but on
+    the overlap axis. Four participants, two two-seat tables, one session to
+    solve: P0 and P1 already sat together at a historical table elsewhere in
+    the program. Reseating them together again reproduces that table's full
+    membership (overlap = 2); splitting them does not (overlap <= 1). A cap
+    of 2 makes both arrangements legal - only the objective can prefer the
+    lower-overlap one.
+    """
+    participants = [
+        {
+            "id": f"p{i}",
+            "name": f"P{i}",
+            "religion": "Christian",
+            "gender": "Male",
+            "couple_id": None,
+        }
+        for i in range(4)
+    ]
+
+    builder = GroupBuilder(
+        participants,
+        num_tables=2,
+        num_sessions=1,
+        table_overlap_cap=2,
+        historical_tables=[{"p0", "p1"}],
+    )
+    result = builder.generate_assignments(max_time_seconds=15)
+
+    assert result["status"] == "success"
+    assert result["solution_quality"] == "optimal"
+    tables = result["assignments"][0]["tables"]
+    seated_together = {frozenset(s["name"] for s in seats) for seats in tables.values()}
+    assert frozenset({"P0", "P1"}) not in seated_together, (
+        "P0 and P1 already shared a historical table and a lower-overlap "
+        "seating exists - the solver had no reason to prefer it before "
+        "this fix, since the overlap cap is a hard ceiling, not a target."
+    )
+
+
 def test_overlap_cap_too_tight_is_reported_infeasible_not_silently_ignored():
     people = _twenty_four_participants_with_relations()
     builder = GroupBuilder(

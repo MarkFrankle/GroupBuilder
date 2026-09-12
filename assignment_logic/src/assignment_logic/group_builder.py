@@ -18,6 +18,7 @@ class GroupBuilder:
         pairing_window_size=None,
         solver_num_workers=None,
         repeat_penalty_weight=None,
+        overlap_penalty_weight=None,
         require_different_assignments=False,
         total_program_sessions=None,
         historical_meeting_counts=None,
@@ -40,6 +41,13 @@ class GroupBuilder:
             repeat_penalty_weight: Extra cost charged for a pair's third and later
                                    meetings, on top of the flat per-meeting cost.
                                    Higher means repeats are spread harder (default: 5)
+            overlap_penalty_weight: Cost charged per person shared between any two
+                                    tables (this solve's own tables, or a table from
+                                    historical_tables), on top of the hard
+                                    table_overlap_cap. The cap only forbids exceeding
+                                    a ceiling; this term gives the solver a reason to
+                                    prefer less overlap than that ceiling when a
+                                    lower-overlap arrangement exists (default: 5)
             require_different_assignments: If True, enforces hard constraint that participants CANNOT be assigned
                                           to their previous tables (fails if impossible)
         """
@@ -86,6 +94,9 @@ class GroupBuilder:
         )
         self.repeat_penalty_weight = repeat_penalty_weight or int(
             os.getenv("SOLVER_REPEAT_PENALTY_WEIGHT", "5")
+        )
+        self.overlap_penalty_weight = overlap_penalty_weight or int(
+            os.getenv("SOLVER_OVERLAP_PENALTY_WEIGHT", "5")
         )
 
     def generate_assignments(self, max_time_seconds=120) -> dict:
@@ -503,6 +514,13 @@ class GroupBuilder:
         # sits at exactly one table per session) or one is from outside this
         # solve entirely (historical_tables, for single-session regeneration
         # against sessions this solve doesn't get to re-derive).
+        #
+        # The cap above is a pure ceiling - it forbids exceeding
+        # table_overlap_cap but does nothing to prefer less overlap among
+        # cap-compliant arrangements, the same gap the historical-repeat term
+        # above fixes for pairwise meetings. overlap_penalty_weight charges a
+        # per-shared-person cost on top of the cap so the solver has a real
+        # reason to pick the lower-overlap arrangement when one exists.
         if self.table_overlap_cap is not None:
             for s1, s2 in combinations(self.sessions, 2):
                 for t1 in self.tables:
@@ -525,6 +543,7 @@ class GroupBuilder:
                             )
                             both_slots.append(both)
                         self.model.Add(sum(both_slots) <= self.table_overlap_cap)
+                        penalty_count += self.overlap_penalty_weight * sum(both_slots)
 
             for s in self.sessions:
                 for t in self.tables:
@@ -535,6 +554,7 @@ class GroupBuilder:
                             if p["id"] in hist_table
                         )
                         self.model.Add(overlap_count <= self.table_overlap_cap)
+                        penalty_count += self.overlap_penalty_weight * overlap_count
 
         self.model.Minimize(penalty_count)
 
