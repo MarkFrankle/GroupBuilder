@@ -237,6 +237,18 @@ function HelpPage() {
             sessions, so it won't seat the same pair twice just because the
             rebuild started fresh.
           </p>
+          <WarningCallout>
+            <p>
+              When the rebuild finishes, a banner appears at the top of the
+              page with two buttons: <strong>Accept</strong> and{" "}
+              <strong>Undo</strong>. Nothing else on the page works until you
+              press one. Look over the new sessions first. <strong>Accept</strong>{" "}
+              locks them in; <strong>Undo</strong> throws the rebuild away and
+              restores the sessions you had before. This is the only thing
+              standing between you and overwriting sessions that haven't run
+              yet, so Group Builder won't let you move on without deciding.
+            </p>
+          </WarningCallout>
         </section>
 
         {/* ===================== Section 3: Viewing Your Assignments ===================== */}
