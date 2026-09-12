@@ -194,10 +194,17 @@ const AssignmentsPage: React.FC = () => {
       checkPlan(
         live,
         keepApartPairs(canonicalRoster?.participants ?? []),
-        metadata?.pairwise_cap,
-        metadata?.table_overlap_cap
+        metadata?.pairwise_floor ?? metadata?.pairwise_cap,
+        metadata?.table_overlap_floor ?? metadata?.table_overlap_cap
       ),
-    [live, canonicalRoster, metadata?.pairwise_cap, metadata?.table_overlap_cap]
+    [
+      live,
+      canonicalRoster,
+      metadata?.pairwise_floor,
+      metadata?.pairwise_cap,
+      metadata?.table_overlap_floor,
+      metadata?.table_overlap_cap,
+    ]
   )
 
   const allParticipants = useMemo<Participant[]>(
