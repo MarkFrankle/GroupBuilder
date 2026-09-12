@@ -390,6 +390,32 @@ class GroupBuilder:
                         )
                         penalty_count += both_sessions
 
+                # HISTORICAL REPEAT: the rolling-window penalty above only
+                # compares sessions *within this solve's own session range*
+                # (self.sessions) - for a single-session regenerate that
+                # range has exactly one session, so the window loop above
+                # never executes and this pair's prior history outside this
+                # solve is otherwise invisible to the objective. This term
+                # gives the solver a reason to prefer not repeating a pair
+                # even when nothing in this solve's own sessions is close
+                # enough to compare, which is the common case for a
+                # single-session shuffle. Weight escalates with how many
+                # times they've already met, echoing repeat_penalty_weight's
+                # documented "extra cost for third and later meetings"
+                # (meeting once before -> this would be the 2nd meeting,
+                # costs weight * 1; meeting twice before -> 3rd meeting,
+                # costs weight * 2). Skipped for linked pairs, same as the
+                # pairwise cap below - they're pinned together by a hard
+                # constraint, so "repeat" isn't a meaningful idea for them.
+                already_met = self.historical_meeting_counts.get(pair_key, 0)
+                if already_met > 0 and pair_key not in linked_pair_ids:
+                    for s in self.sessions:
+                        penalty_count += (
+                            self.repeat_penalty_weight
+                            * already_met
+                            * pair_meets_session[s]
+                        )
+
                 # TOTAL BUDGET: hard-cap how many times this pair can meet at
                 # all, rather than merely penalizing repeats, when the caller
                 # supplies a cap. The value is an external search parameter,
