@@ -355,6 +355,8 @@ def _generate_assignments_internal(
         "label": LABEL_REBUILT if mark_regenerated else LABEL_GENERATED,
         "pairwise_cap": results.get("pairwise_cap"),
         "table_overlap_cap": results.get("table_overlap_cap"),
+        "pairwise_floor": results.get("pairwise_floor"),
+        "table_overlap_floor": results.get("table_overlap_floor"),
     }
 
     if mark_regenerated:

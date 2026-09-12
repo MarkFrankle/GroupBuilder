@@ -1004,6 +1004,8 @@ class TestRegenerateSingleSession:
             },
             2,  # pairwise_cap
             2,  # overlap_cap
+            2,  # pairwise_floor
+            2,  # overlap_floor
         )
 
         response = client.post(
@@ -1087,6 +1089,8 @@ class TestRegenerateSingleSession:
             },
             1,
             1,
+            1,
+            1,
         )
 
         # Mark Alice and Bob as absent
@@ -1138,7 +1142,7 @@ class TestRegenerateSingleSession:
 
         # First call (hard constraint) fails, second call (soft constraint) succeeds
         mock_find_feasible_plan.side_effect = [
-            ({"status": "failure", "error": "Infeasible"}, None, None),
+            ({"status": "failure", "error": "Infeasible"}, None, None, None, None),
             (
                 {
                     "status": "success",
@@ -1148,6 +1152,8 @@ class TestRegenerateSingleSession:
                         :1
                     ],  # Return session 1
                 },
+                1,
+                1,
                 1,
                 1,
             ),
@@ -1239,6 +1245,8 @@ class TestRegenerateSingleSession:
                 "total_deviation": 3,
                 "assignments": sample_assignments_result["assignments"][:1],
             },
+            1,
+            1,
             1,
             1,
         )
@@ -1854,6 +1862,8 @@ class TestVersionLabels:
                     }
                 ],
             },
+            1,
+            1,
             1,
             1,
         )
