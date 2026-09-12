@@ -5,6 +5,7 @@ const tocItems = [
   { id: "welcome-to-group-builder", label: "Welcome to Group Builder" },
   { id: "creating-your-roster", label: "Creating Your Roster" },
   { id: "viewing-your-groups", label: "Reading Your Assignments" },
+  { id: "running-your-sessions", label: "Running Your Sessions" },
   { id: "reading-the-banner", label: "How Good Are the Assignments: Reading the Banner" },
   { id: "editing-sessions", label: "Changing a Plan" },
   { id: "troubleshooting", label: "Troubleshooting" },
@@ -317,7 +318,71 @@ function HelpPage() {
 
         </section>
 
-        {/* ===================== Section 4: How Good Are the Assignments ===================== */}
+        {/* ===================== Section 4: Running Your Sessions ===================== */}
+        <section className="mb-12">
+          <h2 id="running-your-sessions" className="text-2xl font-bold mb-4 scroll-mt-8">
+            Running Your Sessions
+          </h2>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            Once a set of assignments exists, these are the things you'll do every
+            week regardless of what the banner says: hand out seating charts and
+            mark off each session as it happens.
+          </p>
+
+          <h3 className="text-xl font-semibold mb-2">Print roster &amp; seating charts</h3>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            Click <strong>"Print roster &amp; seating charts"</strong> to open a print-formatted page with
+            every session's table assignments listed out (who's at which table), plus
+            circular seating charts showing where each person sits. From there, use
+            your browser's Print function (Ctrl+P on Windows, Cmd+P on Mac) or click
+            the Print button on the page.
+          </p>
+
+          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Saving as PDF to share by email:</p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            To send the assignments to other facilitators, you can save them as a
+            PDF: click <strong>"Print roster &amp; seating charts"</strong>, then in the print dialog
+            instead of choosing a printer, choose{" "}
+            <strong>"Save as PDF."</strong> This will create and download a PDF file
+            you can rename if desired and attach to an email or share however you
+            like.
+          </p>
+
+          <h3 className="text-xl font-semibold mb-2">Print Seating Charts</h3>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            If you only need to print a single session, press <strong>"Print"</strong>
+            in that session's header. This shows just the roster and 
+            circular seating charts for that session's tables.
+          </p>
+
+          <h3 className="text-xl font-semibold mb-2">Copy Link</h3>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            If another facilitator has a Group Builder account, you can share
+            assignments directly: click <strong>"Copy Link"</strong> to copy a
+            shareable URL to your clipboard and send it to them. They'll need to be
+            signed into Group Builder to view it. For facilitators who
+            don't have Group Builder accounts, use the PDF method above instead.
+          </p>
+
+          <h3 className="text-xl font-semibold mt-8 mb-2">Marking a session complete</h3>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            When a meeting night has happened, press <strong>Mark complete</strong> in
+            that session's header. The session collapses to a single line and moves
+            below the sessions still ahead of you, under a <strong>Completed</strong>{" "}
+            heading so the next night to run is always the first thing on the page.
+            Press the arrow on a completed line to expand the session and look at who sat where.
+          </p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            A completed session cannot be changed. Shuffling it and editing it are refused,
+            the past stays as it happened. If you complete any sessions and then change your 
+            roster and rebuild assignments, the completed sesssions will stay as they were.
+            If you marked one complete by mistake, press <strong>Reopen</strong> on
+            it, or press <strong>Undo</strong> on the line that appears at the top
+            right after you mark complete.
+          </p>
+        </section>
+
+        {/* ===================== Section 5: How Good Are the Assignments ===================== */}
         <section className="mb-12">
           <h2 id="reading-the-banner" className="text-2xl font-bold mb-4 scroll-mt-8">
             How Good Are the Assignments: Reading the Banner
@@ -378,159 +443,82 @@ function HelpPage() {
           </p>
         </section>
 
-        {/* ===================== Section 5: Changing a Plan ===================== */}
+        {/* ===================== Section 6: Changing a Plan ===================== */}
         <section className="mb-12">
           <h2 id="editing-sessions" className="text-2xl font-bold mb-4 scroll-mt-8">
-            Changing a Plan
+            Changing Assignments
           </h2>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            The generated assignments are a starting point. Nothing changes unless you
-            press something — the app never re-runs the solver on its own.
-          </p>
 
-          <h3 className="text-xl font-semibold mb-2">Print roster &amp; seating charts</h3>
+          <h3 className="text-xl font-semibold mb-2">Shuffle one session</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            Click <strong>"Print roster &amp; seating charts"</strong> to open a print-formatted page with
-            every session's table assignments listed out (who's at which table), plus
-            circular seating charts showing where each person sits. From there, use
-            your browser's Print function (Ctrl+P on Windows, Cmd+P on Mac) or click
-            the Print button on the page.
-          </p>
-
-          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Saving as PDF to share by email:</p>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            To send the assignments to other facilitators, you can save them as a
-            PDF: click <strong>"Print roster &amp; seating charts"</strong>, then in the print dialog
-            instead of choosing a printer, choose{" "}
-            <strong>"Save as PDF."</strong> This will create and download a PDF file
-            you can rename if desired and attach to an email or share however you
-            like.
-          </p>
-
-          <h3 className="text-xl font-semibold mb-2">Print Seating Charts</h3>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            If you only need seating charts for a single session (for example, to put
-            one on each table), press <strong>"Print"</strong> in that session's
-            header. This shows just the circular seating charts for that session's
-            tables.
-          </p>
-
-          <h3 className="text-xl font-semibold mb-2">Copy Link</h3>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            If another facilitator has a Group Builder account, you can share
-            assignments directly: click <strong>"Copy Link"</strong> to copy a
-            shareable URL to your clipboard and send it to them. They'll need to be
-            signed into Group Builder to view it. Links stay active as long as
-            someone accesses them at least once every 30 days. For facilitators who
-            don't have Group Builder accounts, use the PDF method above instead.
-          </p>
-
-          <h3 className="text-xl font-semibold mt-8 mb-2">Marking a session complete</h3>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            When a meeting night has happened, press <strong>Mark complete</strong> in
-            that session's header. The session collapses to a single line and moves
-            below the sessions still ahead of you, under a <strong>Completed</strong>{" "}
-            heading — so the next night to run is always the first thing on the page.
-            Press the arrow on a completed line to look at who sat where.
-          </p>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            A completed session cannot be changed. Shuffling it, editing it, or
-            rebuilding the program are all refused — the past stays as it happened.
-            If you marked one complete by mistake, press <strong>Reopen</strong> on
-            it, or press <strong>Undo</strong> on the line that appears at the top
-            right after you mark complete — both put the session back the way it was.
-          </p>
-
-          <InfoCallout>
-            <p>
-              Sessions are completed in order, because time runs in order. You can
-              only complete the next session that is still open, and only reopen the
-              most recently completed one. If you try to skip ahead, the app tells you
-              which session is still open.
-            </p>
-          </InfoCallout>
-
-          <h3 className="text-xl font-semibold mt-8 mb-2">Shuffle one session</h3>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            Press <strong>Shuffle</strong> in a session's header to redo just that
+            Press <strong>Shuffle</strong> in a session's header to remake just that
             night. The solver still knows about every other session, so it avoids
-            pairings people have already had — and it changes only the session you
+            pairings people have already had and it changes only the session you
             pressed. Anyone you have marked absent for that session stays absent.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Afterwards a line appears at the top telling you what happened: how many
             people moved, which sessions were left alone, and how many pairs now sit
-            together more than once. If barely anyone moved, the arrangement you had
-            was already close to the best one — shuffle again if you want a bigger
-            change.
-          </p>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            That same line offers <strong>Undo</strong>. Pressing it puts back the
-            arrangement you had before the shuffle. It stays available until you do
-            something else, and even after it is gone you can bring any earlier
-            arrangement back through History.
+            together more than once. That same line offers <strong>Undo</strong>.
+            Pressing it puts back the arrangement you had before the shuffle.
           </p>
 
           <h3 className="text-xl font-semibold mt-8 mb-2">
-            Someone didn't come
+            Marking someone absent
           </h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Click a person's name anywhere on the page and they light up in every
-            session, so you can see where they sit all series. While they are lit up,
+            session, so you can see where they sit across the whole series. While they are lit up,
             a <strong>Mark [name] absent</strong> button appears above their table.
-            Press it and they move to the Absent list under that session.
+            Press it and they move to the Absent list at the bottom of that session.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            Their chair is left empty rather than filled in — the app will not reshuffle
-            the table behind your back. Only that one session changes, and the line at
-            the top says so, with an <strong>Undo</strong> if you clicked the wrong
-            person. Click anywhere else, or press Escape, to stop highlighting someone.
-          </p>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            If they turn up after all — or you marked the wrong person — click their
+            If they turn up after all (or you marked the wrong person) click their
             name in the <strong>Absent</strong> list and press{" "}
             <strong>Mark present</strong>. You will be asked which table to seat them
-            at. The app suggests the empty chair their absence left, but it asks rather
-            than deciding, because it cannot know where they actually sat. Filing
-            someone at the wrong table is not a cosmetic mistake: later sessions are
-            mixed to avoid repeating tablemates, so a wrong table means the app spends
-            the rest of the series keeping them away from people they never met.
+            at. The app suggests the empty chair their absence left.
           </p>
 
-          <h3 className="text-xl font-semibold mt-8 mb-2">Earlier versions</h3>
+          <h3 className="text-xl font-semibold mt-8 mb-2">Earlier versions of your assignments</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            Every change is saved as a new version, and nothing is overwritten. Press{" "}
+            Every time the plan changes, the previous version is stored. Press{" "}
             <strong>History</strong> at the top of the page to look at an earlier one.
-            Each version is named for what created it — "Session 3 shuffled", "Manual
-            edit" — with its date underneath.
+            Each version is named for what created it, eg. "Session 3 shuffled", "Manual
+            edit", with its date underneath.
           </p>
+
+          <Screenshot
+            src="/images/help/version-history.png"
+            alt="The History panel open beneath the History button, listing versions like 'Skyler Cohen marked present in Session 3' and 'Session 1 shuffled' with their timestamps"
+            caption="The History panel, most recent version first"
+          />
+
           <p className="mb-4 text-slate-700 leading-relaxed">
-            While you are looking at an older version the page is read-only — Shuffle
+            While you are looking at an older version the page is read-only: Shuffle
             and Mark complete disappear, and a line at the top offers{" "}
-            <strong>Back to current</strong>. If you want that older arrangement back,
+            <strong>Back to current</strong>. If you prefer the historical pairings,
             press <strong>Promote</strong> and it becomes the current plan. Nothing is
             erased: promoting adds a new version rather than winding the history back,
             so you can always return to where you were.
           </p>
+
+          <Screenshot
+            wide
+            src="/images/help/promote-back-to-current.png"
+            alt={`A banner reading "You're viewing 'Skyler Cohen marked present in Session 2' from Sep 12, 4:46 PM" with Promote, Back to current, and close buttons`}
+            caption="The banner shown while viewing an earlier version"
+          />
           <p className="mb-4 text-slate-700 leading-relaxed">
             Printing still works while you look at an older version. Because the printed
             sheet does not say which version it came from, you will be asked to confirm
             first.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            History goes back as far as your last change to Setup. Versions from before
+            History goes back as far as your last change to the Roster. Versions from before
             that change are still there to look at, under a divider, but they cannot be
-            promoted — they were built for a different roster, and the list says how
-            many of your current participants each one seats.
+            promoted because they were built for a different roster.
           </p>
 
-          <WarningCallout>
-            <p>
-              Shuffling a session replaces what was there. If you preferred the
-              previous arrangement, press <strong>Undo</strong> on the line at the top
-              of the page — or, later, open History and press Promote.
-            </p>
-          </WarningCallout>
         </section>
 
 
@@ -551,41 +539,6 @@ function HelpPage() {
                 Click <strong>Logout</strong> in the top right corner, then enter your
                 email to receive a fresh login link. Your data is safe; nothing is
                 lost when you're logged out.
-              </p>
-            </InfoCallout>
-
-            <InfoCallout>
-              <p className="font-bold mb-1">"I can't find my assignments"</p>
-              <p>
-                Click <strong>Groups</strong> in the nav bar to browse all your past
-                group assignments.
-              </p>
-            </InfoCallout>
-
-            <InfoCallout>
-              <p className="font-bold mb-1">"The link I shared stopped working"</p>
-              <p>
-                Shared links expire if no one accesses them for 30 days. Generate
-                your assignments again and share a new link using the Copy Link button.
-              </p>
-            </InfoCallout>
-
-            <InfoCallout>
-              <p className="font-bold mb-1">"Need at least N facilitators for N tables"</p>
-              <p>
-                You have fewer facilitators marked than the number of tables you chose.
-                For example, if you set 4 tables, you need at least 4 facilitators. Go
-                to the Roster page and check the Facilitator box on more people, or
-                reduce the number of tables.
-              </p>
-            </InfoCallout>
-
-            <InfoCallout>
-              <p className="font-bold mb-1">"The Generate button is grayed out and I can't click it"</p>
-              <p>
-                You need more participants than tables. If you chose 4 tables, you need
-                at least 5 participants. Either add more people on the Roster page or
-                reduce the number of tables.
               </p>
             </InfoCallout>
 
