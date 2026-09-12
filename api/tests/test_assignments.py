@@ -681,6 +681,8 @@ class TestAssignmentSetMetadata:
 
         assert meta["pairwise_cap"] is None
         assert meta["table_overlap_cap"] is None
+        assert meta["pairwise_floor"] is None
+        assert meta["table_overlap_floor"] is None
 
     def test_metadata_reports_the_solved_caps_after_a_real_generate(self, client):
         for i in range(9):
@@ -701,6 +703,34 @@ class TestAssignmentSetMetadata:
         meta = client.get("/api/assignments/metadata?program_id=test_org_id").json()
         assert isinstance(meta["pairwise_cap"], int)
         assert isinstance(meta["table_overlap_cap"], int)
+
+    def test_metadata_reports_the_solved_floors(
+        self,
+        client,
+        sample_set_data,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+    ):
+        """The floors are the pigeonhole lower bounds a version's solve was
+        escalated from - distinct from the caps it was actually solved
+        against - and the endpoint should echo both, not just the caps."""
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        add_version_to_firestore(
+            set_id,
+            "v1",
+            [],
+            metadata={
+                "pairwise_cap": 2,
+                "table_overlap_cap": 1,
+                "pairwise_floor": 1,
+                "table_overlap_floor": 0,
+            },
+        )
+
+        meta = client.get(f"/api/assignments/metadata?program_id={PROGRAM}").json()
+
+        assert meta["pairwise_floor"] == 1
+        assert meta["table_overlap_floor"] == 0
 
 
 class TestAcceptAndUndoRebuild:
@@ -1004,6 +1034,8 @@ class TestRegenerateSingleSession:
             },
             2,  # pairwise_cap
             2,  # overlap_cap
+            2,  # pairwise_floor
+            2,  # overlap_floor
         )
 
         response = client.post(
@@ -1087,6 +1119,8 @@ class TestRegenerateSingleSession:
             },
             1,
             1,
+            1,
+            1,
         )
 
         # Mark Alice and Bob as absent
@@ -1138,7 +1172,7 @@ class TestRegenerateSingleSession:
 
         # First call (hard constraint) fails, second call (soft constraint) succeeds
         mock_find_feasible_plan.side_effect = [
-            ({"status": "failure", "error": "Infeasible"}, None, None),
+            ({"status": "failure", "error": "Infeasible"}, None, None, None, None),
             (
                 {
                     "status": "success",
@@ -1148,6 +1182,8 @@ class TestRegenerateSingleSession:
                         :1
                     ],  # Return session 1
                 },
+                1,
+                1,
                 1,
                 1,
             ),
@@ -1239,6 +1275,8 @@ class TestRegenerateSingleSession:
                 "total_deviation": 3,
                 "assignments": sample_assignments_result["assignments"][:1],
             },
+            1,
+            1,
             1,
             1,
         )
@@ -1854,6 +1892,8 @@ class TestVersionLabels:
                     }
                 ],
             },
+            1,
+            1,
             1,
             1,
         )

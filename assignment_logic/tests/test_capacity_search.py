@@ -17,17 +17,23 @@ def _people(n, religions=("A", "B", "C")):
 
 
 def test_finds_a_working_plan_and_returns_the_caps_used():
-    result, pairwise_cap, overlap_cap = find_feasible_plan(
-        _people(9),
-        num_tables=3,
-        num_sessions=4,
-        probe_seconds=10,
-        max_pairwise_tries=3,
-        max_overlap_tries=3,
+    result, pairwise_cap, overlap_cap, pairwise_floor, overlap_floor = (
+        find_feasible_plan(
+            _people(9),
+            num_tables=3,
+            num_sessions=4,
+            probe_seconds=10,
+            max_pairwise_tries=3,
+            max_overlap_tries=3,
+        )
     )
     assert result["status"] == "success"
     assert pairwise_cap >= 1
     assert overlap_cap >= 1
+    assert pairwise_floor >= 1
+    assert overlap_floor >= 1
+    assert pairwise_cap >= pairwise_floor
+    assert overlap_cap >= overlap_floor
 
 
 def test_gives_up_cleanly_after_max_tries_on_an_impossible_request():
@@ -42,17 +48,22 @@ def test_gives_up_cleanly_after_max_tries_on_an_impossible_request():
     people[2]["linked_id"] = "l1"
     people[3]["linked_id"] = "l1"
 
-    result, pairwise_cap, overlap_cap = find_feasible_plan(
-        people,
-        num_tables=2,
-        num_sessions=3,
-        probe_seconds=3,
-        max_pairwise_tries=1,
-        max_overlap_tries=2,
+    result, pairwise_cap, overlap_cap, pairwise_floor, overlap_floor = (
+        find_feasible_plan(
+            people,
+            num_tables=2,
+            num_sessions=3,
+            probe_seconds=3,
+            max_pairwise_tries=1,
+            max_overlap_tries=2,
+        )
     )
     assert result["status"] == "failure"
     assert pairwise_cap is None
     assert overlap_cap is None
+    # The floor is known even when no cap resolved - it's computed up front.
+    assert pairwise_floor >= 1
+    assert overlap_floor >= 1
 
 
 def test_pairwise_cap_escalates_outer_when_a_constrained_roster_needs_more_than_the_floor():
@@ -66,14 +77,19 @@ def test_pairwise_cap_escalates_outer_when_a_constrained_roster_needs_more_than_
     people[2]["linked_id"] = "l1"
     people[3]["linked_id"] = "l1"
 
-    result, pairwise_cap, overlap_cap = find_feasible_plan(
-        people,
-        num_tables=2,
-        num_sessions=3,
-        probe_seconds=10,
-        max_pairwise_tries=4,
-        max_overlap_tries=4,
+    result, pairwise_cap, overlap_cap, pairwise_floor, overlap_floor = (
+        find_feasible_plan(
+            people,
+            num_tables=2,
+            num_sessions=3,
+            probe_seconds=10,
+            max_pairwise_tries=4,
+            max_overlap_tries=4,
+        )
     )
     assert result["status"] == "success"
     assert pairwise_cap >= 1
     assert overlap_cap >= 1
+    # This roster's floor is provably infeasible (see the test's own docstring
+    # above) - the escalated cap must land strictly above the floor.
+    assert pairwise_cap > pairwise_floor

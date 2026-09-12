@@ -48,21 +48,25 @@ export interface PlanCheckResult {
     balanceEven: boolean
     /** Most times any non-partner pair shares a table. */
     maxPairRepeat: number
-    /** The floor maxPairRepeat is compared against — the caller's pairwiseCap
-     *  when given, else the default of 2. */
+    /** The floor maxPairRepeat is compared against — the caller's pairwiseFloor
+     *  when given, else the default of 2. This is the solver's mathematical
+     *  minimum for this roster shape, not the (possibly looser) escalated cap. */
     pairRepeatFloor: number
     /** Every non-partner pair tied for maxPairRepeat, named — empty when at or under the floor. */
     pairRepeatWorst: { names: [string, string]; count: number }[]
     /** Most sessions any participant shares a table with one same facilitator. 0 = no facilitators. */
     maxFacilitatorRepeat: number
-    /** The floor maxFacilitatorRepeat is compared against. */
+    /** The floor maxFacilitatorRepeat is compared against. Always identical to
+     *  `pairRepeatFloor` — a facilitator is just a participant to the solver,
+     *  so the same pairwise-repeat floor governs both. Kept as a separate
+     *  field only because PlanCheckBand.tsx reads it by this name. */
     facilitatorRepeatFloor: number
     /** Everyone tied for maxFacilitatorRepeat, named — empty when at or under the floor. */
     facilitatorRepeatWorst: { participant: string; facilitator: string; count: number }[]
     /** Most people any two tables from different sessions have in common. */
     maxTableOverlap: number
-    /** The solver's real table-overlap cap, when known — null omits the overlap
-     *  line entirely, matching the caller's overlapCap argument. */
+    /** The solver's real table-overlap floor, when known — null omits the
+     *  overlap line entirely, matching the caller's overlapFloor argument. */
     tableOverlapCap: number | null
     /** Every pair of tables tied for maxTableOverlap, named — empty when at or under the floor. */
     tableOverlapWorst: {
@@ -277,18 +281,19 @@ function balanceFailures(
 }
 
 const DEFAULT_PAIRWISE_FLOOR = 2
-const FACILITATOR_REPEAT_FLOOR = 2
 
 export function checkPlan(
   incompleteAssignments: Assignment[],
   keepApart: [string, string][],
-  /** The solver's real pairwise-repeat cap for this program. Null/undefined
-   *  falls back to the default floor of 2. */
-  pairwiseCap?: number | null,
-  /** The solver's real table-overlap cap for this program. Null/undefined
-   *  means overlap never contributes to the verdict — there is no fallback
-   *  floor to compare against. */
-  overlapCap?: number | null
+  /** This roster's real pairwise-repeat floor (the solver's mathematical
+   *  minimum for this program shape) — governs both the generic pair-repeat
+   *  check and facilitator-repeat, since a facilitator is just a participant
+   *  to the solver. Null/undefined falls back to a default of 2. */
+  pairwiseFloor?: number | null,
+  /** This roster's real table-overlap floor. Null/undefined means overlap
+   *  never contributes to the verdict — there is no fallback floor to
+   *  compare against. */
+  overlapFloor?: number | null
 ): PlanCheckResult {
   const facilitatorRepeat = worstFacilitatorRepeat(incompleteAssignments)
   const pairRepeat = worstPairRepeat(incompleteAssignments)
@@ -350,11 +355,11 @@ export function checkPlan(
     })
   })
 
-  const pairRepeatFloor = pairwiseCap ?? DEFAULT_PAIRWISE_FLOOR
+  const pairRepeatFloor = pairwiseFloor ?? DEFAULT_PAIRWISE_FLOOR
   const softOverFloor =
     pairRepeat.worst > pairRepeatFloor ||
-    (hasFacilitators && facilitatorRepeat.worst > FACILITATOR_REPEAT_FLOOR) ||
-    (overlapCap != null && tableOverlap.worst > overlapCap)
+    (hasFacilitators && facilitatorRepeat.worst > pairRepeatFloor) ||
+    (overlapFloor != null && tableOverlap.worst > overlapFloor)
 
   return {
     verdict: violations.length > 0 ? 'attention' : softOverFloor ? 'lessThanIdeal' : 'ok',
@@ -372,10 +377,10 @@ export function checkPlan(
       pairRepeatFloor,
       pairRepeatWorst: pairRepeat.details,
       maxFacilitatorRepeat: hasFacilitators ? facilitatorRepeat.worst : 0,
-      facilitatorRepeatFloor: FACILITATOR_REPEAT_FLOOR,
+      facilitatorRepeatFloor: pairRepeatFloor,
       facilitatorRepeatWorst: hasFacilitators ? facilitatorRepeat.details : [],
       maxTableOverlap: tableOverlap.worst,
-      tableOverlapCap: overlapCap ?? null,
+      tableOverlapCap: overlapFloor ?? null,
       tableOverlapWorst: tableOverlap.details,
     },
   }

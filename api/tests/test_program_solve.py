@@ -67,6 +67,8 @@ class TestSolveProgram:
         # whole-solve caps no longer describe what got saved.
         assert metadata["pairwise_cap"] is None
         assert metadata["table_overlap_cap"] is None
+        assert metadata["pairwise_floor"] is None
+        assert metadata["table_overlap_floor"] is None
 
     def test_caps_are_reported_when_no_absence_resolve_ran(self):
         assignments, metadata = solve_program(
@@ -79,6 +81,8 @@ class TestSolveProgram:
         assert len(assignments) == 4
         assert isinstance(metadata["pairwise_cap"], int)
         assert isinstance(metadata["table_overlap_cap"], int)
+        assert isinstance(metadata["pairwise_floor"], int)
+        assert isinstance(metadata["table_overlap_floor"], int)
 
     def test_an_infeasible_program_raises_rather_than_returning_junk(self):
         """A couple with only one table to sit at.

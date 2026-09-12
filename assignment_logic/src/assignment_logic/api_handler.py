@@ -30,15 +30,17 @@ def handle_generate_assignments(
     # succeeds on probe 1 and never spends the rest.
     probe_seconds = max(5, max_time_seconds / 12)
 
-    result, pairwise_cap, overlap_cap = find_feasible_plan(
-        participants_df,
-        numTables,
-        numSessions,
-        probe_seconds=probe_seconds,
-        historical_pairings=historical_pairings,
-        historical_meeting_counts=historical_meeting_counts,
-        total_program_sessions=total_program_sessions,
-        historical_tables=historical_tables,
+    result, pairwise_cap, overlap_cap, pairwise_floor, overlap_floor = (
+        find_feasible_plan(
+            participants_df,
+            numTables,
+            numSessions,
+            probe_seconds=probe_seconds,
+            historical_pairings=historical_pairings,
+            historical_meeting_counts=historical_meeting_counts,
+            total_program_sessions=total_program_sessions,
+            historical_tables=historical_tables,
+        )
     )
     if result["status"] == "success":
         logger.info(
@@ -46,6 +48,8 @@ def handle_generate_assignments(
         )
         result["pairwise_cap"] = pairwise_cap
         result["table_overlap_cap"] = overlap_cap
+        result["pairwise_floor"] = pairwise_floor
+        result["table_overlap_floor"] = overlap_floor
     else:
         logger.error("No feasible pair of caps found within the search budget")
     return result

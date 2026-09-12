@@ -207,6 +207,10 @@ def solve_program(
         "table_overlap_cap": None
         if absences_applied
         else results.get("table_overlap_cap"),
+        "pairwise_floor": None if absences_applied else results.get("pairwise_floor"),
+        "table_overlap_floor": None
+        if absences_applied
+        else results.get("table_overlap_floor"),
     }
 
     return assignments, metadata

@@ -39,9 +39,11 @@ def find_feasible_plan(
     **group_builder_kwargs,
 ):
     """
-    Returns (result, pairwise_cap_used, table_overlap_cap_used). On
-    exhaustion, returns (the last failing result, None, None) so the
-    caller can surface a real error rather than a silent None.
+    Returns (result, pairwise_cap_used, table_overlap_cap_used,
+    pairwise_floor, overlap_floor). On exhaustion, cap_used values are None
+    so the caller can surface a real error, but the floors are always
+    populated - they're computed once, up front, independent of whether any
+    probe succeeds.
 
     min_pairwise_cap / min_overlap_cap raise the starting point of each
     escalation above this call's own pigeonhole floor. A caller solving a
@@ -49,7 +51,11 @@ def find_feasible_plan(
     weaker floor than the whole program was built under - without a
     floor, escalation could converge on a looser cap than the rest of the
     program is already locked to, silently permitting more repeat
-    meetings than the accepted plan allows.
+    meetings than the accepted plan allows. The returned pairwise_floor /
+    overlap_floor already reflect this raise (they're maxed against
+    min_pairwise_cap / min_overlap_cap below), so a caller comparing
+    "how close to floor is this result" gets the programwide floor, not
+    just this subset's weaker one.
     """
     total_program_sessions = (
         group_builder_kwargs.get("total_program_sessions") or num_sessions
@@ -83,10 +89,10 @@ def find_feasible_plan(
                     f"table_overlap_cap={overlap_cap} on attempt "
                     f"({p_attempt + 1}, {o_attempt + 1})"
                 )
-                return result, pairwise_cap, overlap_cap
+                return result, pairwise_cap, overlap_cap, pairwise_floor, overlap_floor
             logger.info(
                 f"pairwise_cap={pairwise_cap}, table_overlap_cap={overlap_cap} "
                 f"did not resolve in {probe_seconds}s, escalating"
             )
             last_result = result
-    return last_result, None, None
+    return last_result, None, None, pairwise_floor, overlap_floor
