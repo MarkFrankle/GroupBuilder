@@ -13,7 +13,6 @@ import logging
 from typing import Any, Dict, List, Tuple
 
 from assignment_logic.api_handler import handle_generate_assignments
-from assignment_logic.group_builder import GroupBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +112,8 @@ def solve_program(
     _historical_seed=None,
     _total_program_sessions=None,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    """Solve every session, then re-solve the ones with absences.
+    """Solve every session in one joint solve, with absences baked in as
+    constraints for the sessions they apply to.
 
     ``_historical_seed``, when given, is a dict of real meeting counts (not
     just a set of pairs) from sessions outside this solve - e.g. frozen
@@ -126,6 +126,16 @@ def solve_program(
 
     Returns ``(assignments, metadata)``. Never writes anything.
     """
+    name_to_id = {p["name"]: p["id"] for p in participants}
+    absent_ids_by_session: Dict[int, set] = {}
+    for session_number, absent in absence_map.items():
+        if session_number < 1 or session_number > num_sessions:
+            continue
+        absent_ids = {name_to_id[p["name"]] for p in absent if p["name"] in name_to_id}
+        if not absent_ids:
+            continue
+        absent_ids_by_session[session_number - 1] = absent_ids  # 0-indexed
+
     results = handle_generate_assignments(
         participants,
         num_tables,
@@ -133,84 +143,37 @@ def solve_program(
         max_time_seconds=max_time_seconds,
         historical_meeting_counts=_historical_seed,
         total_program_sessions=_total_program_sessions,
+        absent_ids_by_session=absent_ids_by_session,
     )
     if results["status"] != "success":
         logger.error("Solver failed: %s", results.get("error"))
         raise SolveFailed(NO_SOLUTION)
 
     assignments = results["assignments"]
-    absences_applied = False
 
+    # Absences are now baked into the one joint solve above, not patched in
+    # afterward - restore each absent session's absentParticipants record (the
+    # frontend's "Away" badges read this) without touching the seating the
+    # solve already produced.
     for session_number, absent in absence_map.items():
         if session_number < 1 or session_number > num_sessions:
             continue
-
-        absent_names = {p["name"] for p in absent}
-        active = [p for p in participants if p["name"] not in absent_names]
-
-        if len(active) < num_tables:
-            logger.warning(
-                "Skipping absence re-solve for session %s: only %s active for %s tables",
-                session_number,
-                len(active),
-                num_tables,
-            )
-            # Preserve the record so it survives future rebuilds, even though the
-            # tables keep the everyone-present layout.
-            assignments[session_number - 1]["absentParticipants"] = absent
+        if not absent:
             continue
+        assignments[session_number - 1]["absentParticipants"] = absent
 
-        historical = extract_pairings_from_sessions(
-            assignments, exclude_session=session_number
-        )
-        builder = GroupBuilder(
-            participants=active,
-            num_tables=num_tables,
-            num_sessions=1,
-            historical_pairings=historical,
-            solver_num_workers=4,
-        )
-        single = builder.generate_assignments(
-            max_time_seconds=min(60, max_time_seconds)
-        )
+    absences_applied = bool(absent_ids_by_session)
 
-        if single["status"] == "success":
-            assignments[session_number - 1] = {
-                "session": session_number,
-                "tables": single["assignments"][0]["tables"],
-                "absentParticipants": absent,
-            }
-            absences_applied = True
-        else:
-            logger.warning(
-                "Could not apply absences for session %s; keeping full-solve result",
-                session_number,
-            )
-            assignments[session_number - 1]["absentParticipants"] = absent
-
-    # The full-solve quality numbers describe the all-present solve. Once any
-    # session was re-solved, they no longer match what is saved, so drop them
-    # rather than report stale values.
     metadata: Dict[str, Any] = {
         "max_time_seconds": max_time_seconds,
         "label": LABEL_REBUILT_WITH_ABSENCES if absences_applied else label_when_clean,
-        "solution_quality": None
-        if absences_applied
-        else results.get("solution_quality"),
-        "solve_time": None if absences_applied else results.get("solve_time"),
-        "total_deviation": None if absences_applied else results.get("total_deviation"),
-        # A per-session absence re-solve bypasses find_feasible_plan (plain
-        # GroupBuilder, no cap search), so it doesn't reconfirm either cap
-        # against the sessions actually saved - null both rather than report
-        # a number that no longer describes this result.
-        "pairwise_cap": None if absences_applied else results.get("pairwise_cap"),
-        "table_overlap_cap": None
-        if absences_applied
-        else results.get("table_overlap_cap"),
-        "pairwise_floor": None if absences_applied else results.get("pairwise_floor"),
-        "table_overlap_floor": None
-        if absences_applied
-        else results.get("table_overlap_floor"),
+        "solution_quality": results.get("solution_quality"),
+        "solve_time": results.get("solve_time"),
+        "total_deviation": results.get("total_deviation"),
+        "pairwise_cap": results.get("pairwise_cap"),
+        "table_overlap_cap": results.get("table_overlap_cap"),
+        "pairwise_floor": results.get("pairwise_floor"),
+        "table_overlap_floor": results.get("table_overlap_floor"),
     }
 
     return assignments, metadata
