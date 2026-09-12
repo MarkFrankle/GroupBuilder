@@ -1165,14 +1165,28 @@ describe('AssignmentsPage — plan check band', () => {
 
 describe('AssignmentsPage — plan check compact row', () => {
   it('only appears once the view-controls bar is actually stuck to the top', async () => {
-    const observers: Array<(entries: any[]) => void> = []
-    ;(window as any).IntersectionObserver = class {
-      constructor(callback: (entries: any[]) => void) {
-        observers.push(callback)
+    // A fake that only records the constructor callback (never checking
+    // whether .observe() was actually called with a real node) can't catch
+    // a regression where the sentinel's ref never attaches in time - it was
+    // exactly this blind spot that let a real bug through: AssignmentsPage
+    // has its own loading guard that returns a sentinel-less tree on first
+    // render, so a useRef+useEffect(fn, []) pair set up before that guard
+    // resolves observes nothing, permanently. This mock only accepts the
+    // callback once .observe() has actually been called with a node, which
+    // only a callback-ref (re-attaching whenever the real node mounts, no
+    // matter how late) can satisfy.
+    class FakeIntersectionObserver {
+      static instances: FakeIntersectionObserver[] = []
+      observedNode: Element | null = null
+      constructor(public callback: (entries: any[]) => void) {
+        FakeIntersectionObserver.instances.push(this)
       }
-      observe() {}
+      observe(node: Element) {
+        this.observedNode = node
+      }
       disconnect() {}
     }
+    ;(window as any).IntersectionObserver = FakeIntersectionObserver
 
     api.resultsOverride = [
       {
@@ -1187,13 +1201,16 @@ describe('AssignmentsPage — plan check compact row', () => {
     renderPage()
     await screen.findByText('Looks good — ready to print and hand out')
 
+    const instance = FakeIntersectionObserver.instances.find(i => i.observedNode != null)
+    expect(instance).toBeDefined()
+
     expect(screen.queryByTestId('plan-check-compact-row')).not.toBeInTheDocument()
 
-    act(() => observers[0]([{ isIntersecting: false }]))
+    act(() => instance!.callback([{ isIntersecting: false }]))
 
     expect(screen.getByTestId('plan-check-compact-row')).toBeInTheDocument()
 
-    act(() => observers[0]([{ isIntersecting: true }]))
+    act(() => instance!.callback([{ isIntersecting: true }]))
 
     expect(screen.queryByTestId('plan-check-compact-row')).not.toBeInTheDocument()
   })

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { History, Loader2 } from 'lucide-react'
@@ -128,16 +128,23 @@ const AssignmentsPage: React.FC = () => {
   // The compact mix-quality row only earns its place once the view-controls
   // bar is actually pinned to the top - at the natural scroll position it
   // would just repeat PlanCheckBand a few lines below. Same
-  // sentinel/IntersectionObserver technique as ProgramHeader's condensing.
-  const viewBarSentinel = useRef<HTMLDivElement | null>(null)
+  // sentinel/IntersectionObserver idea as ProgramHeader's condensing, but a
+  // callback ref rather than useRef+useEffect: this component's own loading
+  // guard below returns an entirely different JSX tree while data is still
+  // loading, so the sentinel div doesn't exist on AssignmentsPage's first
+  // render. A useEffect with `[]` deps only ever fires once, against that
+  // first (sentinel-less) render, and never gets a second chance once the
+  // real content mounts. A callback ref fires on every actual attach, so it
+  // still works whenever the node shows up.
   const [viewBarStuck, setViewBarStuck] = useState(false)
-  useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') return undefined
-    const observer = new IntersectionObserver(entries => {
+  const viewBarObserver = useRef<IntersectionObserver | null>(null)
+  const viewBarSentinel = useCallback((node: HTMLDivElement | null) => {
+    viewBarObserver.current?.disconnect()
+    if (!node || typeof IntersectionObserver === 'undefined') return
+    viewBarObserver.current = new IntersectionObserver(entries => {
       setViewBarStuck(!entries[0].isIntersecting)
     })
-    if (viewBarSentinel.current) observer.observe(viewBarSentinel.current)
-    return () => observer.disconnect()
+    viewBarObserver.current.observe(node)
   }, [])
   const toggleSelected = (name: string) =>
     setSelectedName(current => (current === name ? null : name))
