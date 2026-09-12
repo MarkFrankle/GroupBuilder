@@ -63,12 +63,14 @@ class TestSolveProgram:
         assert session_two["absentParticipants"] == absent
         # Session 1 is untouched by session 2's absence.
         assert "absentParticipants" not in assignments[0]
-        # The session-2 re-solve bypasses find_feasible_plan entirely, so the
-        # whole-solve caps no longer describe what got saved.
-        assert metadata["pairwise_cap"] is None
-        assert metadata["table_overlap_cap"] is None
-        assert metadata["pairwise_floor"] is None
-        assert metadata["table_overlap_floor"] is None
+        # The absence was baked into the same joint solve as every other
+        # session, so the caps genuinely describe what was saved - no more
+        # nulling required.
+        assert isinstance(metadata["pairwise_cap"], int)
+        assert isinstance(metadata["table_overlap_cap"], int)
+        assert isinstance(metadata["pairwise_floor"], int)
+        assert isinstance(metadata["table_overlap_floor"], int)
+        assert metadata["label"] == "Sessions rebuilt with absences"
 
     def test_caps_are_reported_when_no_absence_resolve_ran(self):
         assignments, metadata = solve_program(

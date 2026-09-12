@@ -1024,5 +1024,184 @@ def test_overlap_cap_too_tight_is_reported_infeasible_not_silently_ignored():
     assert "No solution exists" in result["error"]
 
 
+def test_absent_participant_is_not_seated_in_their_absent_session():
+    """An absent participant gets no seat at all in their absent session, but
+    is seated normally in every other session."""
+    participants = [
+        {
+            "id": f"p{i}",
+            "name": f"P{i}",
+            "religion": "Christian",
+            "gender": "Male",
+            "couple_id": None,
+        }
+        for i in range(6)
+    ]
+    builder = GroupBuilder(
+        participants,
+        num_tables=2,
+        num_sessions=2,
+        absent_ids_by_session={1: {"p5"}},  # P5 absent in session 2 (0-indexed: 1)
+    )
+    result = builder.generate_assignments(max_time_seconds=15)
+
+    assert result["status"] == "success"
+    session_one, session_two = result["assignments"]
+    seated_s1 = {p["name"] for seats in session_one["tables"].values() for p in seats}
+    seated_s2 = {p["name"] for seats in session_two["tables"].values() for p in seats}
+    assert seated_s1 == {f"P{i}" for i in range(6)}
+    assert seated_s2 == {f"P{i}" for i in range(5)}  # P5 missing
+
+
+def test_linked_partner_absence_does_not_force_the_present_partner_anywhere():
+    """If one linked partner is absent, the equality constraint pinning them
+    to the same table must not apply that session - there is no variable
+    for the absent partner to be equal to."""
+    participants = [
+        {
+            "id": "p0",
+            "name": "P0",
+            "religion": "Christian",
+            "gender": "Male",
+            "couple_id": None,
+            "linked_id": "l1",
+        },
+        {
+            "id": "p1",
+            "name": "P1",
+            "religion": "Jewish",
+            "gender": "Female",
+            "couple_id": None,
+            "linked_id": "l1",
+        },
+        {
+            "id": "p2",
+            "name": "P2",
+            "religion": "Muslim",
+            "gender": "Male",
+            "couple_id": None,
+        },
+        {
+            "id": "p3",
+            "name": "P3",
+            "religion": "Christian",
+            "gender": "Female",
+            "couple_id": None,
+        },
+    ]
+    builder = GroupBuilder(
+        participants,
+        num_tables=2,
+        num_sessions=1,
+        absent_ids_by_session={0: {"p1"}},  # P1 (linked to P0) absent
+    )
+    result = builder.generate_assignments(max_time_seconds=10)
+    assert result["status"] == "success"
+    seated = {
+        p["name"]
+        for seats in result["assignments"][0]["tables"].values()
+        for p in seats
+    }
+    assert seated == {"P0", "P2", "P3"}
+
+
+def test_pairwise_cap_is_enforced_correctly_across_an_absent_session():
+    """A pair's hard cap must still be respected globally even when one of
+    their potential meeting sessions has one of them absent - an absent
+    session must count as "did not meet," not raise or silently allow an
+    extra meeting.
+
+    NOTE: the plan's original fixture (6 people, 2 tables, 3 sessions,
+    pairwise_cap=1) is pigeonhole-infeasible even with nobody absent: 2
+    balanced tables of 3 force 6 pair-meetings per session, so 3 sessions
+    demand 18 pair-meetings (16 once one session loses a person to
+    absence) against only C(6,2)=15 distinct pairs, i.e. cap=1 can never
+    be satisfied. Using 9 people / 3 tables / 4 sessions instead (the
+    AG(2,3) shape documented in CLAUDE.md, where a pairwise_cap=1 solve
+    with everyone present is exactly achievable - every pair meets once)
+    keeps enough slack once one person is absent for one session.
+    """
+    participants = [
+        {
+            "id": f"p{i}",
+            "name": f"P{i}",
+            "religion": "Christian",
+            "gender": "Male",
+            "couple_id": None,
+        }
+        for i in range(9)
+    ]
+    builder = GroupBuilder(
+        participants,
+        num_tables=3,
+        num_sessions=4,
+        pairwise_cap=1,
+        absent_ids_by_session={1: {"p0"}},  # P0 absent session 2 (0-indexed 1)
+    )
+    result = builder.generate_assignments(max_time_seconds=20)
+    assert result["status"] == "success"
+
+    from collections import Counter
+    import itertools
+
+    meetings = Counter()
+    for session in result["assignments"]:
+        for people in session["tables"].values():
+            names = sorted(p["name"] for p in people)
+            for pair in itertools.combinations(names, 2):
+                meetings[pair] += 1
+    assert max(meetings.values()) <= 1
+    # P0 was absent one of the four sessions but still shows up in the other three
+    p0_sessions = sum(
+        1
+        for session in result["assignments"]
+        for people in session["tables"].values()
+        if any(p["name"] == "P0" for p in people)
+    )
+    assert p0_sessions == 3
+
+
+def test_table_overlap_cap_skips_an_absent_participant_cleanly():
+    """The overlap-cap machinery must not reference a table-assignment
+    variable for someone absent that session."""
+    people = _twenty_four_participants_with_relations()
+    builder = GroupBuilder(
+        people,
+        num_tables=4,
+        num_sessions=5,
+        table_overlap_cap=3,
+        absent_ids_by_session={2: {"p0"}},  # P0 absent session 3
+    )
+    result = builder.generate_assignments(max_time_seconds=20)
+    assert result["status"] == "success"
+    session_three = result["assignments"][2]
+    seated = {p["name"] for seats in session_three["tables"].values() for p in seats}
+    assert "P0" not in seated
+
+
+def test_symmetry_breaking_skips_an_absent_first_participant():
+    """If the participant symmetry-breaking would normally pin to session 0
+    is absent that session, pin the first *present* participant instead -
+    fixing an absent id to a table it has no variable for would crash."""
+    participants = [
+        {
+            "id": f"p{i}",
+            "name": f"P{i}",
+            "religion": "Christian",
+            "gender": "Male",
+            "couple_id": None,
+        }
+        for i in range(4)
+    ]
+    builder = GroupBuilder(
+        participants,
+        num_tables=2,
+        num_sessions=1,
+        absent_ids_by_session={0: {"p0"}},  # the usual symmetry-break target is absent
+    )
+    result = builder.generate_assignments(max_time_seconds=10)
+    assert result["status"] == "success"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

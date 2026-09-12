@@ -25,6 +25,7 @@ class GroupBuilder:
         pairwise_cap=None,
         table_overlap_cap=None,
         historical_tables=None,
+        absent_ids_by_session=None,
     ):
         """
         Initialize the GroupBuilder.
@@ -84,6 +85,13 @@ class GroupBuilder:
         self.pairwise_cap = pairwise_cap
         self.table_overlap_cap = table_overlap_cap
         self.historical_tables = historical_tables or []
+        # 0-indexed session -> set of participant ids absent that session.
+        # A missing key means nobody is absent that session. Absent people get
+        # no table-assignment variable at all for that session - there is
+        # nothing to seat, so nothing to patch after the fact. See
+        # program_solve.solve_program for how the router-facing, 1-indexed,
+        # name-based absence_map becomes this shape.
+        self.absent_ids_by_session = absent_ids_by_session or {}
 
         # Configurable solver parameters (can be overridden by env vars or constructor args)
         self.pairing_window_size = pairing_window_size or int(
@@ -98,6 +106,11 @@ class GroupBuilder:
         self.overlap_penalty_weight = overlap_penalty_weight or int(
             os.getenv("SOLVER_OVERLAP_PENALTY_WEIGHT", "5")
         )
+
+    def _present(self, session):
+        """Participants seated in this session (everyone minus that session's absences)."""
+        absent = self.absent_ids_by_session.get(session, set())
+        return [p for p in self.participants if p["id"] not in absent]
 
     def generate_assignments(self, max_time_seconds=120) -> dict:
         logger.info(
@@ -121,8 +134,8 @@ class GroupBuilder:
         # participant_table_assignments[(participant_id, session, table)] -> boolean
         # True if participant is sitting at that table in that session
         self.participant_table_assignments = {}
-        for participant in self.participants:
-            for session in self.sessions:
+        for session in self.sessions:
+            for participant in self._present(session):
                 for table in self.tables:
                     self.participant_table_assignments[
                         (participant["id"], session, table)
@@ -137,9 +150,9 @@ class GroupBuilder:
             )
 
     def _add_constraints_to_model(self):
-        # Each participants sits at one table per session
-        for p in self.participants:
-            for s in self.sessions:
+        # Each present participant sits at one table per session
+        for s in self.sessions:
+            for p in self._present(s):
                 self.model.Add(
                     sum(
                         self.participant_table_assignments[(p["id"], s, t)]
@@ -160,10 +173,11 @@ class GroupBuilder:
                 0, len(self.participants), f"min_participants_s{s}"
             )
 
+            present = self._present(s)
+
             for t in self.tables:
                 table_participant_count = sum(
-                    self.participant_table_assignments[(p["id"], s, t)]
-                    for p in self.participants
+                    self.participant_table_assignments[(p["id"], s, t)] for p in present
                 )
                 self.model.Add(max_participants[s] >= table_participant_count)
                 self.model.Add(min_participants[s] <= table_participant_count)
@@ -204,7 +218,7 @@ class GroupBuilder:
                 for t in self.tables:
                     table_participant_count_per_attribute = sum(
                         self.participant_table_assignments[(p["id"], s, t)]
-                        for p in self.participants
+                        for p in self._present(s)
                         if p[attribute_name] == attribute_value
                     )
                     self.model.Add(
@@ -227,28 +241,33 @@ class GroupBuilder:
         if not self.facilitator_ids:
             return
 
-        num_facilitators = len(self.facilitator_ids)
         num_tables = len(self.tables)
 
-        # Coverage: every table has at least one facilitator per session
         for s in self.sessions:
+            present_facilitator_ids = [
+                f
+                for f in self.facilitator_ids
+                if f not in self.absent_ids_by_session.get(s, set())
+            ]
+            num_facilitators = len(present_facilitator_ids)
+            min_per_table = num_facilitators // num_tables
+            max_per_table = min_per_table + (
+                1 if num_facilitators % num_tables != 0 else 0
+            )
+
             for t in self.tables:
+                # Coverage: every table has at least one present facilitator
                 self.model.Add(
                     sum(
                         self.participant_table_assignments[(f, s, t)]
-                        for f in self.facilitator_ids
+                        for f in present_facilitator_ids
                     )
                     >= 1
                 )
-
-        # Balance: facilitators spread evenly (no table has >1 more than any other)
-        min_per_table = num_facilitators // num_tables
-        max_per_table = min_per_table + (1 if num_facilitators % num_tables != 0 else 0)
-        for s in self.sessions:
-            for t in self.tables:
+                # Balance: facilitators spread evenly (no table has >1 more than any other)
                 facilitator_count = sum(
                     self.participant_table_assignments[(f, s, t)]
-                    for f in self.facilitator_ids
+                    for f in present_facilitator_ids
                 )
                 self.model.Add(facilitator_count >= min_per_table)
                 self.model.Add(facilitator_count <= max_per_table)
@@ -261,14 +280,16 @@ class GroupBuilder:
                 facilitator_religions.setdefault(religion, []).append(p["id"])
 
         for s in self.sessions:
+            absent = self.absent_ids_by_session.get(s, set())
             for t in self.tables:
                 for religion, fac_ids in facilitator_religions.items():
-                    if len(fac_ids) > 1:
+                    present_fac_ids = [f for f in fac_ids if f not in absent]
+                    if len(present_fac_ids) > 1:
                         # At most 1 facilitator of this religion per table
                         self.model.Add(
                             sum(
                                 self.participant_table_assignments[(f, s, t)]
-                                for f in fac_ids
+                                for f in present_fac_ids
                             )
                             <= 1
                         )
@@ -281,15 +302,18 @@ class GroupBuilder:
                 couples[p["couple_id"]].append(p)
 
         for s in self.sessions:
+            absent = self.absent_ids_by_session.get(s, set())
             for t in self.tables:
                 for group in couples.values():
-                    self.model.Add(
-                        sum(
-                            self.participant_table_assignments[(p["id"], s, t)]
-                            for p in group
+                    present_group = [p for p in group if p["id"] not in absent]
+                    if len(present_group) > 1:
+                        self.model.Add(
+                            sum(
+                                self.participant_table_assignments[(p["id"], s, t)]
+                                for p in present_group
+                            )
+                            <= 1
                         )
-                        <= 1
-                    )
 
         # Keep linked partners at the same table
         linked = defaultdict(list)
@@ -298,9 +322,12 @@ class GroupBuilder:
                 linked[p["linked_id"]].append(p)
 
         for s in self.sessions:
+            absent = self.absent_ids_by_session.get(s, set())
             for group in linked.values():
                 if len(group) == 2:
                     p1, p2 = group
+                    if p1["id"] in absent or p2["id"] in absent:
+                        continue
                     for t in self.tables:
                         self.model.Add(
                             self.participant_table_assignments[(p1["id"], s, t)]
@@ -335,8 +362,11 @@ class GroupBuilder:
                 keep_apart_pairs.add(tuple(sorted((p["id"], other_id))))
 
         for s in self.sessions:
+            absent = self.absent_ids_by_session.get(s, set())
             for t in self.tables:
                 for a, b in keep_apart_pairs:
+                    if a in absent or b in absent:
+                        continue
                     self.model.Add(
                         self.participant_table_assignments[(a, s, t)]
                         + self.participant_table_assignments[(b, s, t)]
@@ -358,28 +388,40 @@ class GroupBuilder:
                 # For each session, track if this pair meets (across all tables)
                 pair_meets_session = {}
                 for s in self.sessions:
-                    # Did they meet in session s? (at any table)
-                    session_meeting_vars = []
-                    for t in self.tables:
-                        both_at_table = self.model.NewBoolVar(
-                            f'both_{p1["id"]}_{p2["id"]}_s{s}_t{t}'
-                        )
-                        self.model.AddMultiplicationEquality(
-                            both_at_table,
-                            [
-                                self.participant_table_assignments[(p1["id"], s, t)],
-                                self.participant_table_assignments[(p2["id"], s, t)],
-                            ],
-                        )
-                        session_meeting_vars.append(both_at_table)
+                    absent = self.absent_ids_by_session.get(s, set())
+                    if p1["id"] in absent or p2["id"] in absent:
+                        # Either participant is absent this session, so they
+                        # cannot have met - fix to a constant rather than
+                        # building multiplication variables against missing
+                        # (participant, session, table) keys.
+                        pair_meets_session[s] = self.model.NewConstant(0)
+                    else:
+                        # Did they meet in session s? (at any table)
+                        session_meeting_vars = []
+                        for t in self.tables:
+                            both_at_table = self.model.NewBoolVar(
+                                f'both_{p1["id"]}_{p2["id"]}_s{s}_t{t}'
+                            )
+                            self.model.AddMultiplicationEquality(
+                                both_at_table,
+                                [
+                                    self.participant_table_assignments[
+                                        (p1["id"], s, t)
+                                    ],
+                                    self.participant_table_assignments[
+                                        (p2["id"], s, t)
+                                    ],
+                                ],
+                            )
+                            session_meeting_vars.append(both_at_table)
 
-                    # met_in_session = OR of all tables (did they meet at any table?)
-                    pair_meets_session[s] = self.model.NewBoolVar(
-                        f'pair_{p1["id"]}_{p2["id"]}_meets_s{s}'
-                    )
-                    self.model.AddMaxEquality(
-                        pair_meets_session[s], session_meeting_vars
-                    )
+                        # met_in_session = OR of all tables (did they meet at any table?)
+                        pair_meets_session[s] = self.model.NewBoolVar(
+                            f'pair_{p1["id"]}_{p2["id"]}_meets_s{s}'
+                        )
+                        self.model.AddMaxEquality(
+                            pair_meets_session[s], session_meeting_vars
+                        )
 
                     # HISTORY-AWARE: Penalize if this pair met in previous batches
                     if pair_key in self.historical_pairings:
@@ -457,7 +499,9 @@ class GroupBuilder:
                 # Used when user explicitly regenerates a session - they want something different
                 for p in self.participants:
                     p_id = p["id"]
-                    if p_id in self.current_table_assignments:
+                    if p_id in self.current_table_assignments and p_id not in (
+                        self.absent_ids_by_session.get(0, set())
+                    ):
                         current_table = self.current_table_assignments[p_id]
                         # Forbid assignment to same table in session 0 (only regenerating one session)
                         # Note: When regenerating, num_sessions=1, so we only check session 0
@@ -481,8 +525,10 @@ class GroupBuilder:
                 # each previous table's full membership from landing
                 # together at any table in the new session.
                 previous_tables = defaultdict(list)
+                absent_now = self.absent_ids_by_session.get(0, set())
                 for p_id, table_number in self.current_table_assignments.items():
-                    previous_tables[table_number].append(p_id)
+                    if p_id not in absent_now:
+                        previous_tables[table_number].append(p_id)
                 if 0 in self.sessions:
                     for members in previous_tables.values():
                         if len(members) < 2:
@@ -501,7 +547,9 @@ class GroupBuilder:
                 # Can be violated if the current assignment is actually optimal
                 for p in self.participants:
                     p_id = p["id"]
-                    if p_id in self.current_table_assignments:
+                    if p_id in self.current_table_assignments and p_id not in (
+                        self.absent_ids_by_session.get(0, set())
+                    ):
                         current_table = self.current_table_assignments[p_id]
                         if 0 in self.sessions and current_table in self.tables:
                             penalty_count += self.participant_table_assignments[
@@ -523,10 +571,14 @@ class GroupBuilder:
         # reason to pick the lower-overlap arrangement when one exists.
         if self.table_overlap_cap is not None:
             for s1, s2 in combinations(self.sessions, 2):
+                absent1 = self.absent_ids_by_session.get(s1, set())
+                absent2 = self.absent_ids_by_session.get(s2, set())
                 for t1 in self.tables:
                     for t2 in self.tables:
                         both_slots = []
                         for p in self.participants:
+                            if p["id"] in absent1 or p["id"] in absent2:
+                                continue
                             both = self.model.NewBoolVar(
                                 f'overlap_{p["id"]}_s{s1}t{t1}_s{s2}t{t2}'
                             )
@@ -546,12 +598,13 @@ class GroupBuilder:
                         penalty_count += self.overlap_penalty_weight * sum(both_slots)
 
             for s in self.sessions:
+                absent = self.absent_ids_by_session.get(s, set())
                 for t in self.tables:
                     for hist_table in self.historical_tables:
                         overlap_count = sum(
                             self.participant_table_assignments[(p["id"], s, t)]
                             for p in self.participants
-                            if p["id"] in hist_table
+                            if p["id"] in hist_table and p["id"] not in absent
                         )
                         self.model.Add(overlap_count <= self.table_overlap_cap)
                         penalty_count += self.overlap_penalty_weight * overlap_count
@@ -559,16 +612,17 @@ class GroupBuilder:
         self.model.Minimize(penalty_count)
 
     def _add_symmetry_breaking(self):
-        """Break table symmetry by fixing first participant to first table in first session."""
-        if (
-            len(self.participants) > 0
-            and len(self.sessions) > 0
-            and len(self.tables) > 0
-        ):
-            first_participant_id = self.participants[0]["id"]
-            self.model.Add(
-                self.participant_table_assignments[(first_participant_id, 0, 0)] == 1
-            )
+        """Break table symmetry by fixing the first present participant in
+        session 0's first table to that table."""
+        if len(self.sessions) == 0 or len(self.tables) == 0:
+            return
+        present_in_first_session = self._present(0)
+        if not present_in_first_session:
+            return
+        first_participant_id = present_in_first_session[0]["id"]
+        self.model.Add(
+            self.participant_table_assignments[(first_participant_id, 0, 0)] == 1
+        )
 
     def _run_solver(self, max_time_seconds=120):
         import random
@@ -595,7 +649,7 @@ class GroupBuilder:
             for s in self.sessions:
                 session_data = {"session": s + 1, "tables": defaultdict(list)}
                 for t in self.tables:
-                    for p in self.participants:
+                    for p in self._present(s):
                         if self.solver.BooleanValue(
                             self.participant_table_assignments[(p["id"], s, t)]
                         ):

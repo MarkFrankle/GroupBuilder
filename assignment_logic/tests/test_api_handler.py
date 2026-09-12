@@ -62,6 +62,32 @@ def test_handler_returns_a_plan_within_the_computed_pairwise_cap():
     assert max(meetings.values()) <= cap
 
 
+def test_handle_generate_assignments_forwards_absences_and_reports_real_caps():
+    people = [
+        {
+            "id": f"p{i}",
+            "name": f"P{i}",
+            "religion": "Christian",
+            "gender": "Male",
+            "couple_id": None,
+        }
+        for i in range(6)
+    ]
+    result = handle_generate_assignments(
+        people,
+        numTables=2,
+        numSessions=2,
+        max_time_seconds=20,
+        absent_ids_by_session={1: {"p5"}},
+    )
+    assert result["status"] == "success"
+    assert isinstance(result["pairwise_cap"], int)
+    assert isinstance(result["table_overlap_cap"], int)
+    session_two = result["assignments"][1]
+    seated = {p["name"] for seats in session_two["tables"].values() for p in seats}
+    assert "P5" not in seated
+
+
 def test_handler_reports_the_caps_it_actually_solved_with():
     people = _people(9)
     result = handle_generate_assignments(

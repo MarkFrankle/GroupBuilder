@@ -977,7 +977,9 @@ class TestRebuild:
         add_roster_to_firestore,
     ):
         """Absences are read off the current version every time — there is no
-        checkbox, because forgetting one silently seats someone who is away."""
+        checkbox, because forgetting one silently seats someone who is away.
+        Also confirms the carried-over absence still yields real cap/floor
+        metadata rather than the old nulled-out values."""
         from api.services.assignment_set_storage import AssignmentSetStorage
 
         set_id = add_assignment_set_to_firestore(
@@ -1014,6 +1016,12 @@ class TestRebuild:
             for person in seats
         ]
         assert "Person7" not in seated
+
+        metadata = version["metadata"]
+        assert metadata["pairwise_cap"] is not None
+        assert metadata["pairwise_floor"] is not None
+        assert metadata["table_overlap_cap"] is not None
+        assert metadata["table_overlap_floor"] is not None
 
     def test_first_build_applies_prebuild_absences(
         self, client, add_roster_to_firestore

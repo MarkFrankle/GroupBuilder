@@ -856,28 +856,6 @@ class TestRegenerateAllWithAbsences:
     """Test suite for POST /api/assignments/regenerate/with_absences."""
 
     @staticmethod
-    def _single_session_result(status):
-        result = {"status": status}
-        if status == "success":
-            result.update(
-                {
-                    "solution_quality": "optimal",
-                    "solve_time": 1.0,
-                    "total_deviation": 0,
-                    "assignments": [
-                        {
-                            "session": 1,
-                            "tables": {
-                                "1": [{"name": "Charlie"}],
-                                "2": [{"name": "Diana"}],
-                            },
-                        }
-                    ],
-                }
-            )
-        return result
-
-    @staticmethod
     def _latest_version(set_id):
         from api.services.assignment_set_storage import AssignmentSetStorage
 
@@ -885,26 +863,24 @@ class TestRegenerateAllWithAbsences:
         versions = storage.list_versions(PROGRAM, set_id)
         return storage.get_version(PROGRAM, set_id, versions[0]["version_id"])
 
-    @patch("api.services.program_solve.GroupBuilder")
     @patch("api.services.program_solve.handle_generate_assignments")
-    def test_absences_recorded_and_stale_metrics_dropped(
+    def test_absences_recorded_and_real_metrics_reported(
         self,
         mock_generate,
-        mock_builder_class,
         client,
         sample_set_data,
         sample_assignments_result,
         add_assignment_set_to_firestore,
     ):
-        """A re-solved session records its absences and voids the full-solve metrics."""
+        """An absence is baked into the one joint solve and its record survives,
+        alongside that solve's real metrics - there is no more separate
+        per-session re-solve to null them out for."""
         set_id = add_assignment_set_to_firestore(sample_set_data)
+        sample_assignments_result["pairwise_cap"] = 1
+        sample_assignments_result["table_overlap_cap"] = 1
+        sample_assignments_result["pairwise_floor"] = 1
+        sample_assignments_result["table_overlap_floor"] = 1
         mock_generate.return_value = sample_assignments_result
-
-        mock_builder = MagicMock()
-        mock_builder_class.return_value = mock_builder
-        mock_builder.generate_assignments.return_value = self._single_session_result(
-            "success"
-        )
 
         response = client.post(
             f"/api/assignments/regenerate/with_absences?program_id={PROGRAM}",
@@ -921,34 +897,27 @@ class TestRegenerateAllWithAbsences:
         stored = self._latest_version(set_id)
         assert stored["assignments"][0]["absentParticipants"] == [{"name": "Alice"}]
 
-        # The full-solve quality numbers describe assignments that no longer
-        # exist, so they must not be reported alongside the saved ones.
+        # The absence was baked into the same joint solve as every other
+        # session, so its real metrics are reported, not nulled out.
         metadata = stored["metadata"]
-        assert metadata["solution_quality"] is None
-        assert metadata["solve_time"] is None
-        assert metadata["total_deviation"] is None
+        assert metadata["solution_quality"] == "optimal"
+        assert metadata["solve_time"] == 1.5
+        assert metadata["total_deviation"] == 0
         assert metadata["regenerated"] is True
 
-    @patch("api.services.program_solve.GroupBuilder")
     @patch("api.services.program_solve.handle_generate_assignments")
-    def test_absences_survive_a_failed_resolve(
+    def test_an_infeasible_joint_solve_fails_the_whole_request(
         self,
         mock_generate,
-        mock_builder_class,
         client,
         sample_set_data,
-        sample_assignments_result,
         add_assignment_set_to_firestore,
     ):
-        """When the per-session re-solve fails, the absence record is still kept."""
-        set_id = add_assignment_set_to_firestore(sample_set_data)
-        mock_generate.return_value = sample_assignments_result
-
-        mock_builder = MagicMock()
-        mock_builder_class.return_value = mock_builder
-        mock_builder.generate_assignments.return_value = self._single_session_result(
-            "infeasible"
-        )
+        """Absences are now baked into one joint solve, so a solve that can't
+        satisfy them fails the whole request rather than silently keeping the
+        all-present layout."""
+        add_assignment_set_to_firestore(sample_set_data)
+        mock_generate.return_value = {"status": "infeasible", "error": "no solution"}
 
         response = client.post(
             f"/api/assignments/regenerate/with_absences?program_id={PROGRAM}",
@@ -960,11 +929,7 @@ class TestRegenerateAllWithAbsences:
             ],
         )
 
-        assert response.status_code == 200
-
-        # Tables keep the all-present layout, but the absence must not be lost.
-        stored = self._latest_version(set_id)
-        assert stored["assignments"][0]["absentParticipants"] == [{"name": "Alice"}]
+        assert response.status_code == 400
 
 
 class TestRegenerateSingleSession:
