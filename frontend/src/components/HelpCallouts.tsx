@@ -1,17 +1,35 @@
 import React from "react";
 import { Lightbulb, AlertTriangle, Info } from "lucide-react";
 
-export function Screenshot({ src, alt, caption }: { src: string; alt: string; caption: string }) {
+// Screenshots carry small UI text (buttons, checklist items) that gets
+// illegible if squeezed into the page's ~700px reading column. This bleeds
+// the figure wider than the surrounding prose while keeping paragraphs at
+// their comfortable line length. `wide` raises the cap for screenshots
+// (like the Assignments header) that are themselves too dense to read at
+// the default cap — most screenshots should leave it unset.
+export function Screenshot({
+  src,
+  alt,
+  caption,
+  wide,
+}: {
+  src: string;
+  alt: string;
+  caption: string;
+  wide?: boolean;
+}) {
   return (
-    <figure className="my-6 bg-slate-50 rounded-lg p-4 border border-slate-200">
-      <img
-        src={src}
-        alt={alt}
-        className="rounded border border-slate-200 shadow-sm mx-auto max-w-2xl w-full"
-      />
-      <figcaption className="text-sm text-slate-500 text-center mt-3 italic">
-        {caption}
-      </figcaption>
+    <figure className="my-6 relative left-1/2 right-1/2 -mx-[50vw] w-screen px-4">
+      <div className={wide ? "max-w-[960px] mx-auto" : "max-w-2xl mx-auto"}>
+        <img
+          src={src}
+          alt={alt}
+          className="rounded border border-slate-200 shadow-sm mx-auto max-w-full h-auto block"
+        />
+        <figcaption className="text-sm text-slate-500 text-center mt-3 italic">
+          {caption}
+        </figcaption>
+      </div>
     </figure>
   );
 }
