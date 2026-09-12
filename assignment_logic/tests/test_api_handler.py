@@ -70,3 +70,7 @@ def test_handler_reports_the_caps_it_actually_solved_with():
     assert result["status"] == "success"
     assert result["pairwise_cap"] is not None
     assert result["table_overlap_cap"] is not None
+    assert isinstance(result["pairwise_floor"], int)
+    assert isinstance(result["table_overlap_floor"], int)
+    assert result["pairwise_cap"] >= result["pairwise_floor"]
+    assert result["table_overlap_cap"] >= result["table_overlap_floor"]
