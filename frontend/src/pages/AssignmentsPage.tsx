@@ -400,7 +400,7 @@ const AssignmentsPage: React.FC = () => {
       }
       return response.json()
     },
-    onSuccess: (_data, { receipt }) => {
+    onSuccess: (_data, { label, receipt }) => {
       invalidateAll()
       setSelectedName(null)
       const target = undoTarget.current
@@ -413,7 +413,12 @@ const AssignmentsPage: React.FC = () => {
         // where the Undo is.
         focusOnAppear: true,
         actions: target
-          ? [{ label: 'Undo', onClick: () => promoteMutation.mutate({ version: target }) }]
+          ? [
+              {
+                label: 'Undo',
+                onClick: () => promoteMutation.mutate({ version: target, undoLabel: label }),
+              },
+            ]
           : undefined,
       })
     },
@@ -475,7 +480,13 @@ const AssignmentsPage: React.FC = () => {
    * than deeper into the past.
    */
   const promoteMutation = useMutation({
-    mutationFn: async ({ version }: { version: ResultVersion; undoOf?: number }) => {
+    mutationFn: async ({
+      version,
+    }: {
+      version: ResultVersion
+      undoOf?: number
+      undoLabel?: string
+    }) => {
       const response = await authenticatedFetch(
         `/api/assignments/results/promote/${version.version_id}` +
           `?program_id=${programId}&assignment_set_id=${version.assignment_set_id}`,
@@ -486,21 +497,25 @@ const AssignmentsPage: React.FC = () => {
       }
       return response.json()
     },
-    onSuccess: (data: { label: string }, { undoOf }) => {
+    onSuccess: (data: { label: string }, { undoOf, undoLabel }) => {
       setViewing(null)
       invalidateAll()
       // An undo is a promotion underneath, but saying `Restored "…" is now the
-      // current plan.` buries the thing the user actually did.
+      // current plan.` buries the thing the user actually did — and since the
+      // server's label can itself already be a `Restored "…"` string, quoting
+      // it again would nest indefinitely across repeated undos.
       showNotice({
         tone: 'info',
         message:
-          undoOf === undefined
-            ? `${data.label} is now the current plan.`
-            : `Session ${undoOf} shuffle undone. ${
+          undoOf !== undefined
+            ? `Session ${undoOf} shuffle undone. ${
                 sorted.length === 1
                   ? 'Session 1 is'
                   : `Sessions 1–${sorted.length} are`
-              } back to where they were.`,
+              } back to where they were.`
+            : undoLabel !== undefined
+              ? `Undid "${undoLabel}".`
+              : `${data.label} is now the current plan.`,
       })
     },
     onError: (error: Error) => showNotice({ tone: 'error', message: error.message }),
