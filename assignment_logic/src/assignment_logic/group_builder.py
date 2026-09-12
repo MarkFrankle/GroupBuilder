@@ -173,10 +173,11 @@ class GroupBuilder:
                 0, len(self.participants), f"min_participants_s{s}"
             )
 
+            present = self._present(s)
+
             for t in self.tables:
                 table_participant_count = sum(
-                    self.participant_table_assignments[(p["id"], s, t)]
-                    for p in self.participants
+                    self.participant_table_assignments[(p["id"], s, t)] for p in present
                 )
                 self.model.Add(max_participants[s] >= table_participant_count)
                 self.model.Add(min_participants[s] <= table_participant_count)
@@ -217,7 +218,7 @@ class GroupBuilder:
                 for t in self.tables:
                     table_participant_count_per_attribute = sum(
                         self.participant_table_assignments[(p["id"], s, t)]
-                        for p in self.participants
+                        for p in self._present(s)
                         if p[attribute_name] == attribute_value
                     )
                     self.model.Add(
@@ -240,28 +241,33 @@ class GroupBuilder:
         if not self.facilitator_ids:
             return
 
-        num_facilitators = len(self.facilitator_ids)
         num_tables = len(self.tables)
 
-        # Coverage: every table has at least one facilitator per session
         for s in self.sessions:
+            present_facilitator_ids = [
+                f
+                for f in self.facilitator_ids
+                if f not in self.absent_ids_by_session.get(s, set())
+            ]
+            num_facilitators = len(present_facilitator_ids)
+            min_per_table = num_facilitators // num_tables
+            max_per_table = min_per_table + (
+                1 if num_facilitators % num_tables != 0 else 0
+            )
+
             for t in self.tables:
+                # Coverage: every table has at least one present facilitator
                 self.model.Add(
                     sum(
                         self.participant_table_assignments[(f, s, t)]
-                        for f in self.facilitator_ids
+                        for f in present_facilitator_ids
                     )
                     >= 1
                 )
-
-        # Balance: facilitators spread evenly (no table has >1 more than any other)
-        min_per_table = num_facilitators // num_tables
-        max_per_table = min_per_table + (1 if num_facilitators % num_tables != 0 else 0)
-        for s in self.sessions:
-            for t in self.tables:
+                # Balance: facilitators spread evenly (no table has >1 more than any other)
                 facilitator_count = sum(
                     self.participant_table_assignments[(f, s, t)]
-                    for f in self.facilitator_ids
+                    for f in present_facilitator_ids
                 )
                 self.model.Add(facilitator_count >= min_per_table)
                 self.model.Add(facilitator_count <= max_per_table)
@@ -274,14 +280,16 @@ class GroupBuilder:
                 facilitator_religions.setdefault(religion, []).append(p["id"])
 
         for s in self.sessions:
+            absent = self.absent_ids_by_session.get(s, set())
             for t in self.tables:
                 for religion, fac_ids in facilitator_religions.items():
-                    if len(fac_ids) > 1:
+                    present_fac_ids = [f for f in fac_ids if f not in absent]
+                    if len(present_fac_ids) > 1:
                         # At most 1 facilitator of this religion per table
                         self.model.Add(
                             sum(
                                 self.participant_table_assignments[(f, s, t)]
-                                for f in fac_ids
+                                for f in present_fac_ids
                             )
                             <= 1
                         )
