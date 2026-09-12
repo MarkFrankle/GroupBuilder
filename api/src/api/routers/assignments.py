@@ -661,7 +661,13 @@ async def regenerate_single_session(
         logger.info(
             "Attempt 1: Solving with HARD constraint (must generate different assignments)"
         )
-        result, pairwise_cap, overlap_cap = find_feasible_plan(
+        (
+            result,
+            pairwise_cap,
+            overlap_cap,
+            pairwise_floor,
+            overlap_floor,
+        ) = find_feasible_plan(
             active_participants,
             num_tables,
             1,  # Only regenerating one session
@@ -689,7 +695,13 @@ async def regenerate_single_session(
                 "Attempt 2: Solving WITHOUT hard constraint (may return same assignments)"
             )
 
-            result, pairwise_cap, overlap_cap = find_feasible_plan(
+            (
+                result,
+                pairwise_cap,
+                overlap_cap,
+                pairwise_floor,
+                overlap_floor,
+            ) = find_feasible_plan(
                 active_participants,
                 num_tables,
                 1,
@@ -744,6 +756,8 @@ async def regenerate_single_session(
             "assignments_unchanged": assignments_unchanged,  # Flag if same assignments returned
             "pairwise_cap": pairwise_cap,
             "table_overlap_cap": overlap_cap,
+            "pairwise_floor": pairwise_floor,
+            "table_overlap_floor": overlap_floor,
         }
 
         new_version_id = _next_version_id(storage, program_id, set_id)
