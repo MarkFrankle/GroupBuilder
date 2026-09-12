@@ -81,7 +81,7 @@ const RepeatWorstDetail: React.FC<{
               key={line}
               className={
                 groupKeys && i > 0 && groupKeys[i] !== groupKeys[i - 1]
-                  ? 'mt-1 border-t pt-1 border-border/50'
+                  ? 'mt-1 border-t pt-1 border-border/20'
                   : undefined
               }
             >
