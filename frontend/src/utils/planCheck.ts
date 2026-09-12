@@ -37,6 +37,14 @@ export interface PlanCheckResult {
   /** How many incomplete sessions the check covered — the band hides the
    *  repeat lines below two, where "repeat" is meaningless. */
   incompleteSessionCount: number
+  /**
+   * Sessions that actually contain one of the above-floor instances driving
+   * the `lessThanIdeal` verdict. A per-session Shuffle can only plausibly help
+   * sessions in this list — shuffling a session NOT in this list cannot fix
+   * the flagged repeat/overlap, since that repeat's occurrences live
+   * elsewhere in the plan. Empty unless `verdict === 'lessThanIdeal'`.
+   */
+  improvableSessions: number[]
   reassurances: {
     /** undefined = the roster has no partner links, so there is nothing to say. */
     couplesSeparated?: boolean
@@ -53,7 +61,7 @@ export interface PlanCheckResult {
      *  minimum for this roster shape, not the (possibly looser) escalated cap. */
     pairRepeatFloor: number
     /** Every non-partner pair tied for maxPairRepeat, named — empty when at or under the floor. */
-    pairRepeatWorst: { names: [string, string]; count: number }[]
+    pairRepeatWorst: { names: [string, string]; count: number; sessions: number[] }[]
     /** Most sessions any participant shares a table with one same facilitator. 0 = no facilitators. */
     maxFacilitatorRepeat: number
     /** The floor maxFacilitatorRepeat is compared against. Always identical to
@@ -62,7 +70,12 @@ export interface PlanCheckResult {
      *  field only because PlanCheckBand.tsx reads it by this name. */
     facilitatorRepeatFloor: number
     /** Everyone tied for maxFacilitatorRepeat, named — empty when at or under the floor. */
-    facilitatorRepeatWorst: { participant: string; facilitator: string; count: number }[]
+    facilitatorRepeatWorst: {
+      participant: string
+      facilitator: string
+      count: number
+      sessions: number[]
+    }[]
     /** Most people any two tables from different sessions have in common. */
     maxTableOverlap: number
     /** The solver's real table-overlap floor, when known — null omits the
@@ -123,10 +136,11 @@ function countBy(people: Participant[], key: 'religion' | 'gender'): Record<stri
  */
 function worstPairRepeat(assignments: Assignment[]): {
   worst: number
-  details: { names: [string, string]; count: number }[]
+  details: { names: [string, string]; count: number; sessions: number[] }[]
 } {
   const partnerOf = new Map<string, string>()
   const counts = new Map<string, number>()
+  const sessionsByKey = new Map<string, number[]>()
   assignments.forEach(a =>
     seatedTables(a).forEach(({ people }) => {
       people.forEach(person => {
@@ -137,6 +151,9 @@ function worstPairRepeat(assignments: Assignment[]): {
           if (people[i].is_facilitator || people[j].is_facilitator) continue
           const key = [people[i].name, people[j].name].sort().join('\x00')
           counts.set(key, (counts.get(key) ?? 0) + 1)
+          const sessions = sessionsByKey.get(key) ?? []
+          sessions.push(a.session)
+          sessionsByKey.set(key, sessions)
         }
       }
     })
@@ -147,12 +164,13 @@ function worstPairRepeat(assignments: Assignment[]): {
     if (partnerOf.get(x) === y || partnerOf.get(y) === x) return
     worst = Math.max(worst, count)
   })
-  const details: { names: [string, string]; count: number }[] = []
+  const details: { names: [string, string]; count: number; sessions: number[] }[] = []
   counts.forEach((count, key) => {
     if (count !== worst) return
     const [x, y] = key.split('\x00') as [string, string]
     if (partnerOf.get(x) === y || partnerOf.get(y) === x) return
-    details.push({ names: [x, y], count })
+    const sessions = Array.from(new Set(sessionsByKey.get(key) ?? [])).sort((a, b) => a - b)
+    details.push({ names: [x, y], count, sessions })
   })
   return { worst, details }
 }
@@ -163,9 +181,10 @@ function worstPairRepeat(assignments: Assignment[]): {
  */
 function worstFacilitatorRepeat(assignments: Assignment[]): {
   worst: number
-  details: { participant: string; facilitator: string; count: number }[]
+  details: { participant: string; facilitator: string; count: number; sessions: number[] }[]
 } {
   const counts = new Map<string, number>()
+  const sessionsByKey = new Map<string, number[]>()
   assignments.forEach(a =>
     seatedTables(a).forEach(({ people }) => {
       const facilitators = people.filter(person => person.is_facilitator)
@@ -174,6 +193,9 @@ function worstFacilitatorRepeat(assignments: Assignment[]): {
         facilitators.forEach(f => {
           const key = `${person.name}\x00${f.name}`
           counts.set(key, (counts.get(key) ?? 0) + 1)
+          const sessions = sessionsByKey.get(key) ?? []
+          sessions.push(a.session)
+          sessionsByKey.set(key, sessions)
         })
       )
     })
@@ -182,11 +204,13 @@ function worstFacilitatorRepeat(assignments: Assignment[]): {
   counts.forEach(count => {
     worst = Math.max(worst, count)
   })
-  const details: { participant: string; facilitator: string; count: number }[] = []
+  const details: { participant: string; facilitator: string; count: number; sessions: number[] }[] =
+    []
   counts.forEach((count, key) => {
     if (count !== worst) return
     const [participant, facilitator] = key.split('\x00')
-    details.push({ participant, facilitator, count })
+    const sessions = Array.from(new Set(sessionsByKey.get(key) ?? [])).sort((a, b) => a - b)
+    details.push({ participant, facilitator, count, sessions })
   })
   return { worst, details }
 }
@@ -361,10 +385,25 @@ export function checkPlan(
     (hasFacilitators && facilitatorRepeat.worst > pairRepeatFloor) ||
     (overlapFloor != null && tableOverlap.worst > overlapFloor)
 
+  const verdict: PlanCheckResult['verdict'] =
+    violations.length > 0 ? 'attention' : softOverFloor ? 'lessThanIdeal' : 'ok'
+
+  const improvableSessions =
+    verdict === 'lessThanIdeal'
+      ? Array.from(
+          new Set([
+            ...pairRepeat.details.flatMap(d => d.sessions),
+            ...facilitatorRepeat.details.flatMap(d => d.sessions),
+            ...tableOverlap.details.flatMap(d => d.sessions),
+          ])
+        ).sort((a, b) => a - b)
+      : []
+
   return {
-    verdict: violations.length > 0 ? 'attention' : softOverFloor ? 'lessThanIdeal' : 'ok',
+    verdict,
     violations,
     incompleteSessionCount: incompleteAssignments.length,
+    improvableSessions,
     reassurances: {
       couplesSeparated: hasCouples ? !violations.some(v => v.kind === 'couple') : undefined,
       keepApartHonored:

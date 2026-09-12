@@ -54,6 +54,32 @@ describe('SessionCard — a live session', () => {
     expect(screen.getByRole('button', { name: 'Ken Adler' })).toBeInTheDocument()
   })
 
+  it('has no title on Shuffle when canImproveByShuffle is omitted (default true)', () => {
+    render(<SessionCard assignment={assignment} selectedName={null} onSelect={jest.fn()} onMarkAbsent={jest.fn()} onMarkPresent={jest.fn()} />)
+
+    expect(screen.getByRole('button', { name: /shuffle/i })).not.toHaveAttribute('title')
+  })
+
+  it('adds a clarifying title on Shuffle when canImproveByShuffle is false, without disabling it', () => {
+    render(
+      <SessionCard
+        assignment={assignment}
+        canImproveByShuffle={false}
+        selectedName={null}
+        onSelect={jest.fn()}
+        onMarkAbsent={jest.fn()}
+        onMarkPresent={jest.fn()}
+      />
+    )
+
+    const button = screen.getByRole('button', { name: /shuffle/i })
+    expect(button).toHaveAttribute(
+      'title',
+      "This session isn't where the flagged repeat lives — shuffling it won't clear that note"
+    )
+    expect(button).not.toBeDisabled()
+  })
+
   it('disables Shuffle while a shuffle is running', () => {
     render(<SessionCard assignment={assignment} isShuffling selectedName={null} onSelect={jest.fn()} onMarkAbsent={jest.fn()} onMarkPresent={jest.fn()} />)
 

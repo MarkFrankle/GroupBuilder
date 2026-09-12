@@ -216,8 +216,8 @@ describe('checkPlan — reassurances', () => {
     const { reassurances } = checkPlan(plan, [])
     expect(reassurances.facilitatorRepeatWorst).toEqual(
       expect.arrayContaining([
-        { participant: 'X', facilitator: 'F', count: 3 },
-        { participant: 'Y', facilitator: 'G', count: 3 },
+        { participant: 'X', facilitator: 'F', count: 3, sessions: [1, 2, 3] },
+        { participant: 'Y', facilitator: 'G', count: 3, sessions: [1, 2, 3] },
       ])
     )
     expect(reassurances.facilitatorRepeatWorst).toHaveLength(2)
@@ -302,9 +302,9 @@ describe('checkPlan — pair-repeat worst-case names', () => {
     // A+B, A+C, B+C all repeat 3 times.
     expect(reassurances.pairRepeatWorst).toEqual(
       expect.arrayContaining([
-        { names: ['A', 'B'], count: 3 },
-        { names: ['A', 'C'], count: 3 },
-        { names: ['B', 'C'], count: 3 },
+        { names: ['A', 'B'], count: 3, sessions: [1, 2, 3] },
+        { names: ['A', 'C'], count: 3, sessions: [1, 2, 3] },
+        { names: ['B', 'C'], count: 3, sessions: [1, 2, 3] },
       ])
     )
     expect(reassurances.pairRepeatWorst).toHaveLength(3)
@@ -319,8 +319,8 @@ describe('checkPlan — pair-repeat worst-case names', () => {
     const { reassurances } = checkPlan(twoSessionsSamePeople, [])
     expect(reassurances.pairRepeatWorst).toEqual(
       expect.arrayContaining([
-        { names: ['A', 'C'], count: 2 },
-        { names: ['B', 'C'], count: 2 },
+        { names: ['A', 'C'], count: 2, sessions: [1, 2] },
+        { names: ['B', 'C'], count: 2, sessions: [1, 2] },
       ])
     )
     expect(reassurances.pairRepeatWorst).toHaveLength(2)
@@ -338,5 +338,68 @@ describe('checkPlan — pair-repeat excludes facilitators', () => {
       tables: { 1: [p('F', { is_facilitator: true }), p('X')] },
     }))
     expect(checkPlan(plan, []).reassurances.maxPairRepeat).toBe(0)
+  })
+})
+
+describe('checkPlan — worst-case detail sessions', () => {
+  it('records the exact sessions a repeated pair shared a table in', () => {
+    // A+B share a table in sessions 1 and 3 only, not session 2.
+    const plan: Assignment[] = [
+      { session: 1, tables: { 1: [p('A'), p('B')] } },
+      { session: 2, tables: { 1: [p('A'), p('C')], 2: [p('B'), p('D')] } },
+      { session: 3, tables: { 1: [p('A'), p('B')] } },
+    ]
+    const { reassurances } = checkPlan(plan, [])
+    expect(reassurances.pairRepeatWorst).toEqual([{ names: ['A', 'B'], count: 2, sessions: [1, 3] }])
+  })
+
+  it('records the exact sessions a repeated participant+facilitator pair shared a table in', () => {
+    // X sits with facilitator F in sessions 1 and 3 only, not session 2.
+    const plan: Assignment[] = [
+      { session: 1, tables: { 1: [p('F', { is_facilitator: true }), p('X')] } },
+      { session: 2, tables: { 1: [p('F', { is_facilitator: true }), p('Y')], 2: [p('X'), p('Z')] } },
+      { session: 3, tables: { 1: [p('F', { is_facilitator: true }), p('X')] } },
+    ]
+    const { reassurances } = checkPlan(plan, [])
+    expect(reassurances.facilitatorRepeatWorst).toEqual(
+      expect.arrayContaining([{ participant: 'X', facilitator: 'F', count: 2, sessions: [1, 3] }])
+    )
+  })
+})
+
+describe('checkPlan — improvableSessions', () => {
+  it('is the union of offending sessions when verdict is lessThanIdeal', () => {
+    // A+B repeat in sessions 1 and 3 (pair repeat, default floor 2 -> not over floor here,
+    // so bump to 3 sessions to push past the floor deliberately including session 2 too).
+    const plan: Assignment[] = [
+      { session: 1, tables: { 1: [p('A'), p('B')] } },
+      { session: 2, tables: { 1: [p('A'), p('B')] } },
+      { session: 3, tables: { 1: [p('A'), p('B')] } },
+    ]
+    const result = checkPlan(plan, [])
+    expect(result.verdict).toBe('lessThanIdeal')
+    expect(result.improvableSessions).toEqual([1, 2, 3])
+  })
+
+  it('is empty when verdict is ok', () => {
+    const result = checkPlan(cleanPlan(), [])
+    expect(result.verdict).toBe('ok')
+    expect(result.improvableSessions).toEqual([])
+  })
+
+  it('is empty when verdict is attention', () => {
+    const plan = cleanPlan()
+    plan.forEach(a =>
+      Object.values(a.tables).forEach(seats =>
+        seats.forEach(seat => {
+          if (!seat) return
+          if (seat.name === 'A') seat.partner = 'B'
+          if (seat.name === 'B') seat.partner = 'A'
+        })
+      )
+    )
+    const result = checkPlan(plan, [])
+    expect(result.verdict).toBe('attention')
+    expect(result.improvableSessions).toEqual([])
   })
 })

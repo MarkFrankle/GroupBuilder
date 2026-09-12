@@ -33,6 +33,11 @@ interface SessionCardProps {
   readOnly?: boolean
   isShuffling?: boolean
   onShuffle?: () => void
+  /** False when the plan-check band is `lessThanIdeal` for a reason this
+   *  session isn't part of — shuffling it can't clear that note. Defaults to
+   *  `true` so existing call sites keep today's behavior. The button stays
+   *  clickable either way; this only adds a clarifying tooltip. */
+  canImproveByShuffle?: boolean
   onPrint?: () => void
   onMarkComplete?: () => void
   /** Supplied only for the latest completed session; reopening below it would leave a gap. */
@@ -60,6 +65,7 @@ const SessionCard: React.FC<SessionCardProps> = ({
   readOnly = false,
   isShuffling = false,
   onShuffle,
+  canImproveByShuffle = true,
   onPrint,
   onMarkComplete,
   onReopen,
@@ -201,7 +207,17 @@ const SessionCard: React.FC<SessionCardProps> = ({
 
         <div className="flex gap-2">
           {!completed && !readOnly && (
-            <Button variant="outline" size="sm" onClick={onShuffle} disabled={isShuffling}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onShuffle}
+              disabled={isShuffling}
+              title={
+                canImproveByShuffle
+                  ? undefined
+                  : "This session isn't where the flagged repeat lives — shuffling it won't clear that note"
+              }
+            >
               {isShuffling ? (
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
               ) : (

@@ -7,6 +7,7 @@ const base: PlanCheckResult = {
   verdict: 'ok',
   violations: [],
   incompleteSessionCount: 4,
+  improvableSessions: [],
   reassurances: {
     couplesSeparated: true,
     keepApartHonored: undefined,
@@ -140,8 +141,8 @@ describe('PlanCheckBand — less-than-ideal state', () => {
       reassurances: {
         maxPairRepeat: 3,
         pairRepeatWorst: [
-          { names: ['Ann', 'Bea'], count: 3 },
-          { names: ['Cid', 'Dee'], count: 3 },
+          { names: ['Ann', 'Bea'], count: 3, sessions: [1, 2, 3] },
+          { names: ['Cid', 'Dee'], count: 3, sessions: [1, 2, 3] },
         ],
       },
     })
@@ -159,7 +160,7 @@ describe('PlanCheckBand — less-than-ideal state', () => {
       incompleteSessionCount: 5,
       reassurances: {
         maxFacilitatorRepeat: 4,
-        facilitatorRepeatWorst: [{ participant: 'Priya', facilitator: 'Sam', count: 4 }],
+        facilitatorRepeatWorst: [{ participant: 'Priya', facilitator: 'Sam', count: 4, sessions: [1, 2, 3, 4] }],
       },
     })
     expect(
@@ -174,8 +175,8 @@ describe('PlanCheckBand — less-than-ideal state', () => {
       reassurances: {
         maxFacilitatorRepeat: 4,
         facilitatorRepeatWorst: [
-          { participant: 'Priya', facilitator: 'Sam', count: 4 },
-          { participant: 'Dara', facilitator: 'Erin', count: 4 },
+          { participant: 'Priya', facilitator: 'Sam', count: 4, sessions: [1, 2, 3, 4] },
+          { participant: 'Dara', facilitator: 'Erin', count: 4, sessions: [1, 2, 3, 4] },
         ],
       },
     })

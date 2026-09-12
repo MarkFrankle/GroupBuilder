@@ -810,6 +810,10 @@ const AssignmentsPage: React.FC = () => {
               onSelect={toggleSelected}
               focus={focus}
               onShuffle={() => shuffleMutation.mutate(assignment.session)}
+              canImproveByShuffle={
+                planCheck.verdict !== 'lessThanIdeal' ||
+                planCheck.improvableSessions.includes(assignment.session)
+              }
               onPrint={() => handlePrintSession(assignment.session)}
               onMarkComplete={() =>
                 completionMutation.mutate({
