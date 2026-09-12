@@ -290,13 +290,13 @@ describe('the lock', () => {
  * is to ask once and report what came back.
  */
 describe('rebuilding from the roster', () => {
-  const person = (id: string, name: string) => ({
+  const person = (id: string, name: string, isFacilitator = false) => ({
     id, name, religion: 'Christian', gender: 'Female',
-    partner_id: null, is_facilitator: false, keep_together: false,
+    partner_id: null, is_facilitator: isFacilitator, keep_together: false,
   });
-  const canonicalOf = (p: { name: string; religion: string; gender: string }) => ({
+  const canonicalOf = (p: { name: string; religion: string; gender: string; is_facilitator?: boolean }) => ({
     name: p.name, religion: p.religion, gender: p.gender,
-    partner: null, is_facilitator: false, keep_together: false,
+    partner: null, is_facilitator: p.is_facilitator ?? false, keep_together: false,
   });
 
   /** Wires the page's reads, and lets one test choose what generate answers. */
@@ -337,8 +337,9 @@ describe('rebuilding from the roster', () => {
     });
   };
 
-  const alice = person('p1', 'Alice');
-  const bob = person('p2', 'Bob');
+  // Two tables need two facilitators too, so Alice and Bob carry the flag.
+  const alice = person('p1', 'Alice', true);
+  const bob = person('p2', 'Bob', true);
   const cara = person('p3', 'Cara');
   const dan = person('p4', 'Dan');
 

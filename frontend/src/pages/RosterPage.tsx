@@ -384,10 +384,12 @@ export function RosterPage() {
   })();
 
   // Matches check_shortfalls on the server: a table with one person is not a
-  // discussion group. Disagreeing meant enabling the button and refusing the
-  // request a round trip later.
+  // discussion group, and a table with no facilitator can't run. Disagreeing
+  // meant enabling the button and refusing the request a round trip later.
   const minParticipants = parseInt(numTables) * 2;
-  const canGenerate = participants.length >= minParticipants;
+  const numFacilitators = participants.filter(p => p.is_facilitator).length;
+  const facilitatorShortfall = numFacilitators < parseInt(numTables);
+  const canGenerate = participants.length >= minParticipants && !facilitatorShortfall;
   // computeChangeset reports a brand-new program as clean - there is no
   // canonical roster to differ from - so dirtiness alone would hide the button
   // on exactly the program that needs it.
@@ -562,8 +564,9 @@ export function RosterPage() {
                         </button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        Need at least {minParticipants} participants for {numTables} tables
-                        — you have {participants.length}.
+                        {participants.length < minParticipants
+                          ? `Need at least ${minParticipants} participants for ${numTables} tables — you have ${participants.length}.`
+                          : `Need at least ${numTables} facilitators for ${numTables} tables — you have ${numFacilitators}.`}
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>

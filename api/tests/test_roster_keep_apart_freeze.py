@@ -104,6 +104,7 @@ class TestFrozenOnGenerate:
                 "religion": ["Christian", "Jewish", "Muslim"][i % 3],
                 "gender": ["Male", "Female"][i % 2],
                 "partner_id": None,
+                "is_facilitator": i < 2,
             }
             for i in range(count)
         ]
