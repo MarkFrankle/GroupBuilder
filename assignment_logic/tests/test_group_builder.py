@@ -1179,5 +1179,29 @@ def test_table_overlap_cap_skips_an_absent_participant_cleanly():
     assert "P0" not in seated
 
 
+def test_symmetry_breaking_skips_an_absent_first_participant():
+    """If the participant symmetry-breaking would normally pin to session 0
+    is absent that session, pin the first *present* participant instead -
+    fixing an absent id to a table it has no variable for would crash."""
+    participants = [
+        {
+            "id": f"p{i}",
+            "name": f"P{i}",
+            "religion": "Christian",
+            "gender": "Male",
+            "couple_id": None,
+        }
+        for i in range(4)
+    ]
+    builder = GroupBuilder(
+        participants,
+        num_tables=2,
+        num_sessions=1,
+        absent_ids_by_session={0: {"p0"}},  # the usual symmetry-break target is absent
+    )
+    result = builder.generate_assignments(max_time_seconds=10)
+    assert result["status"] == "success"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

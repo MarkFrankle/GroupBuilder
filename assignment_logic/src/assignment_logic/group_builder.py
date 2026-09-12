@@ -499,7 +499,9 @@ class GroupBuilder:
                 # Used when user explicitly regenerates a session - they want something different
                 for p in self.participants:
                     p_id = p["id"]
-                    if p_id in self.current_table_assignments:
+                    if p_id in self.current_table_assignments and p_id not in (
+                        self.absent_ids_by_session.get(0, set())
+                    ):
                         current_table = self.current_table_assignments[p_id]
                         # Forbid assignment to same table in session 0 (only regenerating one session)
                         # Note: When regenerating, num_sessions=1, so we only check session 0
@@ -523,8 +525,10 @@ class GroupBuilder:
                 # each previous table's full membership from landing
                 # together at any table in the new session.
                 previous_tables = defaultdict(list)
+                absent_now = self.absent_ids_by_session.get(0, set())
                 for p_id, table_number in self.current_table_assignments.items():
-                    previous_tables[table_number].append(p_id)
+                    if p_id not in absent_now:
+                        previous_tables[table_number].append(p_id)
                 if 0 in self.sessions:
                     for members in previous_tables.values():
                         if len(members) < 2:
@@ -543,7 +547,9 @@ class GroupBuilder:
                 # Can be violated if the current assignment is actually optimal
                 for p in self.participants:
                     p_id = p["id"]
-                    if p_id in self.current_table_assignments:
+                    if p_id in self.current_table_assignments and p_id not in (
+                        self.absent_ids_by_session.get(0, set())
+                    ):
                         current_table = self.current_table_assignments[p_id]
                         if 0 in self.sessions and current_table in self.tables:
                             penalty_count += self.participant_table_assignments[
@@ -606,16 +612,17 @@ class GroupBuilder:
         self.model.Minimize(penalty_count)
 
     def _add_symmetry_breaking(self):
-        """Break table symmetry by fixing first participant to first table in first session."""
-        if (
-            len(self.participants) > 0
-            and len(self.sessions) > 0
-            and len(self.tables) > 0
-        ):
-            first_participant_id = self.participants[0]["id"]
-            self.model.Add(
-                self.participant_table_assignments[(first_participant_id, 0, 0)] == 1
-            )
+        """Break table symmetry by fixing the first present participant in
+        session 0's first table to that table."""
+        if len(self.sessions) == 0 or len(self.tables) == 0:
+            return
+        present_in_first_session = self._present(0)
+        if not present_in_first_session:
+            return
+        first_participant_id = present_in_first_session[0]["id"]
+        self.model.Add(
+            self.participant_table_assignments[(first_participant_id, 0, 0)] == 1
+        )
 
     def _run_solver(self, max_time_seconds=120):
         import random
