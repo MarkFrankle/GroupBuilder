@@ -262,31 +262,52 @@ function HelpPage() {
           </p>
 
           <h3 className="text-xl font-semibold mb-2">Reading the page</h3>
+
+          <Screenshot
+            wide
+            src="/images/help/assignments-header.png"
+            alt="The top of the Assignments page: program name and print/copy-link/history buttons, a green plan-check banner, and a row with a Religion/Gender/Couples color legend and a Full/Compact switch"
+            caption="The top of the Assignments page"
+          />
+
+          <ul className="list-disc pl-5 space-y-2 text-slate-700 leading-relaxed mb-4">
+            <li>
+              <strong>Top left:</strong> your program name.
+            </li>
+            <li>
+              <strong>Top right:</strong> print the roster and seating charts,
+              copy a shareable link, or open History.
+            </li>
+            <li>
+              <strong>The green (or amber, or gray) box</strong> is the plan-check
+              banner — see{" "}
+              <a href="#reading-the-banner" className="text-blue-600 hover:text-blue-800 underline">
+                How Good Are the Assignments
+              </a>{" "}
+              below for what each color means.
+            </li>
+            <li>
+              <strong>Bottom left:</strong> switch names between colored by
+              Religion, Gender, or Couples — the legend next to it shows what each
+              color means.
+            </li>
+            <li>
+              <strong>Bottom right:</strong> the Full / Compact switch, covered next.
+            </li>
+          </ul>
+
           <p className="mb-4 text-slate-700 leading-relaxed">
-            At the top is your program name, with buttons to print, copy a
-            shareable link, and open History. Right below that is a banner that
-            tells you how good the plan is — see{" "}
-            <a href="#reading-the-banner" className="text-blue-600 hover:text-blue-800 underline">
-              How Good Are the Assignments
-            </a>{" "}
-            below.
-          </p>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            Each session is a card. Inside it, each table lists its facilitators
-            first, then everyone else, with a summary on the right: how many people
-            are seated, the gender split, and how many religions are represented.
-            Name colours show religion.
+            Below this, each session is a card. Inside it, each table lists its
+            facilitators first, then everyone else, with a summary on the right:
+            how many people are seated, the gender split, and how many religions
+            are represented.
           </p>
 
           <h3 className="text-xl font-semibold mt-8 mb-2">Full and Compact</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            On the right of the view controls row is a <strong>Full / Compact</strong>{" "}
-            switch. <strong>Compact</strong> shrinks everything and lays the sessions out
+            <strong>Compact</strong> shrinks everything and lays the sessions out
             side by side so you can see the whole program at once — useful for checking it
-            looks right and for following one person across every session. Compact is
-            read-only: the session buttons are hidden and completed sessions show inline
-            with the rest. Switch back to <strong>Full</strong> to change anything. The
-            view is not saved — reloading the page puts you back in Full.
+            looks right and for following one person across every session.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Clicking a person's name (in either view) highlights them everywhere they
