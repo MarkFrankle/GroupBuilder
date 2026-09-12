@@ -52,8 +52,17 @@ const ProblemLine: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   </li>
 )
 
-/** The (?) next to a worst-case note — hover or focus to see who, named, one per line. */
-const RepeatWorstDetail: React.FC<{ label: string; lines: string[] }> = ({ label, lines }) => (
+/**
+ * The (?) next to a worst-case note — hover or focus to see who, named, one per line.
+ * `groupKeys`, when given, must be parallel to `lines`; a light divider is drawn
+ * above any line whose group key differs from the line before it (e.g. grouping
+ * the table-overlap list by its first session number).
+ */
+const RepeatWorstDetail: React.FC<{
+  label: string
+  lines: string[]
+  groupKeys?: Array<string | number>
+}> = ({ label, lines, groupKeys }) => (
   <TooltipProvider>
     <Tooltip>
       <TooltipTrigger asChild>
@@ -67,8 +76,17 @@ const RepeatWorstDetail: React.FC<{ label: string; lines: string[] }> = ({ label
       </TooltipTrigger>
       <TooltipContent side="right" align="start">
         <ul className="space-y-0.5">
-          {lines.map(line => (
-            <li key={line}>{line}</li>
+          {lines.map((line, i) => (
+            <li
+              key={line}
+              className={
+                groupKeys && i > 0 && groupKeys[i] !== groupKeys[i - 1]
+                  ? 'mt-1 border-t pt-1 border-border/50'
+                  : undefined
+              }
+            >
+              {line}
+            </li>
           ))}
         </ul>
       </TooltipContent>
@@ -176,6 +194,7 @@ const PlanCheckBand: React.FC<PlanCheckBandProps> = ({ result }) => {
                   w =>
                     `Session ${w.sessions[0]} Table ${w.tables[0]} & Session ${w.sessions[1]} Table ${w.tables[1]}`
                 )}
+                groupKeys={r.tableOverlapWorst.map(w => w.sessions[0])}
               />
             )}
           </NoteLine>
