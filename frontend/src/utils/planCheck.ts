@@ -249,29 +249,34 @@ const BALANCE_LABEL: Record<(typeof BALANCE_KEYS)[number], string> = {
 
 /**
  * Finds every incomplete session where the solver did worse than the minimum
- * spread the roster composition allows, for religion and/or gender.
+ * spread that session's own present roster allows, for religion and/or gender.
  *
- * The roster population is taken from the first incomplete session; a person
- * absent later still counts, matching the old ValidationStats. This assumes
- * session 1 is full — an absence in session 1 would shrink the floor.
+ * The floor is computed per session from who actually attends that session,
+ * not from a shared full-roster count: the solver's balance constraint is
+ * itself scoped to present participants per session, so a session with an
+ * absence can have a genuinely different (often higher) floor than a fully
+ * attended one. Comparing every session against one session's floor would
+ * flag a session as unbalanced solely because someone was away, even when
+ * the solver did the best possible job for who was actually there.
  */
 function balanceFailures(
   assignments: Assignment[]
 ): { session: number; key: (typeof BALANCE_KEYS)[number] }[] {
-  if (assignments.length === 0) return []
-  const firstTables = seatedTables(assignments[0])
-  const numTables = firstTables.length
-  if (numTables === 0) return []
-  const roster = firstTables.flatMap(t => t.people)
-
   const failures: { session: number; key: (typeof BALANCE_KEYS)[number] }[] = []
   BALANCE_KEYS.forEach(key => {
-    const rosterCounts = countBy(roster, key)
-    const values = Object.keys(rosterCounts)
+    // The full set of attribute values across every session, so a session
+    // missing a value entirely (e.g. no "Other" present) still zero-fills.
+    const values = Array.from(
+      new Set(assignments.flatMap(a => seatedTables(a).flatMap(t => t.people.map(p => p[key]))))
+    )
     if (values.length <= 1) return
-    const floor = expectedWithinTableDeviation(rosterCounts, numTables)
     assignments.forEach(a => {
-      const tableMaps = seatedTables(a).map(t => countBy(t.people, key))
+      const tables = seatedTables(a)
+      const numTables = tables.length
+      if (numTables === 0) return
+      const sessionRoster = tables.flatMap(t => t.people)
+      const floor = expectedWithinTableDeviation(countBy(sessionRoster, key), numTables)
+      const tableMaps = tables.map(t => countBy(t.people, key))
       if (actualWithinTableDeviation(tableMaps, values) > floor) {
         failures.push({ session: a.session, key })
       }
