@@ -323,50 +323,58 @@ function HelpPage() {
             How Good Are the Assignments: Reading the Banner
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            The banner near the top of the page checks the plan against your rules
+            The banner near the top of the page checks the quality of the assignments
             and tells you whether it's ready to print. It's the fastest way to know
-            whether you need to do anything before you hand these out — and if you
-            do, it tells you what.
+            whether you need to do anything before you hand these out, and if so, what.
           </p>
 
           <h3 className="text-xl font-semibold mb-2">Green: ready to print</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            "Looks good — ready to print and hand out." Every rule is satisfied and
-            mixing is as good as this roster allows. Nothing to do — print and go.
+            Shown above in{" "}
+            <a href="#viewing-your-groups" className="text-blue-600 hover:text-blue-800 underline">
+              Reading Your Assignments
+            </a>
+            . Every rule is satisfied and mixing is as good as this roster allows.
+            Nothing to do but print and go.
           </p>
 
           <h3 className="text-xl font-semibold mb-2">Gray: good enough, not ideal</h3>
+
+          <Screenshot
+            wide
+            src="/images/help/grey-banner.png"
+            alt="A gray plan-check banner: the three hard rules pass, but a pair sits together three times, two tables share 3 people, and one person has the same facilitator 3 of 5 sessions"
+            caption="Good enough to print, but not ideal"
+          />
+
           <p className="mb-4 text-slate-700 leading-relaxed">
-            "Good enough to print, but not ideal." Every rule is satisfied, but the
-            plan has a soft repeat — a pair sits together more than once, one
-            facilitator sees the same person several sessions in a row, or two
-            tables share more people than expected. Click the <strong>(?)</strong>{" "}
-            next to a line like this to see exactly who's affected.
+            Every rule is satisfied, but the groups aren't perfect. A pair sits
+            together more than once, one facilitator sees the same person in several
+            sessions, or two tables share more people than expected.
+            Hover over the <strong>(?)</strong> next to a line like this to see exactly
+            who's affected and in which sessions.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            This plan is printable as-is. Press <strong>Shuffle</strong> on a
-            session if you want to try for something better — it may reduce the
-            repeat, but with a fixed number of tables and sessions it isn't always
-            avoidable, and shuffling isn't guaranteed to help.
+            This plan is printable as-is. If you want to improve it, the <strong>(?)</strong> will
+            say which sessions need your attention. Press <strong>Shuffle</strong> on a
+            session if you want to try for something better. Shuffling a session will give new
+            table assignments for that session while minimizing repeats in other sessions.
           </p>
 
           <h3 className="text-xl font-semibold mb-2">Amber: fix before you print</h3>
+
+          <Screenshot
+            wide
+            src="/images/help/amber-banner.png"
+            alt="An amber plan-check banner: Session 1 Table 2 has no facilitator, and Session 1 isn't mixed as evenly by religion as the roster allows"
+            caption="A few things to check before you print"
+          />
+
           <p className="mb-4 text-slate-700 leading-relaxed">
-            "One thing to check before you print" (or "a few things"). A rule you
-            set broke: a couple is seated together, a pair you asked to keep apart
-            ended up at the same table, or a table has no facilitator. Each line
-            names which session and table.
-          </p>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            A missing facilitator is often fixed by pressing{" "}
-            <strong>Shuffle</strong> on that session. A couple or keep-apart pair
-            seated together means the rule wasn't set, or wasn't set correctly —
-            go to the Roster to check the <strong>Partner</strong> link or the{" "}
-            <strong>Keep apart</strong> list, then rebuild. See{" "}
-            <a href="#creating-your-roster" className="text-blue-600 hover:text-blue-800 underline">
-              Creating Your Roster
-            </a>{" "}
-            for how rebuilding works.
+            A hard rule has been violated: a couple is seated together, a pair who must be
+            kept apart ended up at the same table, a table has no facilitator, or
+            a session's religion or gender mix is worse than this roster allows.
+            Each line names which session and table.
           </p>
         </section>
 
