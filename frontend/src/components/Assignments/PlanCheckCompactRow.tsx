@@ -65,7 +65,7 @@ const PlanCheckCompactRow: React.FC<PlanCheckCompactRowProps> = ({ result }) => 
 
       {multiSession &&
         (r.maxPairRepeat <= r.pairRepeatFloor ? (
-          <OkChip>No repeats</OkChip>
+          <OkChip>Repeats</OkChip>
         ) : (
           <WarnChip>
             {`Repeats ${timesWord(r.maxPairRepeat)}`}
@@ -83,7 +83,7 @@ const PlanCheckCompactRow: React.FC<PlanCheckCompactRowProps> = ({ result }) => 
       {multiSession &&
         overlapCap != null &&
         (r.maxTableOverlap <= overlapCap ? (
-          <OkChip>No overlap</OkChip>
+          <OkChip>Overlap</OkChip>
         ) : (
           <WarnChip>
             {`Overlap: ${r.maxTableOverlap} ${r.maxTableOverlap === 1 ? 'person' : 'people'}`}

@@ -124,6 +124,21 @@ const AssignmentsPage: React.FC = () => {
   // Full, the only place the plan can be edited.
   const [zoom, setZoom] = useState<ZoomLevel>('full')
   const compact = zoom === 'compact'
+
+  // The compact mix-quality row only earns its place once the view-controls
+  // bar is actually pinned to the top - at the natural scroll position it
+  // would just repeat PlanCheckBand a few lines below. Same
+  // sentinel/IntersectionObserver technique as ProgramHeader's condensing.
+  const viewBarSentinel = useRef<HTMLDivElement | null>(null)
+  const [viewBarStuck, setViewBarStuck] = useState(false)
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return undefined
+    const observer = new IntersectionObserver(entries => {
+      setViewBarStuck(!entries[0].isIntersecting)
+    })
+    if (viewBarSentinel.current) observer.observe(viewBarSentinel.current)
+    return () => observer.disconnect()
+  }, [])
   const toggleSelected = (name: string) =>
     setSelectedName(current => (current === name ? null : name))
 
@@ -769,8 +784,9 @@ const AssignmentsPage: React.FC = () => {
       )}
       <NoticeStrip notice={provisionalNotice ?? notice} onDismiss={() => showNotice(null)} />
 
+      <div ref={viewBarSentinel} aria-hidden="true" />
       <div className="sticky top-14 z-10 -mx-8 border-b bg-white px-8">
-        {live.length > 0 && <PlanCheckCompactRow result={planCheck} />}
+        {live.length > 0 && viewBarStuck && <PlanCheckCompactRow result={planCheck} />}
         <ViewBar
           focus={focus}
           onFocusChange={setFocus}

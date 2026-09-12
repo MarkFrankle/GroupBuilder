@@ -48,8 +48,8 @@ describe('PlanCheckCompactRow — green state', () => {
 
   it('shows the reassuring repeat/overlap/variety chips at or below the floor', () => {
     withResult({ reassurances: { tableOverlapCap: 1, maxTableOverlap: 1 } })
-    expect(screen.getByText('No repeats')).toBeInTheDocument()
-    expect(screen.getByText('No overlap')).toBeInTheDocument()
+    expect(screen.getByText('Repeats')).toBeInTheDocument()
+    expect(screen.getByText('Overlap')).toBeInTheDocument()
     expect(screen.getByText('Facilitator variety')).toBeInTheDocument()
   })
 
@@ -60,14 +60,14 @@ describe('PlanCheckCompactRow — green state', () => {
 
   it('hides the overlap chip entirely when no cap is known', () => {
     withResult()
-    expect(screen.queryByText('No overlap')).not.toBeInTheDocument()
+    expect(screen.queryByText('Overlap')).not.toBeInTheDocument()
     expect(screen.queryByText(/Overlap:/)).not.toBeInTheDocument()
   })
 
   it('hides the repeat/overlap/variety chips for a single-session program', () => {
     withResult({ incompleteSessionCount: 1, reassurances: { tableOverlapCap: 1 } })
-    expect(screen.queryByText('No repeats')).not.toBeInTheDocument()
-    expect(screen.queryByText('No overlap')).not.toBeInTheDocument()
+    expect(screen.queryByText('Repeats')).not.toBeInTheDocument()
+    expect(screen.queryByText('Overlap')).not.toBeInTheDocument()
     expect(screen.queryByText('Facilitator variety')).not.toBeInTheDocument()
     expect(screen.getByText('Facilitator coverage')).toBeInTheDocument()
   })

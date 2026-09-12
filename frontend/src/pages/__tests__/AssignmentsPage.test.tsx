@@ -1163,6 +1163,42 @@ describe('AssignmentsPage — plan check band', () => {
   })
 })
 
+describe('AssignmentsPage — plan check compact row', () => {
+  it('only appears once the view-controls bar is actually stuck to the top', async () => {
+    const observers: Array<(entries: any[]) => void> = []
+    ;(window as any).IntersectionObserver = class {
+      constructor(callback: (entries: any[]) => void) {
+        observers.push(callback)
+      }
+      observe() {}
+      disconnect() {}
+    }
+
+    api.resultsOverride = [
+      {
+        session: 1,
+        tables: { 1: [person('Ann'), person('Ben', 'Male')], 2: [person('Cara'), person('Dan', 'Male')] },
+      },
+      {
+        session: 2,
+        tables: { 1: [person('Ann'), person('Dan', 'Male')], 2: [person('Cara'), person('Ben', 'Male')] },
+      },
+    ]
+    renderPage()
+    await screen.findByText('Looks good — ready to print and hand out')
+
+    expect(screen.queryByTestId('plan-check-compact-row')).not.toBeInTheDocument()
+
+    act(() => observers[0]([{ isIntersecting: false }]))
+
+    expect(screen.getByTestId('plan-check-compact-row')).toBeInTheDocument()
+
+    act(() => observers[0]([{ isIntersecting: true }]))
+
+    expect(screen.queryByTestId('plan-check-compact-row')).not.toBeInTheDocument()
+  })
+})
+
 describe('AssignmentsPage — plan check band, keep-apart', () => {
   it('flags a keep-apart pair the current plan seats together', async () => {
     api.canonicalParticipants = [
