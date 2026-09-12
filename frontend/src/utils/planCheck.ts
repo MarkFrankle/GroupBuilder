@@ -282,6 +282,23 @@ function balanceFailures(
 
 const DEFAULT_PAIRWISE_FLOOR = 2
 
+/**
+ * How much further above the table-overlap floor is tolerated before it's
+ * treated as a real problem (verdict-affecting), versus just a quiet fact.
+ *
+ * The floor (`compute_overlap_lower_bound`) is a pigeonhole *lower bound*,
+ * not a guaranteed-achievable target - couples/keep-apart/linked pairs can
+ * make it genuinely unreachable for a given roster, and a single-session
+ * shuffle has strictly less freedom to approach it than a full multi-session
+ * generate does. One person over floor is exactly the kind of gap that's
+ * often just statistically expected for a small roster, not a sign the
+ * solver did a bad job or that the user has anything to fix. Exactly
+ * `floor + this` is shown as a plain fact (PlanCheckBand/PlanCheckCompactRow
+ * both still surface it) but does not flip the verdict; only strictly more
+ * than that does.
+ */
+export const TABLE_OVERLAP_ALERT_SLACK = 1
+
 export function checkPlan(
   incompleteAssignments: Assignment[],
   keepApart: [string, string][],
@@ -359,7 +376,7 @@ export function checkPlan(
   const softOverFloor =
     pairRepeat.worst > pairRepeatFloor ||
     (hasFacilitators && facilitatorRepeat.worst > pairRepeatFloor) ||
-    (overlapFloor != null && tableOverlap.worst > overlapFloor)
+    (overlapFloor != null && tableOverlap.worst > overlapFloor + TABLE_OVERLAP_ALERT_SLACK)
 
   return {
     verdict: violations.length > 0 ? 'attention' : softOverFloor ? 'lessThanIdeal' : 'ok',
