@@ -977,7 +977,9 @@ class TestRebuild:
         add_roster_to_firestore,
     ):
         """Absences are read off the current version every time — there is no
-        checkbox, because forgetting one silently seats someone who is away."""
+        checkbox, because forgetting one silently seats someone who is away.
+        Also confirms the carried-over absence still yields real cap/floor
+        metadata rather than the old nulled-out values."""
         from api.services.assignment_set_storage import AssignmentSetStorage
 
         set_id = add_assignment_set_to_firestore(
