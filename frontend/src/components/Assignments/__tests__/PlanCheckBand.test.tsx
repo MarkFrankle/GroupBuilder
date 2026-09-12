@@ -130,7 +130,7 @@ describe('PlanCheckBand — less-than-ideal state', () => {
     const trigger = screen.getByRole('button', { name: /which tables overlap/i })
     trigger.focus()
     expect(
-      (await screen.findAllByText('Session 1 Table 1 & Session 3 Table 2 — Ann, Bea')).length
+      (await screen.findAllByText('Session 1 Table 1 & Session 3 Table 2')).length
     ).toBeGreaterThan(0)
   })
 

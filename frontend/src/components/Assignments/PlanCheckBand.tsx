@@ -174,7 +174,7 @@ const PlanCheckBand: React.FC<PlanCheckBandProps> = ({ result }) => {
                 label="Which tables overlap"
                 lines={r.tableOverlapWorst.map(
                   w =>
-                    `Session ${w.sessions[0]} Table ${w.tables[0]} & Session ${w.sessions[1]} Table ${w.tables[1]} — ${w.names.join(', ')}`
+                    `Session ${w.sessions[0]} Table ${w.tables[0]} & Session ${w.sessions[1]} Table ${w.tables[1]}`
                 )}
               />
             )}
