@@ -40,6 +40,7 @@ const Chip: React.FC<ChipProps> = ({
   // Colour is spoken for by the focus and the amber ring by facilitators, so
   // opacity is the only channel left to say "not this person".
   const dimmed = selectedName !== null && selectedName !== participant.name
+  const selected = selectedName === participant.name
 
   const shape = isFacilitator
     ? compact
@@ -66,6 +67,7 @@ const Chip: React.FC<ChipProps> = ({
         // undoes the button element's centring.
         'inline-flex items-center gap-1 cursor-pointer text-left transition-opacity',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-1',
+        selected && 'font-bold ring-2 ring-slate-900 ring-offset-1',
         dimmed && 'opacity-50',
       ]
         .filter(Boolean)

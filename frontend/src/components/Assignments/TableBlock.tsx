@@ -68,7 +68,7 @@ const TableBlock: React.FC<TableBlockProps> = ({
           Table {tableNumber}
         </div>
       ) : (
-      <div className="flex min-h-9 items-center justify-between gap-2 border-b pb-1.5">
+      <div className="flex min-h-11 items-center justify-between gap-2 border-b pb-2">
         <div className="flex items-center gap-2">
           <div className="whitespace-nowrap text-base font-semibold">Table {tableNumber}</div>
           {/*
@@ -77,12 +77,7 @@ const TableBlock: React.FC<TableBlockProps> = ({
             click just made.
           */}
           {selectedHere && onMarkAbsent && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 px-2.5 text-xs"
-              onClick={() => onMarkAbsent(selectedHere)}
-            >
+            <Button variant="outline" size="sm" onClick={() => onMarkAbsent(selectedHere)}>
               <UserMinus className="mr-1.5 h-3.5 w-3.5" />
               Mark {selectedHere} absent
             </Button>
