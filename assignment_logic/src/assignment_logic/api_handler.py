@@ -14,6 +14,7 @@ def handle_generate_assignments(
     historical_meeting_counts=None,
     total_program_sessions=None,
     historical_tables=None,
+    absent_ids_by_session=None,
 ):
     """
     Generate table assignments using a single joint CP-SAT solve with two
@@ -40,6 +41,7 @@ def handle_generate_assignments(
             historical_meeting_counts=historical_meeting_counts,
             total_program_sessions=total_program_sessions,
             historical_tables=historical_tables,
+            absent_ids_by_session=absent_ids_by_session,
         )
     )
     if result["status"] == "success":
