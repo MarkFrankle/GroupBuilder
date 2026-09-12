@@ -4,9 +4,9 @@ import { Screenshot, WarningCallout, InfoCallout } from "../components/HelpCallo
 const tocItems = [
   { id: "welcome-to-group-builder", label: "Welcome to Group Builder" },
   { id: "creating-your-roster", label: "Creating Your Roster" },
-  { id: "viewing-your-groups", label: "Viewing Your Assignments" },
-  { id: "printing-and-sharing", label: "Printing & Sharing" },
-  { id: "editing-sessions", label: "Changing a Session" },
+  { id: "viewing-your-groups", label: "Reading Your Assignments" },
+  { id: "reading-the-banner", label: "How Good Are the Assignments: Reading the Banner" },
+  { id: "editing-sessions", label: "Changing a Plan" },
   { id: "troubleshooting", label: "Troubleshooting" },
 ];
 
@@ -251,30 +251,25 @@ function HelpPage() {
           </WarningCallout>
         </section>
 
-        {/* ===================== Section 3: Viewing Your Assignments ===================== */}
+        {/* ===================== Section 3: Reading Your Assignments ===================== */}
         <section className="mb-12">
           <h2 id="viewing-your-groups" className="text-2xl font-bold mb-4 scroll-mt-8">
-            Viewing Your Assignments
+            Reading Your Assignments
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
             After generating, you land on the Assignments page. Every session is on
-            this one page, stacked from Session 1 downward — there is no view to
-            switch to and no session to navigate to. Scroll and you see the whole
-            program.
+            this one page in chronological order.
           </p>
 
           <h3 className="text-xl font-semibold mb-2">Reading the page</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            At the top is your program name and its facts: how many participants,
-            tables and sessions, and the average number of different people each
-            participant sits with across the program. Below that, a{" "}
-            <strong>Rules</strong> line lists the linked pairs you have set up.
-          </p>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            Just below that, a banner checks the plan against the rules you set —
-            couples seated apart, anyone you asked to keep apart kept apart, a
-            facilitator at every table — and either tells you it's ready to print
-            or names what to fix and in which session.
+            At the top is your program name, with buttons to print, copy a
+            shareable link, and open History. Right below that is a banner that
+            tells you how good the plan is — see{" "}
+            <a href="#reading-the-banner" className="text-blue-600 hover:text-blue-800 underline">
+              How Good Are the Assignments
+            </a>{" "}
+            below.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Each session is a card. Inside it, each table lists its facilitators
@@ -299,41 +294,69 @@ function HelpPage() {
             course of the program.
           </p>
 
-          <h3 className="text-xl font-semibold mt-8 mb-2">Marking a session complete</h3>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            When a meeting night has happened, press <strong>Mark complete</strong> in
-            that session's header. The session collapses to a single line and moves
-            below the sessions still ahead of you, under a <strong>Completed</strong>{" "}
-            heading — so the next night to run is always the first thing on the page.
-            Press the arrow on a completed line to look at who sat where.
-          </p>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            A completed session cannot be changed. Shuffling it, editing it, or
-            rebuilding the program are all refused — the past stays as it happened.
-            If you marked one complete by mistake, press <strong>Reopen</strong> on
-            it, or press <strong>Undo</strong> on the line that appears at the top
-            right after you mark complete — both put the session back the way it was.
-          </p>
-
-          <InfoCallout>
-            <p>
-              Sessions are completed in order, because time runs in order. You can
-              only complete the next session that is still open, and only reopen the
-              most recently completed one. If you try to skip ahead, the app tells you
-              which session is still open.
-            </p>
-          </InfoCallout>
         </section>
 
-
-        {/* ===================== Section 5: Printing & Sharing ===================== */}
+        {/* ===================== Section 4: How Good Are the Assignments ===================== */}
         <section className="mb-12">
-          <h2 id="printing-and-sharing" className="text-2xl font-bold mb-4 scroll-mt-8">
-            Printing & Sharing
+          <h2 id="reading-the-banner" className="text-2xl font-bold mb-4 scroll-mt-8">
+            How Good Are the Assignments: Reading the Banner
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            Once you're happy with the assignments, you'll probably want to print them
-            out or share them with others.
+            The banner near the top of the page checks the plan against your rules
+            and tells you whether it's ready to print. It's the fastest way to know
+            whether you need to do anything before you hand these out — and if you
+            do, it tells you what.
+          </p>
+
+          <h3 className="text-xl font-semibold mb-2">Green: ready to print</h3>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            "Looks good — ready to print and hand out." Every rule is satisfied and
+            mixing is as good as this roster allows. Nothing to do — print and go.
+          </p>
+
+          <h3 className="text-xl font-semibold mb-2">Gray: good enough, not ideal</h3>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            "Good enough to print, but not ideal." Every rule is satisfied, but the
+            plan has a soft repeat — a pair sits together more than once, one
+            facilitator sees the same person several sessions in a row, or two
+            tables share more people than expected. Click the <strong>(?)</strong>{" "}
+            next to a line like this to see exactly who's affected.
+          </p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            This plan is printable as-is. Press <strong>Shuffle</strong> on a
+            session if you want to try for something better — it may reduce the
+            repeat, but with a fixed number of tables and sessions it isn't always
+            avoidable, and shuffling isn't guaranteed to help.
+          </p>
+
+          <h3 className="text-xl font-semibold mb-2">Amber: fix before you print</h3>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            "One thing to check before you print" (or "a few things"). A rule you
+            set broke: a couple is seated together, a pair you asked to keep apart
+            ended up at the same table, or a table has no facilitator. Each line
+            names which session and table.
+          </p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            A missing facilitator is often fixed by pressing{" "}
+            <strong>Shuffle</strong> on that session. A couple or keep-apart pair
+            seated together means the rule wasn't set, or wasn't set correctly —
+            go to the Roster to check the <strong>Partner</strong> link or the{" "}
+            <strong>Keep apart</strong> list, then rebuild. See{" "}
+            <a href="#creating-your-roster" className="text-blue-600 hover:text-blue-800 underline">
+              Creating Your Roster
+            </a>{" "}
+            for how rebuilding works.
+          </p>
+        </section>
+
+        {/* ===================== Section 5: Changing a Plan ===================== */}
+        <section className="mb-12">
+          <h2 id="editing-sessions" className="text-2xl font-bold mb-4 scroll-mt-8">
+            Changing a Plan
+          </h2>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            The generated assignments are a starting point. Nothing changes unless you
+            press something — the app never re-runs the solver on its own.
           </p>
 
           <h3 className="text-xl font-semibold mb-2">Print roster &amp; seating charts</h3>
@@ -373,19 +396,32 @@ function HelpPage() {
             don't have Group Builder accounts, use the PDF method above instead.
           </p>
 
-        </section>
-
-        {/* ===================== Section 6: Changing a Session ===================== */}
-        <section className="mb-12">
-          <h2 id="editing-sessions" className="text-2xl font-bold mb-4 scroll-mt-8">
-            Changing a Session
-          </h2>
+          <h3 className="text-xl font-semibold mt-8 mb-2">Marking a session complete</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            The generated assignments are a starting point. Nothing changes unless you
-            press something — the app never re-runs the solver on its own.
+            When a meeting night has happened, press <strong>Mark complete</strong> in
+            that session's header. The session collapses to a single line and moves
+            below the sessions still ahead of you, under a <strong>Completed</strong>{" "}
+            heading — so the next night to run is always the first thing on the page.
+            Press the arrow on a completed line to look at who sat where.
+          </p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            A completed session cannot be changed. Shuffling it, editing it, or
+            rebuilding the program are all refused — the past stays as it happened.
+            If you marked one complete by mistake, press <strong>Reopen</strong> on
+            it, or press <strong>Undo</strong> on the line that appears at the top
+            right after you mark complete — both put the session back the way it was.
           </p>
 
-          <h3 className="text-xl font-semibold mb-2">Shuffle one session</h3>
+          <InfoCallout>
+            <p>
+              Sessions are completed in order, because time runs in order. You can
+              only complete the next session that is still open, and only reopen the
+              most recently completed one. If you try to skip ahead, the app tells you
+              which session is still open.
+            </p>
+          </InfoCallout>
+
+          <h3 className="text-xl font-semibold mt-8 mb-2">Shuffle one session</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Press <strong>Shuffle</strong> in a session's header to redo just that
             night. The solver still knows about every other session, so it avoids
