@@ -565,10 +565,14 @@ class GroupBuilder:
         # reason to pick the lower-overlap arrangement when one exists.
         if self.table_overlap_cap is not None:
             for s1, s2 in combinations(self.sessions, 2):
+                absent1 = self.absent_ids_by_session.get(s1, set())
+                absent2 = self.absent_ids_by_session.get(s2, set())
                 for t1 in self.tables:
                     for t2 in self.tables:
                         both_slots = []
                         for p in self.participants:
+                            if p["id"] in absent1 or p["id"] in absent2:
+                                continue
                             both = self.model.NewBoolVar(
                                 f'overlap_{p["id"]}_s{s1}t{t1}_s{s2}t{t2}'
                             )
@@ -588,12 +592,13 @@ class GroupBuilder:
                         penalty_count += self.overlap_penalty_weight * sum(both_slots)
 
             for s in self.sessions:
+                absent = self.absent_ids_by_session.get(s, set())
                 for t in self.tables:
                     for hist_table in self.historical_tables:
                         overlap_count = sum(
                             self.participant_table_assignments[(p["id"], s, t)]
                             for p in self.participants
-                            if p["id"] in hist_table
+                            if p["id"] in hist_table and p["id"] not in absent
                         )
                         self.model.Add(overlap_count <= self.table_overlap_cap)
                         penalty_count += self.overlap_penalty_weight * overlap_count

@@ -1161,5 +1161,23 @@ def test_pairwise_cap_is_enforced_correctly_across_an_absent_session():
     assert p0_sessions == 3
 
 
+def test_table_overlap_cap_skips_an_absent_participant_cleanly():
+    """The overlap-cap machinery must not reference a table-assignment
+    variable for someone absent that session."""
+    people = _twenty_four_participants_with_relations()
+    builder = GroupBuilder(
+        people,
+        num_tables=4,
+        num_sessions=5,
+        table_overlap_cap=3,
+        absent_ids_by_session={2: {"p0"}},  # P0 absent session 3
+    )
+    result = builder.generate_assignments(max_time_seconds=20)
+    assert result["status"] == "success"
+    session_three = result["assignments"][2]
+    seated = {p["name"] for seats in session_three["tables"].values() for p in seats}
+    assert "P0" not in seated
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
