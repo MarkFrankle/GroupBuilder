@@ -1015,6 +1015,12 @@ class TestRebuild:
         ]
         assert "Person7" not in seated
 
+        metadata = version["metadata"]
+        assert metadata["pairwise_cap"] is not None
+        assert metadata["pairwise_floor"] is not None
+        assert metadata["table_overlap_cap"] is not None
+        assert metadata["table_overlap_floor"] is not None
+
     def test_first_build_applies_prebuild_absences(
         self, client, add_roster_to_firestore
     ):
