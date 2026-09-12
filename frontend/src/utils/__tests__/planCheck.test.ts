@@ -190,6 +190,21 @@ describe('checkPlan — reassurances', () => {
     expect(checkPlan(plan, []).reassurances.maxFacilitatorRepeat).toBe(3)
   })
 
+  it('does not flag a facilitator repeat that is within the solver-provided floor', () => {
+    // Same fixture as the "reports maxFacilitatorRepeat" test above, but with
+    // an explicit pairwise floor of 3 — the repeat count this fixture
+    // produces — proving the facilitator check now honors the real floor
+    // instead of a hardcoded 2.
+    const plan: Assignment[] = [1, 2, 3].map(session => ({
+      session,
+      tables: { 1: [p('F', { is_facilitator: true }), p('X')] },
+    }))
+    const result = checkPlan(plan, [], 3)
+    expect(result.reassurances.maxFacilitatorRepeat).toBe(3)
+    expect(result.reassurances.facilitatorRepeatFloor).toBe(3)
+    expect(result.verdict).not.toBe('lessThanIdeal')
+  })
+
   it('names who is tied for the worst facilitator repeat', () => {
     const plan: Assignment[] = [1, 2, 3].map(session => ({
       session,
