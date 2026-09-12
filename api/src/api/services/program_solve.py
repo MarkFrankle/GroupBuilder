@@ -131,6 +131,14 @@ def solve_program(
     for session_number, absent in absence_map.items():
         if session_number < 1 or session_number > num_sessions:
             continue
+        unresolved = [p["name"] for p in absent if p["name"] not in name_to_id]
+        if unresolved:
+            logger.warning(
+                "Session %s absence record names %s, not on the current roster - "
+                "their absence is recorded but was not enforced in the solve.",
+                session_number,
+                unresolved,
+            )
         absent_ids = {name_to_id[p["name"]] for p in absent if p["name"] in name_to_id}
         if not absent_ids:
             continue
