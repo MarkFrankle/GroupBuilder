@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { History, Loader2 } from 'lucide-react'
@@ -14,6 +14,7 @@ import { CoupleSlotsContext } from '@/components/Assignments/coupleSlotsContext'
 import { buildCoupleSlots } from '@/utils/chipPalettes'
 import NoticeStrip, { Notice } from '@/components/Assignments/NoticeStrip'
 import PlanCheckBand from '@/components/Assignments/PlanCheckBand'
+import PlanCheckCompactRow from '@/components/Assignments/PlanCheckCompactRow'
 import ProgramHeader from '@/components/Assignments/ProgramHeader'
 import ViewBar from '@/components/Assignments/ViewBar'
 import { authenticatedFetch } from '@/utils/apiClient'
@@ -123,6 +124,28 @@ const AssignmentsPage: React.FC = () => {
   // Full, the only place the plan can be edited.
   const [zoom, setZoom] = useState<ZoomLevel>('full')
   const compact = zoom === 'compact'
+
+  // The compact mix-quality row only earns its place once the view-controls
+  // bar is actually pinned to the top - at the natural scroll position it
+  // would just repeat PlanCheckBand a few lines below. Same
+  // sentinel/IntersectionObserver idea as ProgramHeader's condensing, but a
+  // callback ref rather than useRef+useEffect: this component's own loading
+  // guard below returns an entirely different JSX tree while data is still
+  // loading, so the sentinel div doesn't exist on AssignmentsPage's first
+  // render. A useEffect with `[]` deps only ever fires once, against that
+  // first (sentinel-less) render, and never gets a second chance once the
+  // real content mounts. A callback ref fires on every actual attach, so it
+  // still works whenever the node shows up.
+  const [viewBarStuck, setViewBarStuck] = useState(false)
+  const viewBarObserver = useRef<IntersectionObserver | null>(null)
+  const viewBarSentinel = useCallback((node: HTMLDivElement | null) => {
+    viewBarObserver.current?.disconnect()
+    if (!node || typeof IntersectionObserver === 'undefined') return
+    viewBarObserver.current = new IntersectionObserver(entries => {
+      setViewBarStuck(!entries[0].isIntersecting)
+    })
+    viewBarObserver.current.observe(node)
+  }, [])
   const toggleSelected = (name: string) =>
     setSelectedName(current => (current === name ? null : name))
 
@@ -768,7 +791,9 @@ const AssignmentsPage: React.FC = () => {
       )}
       <NoticeStrip notice={provisionalNotice ?? notice} onDismiss={() => showNotice(null)} />
 
+      <div ref={viewBarSentinel} aria-hidden="true" />
       <div className="sticky top-14 z-10 -mx-8 border-b bg-white px-8">
+        {live.length > 0 && viewBarStuck && <PlanCheckCompactRow result={planCheck} />}
         <ViewBar
           focus={focus}
           onFocusChange={setFocus}

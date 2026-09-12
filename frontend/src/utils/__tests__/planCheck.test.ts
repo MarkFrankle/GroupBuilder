@@ -340,3 +340,34 @@ describe('checkPlan — pair-repeat excludes facilitators', () => {
     expect(checkPlan(plan, []).reassurances.maxPairRepeat).toBe(0)
   })
 })
+
+describe('checkPlan — table-overlap floor has one unit of alert slack', () => {
+  // Six identical people, one table per session, so the only cross-session
+  // table pair that can overlap is Session 1's table against Session 2's -
+  // whoever the two sessions share in common is the entire overlap.
+  const people = Object.fromEntries(
+    ['A', 'B', 'C', 'D', 'E', 'F'].map(n => [n, p(n)])
+  )
+
+  it('stays ok exactly one person over the floor - the gap a single-session shuffle cannot always close', () => {
+    // Floor 1, actual 2 (share A & B): floor + TABLE_OVERLAP_ALERT_SLACK (1).
+    const plan: Assignment[] = [
+      { session: 1, tables: { 1: [people.A, people.B, people.C, people.D] } },
+      { session: 2, tables: { 1: [people.A, people.B, people.E, people.F] } },
+    ]
+    const result = checkPlan(plan, [], undefined, 1)
+    expect(result.verdict).toBe('ok')
+    expect(result.reassurances.maxTableOverlap).toBe(2)
+  })
+
+  it('flips to lessThanIdeal more than one person over the floor', () => {
+    // Floor 1, actual 3 (share A, B & C): floor + TABLE_OVERLAP_ALERT_SLACK + 1.
+    const plan: Assignment[] = [
+      { session: 1, tables: { 1: [people.A, people.B, people.C, people.D] } },
+      { session: 2, tables: { 1: [people.A, people.B, people.C, people.F] } },
+    ]
+    const result = checkPlan(plan, [], undefined, 1)
+    expect(result.verdict).toBe('lessThanIdeal')
+    expect(result.reassurances.maxTableOverlap).toBe(3)
+  })
+})

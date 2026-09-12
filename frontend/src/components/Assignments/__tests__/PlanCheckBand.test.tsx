@@ -107,15 +107,27 @@ describe('PlanCheckBand — less-than-ideal state', () => {
     expect(screen.getByText('At least one pair sits together three times')).toBeInTheDocument()
   })
 
-  it('replaces the overlap reassurance with a factual note above the cap', () => {
+  it('shows a mild, non-alarming note when overlap is within one person of the floor', () => {
     withResult({
-      verdict: 'lessThanIdeal',
+      verdict: 'ok',
       reassurances: { maxTableOverlap: 2, tableOverlapCap: 1 },
     })
     expect(
       screen.queryByText('No two tables share more than 1 person')
     ).not.toBeInTheDocument()
-    expect(screen.getByText('At least two tables share 2 people')).toBeInTheDocument()
+    expect(screen.getByText('Two tables share 2 people')).toBeInTheDocument()
+    expect(screen.queryByText('At least two tables share 2 people')).not.toBeInTheDocument()
+  })
+
+  it('replaces the overlap reassurance with a factual note once overlap is more than one past the floor', () => {
+    withResult({
+      verdict: 'lessThanIdeal',
+      reassurances: { maxTableOverlap: 3, tableOverlapCap: 1 },
+    })
+    expect(
+      screen.queryByText('No two tables share more than 1 person')
+    ).not.toBeInTheDocument()
+    expect(screen.getByText('At least two tables share 3 people')).toBeInTheDocument()
   })
 
   it('names the worst overlapping tables in the hoverable detail', async () => {
@@ -130,7 +142,7 @@ describe('PlanCheckBand — less-than-ideal state', () => {
     const trigger = screen.getByRole('button', { name: /which tables overlap/i })
     trigger.focus()
     expect(
-      (await screen.findAllByText('Session 1 Table 1 & Session 3 Table 2 — Ann, Bea')).length
+      (await screen.findAllByText('Session 1 Table 1 & Session 3 Table 2')).length
     ).toBeGreaterThan(0)
   })
 

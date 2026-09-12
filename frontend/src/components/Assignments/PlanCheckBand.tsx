@@ -1,6 +1,6 @@
 import React from 'react'
 import { CheckCircle2, AlertTriangle, Info, HelpCircle } from 'lucide-react'
-import type { PlanCheckResult } from '@/utils/planCheck'
+import { TABLE_OVERLAP_ALERT_SLACK, type PlanCheckResult } from '@/utils/planCheck'
 import {
   Tooltip,
   TooltipContent,
@@ -37,6 +37,13 @@ function tableOverlapNote(max: number): string {
   return `At least two tables share ${max} ${people}`
 }
 
+/** Same fact, calmer framing - used only within TABLE_OVERLAP_ALERT_SLACK of
+ *  the floor, where the gap is expected roster noise, not a real problem. */
+function tableOverlapMildNote(max: number): string {
+  const people = max === 1 ? 'person' : 'people'
+  return `Two tables share ${max} ${people}`
+}
+
 const CheckLine: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <li className="flex items-start gap-2">
     <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-600" aria-hidden="true" />
@@ -52,8 +59,48 @@ const ProblemLine: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   </li>
 )
 
+/**
+ * The lines inside a worst-case tooltip - shared by the full band's small
+ * `(?)` (RepeatWorstDetail) and the compact row's whole-badge tooltip
+ * (TooltipBadge), so the two surfaces can't drift on how a detail list reads.
+ * `groupKeys`, when given, must be parallel to `lines`; a light divider is
+ * drawn above any line whose group key differs from the line before it (e.g.
+ * grouping the table-overlap list by its first session number). `header`,
+ * when given, renders above the list as its own line - the fact a compact
+ * badge doesn't have room to state inline (e.g. "3 people shared"), so the
+ * badge itself can stay a plain category name.
+ */
+export const DetailList: React.FC<{
+  lines: string[]
+  groupKeys?: Array<string | number>
+  header?: string
+}> = ({ lines, groupKeys, header }) => (
+  <>
+    {header && <div className="mb-1 font-medium">{header}</div>}
+    <ul className="space-y-0.5">
+      {lines.map((line, i) => (
+        <li
+          key={line}
+          className={
+            groupKeys && i > 0 && groupKeys[i] !== groupKeys[i - 1]
+              ? 'mt-1 border-t pt-1 border-black/10'
+              : undefined
+          }
+        >
+          {line}
+        </li>
+      ))}
+    </ul>
+  </>
+)
+
 /** The (?) next to a worst-case note — hover or focus to see who, named, one per line. */
-const RepeatWorstDetail: React.FC<{ label: string; lines: string[] }> = ({ label, lines }) => (
+export const RepeatWorstDetail: React.FC<{
+  label: string
+  lines: string[]
+  groupKeys?: Array<string | number>
+  header?: string
+}> = ({ label, lines, groupKeys, header }) => (
   <TooltipProvider>
     <Tooltip>
       <TooltipTrigger asChild>
@@ -66,11 +113,7 @@ const RepeatWorstDetail: React.FC<{ label: string; lines: string[] }> = ({ label
         </button>
       </TooltipTrigger>
       <TooltipContent side="right" align="start">
-        <ul className="space-y-0.5">
-          {lines.map(line => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
+        <DetailList lines={lines} groupKeys={groupKeys} header={header} />
       </TooltipContent>
     </Tooltip>
   </TooltipProvider>
@@ -166,7 +209,25 @@ const PlanCheckBand: React.FC<PlanCheckBandProps> = ({ result }) => {
             overlapCap === 1 ? 'person' : 'people'
           }`}</CheckLine>
         )}
-        {multiSession && overlapCap != null && r.maxTableOverlap > overlapCap && (
+        {multiSession &&
+          overlapCap != null &&
+          r.maxTableOverlap > overlapCap &&
+          r.maxTableOverlap <= overlapCap + TABLE_OVERLAP_ALERT_SLACK && (
+            <NoteLine>
+              {tableOverlapMildNote(r.maxTableOverlap)}
+              {r.tableOverlapWorst.length > 0 && (
+                <RepeatWorstDetail
+                  label="Which tables overlap"
+                  lines={r.tableOverlapWorst.map(
+                    w =>
+                      `Session ${w.sessions[0]} Table ${w.tables[0]} & Session ${w.sessions[1]} Table ${w.tables[1]}`
+                  )}
+                  groupKeys={r.tableOverlapWorst.map(w => w.sessions[0])}
+                />
+              )}
+            </NoteLine>
+          )}
+        {multiSession && overlapCap != null && r.maxTableOverlap > overlapCap + TABLE_OVERLAP_ALERT_SLACK && (
           <NoteLine>
             {tableOverlapNote(r.maxTableOverlap)}
             {r.tableOverlapWorst.length > 0 && (
@@ -174,8 +235,9 @@ const PlanCheckBand: React.FC<PlanCheckBandProps> = ({ result }) => {
                 label="Which tables overlap"
                 lines={r.tableOverlapWorst.map(
                   w =>
-                    `Session ${w.sessions[0]} Table ${w.tables[0]} & Session ${w.sessions[1]} Table ${w.tables[1]} — ${w.names.join(', ')}`
+                    `Session ${w.sessions[0]} Table ${w.tables[0]} & Session ${w.sessions[1]} Table ${w.tables[1]}`
                 )}
+                groupKeys={r.tableOverlapWorst.map(w => w.sessions[0])}
               />
             )}
           </NoteLine>

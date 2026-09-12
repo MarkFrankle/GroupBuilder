@@ -915,6 +915,46 @@ def test_historical_meeting_counts_forbid_a_pair_that_already_hit_the_cap():
         assert not ({"P0", "P1"} <= names)
 
 
+def test_single_session_solve_prefers_not_repeating_a_historical_pair():
+    """A single-session solve (num_sessions=1) has no rolling-window signal
+    at all - range(s1+1, min(s1+window+1, 1)) is always empty when there's
+    only one session - so without this objective term, nothing prefers
+    avoiding a pair who already met elsewhere. Four participants, two
+    two-seat tables: P0+P1 have already met once; P2+P3 have not. Seating
+    P0 with P1 recreates a repeat; seating P0 with P2 (or P3) does not.
+    Both arrangements are equally legal (no cap is set, so neither is
+    forbidden) - only the objective can prefer one over the other.
+    """
+    participants = [
+        {
+            "id": f"p{i}",
+            "name": f"P{i}",
+            "religion": "Christian",
+            "gender": "Male",
+            "couple_id": None,
+        }
+        for i in range(4)
+    ]
+
+    builder = GroupBuilder(
+        participants,
+        num_tables=2,
+        num_sessions=1,
+        historical_meeting_counts={("p0", "p1"): 1},
+    )
+    result = builder.generate_assignments(max_time_seconds=15)
+
+    assert result["status"] == "success"
+    assert result["solution_quality"] == "optimal"
+    tables = result["assignments"][0]["tables"]
+    seated_together = {frozenset(s["name"] for s in seats) for seats in tables.values()}
+    assert frozenset({"P0", "P1"}) not in seated_together, (
+        "P0 and P1 already met once elsewhere and a repeat-free seating "
+        "exists - the solver had no reason to prefer it before this fix, "
+        "since a single-session solve's rolling window is always empty."
+    )
+
+
 def test_table_overlap_never_exceeds_the_configured_cap():
     from itertools import combinations
 
@@ -929,6 +969,49 @@ def test_table_overlap_never_exceeds_the_configured_cap():
             tables.append(frozenset(p["name"] for p in people_at_table))
     for a, b in combinations(tables, 2):
         assert len(a & b) <= 3
+
+
+def test_single_session_solve_prefers_less_overlap_with_a_historical_table():
+    """The whole-table-overlap cap (`table_overlap_cap`) is enforced as a pure
+    hard constraint (`sum(both_slots) <= cap` / `overlap_count <= cap`) with
+    no objective term pushing the solver toward *less* overlap than the cap
+    allows - the same class of bug fixed for pairwise repeats above, but on
+    the overlap axis. Four participants, two two-seat tables, one session to
+    solve: P0 and P1 already sat together at a historical table elsewhere in
+    the program. Reseating them together again reproduces that table's full
+    membership (overlap = 2); splitting them does not (overlap <= 1). A cap
+    of 2 makes both arrangements legal - only the objective can prefer the
+    lower-overlap one.
+    """
+    participants = [
+        {
+            "id": f"p{i}",
+            "name": f"P{i}",
+            "religion": "Christian",
+            "gender": "Male",
+            "couple_id": None,
+        }
+        for i in range(4)
+    ]
+
+    builder = GroupBuilder(
+        participants,
+        num_tables=2,
+        num_sessions=1,
+        table_overlap_cap=2,
+        historical_tables=[{"p0", "p1"}],
+    )
+    result = builder.generate_assignments(max_time_seconds=15)
+
+    assert result["status"] == "success"
+    assert result["solution_quality"] == "optimal"
+    tables = result["assignments"][0]["tables"]
+    seated_together = {frozenset(s["name"] for s in seats) for seats in tables.values()}
+    assert frozenset({"P0", "P1"}) not in seated_together, (
+        "P0 and P1 already shared a historical table and a lower-overlap "
+        "seating exists - the solver had no reason to prefer it before "
+        "this fix, since the overlap cap is a hard ceiling, not a target."
+    )
 
 
 def test_overlap_cap_too_tight_is_reported_infeasible_not_silently_ignored():
