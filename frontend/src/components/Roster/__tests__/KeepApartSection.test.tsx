@@ -39,7 +39,7 @@ describe('KeepApartSection', () => {
     expect(screen.getByText(
       'People here will never be seated at the same table.',
     )).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Add a pair' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Separate pair' })).toBeInTheDocument();
   });
 
   test('a committed pair reads as text, not as dropdowns', () => {
@@ -54,7 +54,7 @@ describe('KeepApartSection', () => {
 
   test('the explanation stays up while a draft row is open', () => {
     render(<KeepApartSection {...defaultProps} />);
-    click(screen.getByRole('button', { name: 'Add a pair' }));
+    click(screen.getByRole('button', { name: 'Separate pair' }));
     expect(screen.getAllByRole('combobox')).toHaveLength(2);
     expect(screen.getByText(
       'People here will never be seated at the same table.',
@@ -63,7 +63,7 @@ describe('KeepApartSection', () => {
 
   test('a half-filled draft row is discarded, not remembered', () => {
     render(<KeepApartSection {...defaultProps} />);
-    click(screen.getByRole('button', { name: 'Add a pair' }));
+    click(screen.getByRole('button', { name: 'Separate pair' }));
     openSelect(0);
     pick('Ken Adler');
 
@@ -75,7 +75,7 @@ describe('KeepApartSection', () => {
 
   test('nothing is saved until both names are chosen', async () => {
     render(<KeepApartSection {...defaultProps} />);
-    click(screen.getByRole('button', { name: 'Add a pair' }));
+    click(screen.getByRole('button', { name: 'Separate pair' }));
     expect(screen.getAllByRole('combobox')).toHaveLength(2);
 
     await openSelect(0);
@@ -89,7 +89,7 @@ describe('KeepApartSection', () => {
 
   test('the second select excludes the first person and anyone already kept apart from them', async () => {
     render(<KeepApartSection {...defaultProps} pairs={[['p1', 'p2']]} />);
-    click(screen.getByRole('button', { name: 'Add a pair' }));
+    click(screen.getByRole('button', { name: 'Separate pair' }));
 
     await openSelect(0);
     await pick('Ken Adler');
@@ -105,7 +105,7 @@ describe('KeepApartSection', () => {
       'Ken Adler and Bill Steigelmann are a couple, and couples are always seated at different tables.',
     )));
     render(<KeepApartSection {...defaultProps} onAdd={onAdd} />);
-    click(screen.getByRole('button', { name: 'Add a pair' }));
+    click(screen.getByRole('button', { name: 'Separate pair' }));
 
     await openSelect(0);
     await pick('Ken Adler');
@@ -129,7 +129,7 @@ describe('KeepApartSection', () => {
       // disappearance can only be the change clearing it.
       .mockReturnValue(new Promise(() => {}));
     render(<KeepApartSection {...defaultProps} onAdd={onAdd} />);
-    click(screen.getByRole('button', { name: 'Add a pair' }));
+    click(screen.getByRole('button', { name: 'Separate pair' }));
 
     await openSelect(0);
     await pick('Ken Adler');
@@ -146,7 +146,7 @@ describe('KeepApartSection', () => {
 
   test('a successful commit clears the draft row', async () => {
     render(<KeepApartSection {...defaultProps} />);
-    click(screen.getByRole('button', { name: 'Add a pair' }));
+    click(screen.getByRole('button', { name: 'Separate pair' }));
 
     openSelect(0);
     pick('Ken Adler');
@@ -154,12 +154,12 @@ describe('KeepApartSection', () => {
     pick('Bill Steigelmann');
 
     await waitFor(() => expect(screen.queryByRole('combobox')).not.toBeInTheDocument());
-    expect(screen.getByRole('button', { name: 'Add a pair' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Separate pair' })).toBeInTheDocument();
   });
 
   test('the exclusion works in the other direction too', async () => {
     render(<KeepApartSection {...defaultProps} pairs={[['p1', 'p2']]} />);
-    click(screen.getByRole('button', { name: 'Add a pair' }));
+    click(screen.getByRole('button', { name: 'Separate pair' }));
 
     openSelect(1);
     pick('Ken Adler');
@@ -173,7 +173,7 @@ describe('KeepApartSection', () => {
   test('both names are inert while the add is in flight', async () => {
     const onAdd = jest.fn(() => new Promise<void>(() => {}));
     render(<KeepApartSection {...defaultProps} onAdd={onAdd} />);
-    click(screen.getByRole('button', { name: 'Add a pair' }));
+    click(screen.getByRole('button', { name: 'Separate pair' }));
 
     openSelect(0);
     pick('Ken Adler');
@@ -191,23 +191,23 @@ describe('KeepApartSection', () => {
 
   test('only one draft row exists at a time', () => {
     render(<KeepApartSection {...defaultProps} />);
-    click(screen.getByRole('button', { name: 'Add a pair' }));
+    click(screen.getByRole('button', { name: 'Separate pair' }));
     expect(screen.getAllByRole('combobox')).toHaveLength(2);
-    expect(screen.queryByRole('button', { name: 'Add a pair' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Separate pair' })).not.toBeInTheDocument();
   });
 
   test('the block and its selects carry accessible names', () => {
     render(<KeepApartSection {...defaultProps} />);
     expect(screen.getByRole('group', { name: 'Keep apart' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Keep apart' })).toBeInTheDocument();
-    click(screen.getByRole('button', { name: 'Add a pair' }));
+    click(screen.getByRole('button', { name: 'Separate pair' }));
     expect(screen.getByLabelText('First person')).toBeInTheDocument();
     expect(screen.getByLabelText('Second person')).toBeInTheDocument();
   });
 
   test('names are offered in alphabetical order', () => {
     render(<KeepApartSection {...defaultProps} participants={[diane, ken, bill]} />);
-    click(screen.getByRole('button', { name: 'Add a pair' }));
+    click(screen.getByRole('button', { name: 'Separate pair' }));
     openSelect(0);
     expect(screen.getAllByRole('option').map(o => o.textContent)).toEqual([
       'Bill Steigelmann', 'Diane Stadlen', 'Ken Adler',

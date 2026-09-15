@@ -69,12 +69,13 @@ function HelpPage() {
               Assignments, and Help.
             </li>
             <li>
-              <strong>Roster</strong> — Where you add and edit your list of participants.
+              <strong>Roster</strong> — Where you add and edit your list of participants
+              and their characteristics.
             </li>
             <li>
-              <strong>Assignments</strong> — Browse the groups Group Builder has generated
-              for you, sorted by session. This link appears once you've built your first
-              set of groups.
+              <strong>Assignments</strong> — This link appears once you've built your first
+              set of groups. Browse the groups Group Builder has generated for you, sorted
+              by session.
             </li>
             <li>
               <strong>Help</strong> — This page.
@@ -93,12 +94,6 @@ function HelpPage() {
             participants are.
           </p>
 
-          <Screenshot
-            src="/images/help/roster-management.png"
-            alt="The roster manager showing several participants with their religion, gender, partner, and facilitator settings"
-            caption="The roster manager with participants, their details, partner links, and facilitator checkboxes"
-          />
-
           <h3 className="text-xl font-semibold mb-2">Using the Roster Manager</h3>
           <p className="mb-2 text-slate-700 leading-relaxed">
             Click <strong>Roster</strong> in the nav bar to open the roster manager.
@@ -106,17 +101,23 @@ function HelpPage() {
             one by one.
           </p>
 
+          <Screenshot
+            src="/images/help/roster-management.png"
+            alt="The roster manager showing several participants with their religion, gender, partner, and facilitator settings"
+            caption="The roster manager with participants, their details, partner links, and facilitator checkboxes"
+          />
+
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Adding a participant:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             As you enter a participant's information, a new empty row will appear
             for the next person and the roster will save automatically.
           </p>
 
-          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Setting details:</p>
+          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Adding characteristics:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Each participant has a <strong>Religion</strong> dropdown (Christian, Jewish,
             Muslim, or Other) and a <strong>Gender</strong> dropdown (Male, Female, or
-            Other). These are used when balancing the tables: every table will
+            Other). These are used when balancing the tables: ideally every table will
             have an even mix of religions and genders.
           </p>
 
@@ -145,13 +146,13 @@ function HelpPage() {
             you have 6 facilitators for 4 tables, some tables will get two.
           </p>
 
-          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Recording absences ahead of time:</p>
+          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Recording absences:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            If you already know someone will miss a session or two, use the{" "}
-            <strong>Absences</strong> column on their row and tick the sessions they'll
-            miss. The first build works around those absences. After you've built your
-            sessions, absences are managed per session on the Assignments page instead,
-            and the Absences column becomes a read-only summary.
+            If you know someone will miss a session or two when you are creating the
+            roster, use the <strong>Absences</strong> column on their row and tick the
+            sessions they'll miss. The first build works around those absences. After
+            you've built your sessions, new absences are managed per session on the
+            Assignments page instead, and the Absences column becomes a read-only summary.
           </p>
 
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Deleting a participant:</p>
@@ -164,7 +165,7 @@ function HelpPage() {
           <p className="mb-4 text-slate-700 leading-relaxed">
             Sometimes two participants shouldn't share a table. Below the table and
             session counts, find the <strong>Keep apart</strong> section and click{" "}
-            <strong>+ Add a pair</strong>. Choose two people from the dropdowns and
+            <strong>Separate pair</strong>. Choose two people from the dropdowns and
             they'll never be seated together in any session. Remove a pair you've
             added by clicking its remove icon. Partners do not appear as options to
             keep apart because they are kept apart by default.
@@ -183,10 +184,11 @@ function HelpPage() {
           </p>
           <p className="mb-1 text-slate-700 leading-relaxed">
             <strong>Number of Sessions</strong> is how many rounds of different
-            groupings you need, typically one per week of your program. If your
-            program runs for 5 weeks, choose 5 sessions. Each session will have a
-            completely different arrangement so people meet new tablemates each
-            week.
+            groupings (or sessions) you need, typically one per week of your
+            program. If your program has five sessions, then insert 5 sessions.
+            Group Builder will solve the assignments for each session so that each
+            session has a different arrangement and mix of people, and people will
+            meet new tablemates each week.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             When you're ready, click <strong>Generate assignments</strong>. The
@@ -195,7 +197,7 @@ function HelpPage() {
             it's done, you'll be taken to the results page.
           </p>
 
-          <h3 className="text-xl font-semibold mb-2">Editing after you've built groups</h3>
+          <h3 className="text-xl font-semibold mb-2">Editing after you've generated assignments</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Once you've generated a set of sessions, the roster <strong>locks</strong>:
             every field goes read-only and the header reads "Locked — these are the
