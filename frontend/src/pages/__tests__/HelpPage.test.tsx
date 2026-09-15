@@ -15,9 +15,10 @@ describe('HelpPage', () => {
     const sectionNames = [
       'Welcome to Group Builder',
       'Creating Your Roster',
-      'Viewing Your Assignments',
-      'Printing & Sharing',
-      'Changing a Session',
+      'Reading Your Assignments',
+      'Running Your Sessions',
+      'How Good Are the Assignments: Reading the Banner',
+      'Changing a Plan',
       'Troubleshooting',
     ];
     for (const name of sectionNames) {
@@ -30,9 +31,10 @@ describe('HelpPage', () => {
     const headings = [
       'Welcome to Group Builder',
       'Creating Your Roster',
-      'Viewing Your Assignments',
-      'Printing & Sharing',
-      'Changing a Session',
+      'Reading Your Assignments',
+      'Running Your Sessions',
+      'How Good Are the Assignments: Reading the Banner',
+      'Changing Assignments',
       'Troubleshooting',
     ];
     for (const heading of headings) {
@@ -47,7 +49,7 @@ describe('HelpPage', () => {
 
   test('renders callout boxes', () => {
     renderPage();
-    // Info callout explaining that completion runs in order
-    expect(screen.getAllByText(/only complete the next session/).length).toBeGreaterThan(0);
+    // Info callout explaining the login-link expiry
+    expect(screen.getAllByText(/login links expire/).length).toBeGreaterThan(0);
   });
 });
