@@ -635,7 +635,7 @@ describe('the Keep apart block', () => {
     // The roster matches the sessions, so the block starts inert: pressing
     // Edit roster is how a coordinator gets at it, exactly as for the grid.
     fireEvent.click(await screen.findByRole('button', { name: /edit roster/i }));
-    fireEvent.click(screen.getByRole('button', { name: 'Add a pair' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Separate pair' }));
     fireEvent.keyDown(screen.getByRole('combobox', { name: 'First person' }), { key: 'Enter' });
     fireEvent.click(screen.getByRole('option', { name: 'Alice' }));
     fireEvent.keyDown(screen.getByRole('combobox', { name: 'Second person' }), { key: 'Enter' });
@@ -673,7 +673,7 @@ describe('the Keep apart block', () => {
     // The roster matches the sessions, so the block starts inert: pressing
     // Edit roster is how a coordinator gets at it, exactly as for the grid.
     fireEvent.click(await screen.findByRole('button', { name: /edit roster/i }));
-    fireEvent.click(screen.getByRole('button', { name: 'Add a pair' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Separate pair' }));
     fireEvent.keyDown(screen.getByRole('combobox', { name: 'First person' }), { key: 'Enter' });
     fireEvent.click(screen.getByRole('option', { name: 'Alice' }));
     fireEvent.keyDown(screen.getByRole('combobox', { name: 'Second person' }), { key: 'Enter' });
