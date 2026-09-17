@@ -634,6 +634,11 @@ const AssignmentsPage: React.FC = () => {
       actions: version.promotable
         ? [{ label: 'Promote', onClick: () => promoteMutation.mutate({ version }) }, backToCurrent]
         : [backToCurrent],
+      // No × on this one: closing it must not be a way to leave `viewing` set
+      // with no remaining visual sign — that traps the page in read-only mode
+      // (no Mark absent, etc.) while looking exactly like the live view.
+      // Promote or Back to current are the only ways out.
+      dismissible: false,
     })
   }
 
