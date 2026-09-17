@@ -21,12 +21,10 @@ const defaultProps = {
   readOnly: false,
 };
 
-// Radix's select opens on a keypress and commits on a click; user-event v13's
-// synthetic pointer sequence does neither, so drive it with fireEvent.
 const click = (el: Element) => fireEvent.click(el);
 
-const openSelect = (index: number) =>
-  fireEvent.keyDown(screen.getAllByRole('combobox')[index], { key: 'Enter' });
+const openSelect = (label: string) =>
+  fireEvent.click(screen.getByRole('button', { name: label }));
 
 const pick = (name: string) => fireEvent.click(screen.getByRole('option', { name }));
 
@@ -45,7 +43,7 @@ describe('KeepApartSection', () => {
   test('a committed pair reads as text, not as dropdowns', () => {
     render(<KeepApartSection {...defaultProps} pairs={[['p1', 'p2']]} />);
     expect(screen.getByText('Ken Adler and Bill Steigelmann')).toBeInTheDocument();
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('First person')).not.toBeInTheDocument();
     // The description stays; only the "nobody yet" half goes away.
     expect(screen.getByText(
       'People here will never be seated at the same table.',
@@ -55,7 +53,8 @@ describe('KeepApartSection', () => {
   test('the explanation stays up while a draft row is open', () => {
     render(<KeepApartSection {...defaultProps} />);
     click(screen.getByRole('button', { name: 'Separate pair' }));
-    expect(screen.getAllByRole('combobox')).toHaveLength(2);
+    expect(screen.getByLabelText('First person')).toBeInTheDocument();
+    expect(screen.getByLabelText('Second person')).toBeInTheDocument();
     expect(screen.getByText(
       'People here will never be seated at the same table.',
     )).toBeInTheDocument();
@@ -64,25 +63,26 @@ describe('KeepApartSection', () => {
   test('a half-filled draft row is discarded, not remembered', () => {
     render(<KeepApartSection {...defaultProps} />);
     click(screen.getByRole('button', { name: 'Separate pair' }));
-    openSelect(0);
+    openSelect('First person');
     pick('Ken Adler');
 
     click(screen.getByRole('button', { name: 'Discard this row' }));
 
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('First person')).not.toBeInTheDocument();
     expect(defaultProps.onAdd).not.toHaveBeenCalled();
   });
 
   test('nothing is saved until both names are chosen', async () => {
     render(<KeepApartSection {...defaultProps} />);
     click(screen.getByRole('button', { name: 'Separate pair' }));
-    expect(screen.getAllByRole('combobox')).toHaveLength(2);
+    expect(screen.getByLabelText('First person')).toBeInTheDocument();
+    expect(screen.getByLabelText('Second person')).toBeInTheDocument();
 
-    await openSelect(0);
+    await openSelect('First person');
     await pick('Ken Adler');
     expect(defaultProps.onAdd).not.toHaveBeenCalled();
 
-    await openSelect(1);
+    await openSelect('Second person');
     await pick('Bill Steigelmann');
     await waitFor(() => expect(defaultProps.onAdd).toHaveBeenCalledWith('p1', 'p2'));
   });
@@ -91,10 +91,10 @@ describe('KeepApartSection', () => {
     render(<KeepApartSection {...defaultProps} pairs={[['p1', 'p2']]} />);
     click(screen.getByRole('button', { name: 'Separate pair' }));
 
-    await openSelect(0);
+    await openSelect('First person');
     await pick('Ken Adler');
 
-    await openSelect(1);
+    await openSelect('Second person');
     expect(screen.getByRole('option', { name: 'Diane Stadlen' })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Ken Adler' })).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Bill Steigelmann' })).not.toBeInTheDocument();
@@ -107,16 +107,17 @@ describe('KeepApartSection', () => {
     render(<KeepApartSection {...defaultProps} onAdd={onAdd} />);
     click(screen.getByRole('button', { name: 'Separate pair' }));
 
-    await openSelect(0);
+    await openSelect('First person');
     await pick('Ken Adler');
-    await openSelect(1);
+    await openSelect('Second person');
     await pick('Bill Steigelmann');
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(
       'Ken Adler and Bill Steigelmann are a couple, and couples are always seated at different tables.',
     );
-    expect(screen.getAllByRole('combobox')).toHaveLength(2);
+    expect(screen.getByLabelText('First person')).toBeInTheDocument();
+    expect(screen.getByLabelText('Second person')).toBeInTheDocument();
     // A screen reader must be able to reach the refusal from either name.
     expect(screen.getByLabelText('First person')).toHaveAttribute('aria-describedby', alert.id);
     expect(screen.getByLabelText('Second person')).toHaveAttribute('aria-describedby', alert.id);
@@ -131,13 +132,13 @@ describe('KeepApartSection', () => {
     render(<KeepApartSection {...defaultProps} onAdd={onAdd} />);
     click(screen.getByRole('button', { name: 'Separate pair' }));
 
-    await openSelect(0);
+    await openSelect('First person');
     await pick('Ken Adler');
-    await openSelect(1);
+    await openSelect('Second person');
     await pick('Bill Steigelmann');
     await screen.findByText('A person can\'t be kept apart from themselves.');
 
-    await openSelect(1);
+    await openSelect('Second person');
     await pick('Diane Stadlen');
     await waitFor(() => expect(
       screen.queryByText('A person can\'t be kept apart from themselves.'),
@@ -148,12 +149,12 @@ describe('KeepApartSection', () => {
     render(<KeepApartSection {...defaultProps} />);
     click(screen.getByRole('button', { name: 'Separate pair' }));
 
-    openSelect(0);
+    openSelect('First person');
     pick('Ken Adler');
-    openSelect(1);
+    openSelect('Second person');
     pick('Bill Steigelmann');
 
-    await waitFor(() => expect(screen.queryByRole('combobox')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByLabelText('First person')).not.toBeInTheDocument());
     expect(screen.getByRole('button', { name: 'Separate pair' })).toBeInTheDocument();
   });
 
@@ -161,10 +162,10 @@ describe('KeepApartSection', () => {
     render(<KeepApartSection {...defaultProps} pairs={[['p1', 'p2']]} />);
     click(screen.getByRole('button', { name: 'Separate pair' }));
 
-    openSelect(1);
+    openSelect('Second person');
     pick('Ken Adler');
 
-    openSelect(0);
+    openSelect('First person');
     expect(screen.getByRole('option', { name: 'Diane Stadlen' })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Ken Adler' })).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Bill Steigelmann' })).not.toBeInTheDocument();
@@ -175,16 +176,16 @@ describe('KeepApartSection', () => {
     render(<KeepApartSection {...defaultProps} onAdd={onAdd} />);
     click(screen.getByRole('button', { name: 'Separate pair' }));
 
-    openSelect(0);
+    openSelect('First person');
     pick('Ken Adler');
-    openSelect(1);
+    openSelect('Second person');
     pick('Bill Steigelmann');
 
     await waitFor(() => expect(screen.getByLabelText('First person')).toBeDisabled());
     expect(screen.getByLabelText('Second person')).toBeDisabled();
 
     // A second pick cannot get through, so only one rule is ever created.
-    openSelect(0);
+    openSelect('First person');
     expect(screen.queryByRole('option', { name: 'Diane Stadlen' })).not.toBeInTheDocument();
     expect(onAdd).toHaveBeenCalledTimes(1);
   });
@@ -192,7 +193,8 @@ describe('KeepApartSection', () => {
   test('only one draft row exists at a time', () => {
     render(<KeepApartSection {...defaultProps} />);
     click(screen.getByRole('button', { name: 'Separate pair' }));
-    expect(screen.getAllByRole('combobox')).toHaveLength(2);
+    expect(screen.getByLabelText('First person')).toBeInTheDocument();
+    expect(screen.getByLabelText('Second person')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Separate pair' })).not.toBeInTheDocument();
   });
 
@@ -208,7 +210,7 @@ describe('KeepApartSection', () => {
   test('names are offered in alphabetical order', () => {
     render(<KeepApartSection {...defaultProps} participants={[diane, ken, bill]} />);
     click(screen.getByRole('button', { name: 'Separate pair' }));
-    openSelect(0);
+    openSelect('First person');
     expect(screen.getAllByRole('option').map(o => o.textContent)).toEqual([
       'Bill Steigelmann', 'Diane Stadlen', 'Ken Adler',
     ]);

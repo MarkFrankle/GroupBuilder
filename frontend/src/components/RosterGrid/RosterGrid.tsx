@@ -7,6 +7,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { PersonCombobox } from '@/components/ui/PersonCombobox';
 import { Trash2, Link, Unlink } from 'lucide-react';
 import { RosterParticipant, Religion, Gender, RELIGIONS, GENDERS } from '@/types/roster';
 import { AwayCell } from './AwayCell';
@@ -173,7 +174,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
               <TableHead className="w-[200px]">Name</TableHead>
               <TableHead className="w-[150px]">Religion</TableHead>
               <TableHead className="w-[120px]">Gender</TableHead>
-              <TableHead className="w-[200px]">Partner</TableHead>
+              <TableHead className="w-[260px]">Partner</TableHead>
               <TableHead className="w-[90px]">Facilitator</TableHead>
               <TableHead className="w-[160px]">Absences</TableHead>
               <TableHead className="w-[50px]"></TableHead>
@@ -214,22 +215,19 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
                   </TableCell>
                   <TableCell className="p-1">
                     <div className="flex items-center gap-1">
-                      <Select
-                        value={p.partner_id ?? 'none'}
+                      <PersonCombobox
+                        className="min-w-0"
+                        aria-label={`Partner for ${currentName || 'this row'}`}
+                        value={p.partner_id}
                         disabled={readOnly}
-                        onValueChange={v => handleFieldChange(p, 'partner_id', v)}
-                      >
-                        <SelectTrigger className="min-w-0 [&>span]:flex-1 [&>span]:truncate [&>span]:text-left"><SelectValue placeholder="None" /></SelectTrigger>
-                        <SelectContent className="max-h-60 overflow-y-auto border shadow-md">
-                          <SelectItem value="none">None</SelectItem>
-                          {[...participants]
-                            .filter(other => other.id !== p.id && (!other.partner_id || other.partner_id === p.id))
-                            .sort((a, b) => a.name.localeCompare(b.name))
-                            .map(other => (
-                              <SelectItem key={other.id} value={other.id}>{other.name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
+                        placeholder="None"
+                        searchPlaceholder="Search for a partner"
+                        noneLabel="None"
+                        onSelect={id => handleFieldChange(p, 'partner_id', id ?? 'none')}
+                        options={[...participants]
+                          .filter(other => other.id !== p.id && (!other.partner_id || other.partner_id === p.id))
+                          .sort((a, b) => a.name.localeCompare(b.name))}
+                      />
                       <span className="flex w-5 shrink-0 items-center justify-center">
                       {p.partner_id && (
                         <button

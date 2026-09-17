@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+import { PersonCombobox } from '@/components/ui/PersonCombobox';
 import { Plus, X } from 'lucide-react';
 import { RosterParticipant } from '@/types/roster';
 
@@ -90,20 +88,17 @@ export function KeepApartSection({
   const describedBy = draft?.error ? ERROR_ID : undefined;
 
   const personSelect = (side: 'a' | 'b', label: string) => (
-    <Select
-      value={draft?.[side] ?? undefined}
+    <PersonCombobox
+      className="w-52"
+      aria-label={label}
+      aria-describedby={describedBy}
+      value={draft?.[side] ?? null}
       disabled={draft?.pending}
-      onValueChange={v => choose(side, v)}
-    >
-      <SelectTrigger className="w-52" aria-label={label} aria-describedby={describedBy}>
-        <SelectValue placeholder="Choose a person" />
-      </SelectTrigger>
-      <SelectContent className="max-h-60 overflow-y-auto border shadow-md">
-        {choicesExcluding(side === 'a' ? draft?.b ?? null : draft?.a ?? null).map(p => (
-          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+      placeholder="Choose a person"
+      searchPlaceholder="Search for a person"
+      onSelect={id => id && choose(side, id)}
+      options={choicesExcluding(side === 'a' ? draft?.b ?? null : draft?.a ?? null)}
+    />
   );
 
   return (
