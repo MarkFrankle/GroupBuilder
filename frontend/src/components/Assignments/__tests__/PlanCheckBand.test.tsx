@@ -42,7 +42,7 @@ const withResult = (
 describe('PlanCheckBand — green state', () => {
   it('shows the ready-to-print headline', () => {
     withResult()
-    expect(screen.getByText('Looks good — ready to print and hand out')).toBeInTheDocument()
+    expect(screen.getByText('Looks good! Ready to print and hand out')).toBeInTheDocument()
   })
 
   it('shows a line only for features the roster uses', () => {
@@ -81,12 +81,12 @@ describe('PlanCheckBand — green state', () => {
     ).toBeInTheDocument()
   })
 
-  it('shows the table-overlap line only once a cap is known', () => {
+  it('never shows an overlap line in the clean state, even once a cap is known', () => {
     withResult()
-    expect(screen.queryByText(/No two tables share/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/tables share/)).not.toBeInTheDocument()
 
     withResult({ reassurances: { tableOverlapCap: 1 } })
-    expect(screen.getByText('No two tables share more than 1 person')).toBeInTheDocument()
+    expect(screen.queryByText(/tables share/)).not.toBeInTheDocument()
   })
 })
 
@@ -107,7 +107,7 @@ describe('PlanCheckBand — less-than-ideal state', () => {
     expect(screen.getByText('At least one pair sits together three times')).toBeInTheDocument()
   })
 
-  it('shows a mild, non-alarming note when overlap is within one person of the floor', () => {
+  it('shows nothing about overlap when it is within one person of the floor', () => {
     withResult({
       verdict: 'ok',
       reassurances: { maxTableOverlap: 2, tableOverlapCap: 1 },
@@ -115,8 +115,8 @@ describe('PlanCheckBand — less-than-ideal state', () => {
     expect(
       screen.queryByText('No two tables share more than 1 person')
     ).not.toBeInTheDocument()
-    expect(screen.getByText('Two tables share 2 people')).toBeInTheDocument()
-    expect(screen.queryByText('At least two tables share 2 people')).not.toBeInTheDocument()
+    expect(screen.queryByText(/tables share/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/very similar/)).not.toBeInTheDocument()
   })
 
   it('replaces the overlap reassurance with a factual note once overlap is more than one past the floor', () => {
@@ -127,14 +127,14 @@ describe('PlanCheckBand — less-than-ideal state', () => {
     expect(
       screen.queryByText('No two tables share more than 1 person')
     ).not.toBeInTheDocument()
-    expect(screen.getByText('At least two tables share 3 people')).toBeInTheDocument()
+    expect(screen.getByText('Tables between sessions are very similar')).toBeInTheDocument()
   })
 
   it('names the worst overlapping tables in the hoverable detail', async () => {
     withResult({
       verdict: 'lessThanIdeal',
       reassurances: {
-        maxTableOverlap: 2,
+        maxTableOverlap: 3,
         tableOverlapCap: 1,
         tableOverlapWorst: [{ sessions: [1, 3], tables: [1, 2], names: ['Ann', 'Bea'] }],
       },

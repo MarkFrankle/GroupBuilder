@@ -1214,7 +1214,7 @@ describe('AssignmentsPage — plan check band', () => {
     renderPage()
 
     expect(
-      await screen.findByText('Looks good — ready to print and hand out')
+      await screen.findByText('Looks good! Ready to print and hand out')
     ).toBeInTheDocument()
   })
 
@@ -1274,7 +1274,7 @@ describe('AssignmentsPage — plan check compact row', () => {
       },
     ]
     renderPage()
-    await screen.findByText('Looks good — ready to print and hand out')
+    await screen.findByText('Looks good! Ready to print and hand out')
 
     const instance = FakeIntersectionObserver.instances.find(i => i.observedNode != null)
     expect(instance).toBeDefined()
