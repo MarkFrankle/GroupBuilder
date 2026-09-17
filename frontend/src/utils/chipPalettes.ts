@@ -26,7 +26,7 @@ export const GENDER_COLORS: Record<string, Swatch> = {
 
 /**
  * Every chip in couples focus, partnered or not. Couples are told apart by a
- * numbered badge (see `buildCoupleNumbers`), not by colour — colour-matching
+ * numbered badge (see `buildCoupleNumbers`), not by colour. Colour-matching
  * across a crowded screen was hard to scan and not colourblind-safe.
  */
 export const NO_COUPLE: Swatch = { bg: '#E4E4E4', fg: '#333333' }
