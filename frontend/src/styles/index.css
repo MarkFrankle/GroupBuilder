@@ -140,6 +140,12 @@ code {
     text-shadow: none !important;
   }
 
+  /* Compact-view session cards — never split one across a page boundary */
+  [data-testid="sessions-container"] > * {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
   /* Remove page background gradient */
   html, body, #root {
     background: white !important;
