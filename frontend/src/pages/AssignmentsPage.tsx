@@ -638,6 +638,11 @@ const AssignmentsPage: React.FC = () => {
     })
   }
 
+  const handlePrintCompact = () => {
+    if (!confirmPrintingOldVersion()) return
+    window.print()
+  }
+
   const handlePrintSession = (sessionNumber: number) => {
     const sessionAssignment = sorted.find(a => a.session === sessionNumber)
     if (!sessionAssignment || !programId) return
@@ -815,16 +820,20 @@ const AssignmentsPage: React.FC = () => {
       >
         {trackingSummary ?? ''}
       </div>
-      <ProgramHeader
-        programName={currentProgram?.name ?? 'Assignments'}
-        onPrintRoster={handlePrintRoster}
-        onCopyLink={handleCopyLink}
-        history={historyMenu}
-      />
+      <div className="no-print">
+        <ProgramHeader
+          programName={currentProgram?.name ?? 'Assignments'}
+          onPrintRoster={handlePrintRoster}
+          onCopyLink={handleCopyLink}
+          history={historyMenu}
+        />
+      </div>
 
       <div className="flex flex-col gap-4 px-8">
       {live.length > 0 && (
-        <PlanCheckBand result={planCheck} />
+        <div className="no-print">
+          <PlanCheckBand result={planCheck} />
+        </div>
       )}
       {/*
         A notice scoped to one session (shuffle, mark absent/present, mark
@@ -835,18 +844,20 @@ const AssignmentsPage: React.FC = () => {
         does a provisional-rebuild notice, which always wins the top slot.
       */}
       {(provisionalNotice || !noticeIsSessionScoped) && (
-        <NoticeStrip notice={provisionalNotice ?? notice} onDismiss={() => showNotice(null)} />
+        <div className="no-print">
+          <NoticeStrip notice={provisionalNotice ?? notice} onDismiss={() => showNotice(null)} />
+        </div>
       )}
 
       <div ref={viewBarSentinel} aria-hidden="true" />
-      <div className="sticky top-[104px] z-10 -mx-8 border-b bg-white px-8">
+      <div className="sticky top-[104px] z-10 -mx-8 border-b bg-white px-8 no-print">
         {live.length > 0 && viewBarStuck && <PlanCheckCompactRow result={planCheck} />}
         <ViewBar
           focus={focus}
           onFocusChange={setFocus}
           zoom={zoom}
           onZoomChange={setZoom}
-          onPrint={() => window.print()}
+          onPrint={handlePrintCompact}
           participants={allParticipants}
         />
       </div>

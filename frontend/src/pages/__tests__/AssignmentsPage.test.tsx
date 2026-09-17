@@ -617,6 +617,44 @@ describe('AssignmentsPage', () => {
     })
   })
 
+  describe('printing the compact view', () => {
+    const realConfirm = window.confirm
+
+    afterEach(() => {
+      window.confirm = realConfirm
+    })
+
+    it('prints in place from the compact view Print button, respecting the old-version confirm gate', async () => {
+      const printSpy = jest.spyOn(window, 'print').mockImplementation(() => {})
+      renderPage()
+
+      await screen.findByText('Session 1')
+      fireEvent.click(screen.getByRole('button', { name: 'Compact' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Print' }))
+
+      expect(printSpy).toHaveBeenCalledTimes(1)
+      printSpy.mockRestore()
+    })
+
+    it('does not print an older version when the confirm is declined', async () => {
+      window.confirm = jest.fn(() => false)
+      const printSpy = jest.spyOn(window, 'print').mockImplementation(() => {})
+      renderPage()
+
+      await screen.findByText('Session 1')
+      await openVersion(/Session 3 shuffled/)
+      await screen.findByText(/You're viewing/)
+      fireEvent.click(screen.getByRole('button', { name: 'Compact' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Print' }))
+
+      expect(window.confirm).toHaveBeenCalledWith(
+        expect.stringContaining('older version')
+      )
+      expect(printSpy).not.toHaveBeenCalled()
+      printSpy.mockRestore()
+    })
+  })
+
   it('folds the current head into the Latest item instead of listing it twice', async () => {
     renderPage()
 
