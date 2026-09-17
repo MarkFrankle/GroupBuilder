@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import SessionCard from '@/components/Assignments/SessionCard'
 import { CoupleSlotsContext } from '@/components/Assignments/coupleSlotsContext'
-import { buildCoupleSlots } from '@/utils/chipPalettes'
+import { buildCoupleNumbers } from '@/utils/chipPalettes'
 import NoticeStrip, { Notice } from '@/components/Assignments/NoticeStrip'
 import PlanCheckBand from '@/components/Assignments/PlanCheckBand'
 import PlanCheckCompactRow from '@/components/Assignments/PlanCheckCompactRow'
@@ -245,7 +245,7 @@ const AssignmentsPage: React.FC = () => {
     [sorted]
   )
 
-  const coupleSlots = useMemo(() => buildCoupleSlots(allParticipants), [allParticipants])
+  const coupleSlots = useMemo(() => buildCoupleNumbers(allParticipants), [allParticipants])
 
   // Collapsing a card reflows everything below it, so the anchor is lost. Put
   // the next thing to do back under the user's eyes.

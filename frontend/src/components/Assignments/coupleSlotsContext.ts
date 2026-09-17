@@ -1,9 +1,9 @@
 import { createContext, useContext } from 'react'
 
 /**
- * Couple → palette-slot map for the current plan, built once by AssignmentsPage
- * from every participant so each couple gets its own colour (see
- * `buildCoupleSlots`). Chip reads it here rather than having it threaded through
+ * Couple → badge-number map for the current plan, built once by AssignmentsPage
+ * from every participant so each couple gets its own numbered badge (see
+ * `buildCoupleNumbers`). Chip reads it here rather than having it threaded through
  * SessionCard and TableBlock alongside `focus`. Undefined outside the provider —
  * Chip then falls back to per-pair hashing.
  */

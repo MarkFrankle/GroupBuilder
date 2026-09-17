@@ -62,7 +62,7 @@ describe('buildCoupleNumbers / coupleNumber', () => {
     const cd = coupleNumber('Cara', 'Dan', numbers)
     const ef = coupleNumber('Eve', 'Finn', numbers)
     expect(new Set([ab, cd, ef]).size).toBe(3)
-    expect([ab, cd, ef].every(n => n >= 1)).toBe(true)
+    expect([ab, cd, ef].every(n => n !== undefined && n >= 1)).toBe(true)
   })
 
   it('returns undefined for a pair with no assigned number', () => {
