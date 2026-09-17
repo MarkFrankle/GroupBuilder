@@ -39,6 +39,14 @@ code {
 
 /* Print-specific styles for seating charts */
 @media print {
+  /* Without this, browsers drop background colors and box-shadows by default
+     when printing — the compact-view chips are colored solely via an inline
+     backgroundColor style, so they'd otherwise print as plain black text. */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
   /* Hide UI controls when printing */
   .no-print {
     display: none !important;

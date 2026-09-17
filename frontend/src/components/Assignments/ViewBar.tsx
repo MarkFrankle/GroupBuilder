@@ -67,6 +67,12 @@ const ViewBar: React.FC<ViewBarProps> = ({
       <FocusLegend focus={focus} participants={participants} />
     </div>
     <div className="flex items-center gap-2">
+      {zoom === 'compact' && (
+        <Button variant="outline" size="sm" onClick={onPrint}>
+          <Printer className="mr-1.5 h-3.5 w-3.5" />
+          Print
+        </Button>
+      )}
       <span className="text-base text-muted-foreground">View</span>
       <div role="group" aria-label="Zoom level" className="inline-flex rounded-md border">
         {ZOOMS.map(({ value, label }, i) => (
@@ -89,12 +95,6 @@ const ViewBar: React.FC<ViewBarProps> = ({
           </button>
         ))}
       </div>
-      {zoom === 'compact' && (
-        <Button variant="outline" size="sm" onClick={onPrint}>
-          <Printer className="mr-1.5 h-3.5 w-3.5" />
-          Print
-        </Button>
-      )}
     </div>
   </div>
 )
