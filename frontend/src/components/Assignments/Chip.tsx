@@ -1,6 +1,5 @@
 import React from 'react'
-import { chipSwatch, coupleNumber } from '@/utils/chipPalettes'
-import { useCoupleSlots } from './coupleSlotsContext'
+import { chipSwatch } from '@/utils/chipPalettes'
 import type { AttributeFocus, Participant } from '@/types/assignments'
 
 interface ChipProps {
@@ -9,7 +8,7 @@ interface ChipProps {
   selectedName: string | null
   onSelect: (name: string) => void
   /**
-   * What the chip is coloured about — religion, gender, or couples. Program-scoped,
+   * What the chip is coloured about — religion or gender. Program-scoped,
    * set by the view-controls switch and threaded down the same path as
    * `selectedName`. Defaults to religion so the many leaf call sites need not pass it.
    */
@@ -26,19 +25,9 @@ const Chip: React.FC<ChipProps> = ({
   compact = false,
 }) => {
   const isFacilitator = !!participant.is_facilitator
-  const coupleSlots = useCoupleSlots()
   const { bg, fg } = chipSwatch(focus, participant)
-  const partnered = focus === 'couples' && !!participant.partner
-  const badgeNumber =
-    partnered && participant.partner
-      ? coupleNumber(participant.name, participant.partner, coupleSlots ?? new Map())
-      : undefined
 
-  const title = isFacilitator
-    ? `${participant.name} · Facilitator`
-    : partnered
-      ? `${participant.name} · partner of ${participant.partner}`
-      : participant.name
+  const title = isFacilitator ? `${participant.name} · Facilitator` : participant.name
 
   // Colour is spoken for by the focus and the amber ring by facilitators, so
   // opacity is the only channel left to say "not this person".
@@ -66,8 +55,6 @@ const Chip: React.FC<ChipProps> = ({
       }}
       className={[
         shape,
-        // `inline-flex` keeps the couples badge on the baseline; `text-left`
-        // undoes the button element's centring.
         'inline-flex items-center gap-1 cursor-pointer text-left transition-opacity',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-1',
         selected && 'font-bold ring-2 ring-slate-900 ring-offset-1',
@@ -77,14 +64,6 @@ const Chip: React.FC<ChipProps> = ({
         .join(' ')}
       style={{ backgroundColor: bg, color: fg }}
     >
-      {badgeNumber !== undefined && (
-        <span
-          aria-hidden="true"
-          className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-current text-[9px] font-semibold"
-        >
-          {badgeNumber}
-        </span>
-      )}
       {participant.name}
       {isFacilitator && <span className="sr-only"> · Facilitator</span>}
     </button>

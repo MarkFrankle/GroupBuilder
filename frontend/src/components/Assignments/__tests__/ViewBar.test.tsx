@@ -25,11 +25,10 @@ function renderBar(overrides: Partial<React.ComponentProps<typeof ViewBar>> = {}
 }
 
 describe('ViewBar', () => {
-  it('offers the three focuses with Religion pressed by default', () => {
+  it('offers the two focuses with Religion pressed by default', () => {
     renderBar()
     expect(screen.getByRole('button', { name: 'Religion' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: 'Gender' })).toHaveAttribute('aria-pressed', 'false')
-    expect(screen.getByRole('button', { name: 'Couples' })).toBeInTheDocument()
   })
 
   it('reports a focus change on click', () => {
@@ -59,11 +58,6 @@ describe('ViewBar', () => {
       participants: [...people, { name: 'Sam', religion: 'Other', gender: 'Other', partner: null }],
     })
     expect(within(screen.getByTestId('focus-legend')).getByText('Other')).toBeInTheDocument()
-  })
-
-  it('renders no legend under couples focus', () => {
-    renderBar({ focus: 'couples' })
-    expect(screen.queryByTestId('focus-legend')).not.toBeInTheDocument()
   })
 
   it('offers Full and Compact with Full pressed by default', () => {

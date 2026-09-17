@@ -6,7 +6,7 @@
  */
 
 /** What the chiclets are coloured *about* — the view-controls focus switch (Item 12). */
-export type AttributeFocus = 'religion' | 'gender' | 'couples'
+export type AttributeFocus = 'religion' | 'gender'
 
 /** View-controls zoom toggle: how much detail each chiclet shows (Item 11). */
 export type ZoomLevel = 'full' | 'compact'

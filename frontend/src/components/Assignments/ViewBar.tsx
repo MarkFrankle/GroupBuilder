@@ -14,7 +14,6 @@ interface ViewBarProps {
 const OPTIONS: { value: AttributeFocus; label: string }[] = [
   { value: 'religion', label: 'Religion' },
   { value: 'gender', label: 'Gender' },
-  { value: 'couples', label: 'Couples' },
 ]
 
 const ZOOMS: { value: ZoomLevel; label: string }[] = [
@@ -105,9 +104,6 @@ const FocusLegend: React.FC<{ focus: AttributeFocus; participants: Participant[]
   focus,
   participants,
 }) => {
-  // The couple colours mean only "these two match", so there is nothing to spell out.
-  if (focus === 'couples') return null
-
   if (focus === 'gender') {
     const hasOther = participants.some(p => p.gender !== 'Female' && p.gender !== 'Male')
     return (

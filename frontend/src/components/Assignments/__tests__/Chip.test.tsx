@@ -1,8 +1,6 @@
 import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import Chip from '../Chip'
-import { CoupleSlotsContext } from '../coupleSlotsContext'
-import { canonicalPairKey } from '@/utils/chipPalettes'
 import type { Participant } from '@/types/assignments'
 
 const alice: Participant = {
@@ -98,55 +96,6 @@ describe('Chip', () => {
       expect(screen.getByRole('button', { name: /Alice/ })).toHaveStyle({
         backgroundColor: '#FBD5E6',
       })
-    })
-
-    it('gives both partners the same numbered badge under couples focus', () => {
-      const { rerender } = render(
-        <CoupleSlotsContext.Provider value={new Map([[canonicalPairKey('Alice', 'Bob'), 1]])}>
-          <Chip
-            participant={{ ...alice, partner: 'Bob' }}
-            selectedName={null}
-            onSelect={jest.fn()}
-            focus="couples"
-          />
-        </CoupleSlotsContext.Provider>
-      )
-      expect(screen.getByRole('button', { name: /Alice/ })).toHaveTextContent('1')
-
-      rerender(
-        <CoupleSlotsContext.Provider value={new Map([[canonicalPairKey('Alice', 'Bob'), 1]])}>
-          <Chip
-            participant={{ name: 'Bob', religion: 'Jewish', gender: 'Male', partner: 'Alice' }}
-            selectedName={null}
-            onSelect={jest.fn()}
-            focus="couples"
-          />
-        </CoupleSlotsContext.Provider>
-      )
-      expect(screen.getByRole('button', { name: /Bob/ })).toHaveTextContent('1')
-    })
-
-    it('shows no badge for an unpartnered chip under couples focus', () => {
-      render(<Chip participant={alice} selectedName={null} onSelect={jest.fn()} focus="couples" />)
-      expect(screen.getByRole('button', { name: /Alice/ })).toHaveTextContent('Alice')
-    })
-
-    it('names the partner in the title only for a partnered chip under couples focus', () => {
-      const { rerender } = render(
-        <Chip
-          participant={{ ...alice, partner: 'Bob' }}
-          selectedName={null}
-          onSelect={jest.fn()}
-          focus="couples"
-        />
-      )
-      expect(screen.getByRole('button', { name: /Alice/ })).toHaveAttribute(
-        'title',
-        'Alice · partner of Bob'
-      )
-
-      rerender(<Chip participant={alice} selectedName={null} onSelect={jest.fn()} focus="couples" />)
-      expect(screen.getByRole('button', { name: /Alice/ })).toHaveAttribute('title', 'Alice')
     })
 
     it('keeps the facilitator ring across focuses', () => {
