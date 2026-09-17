@@ -32,16 +32,8 @@ function pairRepeatNote(max: number): string {
   return `At least one pair sits together ${timesWord(max)}`
 }
 
-function tableOverlapNote(max: number): string {
-  const people = max === 1 ? 'person' : 'people'
-  return `At least two tables share ${max} ${people}`
-}
-
-/** Same fact, calmer framing - used only within TABLE_OVERLAP_ALERT_SLACK of
- *  the floor, where the gap is expected roster noise, not a real problem. */
-function tableOverlapMildNote(max: number): string {
-  const people = max === 1 ? 'person' : 'people'
-  return `Two tables share ${max} ${people}`
+function tableOverlapNote(): string {
+  return 'Tables between sessions are very similar'
 }
 
 const CheckLine: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -127,7 +119,7 @@ const NoteLine: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 )
 
 const HEADLINE: Record<PlanCheckResult['verdict'], string> = {
-  ok: 'Looks good — ready to print and hand out',
+  ok: 'Looks good! Ready to print and hand out',
   lessThanIdeal: 'Good enough to print, but not ideal',
   attention: '', // computed below — singular/plural depends on violation count
 }
@@ -204,32 +196,9 @@ const PlanCheckBand: React.FC<PlanCheckBandProps> = ({ result }) => {
           </NoteLine>
         )}
 
-        {multiSession && overlapCap != null && r.maxTableOverlap <= overlapCap && (
-          <CheckLine>{`No two tables share more than ${overlapCap} ${
-            overlapCap === 1 ? 'person' : 'people'
-          }`}</CheckLine>
-        )}
-        {multiSession &&
-          overlapCap != null &&
-          r.maxTableOverlap > overlapCap &&
-          r.maxTableOverlap <= overlapCap + TABLE_OVERLAP_ALERT_SLACK && (
-            <NoteLine>
-              {tableOverlapMildNote(r.maxTableOverlap)}
-              {r.tableOverlapWorst.length > 0 && (
-                <RepeatWorstDetail
-                  label="Which tables overlap"
-                  lines={r.tableOverlapWorst.map(
-                    w =>
-                      `Session ${w.sessions[0]} Table ${w.tables[0]} & Session ${w.sessions[1]} Table ${w.tables[1]}`
-                  )}
-                  groupKeys={r.tableOverlapWorst.map(w => w.sessions[0])}
-                />
-              )}
-            </NoteLine>
-          )}
         {multiSession && overlapCap != null && r.maxTableOverlap > overlapCap + TABLE_OVERLAP_ALERT_SLACK && (
           <NoteLine>
-            {tableOverlapNote(r.maxTableOverlap)}
+            {tableOverlapNote()}
             {r.tableOverlapWorst.length > 0 && (
               <RepeatWorstDetail
                 label="Which tables overlap"

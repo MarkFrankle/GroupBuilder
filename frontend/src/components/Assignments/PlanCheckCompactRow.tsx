@@ -57,14 +57,6 @@ const Badge: React.FC<{
 )
 
 const okIcon = <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0 text-green-600" aria-hidden="true" />
-/** Same shape as okIcon, muted rather than green - used only within
- *  TABLE_OVERLAP_ALERT_SLACK of the floor, where the gap is expected roster
- *  noise rather than something to fix, but still worth a status icon rather
- *  than none (a bare label next to four checkmarks reads as a rendering gap,
- *  not a deliberate calmer state). */
-const mildIcon = (
-  <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
-)
 const warnIcon = (
   <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 text-amber-600" aria-hidden="true" />
 )
@@ -145,6 +137,7 @@ const PlanCheckCompactRow: React.FC<PlanCheckCompactRowProps> = ({ result }) => 
 
       {multiSession &&
         overlapCap != null &&
+        r.maxTableOverlap > overlapCap + TABLE_OVERLAP_ALERT_SLACK &&
         (() => {
           const overlapLines = r.tableOverlapWorst.map(
             w =>
@@ -155,31 +148,6 @@ const PlanCheckCompactRow: React.FC<PlanCheckCompactRowProps> = ({ result }) => 
             r.maxTableOverlap === 1 ? 'person' : 'people'
           } shared`
 
-          if (r.maxTableOverlap <= overlapCap) {
-            return (
-              <Badge
-                icon={okIcon}
-                label="Overlap"
-                lines={[
-                  `No two tables share more than ${overlapCap} ${
-                    overlapCap === 1 ? 'person' : 'people'
-                  }`,
-                ]}
-              />
-            )
-          }
-          if (r.maxTableOverlap <= overlapCap + TABLE_OVERLAP_ALERT_SLACK) {
-            return (
-              <Badge
-                icon={mildIcon}
-                label="Overlap"
-                ariaLabel="Which tables overlap"
-                header={overlapHeader}
-                lines={overlapLines}
-                groupKeys={overlapGroupKeys}
-              />
-            )
-          }
           return (
             <Badge
               icon={warnIcon}

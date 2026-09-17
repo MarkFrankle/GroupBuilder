@@ -46,10 +46,10 @@ describe('PlanCheckCompactRow — green state', () => {
     expect(screen.getByText('Balance')).toBeInTheDocument()
   })
 
-  it('shows the reassuring repeat/overlap/variety chips at or below the floor', () => {
+  it('shows the reassuring repeat/variety chips at or below the floor, but no overlap chip', () => {
     withResult({ reassurances: { tableOverlapCap: 1, maxTableOverlap: 1 } })
     expect(screen.getByText('Repeats')).toBeInTheDocument()
-    expect(screen.getByText('Overlap')).toBeInTheDocument()
+    expect(screen.queryByText('Overlap')).not.toBeInTheDocument()
     expect(screen.getByText('Facilitator variety')).toBeInTheDocument()
   })
 
@@ -73,12 +73,6 @@ describe('PlanCheckCompactRow — green state', () => {
     trigger.focus()
     expect(
       (await screen.findAllByText('No one sits with the same person more than twice')).length
-    ).toBeGreaterThan(0)
-
-    trigger = screen.getByRole('button', { name: 'Overlap' })
-    trigger.focus()
-    expect(
-      (await screen.findAllByText('No two tables share more than 1 person')).length
     ).toBeGreaterThan(0)
 
     trigger = screen.getByRole('button', { name: 'Facilitator variety' })
@@ -125,7 +119,7 @@ describe('PlanCheckCompactRow — less-than-ideal state', () => {
     ).toBeGreaterThan(0)
   })
 
-  it('shows a mild overlap note within one person of the floor, with the count in its detail', async () => {
+  it('hides the overlap chip entirely within one person of the floor', () => {
     withResult({
       verdict: 'ok',
       reassurances: {
@@ -134,13 +128,7 @@ describe('PlanCheckCompactRow — less-than-ideal state', () => {
         tableOverlapWorst: [{ sessions: [1, 3], tables: [1, 2], names: ['Ann', 'Bea'] }],
       },
     })
-    expect(screen.getByText('Overlap')).toBeInTheDocument()
-    const trigger = screen.getByRole('button', { name: /which tables overlap/i })
-    trigger.focus()
-    expect((await screen.findAllByText('2 people shared')).length).toBeGreaterThan(0)
-    expect(
-      (await screen.findAllByText('Session 1 Table 1 & Session 3 Table 2')).length
-    ).toBeGreaterThan(0)
+    expect(screen.queryByText('Overlap')).not.toBeInTheDocument()
   })
 
   it('shows a warning chip once overlap is more than one person past the floor, with detail', async () => {

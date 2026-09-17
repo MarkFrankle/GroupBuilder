@@ -426,7 +426,7 @@ function HelpPage() {
           <Screenshot
             wide
             src="/images/help/grey-banner.png"
-            alt="A gray plan-check banner: the three hard rules pass, but a pair sits together three times, two tables share 3 people, and one person has the same facilitator 3 of 5 sessions"
+            alt="A gray plan-check banner: the three hard rules pass, but a pair sits together three times, tables between sessions are very similar, and one person has the same facilitator 3 of 5 sessions"
             caption="Good enough to print, but not ideal"
           />
 
