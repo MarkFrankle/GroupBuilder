@@ -169,7 +169,7 @@ function mockApi() {
         ok: true,
         status: 200,
         json: () =>
-          Promise.resolve({ version_id: 'v3', label: 'Restored "Session 3 shuffled"' }),
+          Promise.resolve({ version_id: 'v4', label: 'Undid "Session 3 shuffled"' }),
       } as Response)
     }
 
@@ -180,6 +180,14 @@ function mockApi() {
         json: () =>
           Promise.resolve({
             versions: [
+              {
+                version_id: 'v3',
+                created_at: 1740090000,
+                assignment_set_id: 'set-current',
+                label: 'Oktay marked present in Session 2',
+                promotable: true,
+                not_promotable_reason: null,
+              },
               {
                 version_id: 'v2',
                 created_at: 1740086400,
@@ -470,7 +478,7 @@ describe('AssignmentsPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: /promote/i }))
 
     expect(
-      await screen.findByText(/Restored "Session 3 shuffled" is now the current plan\./)
+      await screen.findByText(/Undid "Session 3 shuffled" is now the current plan\./)
     ).toBeInTheDocument()
     expect(api.promoted).toContain('/api/assignments/results/promote/v2')
     expect(api.promoted).toContain('program_id=test-program-id')
@@ -596,6 +604,22 @@ describe('AssignmentsPage', () => {
     })
   })
 
+  it('folds the current head into the Latest item instead of listing it twice', async () => {
+    renderPage()
+
+    fireEvent.keyDown(await screen.findByRole('button', { name: /history/i }), {
+      key: 'Enter',
+    })
+
+    expect(
+      await screen.findByText('Latest: Oktay marked present in Session 2')
+    ).toBeInTheDocument()
+    // The head's own entry is folded into "Latest", not listed separately.
+    expect(
+      screen.queryByRole('menuitem', { name: /^Oktay marked present in Session 2/ })
+    ).not.toBeInTheDocument()
+  })
+
   it('labels versions and divides them at the setup change', async () => {
     renderPage()
 
@@ -669,9 +693,9 @@ describe('AssignmentsPage', () => {
 
       fireEvent.click(await screen.findByRole('button', { name: /^undo$/i }))
 
-      // v2 was the head when Shuffle was pressed. Reading the list afterwards
+      // v3 was the head when Shuffle was pressed. Reading the list afterwards
       // would find the shuffle's own version there instead.
-      await waitFor(() => expect(api.promoted).toContain('/promote/v2'))
+      await waitFor(() => expect(api.promoted).toContain('/promote/v3'))
       expect(
         await screen.findByText(/Session 2 shuffle undone/)
       ).toBeInTheDocument()
@@ -916,7 +940,7 @@ describe('AssignmentsPage', () => {
 
       fireEvent.click(await screen.findByRole('button', { name: /^undo$/i }))
 
-      await waitFor(() => expect(api.promoted).toContain('/promote/v2'))
+      await waitFor(() => expect(api.promoted).toContain('/promote/v3'))
     })
 
     it('surfaces the server\u2019s refusal rather than writing its own', async () => {

@@ -987,8 +987,8 @@ async def promote_version(
             completion, program_id, current.get("assignments"), assignments
         )
 
-    promoted_label = (promoted.get("metadata") or {}).get("label") or version_id
-    label = f'Restored "{promoted_label}"'
+    undone_label = (current.get("metadata") or {}).get("label") if current else None
+    label = f'Undid "{undone_label}"' if undone_label else "Undid the previous change"
 
     new_version_id = _next_version_id(storage, program_id, current_set_id)
     storage.save_version(

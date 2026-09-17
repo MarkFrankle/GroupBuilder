@@ -733,16 +733,24 @@ const AssignmentsPage: React.FC = () => {
             showNotice(null)
           }}
         >
-          Latest
+          <div className="flex flex-col items-start">
+            <span>
+              Latest: {versions[0].label ?? formatVersionDate(versions[0].created_at)}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {formatVersionDate(versions[0].created_at)}
+            </span>
+          </div>
         </DropdownMenuItem>
         {/*
           Left in server order — current set first, newest first within each
           set. Re-sorting by timestamp would scramble the grouping the divider
-          depends on.
+          depends on. Index 0 is folded into the "Latest" item above, so the
+          selectable list starts at index 1.
         */}
-        {versions.map((version: ResultVersion, index: number) => {
+        {versions.slice(1).map((version: ResultVersion, sliceIndex: number) => {
+          const index = sliceIndex + 1
           const startsNewSet =
-            index > 0 &&
             version.assignment_set_id !== versions[index - 1].assignment_set_id
 
           return (

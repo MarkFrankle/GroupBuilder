@@ -2000,7 +2000,7 @@ class TestPromotion:
 
         assert response.status_code == 200
         assert response.json()["version_id"] == "v3"
-        assert response.json()["label"] == 'Restored "Manual edit"'
+        assert response.json()["label"] == 'Undid "Manual edit"'
         current = client.get(f"/api/assignments/results?program_id={PROGRAM}").json()
         assert current[0]["tables"]["1"] == first[0]["tables"]["1"]
 
@@ -2074,7 +2074,7 @@ class TestPromotion:
         # Names the version, so a deleted route's own 404 cannot pass this test.
         assert response.json()["detail"] == "Version v99 not found."
 
-    def test_promoting_an_unlabelled_version_names_the_version(
+    def test_promoting_when_the_current_version_is_unlabelled_uses_a_generic_label(
         self,
         client,
         sample_set_data,
@@ -2082,21 +2082,20 @@ class TestPromotion:
         add_version_to_firestore,
         sample_assignments_result,
     ):
-        """A legacy version with no label is restored by its id, never "None"."""
+        """A legacy current version with no label is undone with generic copy, never "None"."""
         set_id = add_assignment_set_to_firestore(sample_set_data)
         first = sample_assignments_result["assignments"]
-        add_version_to_firestore(set_id, "v1", first, metadata={"source": "generated"})
+        add_version_to_firestore(set_id, "v1", first, metadata={"label": "Generated"})
         swapped = copy.deepcopy(first)
         swapped[0]["tables"]["1"], swapped[0]["tables"]["2"] = (
             swapped[0]["tables"]["2"],
             swapped[0]["tables"]["1"],
         )
-        client.post(
-            f"/api/assignments/results/save?program_id={PROGRAM}",
-            json={"assignments": swapped},
+        add_version_to_firestore(
+            set_id, "v2", swapped, metadata={"source": "generated"}
         )
 
         response = self._promote(client, "v1")
 
         assert response.status_code == 200
-        assert response.json()["label"] == 'Restored "v1"'
+        assert response.json()["label"] == "Undid the previous change"
