@@ -269,7 +269,7 @@ function HelpPage() {
           <Screenshot
             wide
             src="/images/help/assignments-header.png"
-            alt="The top of the Assignments page: program name and print/copy-link/history buttons, a green plan-check banner, and a row with a Religion/Gender/Couples color legend and a Full/Compact switch"
+            alt="The top of the Assignments page: program name and print/copy-link/history buttons, a green plan-check banner, and a row with a Religion/Gender color legend and a Full/Compact switch"
             caption="The top of the Assignments page"
           />
 
@@ -291,7 +291,7 @@ function HelpPage() {
             </li>
             <li>
               <strong>Bottom left:</strong> switch names between colored by
-              Religion, Gender, or Couples — the legend next to it shows what each
+              Religion or Gender. The legend next to it shows what each
               color means.
             </li>
             <li>
