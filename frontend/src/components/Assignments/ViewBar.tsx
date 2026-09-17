@@ -1,4 +1,6 @@
 import React from 'react'
+import { Printer } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { GENDER_COLORS, RELIGION_COLORS } from '@/utils/chipPalettes'
 import type { AttributeFocus, Participant, ZoomLevel } from '@/types/assignments'
 
@@ -9,6 +11,7 @@ interface ViewBarProps {
   participants: Participant[]
   zoom: ZoomLevel
   onZoomChange: (zoom: ZoomLevel) => void
+  onPrint: () => void
 }
 
 const OPTIONS: { value: AttributeFocus; label: string }[] = [
@@ -36,6 +39,7 @@ const ViewBar: React.FC<ViewBarProps> = ({
   participants,
   zoom,
   onZoomChange,
+  onPrint,
 }) => (
   <div className="flex items-center justify-between gap-4 py-1">
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -63,6 +67,12 @@ const ViewBar: React.FC<ViewBarProps> = ({
       <FocusLegend focus={focus} participants={participants} />
     </div>
     <div className="flex items-center gap-2">
+      {zoom === 'compact' && (
+        <Button variant="outline" size="sm" onClick={onPrint} className="mr-6">
+          <Printer className="mr-1.5 h-3.5 w-3.5" />
+          Print
+        </Button>
+      )}
       <span className="text-base text-muted-foreground">View</span>
       <div role="group" aria-label="Zoom level" className="inline-flex rounded-md border">
         {ZOOMS.map(({ value, label }, i) => (

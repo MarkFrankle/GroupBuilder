@@ -39,8 +39,27 @@ code {
 
 /* Print-specific styles for seating charts */
 @media print {
+  /* Without this, browsers drop background colors and box-shadows by default
+     when printing — the compact-view chips are colored solely via an inline
+     backgroundColor style, so they'd otherwise print as plain black text. */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
   /* Hide UI controls when printing */
   .no-print {
+    display: none !important;
+  }
+
+  /* Compact-view print: these surround the sessions grid but aren't part of
+     it. Targeted by testid rather than a wrapping div in AssignmentsPage.tsx —
+     a wrapper broke ProgramHeader's own sticky/condense behavior on screen,
+     since it changed ProgramHeader from being a direct flex child of the page
+     to a nested one. */
+  [data-testid="program-header"],
+  [data-testid="plan-check-band"],
+  [data-testid="notice-strip"] {
     display: none !important;
   }
 
@@ -130,6 +149,12 @@ code {
   * {
     box-shadow: none !important;
     text-shadow: none !important;
+  }
+
+  /* Compact-view session cards — never split one across a page boundary */
+  [data-testid="sessions-container"] > * {
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   /* Remove page background gradient */

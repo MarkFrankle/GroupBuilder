@@ -638,6 +638,11 @@ const AssignmentsPage: React.FC = () => {
     })
   }
 
+  const handlePrintCompact = () => {
+    if (!confirmPrintingOldVersion()) return
+    window.print()
+  }
+
   const handlePrintSession = (sessionNumber: number) => {
     const sessionAssignment = sorted.find(a => a.session === sessionNumber)
     if (!sessionAssignment || !programId) return
@@ -839,13 +844,14 @@ const AssignmentsPage: React.FC = () => {
       )}
 
       <div ref={viewBarSentinel} aria-hidden="true" />
-      <div className="sticky top-[104px] z-10 -mx-8 border-b bg-white px-8">
+      <div className="sticky top-[104px] z-10 -mx-8 border-b bg-white px-8 no-print">
         {live.length > 0 && viewBarStuck && <PlanCheckCompactRow result={planCheck} />}
         <ViewBar
           focus={focus}
           onFocusChange={setFocus}
           zoom={zoom}
           onZoomChange={setZoom}
+          onPrint={handlePrintCompact}
           participants={allParticipants}
         />
       </div>

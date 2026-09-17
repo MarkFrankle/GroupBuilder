@@ -18,6 +18,7 @@ function renderBar(overrides: Partial<React.ComponentProps<typeof ViewBar>> = {}
       participants={people}
       zoom="full"
       onZoomChange={onZoomChange}
+      onPrint={jest.fn()}
       {...overrides}
     />
   )
@@ -75,5 +76,34 @@ describe('ViewBar', () => {
   it('marks Compact pressed when that is the active zoom', () => {
     renderBar({ zoom: 'compact' })
     expect(screen.getByRole('button', { name: 'Compact' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('shows a Print button only in compact view, and calls onPrint when clicked', () => {
+    const onPrint = jest.fn()
+    const { rerender } = render(
+      <ViewBar
+        focus="religion"
+        onFocusChange={jest.fn()}
+        participants={[]}
+        zoom="full"
+        onZoomChange={jest.fn()}
+        onPrint={onPrint}
+      />
+    )
+    expect(screen.queryByRole('button', { name: 'Print' })).not.toBeInTheDocument()
+
+    rerender(
+      <ViewBar
+        focus="religion"
+        onFocusChange={jest.fn()}
+        participants={[]}
+        zoom="compact"
+        onZoomChange={jest.fn()}
+        onPrint={onPrint}
+      />
+    )
+    const printButton = screen.getByRole('button', { name: 'Print' })
+    fireEvent.click(printButton)
+    expect(onPrint).toHaveBeenCalledTimes(1)
   })
 })
