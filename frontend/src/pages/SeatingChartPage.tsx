@@ -100,7 +100,7 @@ const SeatingChartPage: React.FC = () => {
   return (
     <div ref={topRef} className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Header with controls (hidden on print) */}
-      <div className="no-print border-b bg-white sticky top-0 z-10">
+      <div className="no-print border-b bg-white sticky top-12 z-10">
         <div className="container mx-auto p-4">
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold">

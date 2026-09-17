@@ -41,7 +41,7 @@ export function NavBar() {
   const isAdminPage = location.pathname.startsWith('/admin');
   const isHelpPage = location.pathname === '/help';
   return (
-    <nav className="no-print border-b px-4 py-2 flex gap-4 text-sm items-center">
+    <nav className="no-print sticky top-0 z-20 bg-white border-b px-4 h-12 flex gap-4 text-sm items-center">
       {(hasProgram || isAdminPage || isHelpPage) && <>
         <Link to="/home" className="text-muted-foreground hover:text-foreground transition-colors">Home</Link>
         <Link to="/roster" className="text-muted-foreground hover:text-foreground transition-colors">Roster</Link>
