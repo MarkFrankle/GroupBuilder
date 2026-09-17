@@ -689,6 +689,32 @@ class TestCanonicalRoster:
         assert by_name["Person3"]["absent_sessions"] == [2]
         assert by_name["Person0"]["absent_sessions"] == []
 
+    def test_assignment_set_id_serves_that_set_even_when_not_current(
+        self, client, add_assignment_set_to_firestore
+    ):
+        """History views a specific past assignment set, which may not be the
+        program's current one. Its keep-apart rules must come from that set's
+        own frozen roster, not whatever roster is current today - otherwise the
+        plan-check band compares an old plan against rules it never knew about."""
+        old_canonical = _canonical(4)
+        old_canonical[0]["keep_apart"] = ["Person2"]
+        old_set_id = add_assignment_set_to_firestore(
+            {"participant_data": old_canonical, "num_tables": 2, "num_sessions": 2}
+        )
+        new_canonical = _canonical(4)
+        new_canonical[0]["keep_apart"] = []
+        add_assignment_set_to_firestore(
+            {"participant_data": new_canonical, "num_tables": 2, "num_sessions": 2}
+        )
+
+        response = client.get(
+            f"/api/roster/canonical?program_id=test_org_id&assignment_set_id={old_set_id}"
+        )
+
+        assert response.status_code == 200
+        by_name = {p["name"]: p for p in response.json()["participants"]}
+        assert by_name["Person0"]["keep_apart"] == ["Person2"]
+
     def test_no_assignment_set_yet_is_a_normal_state(self, client):
         """A program before its first generate has no canonical roster. That is
         not an error - it is the first-run state, and the page renders unlocked."""

@@ -1241,6 +1241,24 @@ describe('AssignmentsPage — plan check compact row', () => {
 })
 
 describe('AssignmentsPage — plan check band, keep-apart', () => {
+  it('checks a viewed history version against that version\'s own set, not the current one', async () => {
+    renderPage()
+    await screen.findByText('Session 1')
+
+    fireEvent.keyDown(await screen.findByRole('button', { name: /history/i }), {
+      key: 'Enter',
+    })
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Original plan/ }))
+
+    await screen.findByText(/predates your roster change/i)
+
+    await waitFor(() => {
+      expect(mockAuthenticatedFetch).toHaveBeenCalledWith(
+        expect.stringMatching(/\/api\/roster\/canonical\?.*assignment_set_id=set-previous/)
+      )
+    })
+  })
+
   it('flags a keep-apart pair the current plan seats together', async () => {
     api.canonicalParticipants = [
       { name: 'Ann', keep_apart: ['Cara'] },

@@ -218,7 +218,7 @@ const AssignmentsPage: React.FC = () => {
     [sorted, completedThrough]
   )
 
-  const { data: canonicalRoster } = useCanonicalRoster(programId)
+  const { data: canonicalRoster } = useCanonicalRoster(programId, viewing?.assignment_set_id)
   const planCheck = useMemo(
     () =>
       checkPlan(

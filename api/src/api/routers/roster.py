@@ -77,16 +77,22 @@ def _absent_sessions_by_name(head: dict | None) -> dict[str, list[int]]:
 @router.get("/canonical")
 async def get_canonical_roster(
     program_id: str = Depends(validate_program_access),
+    assignment_set_id: str | None = None,
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
 ):
-    """The roster the current assignments were built from, plus its shape.
+    """The roster a given set of assignments was built from, plus its shape.
 
     This is the *canonical* copy - frozen on the assignment set at generate
     time. The live ``roster/`` collection is the draft. The Roster page derives
     its lock by comparing the two, so an empty answer here means "no assignments
     yet", which is a normal first-run state rather than an error.
+
+    Defaults to the program's current set. History views pass
+    ``assignment_set_id`` to fetch a specific past set's own frozen roster
+    (including its own keep-apart rules) instead - a past plan must be checked
+    against the rules it was actually built with, not whatever is current today.
     """
-    set_id = storage.get_current_set_id(program_id)
+    set_id = assignment_set_id or storage.get_current_set_id(program_id)
     if not set_id:
         return {"participants": [], "num_tables": None, "num_sessions": None}
 
