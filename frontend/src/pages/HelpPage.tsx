@@ -328,7 +328,14 @@ function HelpPage() {
           <p className="mb-4 text-slate-700 leading-relaxed">
             Once a set of assignments exists, these are the things you'll do every
             week regardless of what the banner says: hand out seating charts and
-            mark off each session as it happens.
+            mark off each session as it happens. Day to day, there are really only
+            two things you'll change on this page: <strong>Shuffle</strong> a
+            session to try for better mixing, or mark someone <strong>absent</strong>{" "}
+            when they can't make it. See{" "}
+            <a href="#editing-sessions" className="text-blue-600 hover:text-blue-800 underline">
+              Changing a Plan
+            </a>{" "}
+            below for both.
           </p>
 
           <h3 className="text-xl font-semibold mb-2">Print roster &amp; seating charts</h3>
@@ -347,7 +354,10 @@ function HelpPage() {
             instead of choosing a printer, choose{" "}
             <strong>"Save as PDF."</strong> This will create and download a PDF file
             you can rename if desired and attach to an email or share however you
-            like.
+            like. The file lands wherever your browser normally saves downloads
+            (often a folder called <strong>Downloads</strong>), not in your printer
+            or your email: to send it, open a new email, attach it from there, and
+            send as usual.
           </p>
 
           <h3 className="text-xl font-semibold mb-2">Print Seating Charts</h3>
@@ -474,6 +484,13 @@ function HelpPage() {
             a <strong>Mark [name] absent</strong> button appears above their table.
             Press it and they move to the Absent list at the bottom of that session.
           </p>
+
+          <Screenshot
+            src="/images/help/mark-absent.png"
+            alt="A highlighted person's table showing a 'Mark [name] absent' button above it"
+            caption="Marking someone absent for a session"
+          />
+
           <p className="mb-4 text-slate-700 leading-relaxed">
             If they turn up after all (or you marked the wrong person) click their
             name in the <strong>Absent</strong> list and press{" "}
