@@ -1,6 +1,5 @@
 import React from 'react'
-import { Link2 } from 'lucide-react'
-import { chipSwatch } from '@/utils/chipPalettes'
+import { chipSwatch, coupleNumber } from '@/utils/chipPalettes'
 import { useCoupleSlots } from './coupleSlotsContext'
 import type { AttributeFocus, Participant } from '@/types/assignments'
 
@@ -28,8 +27,12 @@ const Chip: React.FC<ChipProps> = ({
 }) => {
   const isFacilitator = !!participant.is_facilitator
   const coupleSlots = useCoupleSlots()
-  const { bg, fg } = chipSwatch(focus, participant, coupleSlots)
+  const { bg, fg } = chipSwatch(focus, participant)
   const partnered = focus === 'couples' && !!participant.partner
+  const badgeNumber =
+    partnered && participant.partner
+      ? coupleNumber(participant.name, participant.partner, coupleSlots ?? new Map())
+      : undefined
 
   const title = isFacilitator
     ? `${participant.name} · Facilitator`
@@ -63,7 +66,7 @@ const Chip: React.FC<ChipProps> = ({
       }}
       className={[
         shape,
-        // `inline-flex` keeps the couples link icon on the baseline; `text-left`
+        // `inline-flex` keeps the couples badge on the baseline; `text-left`
         // undoes the button element's centring.
         'inline-flex items-center gap-1 cursor-pointer text-left transition-opacity',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-1',
@@ -74,7 +77,14 @@ const Chip: React.FC<ChipProps> = ({
         .join(' ')}
       style={{ backgroundColor: bg, color: fg }}
     >
-      {partnered && <Link2 className="h-3 w-3 shrink-0" aria-hidden="true" />}
+      {badgeNumber !== undefined && (
+        <span
+          aria-hidden="true"
+          className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-current text-[9px] font-semibold"
+        >
+          {badgeNumber}
+        </span>
+      )}
       {participant.name}
       {isFacilitator && <span className="sr-only"> · Facilitator</span>}
     </button>
