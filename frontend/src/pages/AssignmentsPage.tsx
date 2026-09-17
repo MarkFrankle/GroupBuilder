@@ -820,20 +820,16 @@ const AssignmentsPage: React.FC = () => {
       >
         {trackingSummary ?? ''}
       </div>
-      <div className="no-print">
-        <ProgramHeader
-          programName={currentProgram?.name ?? 'Assignments'}
-          onPrintRoster={handlePrintRoster}
-          onCopyLink={handleCopyLink}
-          history={historyMenu}
-        />
-      </div>
+      <ProgramHeader
+        programName={currentProgram?.name ?? 'Assignments'}
+        onPrintRoster={handlePrintRoster}
+        onCopyLink={handleCopyLink}
+        history={historyMenu}
+      />
 
       <div className="flex flex-col gap-4 px-8">
       {live.length > 0 && (
-        <div className="no-print">
-          <PlanCheckBand result={planCheck} />
-        </div>
+        <PlanCheckBand result={planCheck} />
       )}
       {/*
         A notice scoped to one session (shuffle, mark absent/present, mark
@@ -844,9 +840,7 @@ const AssignmentsPage: React.FC = () => {
         does a provisional-rebuild notice, which always wins the top slot.
       */}
       {(provisionalNotice || !noticeIsSessionScoped) && (
-        <div className="no-print">
-          <NoticeStrip notice={provisionalNotice ?? notice} onDismiss={() => showNotice(null)} />
-        </div>
+        <NoticeStrip notice={provisionalNotice ?? notice} onDismiss={() => showNotice(null)} />
       )}
 
       <div ref={viewBarSentinel} aria-hidden="true" />
