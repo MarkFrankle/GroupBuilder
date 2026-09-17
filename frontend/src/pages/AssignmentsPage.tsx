@@ -168,13 +168,20 @@ const AssignmentsPage: React.FC = () => {
 
   const [notice, setNotice] = useState<Notice | null>(null)
 
+  // Which session the current notice is about, if any. A session-scoped
+  // notice renders inline above that session's card instead of at the top of
+  // the page, so a user scrolled down to Session 3 sees its shuffle receipt
+  // where they're looking rather than having to scroll back up for it.
+  const [noticeSession, setNoticeSession] = useState<number | null>(null)
+
   // Mirrors `notice` so a replacement can retire the one it displaces. The
   // side effect cannot live in a setState updater, which React may run twice.
   const noticeRef = useRef<Notice | null>(null)
-  const showNotice = (next: Notice | null) => {
+  const showNotice = (next: Notice | null, sessionNumber: number | null = null) => {
     noticeRef.current?.onDismiss?.()
     noticeRef.current = next
     setNotice(next)
+    setNoticeSession(sessionNumber)
   }
   const [shufflingSession, setShufflingSession] = useState<number | null>(null)
 
@@ -246,6 +253,17 @@ const AssignmentsPage: React.FC = () => {
   const scrollToFirstLive = () => {
     firstLiveRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
+
+  // Keyed by session number so a session-scoped notice (shuffle, mark
+  // absent/present, mark complete) can bring its own card into view rather
+  // than leaving the receipt to render off-screen above or below the fold.
+  const sessionRefs = useRef<Map<number, HTMLDivElement>>(new Map())
+  useEffect(() => {
+    if (noticeSession === null) return
+    // block: 'nearest' is a no-op when the card is already visible, so this
+    // never yanks the page for a shuffle the user was already looking at.
+    sessionRefs.current.get(noticeSession)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [noticeSession, notice])
 
   /**
    * Item 13's second push: the one place a once-only user is told there is
@@ -337,7 +355,7 @@ const AssignmentsPage: React.FC = () => {
             onClick: () => completionMutation.mutate({ sessionNumber, method: inverse }),
           },
         ],
-      })
+      }, sessionNumber)
       invalidateAll()
       scrollToFirstLive()
     },
@@ -393,7 +411,7 @@ const AssignmentsPage: React.FC = () => {
               },
             ]
           : undefined,
-      })
+      }, sessionNumber)
     },
     onError: (error: Error) => {
       showNotice({ tone: 'error', message: error.message })
@@ -413,6 +431,7 @@ const AssignmentsPage: React.FC = () => {
       assignments: Assignment[]
       label: string
       receipt: string
+      sessionNumber: number
     }) => {
       undoTarget.current = versions[0]?.promotable ? versions[0] : null
       const response = await authenticatedFetch(
@@ -430,7 +449,7 @@ const AssignmentsPage: React.FC = () => {
       }
       return response.json()
     },
-    onSuccess: (_data, { label, receipt }) => {
+    onSuccess: (_data, { label, receipt, sessionNumber }) => {
       invalidateAll()
       setSelectedName(null)
       const target = undoTarget.current
@@ -450,7 +469,7 @@ const AssignmentsPage: React.FC = () => {
               },
             ]
           : undefined,
-      })
+      }, sessionNumber)
     },
     onError: (error: Error) => showNotice({ tone: 'error', message: error.message }),
   })
@@ -478,6 +497,7 @@ const AssignmentsPage: React.FC = () => {
 
     editMutation.mutate({
       assignments: edited,
+      sessionNumber,
       label: `${name} marked absent from Session ${sessionNumber}`,
       receipt:
         `${name} marked absent from Session ${sessionNumber} · ` +
@@ -497,6 +517,7 @@ const AssignmentsPage: React.FC = () => {
   ) => {
     editMutation.mutate({
       assignments: markPresent(sorted, sessionNumber, name, tableNumber),
+      sessionNumber,
       label: `${name} marked present in Session ${sessionNumber}`,
       receipt:
         `${name} marked present in Session ${sessionNumber} · ` +
@@ -546,7 +567,7 @@ const AssignmentsPage: React.FC = () => {
             : undoLabel !== undefined
               ? `Undid "${undoLabel}".`
               : `${data.label} is now the current plan.`,
-      })
+      }, undoOf ?? null)
     },
     onError: (error: Error) => showNotice({ tone: 'error', message: error.message }),
   })
@@ -758,6 +779,14 @@ const AssignmentsPage: React.FC = () => {
     </DropdownMenu>
   )
 
+  // Compact mode lays sessions out in a wrapping grid, not a column, so
+  // there's no sensible "above this card" slot — the compact grid always
+  // gets the top banner regardless of what the notice is about.
+  const noticeIsSessionScoped =
+    !compact &&
+    noticeSession !== null &&
+    (live.some(a => a.session === noticeSession) || completed.some(a => a.session === noticeSession))
+
   return (
     <div className="flex flex-col pb-10" onClick={() => setSelectedName(null)}>
       {/*
@@ -789,7 +818,17 @@ const AssignmentsPage: React.FC = () => {
       {live.length > 0 && (
         <PlanCheckBand result={planCheck} />
       )}
-      <NoticeStrip notice={provisionalNotice ?? notice} onDismiss={() => showNotice(null)} />
+      {/*
+        A notice scoped to one session (shuffle, mark absent/present, mark
+        complete) renders inline above that session's card instead — a user
+        scrolled down to Session 3 sees its receipt where they're looking, not
+        back at the top of the page. Anything not scoped to a session (the
+        first-visit nudge, copy-link, switching versions) still lands here, as
+        does a provisional-rebuild notice, which always wins the top slot.
+      */}
+      {(provisionalNotice || !noticeIsSessionScoped) && (
+        <NoticeStrip notice={provisionalNotice ?? notice} onDismiss={() => showNotice(null)} />
+      )}
 
       <div ref={viewBarSentinel} aria-hidden="true" />
       <div className="sticky top-[104px] z-10 -mx-8 border-b bg-white px-8">
@@ -826,7 +865,19 @@ const AssignmentsPage: React.FC = () => {
         ) : (
           <>
         {live.map((assignment, index) => (
-          <div key={assignment.session} ref={index === 0 ? firstLiveRef : undefined}>
+          <div
+            key={assignment.session}
+            ref={node => {
+              if (index === 0) firstLiveRef.current = node
+              if (node) sessionRefs.current.set(assignment.session, node)
+              else sessionRefs.current.delete(assignment.session)
+            }}
+          >
+            {noticeIsSessionScoped && noticeSession === assignment.session && (
+              <div className="mb-4">
+                <NoticeStrip notice={notice} onDismiss={() => showNotice(null)} />
+              </div>
+            )}
             <SessionCard
               assignment={assignment}
               readOnly={readOnly}
@@ -864,8 +915,19 @@ const AssignmentsPage: React.FC = () => {
               Completed
             </div>
             {completed.map(assignment => (
-              <SessionCard
+              <div
                 key={assignment.session}
+                ref={node => {
+                  if (node) sessionRefs.current.set(assignment.session, node)
+                  else sessionRefs.current.delete(assignment.session)
+                }}
+              >
+                {noticeIsSessionScoped && noticeSession === assignment.session && (
+                  <div className="mb-4">
+                    <NoticeStrip notice={notice} onDismiss={() => showNotice(null)} />
+                  </div>
+                )}
+                <SessionCard
                 assignment={assignment}
                 completed
                 readOnly={readOnly}
@@ -886,7 +948,8 @@ const AssignmentsPage: React.FC = () => {
                         })
                     : undefined
                 }
-              />
+                />
+              </div>
             ))}
           </>
         )}
