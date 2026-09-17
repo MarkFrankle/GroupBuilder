@@ -317,6 +317,12 @@ function HelpPage() {
             appear across every session, so you can trace who they sit with over the
             course of the program.
           </p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            Compact view has its own <strong>Print</strong> button, next to the Full/Compact
+            switch. It prints just that view: the whole program's sessions and tables on paper,
+            at a glance. This is separate from "Print roster &amp; seating charts" in the header
+            above, which prints per-participant roster and seating-chart pages instead.
+          </p>
 
         </section>
 
