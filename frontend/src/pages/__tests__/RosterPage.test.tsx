@@ -636,9 +636,9 @@ describe('the Keep apart block', () => {
     // Edit roster is how a coordinator gets at it, exactly as for the grid.
     fireEvent.click(await screen.findByRole('button', { name: /edit roster/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Separate pair' }));
-    fireEvent.keyDown(screen.getByRole('combobox', { name: 'First person' }), { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: 'First person' }));
     fireEvent.click(screen.getByRole('option', { name: 'Alice' }));
-    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Second person' }), { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: 'Second person' }));
     fireEvent.click(screen.getByRole('option', { name: 'Bob' }));
 
     expect(await screen.findByText('Alice and Bob')).toBeInTheDocument();
@@ -674,15 +674,15 @@ describe('the Keep apart block', () => {
     // Edit roster is how a coordinator gets at it, exactly as for the grid.
     fireEvent.click(await screen.findByRole('button', { name: /edit roster/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Separate pair' }));
-    fireEvent.keyDown(screen.getByRole('combobox', { name: 'First person' }), { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: 'First person' }));
     fireEvent.click(screen.getByRole('option', { name: 'Alice' }));
-    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Second person' }), { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: 'Second person' }));
     fireEvent.click(screen.getByRole('option', { name: 'Bob' }));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Alice and Bob are partners.');
     // The row stays up so it can be fixed rather than re-opened.
-    expect(screen.getByRole('combobox', { name: 'First person' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'First person' })).toBeInTheDocument();
   });
 
   test('names both people in the changeset', async () => {
