@@ -103,7 +103,7 @@ const RosterPrintPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="no-print border-b bg-white sticky top-0 z-10">
+      <div className="no-print border-b bg-white sticky top-12 z-10">
         <div className="container mx-auto p-4">
           <div className="flex justify-between items-center">
             <Button onClick={handleBack} variant="outline" size="sm">

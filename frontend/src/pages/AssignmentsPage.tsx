@@ -792,7 +792,7 @@ const AssignmentsPage: React.FC = () => {
       <NoticeStrip notice={provisionalNotice ?? notice} onDismiss={() => showNotice(null)} />
 
       <div ref={viewBarSentinel} aria-hidden="true" />
-      <div className="sticky top-14 z-10 -mx-8 border-b bg-white px-8">
+      <div className="sticky top-[104px] z-10 -mx-8 border-b bg-white px-8">
         {live.length > 0 && viewBarStuck && <PlanCheckCompactRow result={planCheck} />}
         <ViewBar
           focus={focus}
