@@ -243,13 +243,6 @@ const AssignmentsPage: React.FC = () => {
     [sorted]
   )
 
-  // Collapsing a card reflows everything below it, so the anchor is lost. Put
-  // the next thing to do back under the user's eyes.
-  const firstLiveRef = useRef<HTMLDivElement | null>(null)
-  const scrollToFirstLive = () => {
-    firstLiveRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
   // Keyed by session number so a session-scoped notice (shuffle, mark
   // absent/present, mark complete) can bring its own card into view rather
   // than leaving the receipt to render off-screen above or below the fold.
@@ -351,9 +344,8 @@ const AssignmentsPage: React.FC = () => {
             onClick: () => completionMutation.mutate({ sessionNumber, method: inverse }),
           },
         ],
-      }, sessionNumber)
+      })
       invalidateAll()
-      scrollToFirstLive()
     },
     onError: (error: Error) => {
       showNotice({ tone: 'error', message: error.message })
@@ -878,11 +870,10 @@ const AssignmentsPage: React.FC = () => {
           ))
         ) : (
           <>
-        {live.map((assignment, index) => (
+        {live.map(assignment => (
           <div
             key={assignment.session}
             ref={node => {
-              if (index === 0) firstLiveRef.current = node
               if (node) sessionRefs.current.set(assignment.session, node)
               else sessionRefs.current.delete(assignment.session)
             }}
