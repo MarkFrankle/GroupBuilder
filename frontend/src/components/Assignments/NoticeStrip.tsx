@@ -22,6 +22,13 @@ export interface Notice {
    * seen, so being overruled by a receipt does not bring it back on reload.
    */
   onDismiss?: () => void
+  /**
+   * False hides the strip's × entirely. For a notice whose state (e.g.
+   * `viewing` an old version) has no other visible indicator once the strip
+   * is gone — dismissing it would silently strand the page in a mode the
+   * user can no longer see they're in. Defaults to true.
+   */
+  dismissible?: boolean
 }
 
 interface NoticeStripProps {
@@ -81,7 +88,7 @@ const NoticeStrip: React.FC<NoticeStripProps> = ({ notice, onDismiss }) => {
                 {action.label}
               </Button>
             ))}
-            {onDismiss && (
+            {onDismiss && notice.dismissible !== false && (
               <Button variant="outline" size="sm" aria-label="Dismiss" onClick={onDismiss}>
                 <X className="h-3.5 w-3.5" />
               </Button>

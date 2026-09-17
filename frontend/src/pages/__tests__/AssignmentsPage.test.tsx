@@ -452,6 +452,19 @@ describe('AssignmentsPage', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: label }))
   }
 
+  it('offers no dismiss control on the viewing-a-version notice', async () => {
+    // Closing the notice via × must not be possible: Promote and Back to
+    // current are the only ways out, so `viewing` can never get stuck non-null
+    // with no remaining sign of it (the bug that hid Mark absent while the
+    // page still looked live).
+    renderPage()
+
+    await openVersion(/Session 3 shuffled/)
+
+    expect(await screen.findByRole('button', { name: /promote/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /dismiss/i })).not.toBeInTheDocument()
+  })
+
   it('offers Promote when viewing a version from the current set', async () => {
     renderPage()
 
