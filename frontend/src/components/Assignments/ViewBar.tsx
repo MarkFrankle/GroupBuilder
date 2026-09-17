@@ -90,7 +90,7 @@ const ViewBar: React.FC<ViewBarProps> = ({
         ))}
       </div>
       {zoom === 'compact' && (
-        <Button variant="outline" size="sm" onClick={onPrint} className="no-print">
+        <Button variant="outline" size="sm" onClick={onPrint}>
           <Printer className="mr-1.5 h-3.5 w-3.5" />
           Print
         </Button>
