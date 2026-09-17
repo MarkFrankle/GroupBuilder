@@ -846,6 +846,7 @@ const AssignmentsPage: React.FC = () => {
           onFocusChange={setFocus}
           zoom={zoom}
           onZoomChange={setZoom}
+          onPrint={() => window.print()}
           participants={allParticipants}
         />
       </div>
