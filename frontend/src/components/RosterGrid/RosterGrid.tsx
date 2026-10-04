@@ -9,8 +9,9 @@ import {
 } from '@/components/ui/select';
 import { PersonCombobox } from '@/components/ui/PersonCombobox';
 import { Trash2, Link, Unlink } from 'lucide-react';
-import { RosterParticipant, Religion, Gender, RELIGIONS, GENDERS } from '@/types/roster';
+import { DraftPatch, RosterDraft, RosterParticipant, Religion, Gender, RELIGIONS, GENDERS } from '@/types/roster';
 import { AwayCell } from './AwayCell';
+import { DraftRow } from './DraftRow';
 
 interface RosterGridProps {
   participants: RosterParticipant[];
@@ -24,6 +25,10 @@ interface RosterGridProps {
   /** Locked: the assignments were built from this roster and editing it would
    * invalidate them. Every field is inert and the add-row is gone. */
   readOnly?: boolean;
+  /** Uploaded people not yet saved. Rendered first so they're seen. */
+  drafts?: RosterDraft[];
+  onDraftChange?: (id: string, patch: DraftPatch) => void;
+  onDraftDelete?: (id: string) => void;
 }
 
 interface EmptyRowState {
@@ -38,7 +43,18 @@ const EMPTY_ROW: EmptyRowState = {
   name: '', religion: 'Other', gender: 'Other', partner_id: null, is_facilitator: false,
 };
 
-export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepTogetherToggle, numSessions, readOnly = false }: RosterGridProps) {
+export function RosterGrid({
+  participants,
+  onUpdate,
+  onDelete,
+  onAdd,
+  onKeepTogetherToggle,
+  numSessions,
+  readOnly = false,
+  drafts = [],
+  onDraftChange,
+  onDraftDelete,
+}: RosterGridProps) {
 
   const [editingNames, setEditingNames] = useState<Record<string, string>>({});
   const [emptyRow, setEmptyRow] = useState<EmptyRowState>({ ...EMPTY_ROW });
@@ -166,6 +182,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
     <div>
       <div className="text-sm text-muted-foreground mb-2">
         {participants.length} participant{participants.length !== 1 ? 's' : ''}
+        {drafts.length > 0 && `, ${drafts.length} not saved yet`}
       </div>
       <div className="w-full overflow-auto border rounded-md">
         <Table>
@@ -181,6 +198,17 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
             </TableRow>
           </TableHeader>
           <TableBody>
+            {[...drafts]
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map(d => (
+                <DraftRow
+                  key={d.id}
+                  draft={d}
+                  readOnly={readOnly}
+                  onChange={patch => onDraftChange?.(d.id, patch)}
+                  onDelete={() => onDraftDelete?.(d.id)}
+                />
+              ))}
             {participants.map(p => {
               const currentName = editingNames[p.id] ?? p.name;
               const hasError = !currentName.trim() || duplicateNames.has(p.name);
