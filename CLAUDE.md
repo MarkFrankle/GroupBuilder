@@ -122,6 +122,11 @@
   the roster into state on an effect, one render after loading ends, so a `findByRole` on a
   button can resolve against an empty grid. A discard prompt then counts the wrong changes.
   `await screen.findByDisplayValue('<name>')` first.
+- **The roster grid is `table-fixed`, so its header widths are a budget.** They sum to the
+  card's inner width (842px, `max-w-4xl` less padding), matched by the table's `min-w`. A new
+  column, or a wider one, has to take its pixels from another. Under the old auto layout the
+  widths were only hints and the Name inputs, which have no content width, got squeezed.
+  jsdom does no layout, so no test catches this: look at it in a browser.
 - **A multi-select popover with checkboxes: use `DropdownMenu` + `DropdownMenuCheckboxItem`,
   not a new Popover dep.** `@radix-ui/react-popover` isn't installed. Give each checkbox item
   `onSelect={e => e.preventDefault()}` or the menu closes on the first tick. Opens in tests
