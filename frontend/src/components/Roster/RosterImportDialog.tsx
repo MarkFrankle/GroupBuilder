@@ -63,8 +63,6 @@ export function RosterImportDialog({
   const skipped = new Set(resolution.skippedRows);
   const total = resolution.participants.length + resolution.drafts.length;
   const drafts = resolution.drafts.length;
-  const noteCount = resolution.notes.filter(n => n.message).length;
-  const ignoredCount = mapping.filter(f => f === 'ignore').length;
   const incoming = new Set([...resolution.participants, ...resolution.drafts].map(p => nameKey(p.name)));
   const droppedRules = resolution.missingName
     ? 0
@@ -93,16 +91,14 @@ export function RosterImportDialog({
     status = `All ${people(total)} ready.`;
     tone = 'ok';
   }
-  const minor = [
-    resolution.skippedRows.length > 0 &&
-      `${resolution.skippedRows.length} ${resolution.skippedRows.length === 1 ? 'row' : 'rows'} skipped`,
-    noteCount > 0 && `${noteCount} ${noteCount === 1 ? 'note' : 'notes'} (hover a highlighted cell for details)`,
-    `${ignoredCount} ${ignoredCount === 1 ? 'column' : 'columns'} not imported`,
-    droppedRules > 0 &&
-      `${droppedRules} keep-apart ${droppedRules === 1 ? 'rule' : 'rules'} will be removed because someone in ${
-        droppedRules === 1 ? 'it' : 'them'
-      } isn't in this file`,
-  ].filter(Boolean);
+  // The one loss the table can't show. Skipped rows, notes and unused columns
+  // are all visible in the table itself, so the footer doesn't repeat them.
+  const keepApartWarning =
+    droppedRules > 0
+      ? `${droppedRules} keep-apart ${droppedRules === 1 ? 'rule' : 'rules'} will be removed because someone in ${
+          droppedRules === 1 ? 'it' : 'them'
+        } isn't in this file.`
+      : null;
 
   const answer = (note: CellNote, value: string) => {
     if (!note.fix) return;
@@ -261,7 +257,9 @@ export function RosterImportDialog({
               )}
               {error ?? status}
             </span>
-            {!error && <span className="text-xs text-muted-foreground">{minor.join(' · ')}</span>}
+            {!error && keepApartWarning && (
+              <span className="text-xs text-muted-foreground">{keepApartWarning}</span>
+            )}
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onCancel}>Cancel</Button>
