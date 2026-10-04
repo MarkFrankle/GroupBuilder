@@ -110,7 +110,9 @@ function HelpPage() {
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Adding a participant:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             As you enter a participant's information, a new empty row will appear
-            for the next person and the roster will save automatically.
+            for the next person and the roster will save automatically. Every name
+            must be different. If two people share a name, add a last initial or a
+            nickname to tell them apart.
           </p>
 
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Adding characteristics:</p>
