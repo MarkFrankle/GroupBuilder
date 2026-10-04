@@ -7,6 +7,7 @@ import {
   resolveRows,
   NO_FIXES,
   ImportField,
+  guessMapping,
 } from '@/utils/rosterImport';
 
 describe('normalize', () => {
@@ -135,5 +136,52 @@ describe('resolveRows', () => {
     );
     expect(participants.every(p => p.partner_name === null)).toBe(true);
     expect(notes.filter(n => n.column === 3)).toHaveLength(3);
+  });
+});
+
+describe('guessMapping', () => {
+  it('recognizes religion, gender and facilitator from their values', () => {
+    const rows = [
+      ['Ana', 'Jewish', 'F', ''],
+      ['Ben', 'Muslim', 'M', 'x'],
+      ['Cy', 'Christian', 'M', ''],
+    ];
+    expect(guessMapping(['Full Name', 'Tradition', 'Col C', 'Lead'], rows)).toEqual([
+      'name',
+      'religion',
+      'gender',
+      'facilitator',
+    ]);
+  });
+
+  it('uses header alternates', () => {
+    expect(guessMapping(['Faith', 'Sex', 'Spouse'], [['Catholic', '?', 'Ben']])).toEqual([
+      'religion',
+      'gender',
+      'partner',
+    ]);
+  });
+
+  it('finds name and partner only from their headers', () => {
+    const rows = [
+      ['Ana', 'Ben'],
+      ['Ben', 'Ana'],
+    ];
+    expect(guessMapping(['First Name', 'Spouse or partner attending'], rows)).toEqual([
+      'ignore',
+      'ignore',
+    ]);
+  });
+
+  it('never matches part of a header', () => {
+    expect(guessMapping(['Email', 'Name'], [['ana@example.com', 'Ana']])).toEqual([
+      'ignore',
+      'name',
+    ]);
+  });
+
+  it('gives a field to one column only, header first', () => {
+    const rows = [['Jewish', 'Muslim']];
+    expect(guessMapping(['Notes', 'Religion'], rows)).toEqual(['ignore', 'religion']);
   });
 });

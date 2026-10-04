@@ -299,3 +299,62 @@ function resolvePartners(kept: Kept[], column: number, notes: CellNote[]): Map<K
   });
   return partners;
 }
+
+/** A field's own label plus one or two alternates, compared after `normalize`. */
+const HEADER_MATCHES: Record<Exclude<ImportField, 'ignore'>, string[]> = {
+  name: ['name', 'full name'],
+  religion: ['religion', 'faith'],
+  gender: ['gender', 'sex'],
+  facilitator: ['facilitator', 'leader'],
+  partner: ['partner', 'spouse'],
+};
+
+// A wrong guess fills the preview with red cells; a missed one costs a click.
+// So content only counts when nearly every value fits.
+const CONTENT_THRESHOLD = 0.8;
+const HEADER_SCORE = 2;
+
+interface Candidate {
+  column: number;
+  field: ImportField;
+  score: number;
+}
+
+export function guessMapping(headers: string[], rows: string[][]): ImportField[] {
+  const candidates: Candidate[] = [];
+
+  headers.forEach((header, c) => {
+    const n = normalize(header);
+    (Object.keys(HEADER_MATCHES) as Exclude<ImportField, 'ignore'>[]).forEach(field => {
+      if (HEADER_MATCHES[field].includes(n)) candidates.push({ column: c, field, score: HEADER_SCORE });
+    });
+
+    const values = rows.map(r => (r[c] ?? '').trim()).filter(Boolean);
+    if (values.length === 0) return;
+    const share = (read: (v: string) => unknown) =>
+      values.filter(v => read(v) !== null).length / values.length;
+
+    const religion = share(readReligion);
+    if (religion >= CONTENT_THRESHOLD) candidates.push({ column: c, field: 'religion', score: religion });
+    const gender = share(readGender);
+    if (gender >= CONTENT_THRESHOLD) candidates.push({ column: c, field: 'gender', score: gender });
+
+    // Facilitators are a minority, so a column of mostly "yes" is something else.
+    const facilitator = share(readFacilitator);
+    const yeses = values.filter(v => readFacilitator(v) === true).length;
+    if (facilitator >= CONTENT_THRESHOLD && yeses > 0 && yeses <= rows.length / 2) {
+      candidates.push({ column: c, field: 'facilitator', score: facilitator });
+    }
+  });
+
+  // Strongest first. The sort is stable, so ties go to the leftmost column.
+  candidates.sort((a, b) => b.score - a.score);
+  const mapping: ImportField[] = headers.map(() => 'ignore');
+  const taken = new Set<ImportField>();
+  for (const { column, field } of candidates) {
+    if (mapping[column] !== 'ignore' || taken.has(field)) continue;
+    mapping[column] = field;
+    taken.add(field);
+  }
+  return mapping;
+}
