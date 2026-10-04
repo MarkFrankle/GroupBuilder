@@ -1,3 +1,4 @@
+import Papa from 'papaparse';
 import { Gender, Religion } from '@/types/roster';
 
 /** What a spreadsheet column can be mapped to in the upload preview. */
@@ -357,4 +358,50 @@ export function guessMapping(headers: string[], rows: string[][]): ImportField[]
     taken.add(field);
   }
   return mapping;
+}
+
+export const UNREADABLE_FILE = "We couldn't read this file. Save it as .xlsx or .csv and try again.";
+export const NO_ROWS = 'This file has no rows to import.';
+
+function readText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
+}
+
+function cellToString(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value).trim();
+}
+
+/**
+ * The file's first sheet as rows of trimmed strings, blank rows dropped, every
+ * row padded to the same width. The first row is the header row.
+ */
+export async function readRosterFile(file: File): Promise<string[][]> {
+  const lower = file.name.toLowerCase();
+  let raw: unknown[][];
+  try {
+    if (lower.endsWith('.csv')) {
+      raw = Papa.parse<string[]>(await readText(file), { skipEmptyLines: 'greedy' }).data;
+    } else if (lower.endsWith('.xlsx')) {
+      // Loaded on demand: only people who upload a spreadsheet pay for the parser.
+      const { readSheet } = await import('read-excel-file/browser');
+      raw = await readSheet(file);
+    } else {
+      throw new Error(UNREADABLE_FILE);
+    }
+  } catch (_err) {
+    throw new Error(UNREADABLE_FILE);
+  }
+
+  const rows = raw
+    .map(row => row.map(cellToString))
+    .filter(row => row.some(value => value !== ''));
+  const width = Math.max(0, ...rows.map(row => row.length));
+  return rows.map(row => [...row, ...Array(width - row.length).fill('')]);
 }

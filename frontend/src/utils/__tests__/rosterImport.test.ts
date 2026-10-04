@@ -8,6 +8,8 @@ import {
   NO_FIXES,
   ImportField,
   guessMapping,
+  readRosterFile,
+  UNREADABLE_FILE,
 } from '@/utils/rosterImport';
 
 describe('normalize', () => {
@@ -183,5 +185,21 @@ describe('guessMapping', () => {
   it('gives a field to one column only, header first', () => {
     const rows = [['Jewish', 'Muslim']];
     expect(guessMapping(['Notes', 'Religion'], rows)).toEqual(['ignore', 'religion']);
+  });
+});
+
+describe('readRosterFile', () => {
+  it('reads a csv into trimmed, equal-width rows without blank lines', async () => {
+    const file = new File(['Name,Faith\n Ana ,Jewish\n\nBen\n'], 'roster.csv', { type: 'text/csv' });
+    expect(await readRosterFile(file)).toEqual([
+      ['Name', 'Faith'],
+      ['Ana', 'Jewish'],
+      ['Ben', ''],
+    ]);
+  });
+
+  it('refuses other file types with a message that says what to do', async () => {
+    const file = new File(['x'], 'roster.pdf');
+    await expect(readRosterFile(file)).rejects.toThrow(UNREADABLE_FILE);
   });
 });
