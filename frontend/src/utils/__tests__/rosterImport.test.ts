@@ -198,6 +198,18 @@ describe('readRosterFile', () => {
     ]);
   });
 
+  it('reads a csv Excel saved as Windows-1252, the Windows default', async () => {
+    // "José" with é as the single byte 0xE9, which is not valid UTF-8.
+    const bytes = new Uint8Array([...Array.from('Name\nJos', c => c.charCodeAt(0)), 0xe9, 0x0a]);
+    const file = new File([bytes], 'roster.csv', { type: 'text/csv' });
+    expect(await readRosterFile(file)).toEqual([['Name'], ['José']]);
+  });
+
+  it('keeps a UTF-8 csv as UTF-8', async () => {
+    const file = new File(['Name\nJosé Núñez\n'], 'roster.csv', { type: 'text/csv' });
+    expect(await readRosterFile(file)).toEqual([['Name'], ['José Núñez']]);
+  });
+
   it('refuses other file types with a message that says what to do', async () => {
     const file = new File(['x'], 'roster.pdf');
     await expect(readRosterFile(file)).rejects.toThrow(UNREADABLE_FILE);

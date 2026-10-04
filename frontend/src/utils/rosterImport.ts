@@ -363,13 +363,24 @@ export function guessMapping(headers: string[], rows: string[][]): ImportField[]
 export const UNREADABLE_FILE = "We couldn't read this file. Save it as .xlsx or .csv and try again.";
 export const NO_ROWS = 'This file has no rows to import.';
 
-function readText(file: File): Promise<string> {
+function readText(file: File, encoding?: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result ?? ''));
     reader.onerror = () => reject(reader.error);
-    reader.readAsText(file);
+    reader.readAsText(file, encoding);
   });
+}
+
+/**
+ * A csv as text. Excel on Windows saves "CSV (Comma delimited)" as
+ * Windows-1252, not UTF-8, so read as UTF-8 an accented name like José comes
+ * out as "Jos\uFFFD". Real UTF-8 never decodes to that replacement character,
+ * so finding one means the file is the Windows kind: read it again as that.
+ */
+async function readCsvText(file: File): Promise<string> {
+  const text = await readText(file);
+  return text.includes('\uFFFD') ? readText(file, 'windows-1252') : text;
 }
 
 function cellToString(value: unknown): string {
@@ -387,7 +398,7 @@ export async function readRosterFile(file: File): Promise<string[][]> {
   let raw: unknown[][];
   try {
     if (lower.endsWith('.csv')) {
-      raw = Papa.parse<string[]>(await readText(file), { skipEmptyLines: 'greedy' }).data;
+      raw = Papa.parse<string[]>(await readCsvText(file), { skipEmptyLines: 'greedy' }).data;
     } else if (lower.endsWith('.xlsx')) {
       // Loaded on demand: only people who upload a spreadsheet pay for the parser.
       const { readSheet } = await import('read-excel-file/browser');
