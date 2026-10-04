@@ -17,3 +17,21 @@ export type Gender = RosterParticipant["gender"];
 
 export const RELIGIONS: Religion[] = ["Christian", "Jewish", "Muslim", "Other"];
 export const GENDERS: Gender[] = ["Male", "Female", "Other"];
+
+/**
+ * An uploaded person not yet on the roster because their religion or gender
+ * couldn't be read. Stored on the server beside the roster, never in it.
+ */
+export interface RosterDraft {
+  id: string;
+  name: string;
+  religion: Religion | null;
+  gender: Gender | null;
+  is_facilitator: boolean;
+  partner_name: string | null;
+}
+
+export type DraftPatch = Partial<Pick<RosterDraft, 'name' | 'is_facilitator'>> & {
+  religion?: Religion;
+  gender?: Gender;
+};

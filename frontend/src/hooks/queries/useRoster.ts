@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { getKeepApart, getRoster } from '@/api/roster'
+import { getKeepApart, getRoster, getRosterDrafts } from '@/api/roster'
 import { authenticatedFetch } from '@/utils/apiClient'
 import { useProgram } from '@/contexts/ProgramContext'
 
@@ -48,6 +48,15 @@ export function useKeepApart(programId: string | null) {
   return useQuery({
     queryKey: ['keep-apart', programId],
     queryFn: () => getKeepApart(programId!),
+    enabled: !!programId,
+  })
+}
+
+/** Upload drafts for the Roster page. Server-side so every coordinator sees the same drafts. */
+export function useRosterDrafts(programId: string | null) {
+  return useQuery({
+    queryKey: ['roster-drafts', programId],
+    queryFn: () => getRosterDrafts(programId!),
     enabled: !!programId,
   })
 }
