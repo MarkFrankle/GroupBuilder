@@ -6,6 +6,10 @@ before designing or changing user-facing behavior.
 Full reasoning behind everything here lives in `docs/product/assignments-redesign-notes.md`
 (2026-09). This file is the conclusion; that file is the argument.
 
+**The mission:** make thoughtful group mixing effortless. Two things must work well, an
+intuitive UI and reliable assignments. When they conflict, UI wins. A perfect algorithm that
+confuses volunteers fails the mission.
+
 ---
 
 ## Who the user is
@@ -240,6 +244,9 @@ Words carry guardrails here. The safe actions must never share a verb with a dan
   pair, and at 24 participants that starved the search badly enough to return *worse* plans
   than no global penalty at all. The model spends its full time budget without proving
   optimality, so variables come straight out of solution quality.
-- A hard cap on meetings was rejected — it can make a program infeasible.
+- Repeat meetings are also hard-capped, but no cap is fixed up front. A fixed cap was
+  rejected because it can make a program infeasible. Instead the search starts at a pigeonhole
+  floor and loosens the cap, within a bounded number of tries, until a plan solves. Mechanics
+  are in `agent_docs/solver.md`.
 - General keep-apart is new solver work. Couples separation already exists, so the mechanism
   is close at hand.
