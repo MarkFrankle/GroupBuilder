@@ -16,6 +16,18 @@ assignment_logic/   → Google OR-Tools CP-SAT constraint solver (local Poetry d
 - `lucide-react` for icons, `immer` for immutable updates
 - React Context only (no Redux): `AuthContext` (Firebase user), `ProgramContext` (current program in `localStorage`)
 
+### Layout couplings
+
+jsdom does no layout, so no test catches a break in either of these. Look at it in a browser.
+
+- **The Assignments view-controls row uses `sticky top-14`**, a hardcoded match to the condensed
+  `ProgramHeader`'s explicit `h-14` (56px, chosen to fit the `h-9` action buttons). If the
+  header's height class changes, this offset must change with it.
+- **The roster grid is `table-fixed`, so its header widths are a budget.** They sum to the
+  card's inner width (842px, `max-w-4xl` less padding), matched by the table's `min-w`. A new
+  column, or a wider one, has to take its pixels from another. Under the old auto layout the
+  widths were only hints and the Name inputs, which have no content width, got squeezed.
+
 ## Backend Stack
 
 - Pydantic v2 (use `.model_dump()`, not `.dict()`)
@@ -87,6 +99,17 @@ Every route below takes `?program_id=<id>` and is gated by `validate_program_acc
 | POST | `/api/roster/generate` → `{"assignment_set_id": ...}` |
 | PUT | `/api/roster/{participant_id}` |
 | DELETE | `/api/roster/{participant_id}` |
+
+**`GET /api/roster/canonical` returns `keep_apart` per participant as a resolved list of
+*names*.** The backend resolves the id pairs at generate time and freezes them on the
+assignment set. Consumers that need keep-apart on the assignments side (e.g. `planCheck.ts`)
+read it straight off `useCanonicalRoster`, with no `useKeepApart` + id→name resolution.
+`partner` on that payload is likewise a name.
+
+**It also returns `absent_sessions` per participant.** This is derived at request time from the
+current version's per-session `absentParticipants`, not stored on `participant_data`. The
+Roster page's locked "Away" column mirrors it. The dormant roster-document `absent_sessions`
+field is not read while a set exists and may drift.
 
 ## Frontend Routes (defined in `frontend/src/App.tsx`)
 
