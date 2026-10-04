@@ -231,7 +231,7 @@ export function RosterGrid({
     <div>
       <div className="text-sm text-muted-foreground mb-2">
         {participants.length} participant{participants.length !== 1 ? 's' : ''}
-        {drafts.length > 0 && `, ${drafts.length} not saved yet`}
+        {drafts.length > 0 && `, plus ${drafts.length} not saved yet`}
       </div>
       <div className="w-full overflow-auto border rounded-md">
         {/* Fixed layout, or the widths below are only hints: auto layout sizes by

@@ -37,3 +37,14 @@ it('sends a chosen religion', () => {
   fireEvent.click(screen.getByRole('option', { name: 'Christian' }));
   expect(onChange).toHaveBeenCalledWith({ religion: 'Christian' });
 });
+
+it('shows a waiting partner by name alone', () => {
+  render(
+    <table>
+      <tbody>
+        <DraftRow draft={{ ...DRAFT, partner_name: 'Joe Rossi' }} onChange={jest.fn()} onDelete={jest.fn()} />
+      </tbody>
+    </table>,
+  );
+  expect(screen.getByText('Joe Rossi')).toHaveAttribute('title', 'Partners are linked once both are saved.');
+});

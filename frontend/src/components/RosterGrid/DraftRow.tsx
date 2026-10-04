@@ -66,8 +66,13 @@ export function DraftRow({ draft, readOnly = false, onChange, onDelete }: DraftR
       </TableCell>
       {choice('religion', RELIGIONS)}
       {choice('gender', GENDERS)}
-      <TableCell className="p-1 text-sm italic text-muted-foreground">
-        {draft.partner_name ? `${draft.partner_name} (once saved)` : 'None'}
+      {/* Just the name: the row already says Not saved, and the link itself is
+          made on the server once both people are saved. */}
+      <TableCell
+        className="p-1 px-3 text-sm"
+        title={draft.partner_name ? 'Partners are linked once both are saved.' : undefined}
+      >
+        {draft.partner_name ?? 'None'}
       </TableCell>
       <TableCell className="p-1 text-center">
         <input
