@@ -1528,3 +1528,111 @@ class TestUploadRoster:
 
         assert response.status_code == 400
         assert sorted(self._roster()) == ["Person0", "Person1"]
+
+
+class TestRosterDrafts:
+    """Draft edits, and promotion once a draft is complete."""
+
+    def _seed(self, drafts):
+        from api.services.roster_draft_storage import RosterDraftStorage
+
+        RosterDraftStorage().write_drafts("test_org_id", list(drafts))
+
+    def _draft(self, id_, name, **fields):
+        return {
+            "id": id_,
+            "name": name,
+            "religion": None,
+            "gender": "Female",
+            "is_facilitator": False,
+            "partner_name": None,
+            **fields,
+        }
+
+    def _url(self, draft_id=""):
+        suffix = f"/{draft_id}" if draft_id else ""
+        return f"/api/roster/drafts{suffix}?program_id=test_org_id"
+
+    def _roster(self):
+        from api.services.roster_service import RosterService
+
+        return {p["name"]: p for p in RosterService().get_roster("test_org_id")}
+
+    def test_lists_drafts(self, client):
+        self._seed([self._draft("d1", "Grace")])
+
+        body = client.get(self._url()).json()
+
+        assert [d["name"] for d in body["drafts"]] == ["Grace"]
+
+    def test_an_incomplete_edit_stays_a_draft(self, client):
+        self._seed([self._draft("d1", "Grace", gender=None)])
+
+        body = client.put(self._url("d1"), json={"religion": "Christian"}).json()
+
+        assert body["participant"] is None
+        assert body["draft"]["religion"] == "Christian"
+        assert self._roster() == {}
+
+    def test_completing_a_draft_saves_it(self, client):
+        self._seed([self._draft("d1", "Grace")])
+
+        body = client.put(self._url("d1"), json={"religion": "Christian"}).json()
+
+        assert body["draft"] is None
+        assert self._roster()["Grace"]["id"] == "d1"
+        assert client.get(self._url()).json()["drafts"] == []
+
+    def test_a_saved_draft_links_its_waiting_partner(
+        self, client, add_roster_to_firestore
+    ):
+        add_roster_to_firestore(_draft(2))
+        self._seed([self._draft("d1", "Grace", partner_name="Person0")])
+
+        client.put(self._url("d1"), json={"religion": "Christian"})
+
+        roster = self._roster()
+        assert roster["Grace"]["partner_id"] == "p0"
+        assert roster["Person0"]["partner_id"] == "d1"
+
+    def test_refuses_a_name_already_on_the_roster(
+        self, client, add_roster_to_firestore
+    ):
+        add_roster_to_firestore(_draft(2))
+        self._seed([self._draft("d1", "Grace")])
+
+        response = client.put(self._url("d1"), json={"name": "person0"})
+
+        assert response.status_code == 400
+
+    def test_deletes_a_draft(self, client):
+        self._seed([self._draft("d1", "Grace"), self._draft("d2", "Ben")])
+
+        client.delete(self._url("d1"))
+
+        assert [d["id"] for d in client.get(self._url()).json()["drafts"]] == ["d2"]
+
+    def test_generate_refuses_while_drafts_exist(self, client, add_roster_to_firestore):
+        add_roster_to_firestore(_draft(6))
+        self._seed([self._draft("d1", "Grace")])
+
+        response = client.post(
+            "/api/roster/generate?program_id=test_org_id",
+            json={"num_tables": 2, "num_sessions": 2},
+        )
+
+        assert response.status_code == 400
+        assert "from your upload" in response.json()["detail"]
+
+    def test_discard_clears_drafts(
+        self, client, add_assignment_set_to_firestore, add_roster_to_firestore
+    ):
+        add_assignment_set_to_firestore(
+            {"participant_data": _canonical(4), "num_tables": 2, "num_sessions": 2}
+        )
+        add_roster_to_firestore(_draft(4))
+        self._seed([self._draft("d1", "Grace")])
+
+        client.post("/api/roster/discard?program_id=test_org_id")
+
+        assert client.get(self._url()).json()["drafts"] == []

@@ -73,6 +73,13 @@ class UploadRosterRequest(BaseModel):
     drafts: list[UploadedPerson] = Field(default_factory=list)
 
 
+class DraftUpdate(BaseModel):
+    name: Optional[str] = None
+    religion: Optional[str] = None
+    gender: Optional[str] = None
+    is_facilitator: Optional[bool] = None
+
+
 def _name_key(name: str) -> str:
     """How uploads and drafts match names: case and spacing don't count."""
     # .lower(), not .casefold(): must match nameKey's toLowerCase() in rosterImport.ts.
@@ -251,6 +258,7 @@ async def generate_from_roster(
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
     completion: SessionCompletionStorage = Depends(get_session_completion_storage),
     keep_apart: KeepApartStorage = Depends(get_keep_apart_storage),
+    drafts_storage: RosterDraftStorage = Depends(get_roster_draft_storage),
 ):
     """Rebuild the program from the live roster.
 
@@ -260,6 +268,11 @@ async def generate_from_roster(
     # Refuse before any work or write. The floor check goes first so the more
     # specific message wins for a coordinator shrinking the program.
     refuse_if_below_completed_prefix(completion, program_id, data.num_sessions)
+    # Drafts are people the coordinator uploaded but hasn't finished. Building
+    # without them would quietly leave them out of every session.
+    pending = len(drafts_storage.get_drafts(program_id))
+    if pending:
+        raise HTTPException(status_code=400, detail=_drafts_refusal(pending))
     completed_through = completion.get_completed_through(program_id)
 
     participants = roster_service.get_roster(program_id)
@@ -464,6 +477,7 @@ async def discard_roster_changes(
     roster_service: RosterService = Depends(get_roster_service),
     storage: AssignmentSetStorage = Depends(get_assignment_set_storage),
     keep_apart: KeepApartStorage = Depends(get_keep_apart_storage),
+    drafts_storage: RosterDraftStorage = Depends(get_roster_draft_storage),
 ):
     """Throw the draft away and rewrite the roster from the current sessions.
 
@@ -522,6 +536,9 @@ async def discard_roster_changes(
             if a_name in new_ids and b_name in new_ids
         ],
     )
+
+    # Discard throws the upload away, and its drafts with it.
+    drafts_storage.write_drafts(program_id, [])
 
     return {"status": "discarded", "count": len(canonical)}
 
@@ -743,6 +760,113 @@ async def remove_keep_apart(
     """
     pairs = keep_apart.remove_pair(program_id, a_id, b_id)
     return {"pairs": [list(p) for p in pairs]}
+
+
+@router.get("/drafts")
+async def list_drafts(
+    program_id: str = Depends(validate_program_access),
+    drafts_storage: RosterDraftStorage = Depends(get_roster_draft_storage),
+):
+    return {"drafts": drafts_storage.get_drafts(program_id)}
+
+
+@router.put("/drafts/{draft_id}")
+@limiter.limit("60/minute")
+async def update_draft(
+    request: Request,
+    draft_id: str,
+    data: DraftUpdate,
+    program_id: str = Depends(validate_program_access),
+    roster_service: RosterService = Depends(get_roster_service),
+    drafts_storage: RosterDraftStorage = Depends(get_roster_draft_storage),
+):
+    """Edit a draft. Once it has both a religion and a gender it is saved as a
+    participant under the same id, linked to a waiting partner if that person
+    is saved and unpaired, and dropped from the drafts, all in one batch."""
+    drafts = drafts_storage.get_drafts(program_id)
+    draft = next((d for d in drafts if d["id"] == draft_id), None)
+    if draft is None:
+        raise HTTPException(
+            status_code=404,
+            detail="This person is no longer waiting to be saved. Reload the page to see the current roster.",
+        )
+
+    changes = {
+        k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None
+    }
+    if "religion" in changes and changes["religion"] not in VALID_RELIGIONS:
+        raise HTTPException(status_code=400, detail="Choose a religion from the list.")
+    if "gender" in changes and changes["gender"] not in VALID_GENDERS:
+        raise HTTPException(status_code=400, detail="Choose a gender from the list.")
+
+    roster = roster_service.get_roster(program_id)
+    if "name" in changes:
+        name = changes["name"].strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="A name can't be empty.")
+        taken = {_name_key(p["name"]) for p in roster} | {
+            _name_key(d["name"]) for d in drafts if d["id"] != draft_id
+        }
+        if _name_key(name) in taken:
+            raise HTTPException(status_code=400, detail=_name_taken(name))
+        changes["name"] = name
+
+    updated = {**draft, **changes}
+    remaining = [d for d in drafts if d["id"] != draft_id]
+    if not (updated.get("religion") and updated.get("gender")):
+        drafts_storage.write_drafts(program_id, remaining + [updated])
+        return {"draft": updated, "participant": None}
+
+    partner = None
+    if updated.get("partner_name"):
+        partner = next(
+            (
+                p
+                for p in roster
+                if _name_key(p["name"]) == _name_key(updated["partner_name"])
+                and not p.get("partner_id")
+            ),
+            None,
+        )
+
+    batch = roster_service.db.batch()
+    participant = roster_service.stage_participant(
+        batch,
+        program_id,
+        draft_id,
+        {
+            "name": updated["name"],
+            "religion": updated["religion"],
+            "gender": updated["gender"],
+            "is_facilitator": updated.get("is_facilitator", False),
+            "partner_id": partner["id"] if partner else None,
+            "keep_together": False,
+            "absent_sessions": updated.get("absent_sessions") or [],
+        },
+    )
+    if partner:
+        roster_service.stage_participant(
+            batch,
+            program_id,
+            partner["id"],
+            {**partner, "partner_id": draft_id, "keep_together": False},
+        )
+    drafts_storage.stage_drafts(batch, program_id, remaining)
+    batch.commit()
+    return {"draft": None, "participant": participant}
+
+
+@router.delete("/drafts/{draft_id}")
+@limiter.limit("30/minute")
+async def delete_draft(
+    request: Request,
+    draft_id: str,
+    program_id: str = Depends(validate_program_access),
+    drafts_storage: RosterDraftStorage = Depends(get_roster_draft_storage),
+):
+    drafts = drafts_storage.get_drafts(program_id)
+    drafts_storage.write_drafts(program_id, [d for d in drafts if d["id"] != draft_id])
+    return {"status": "deleted"}
 
 
 @router.put("/{participant_id}")
