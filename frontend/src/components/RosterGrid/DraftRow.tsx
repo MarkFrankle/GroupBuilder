@@ -10,6 +10,8 @@ import { cn } from '@/utils/cn';
 interface DraftRowProps {
   draft: RosterDraft;
   readOnly?: boolean;
+  /** The last draft: draws the divider between drafts and saved people. */
+  last?: boolean;
   onChange: (patch: DraftPatch) => void;
   onDelete: () => void;
 }
@@ -17,8 +19,12 @@ interface DraftRowProps {
 /**
  * An uploaded person who isn't on the roster yet. Partner and absences wait
  * until the person is saved, because both are stored against a roster id.
+ *
+ * Built to the same geometry as a saved row: same heights, same boxes. The
+ * grid labels the drafts as a group, so the only per-row signal is a red
+ * "Choose…" on whatever is missing.
  */
-export function DraftRow({ draft, readOnly = false, onChange, onDelete }: DraftRowProps) {
+export function DraftRow({ draft, readOnly = false, last = false, onChange, onDelete }: DraftRowProps) {
   const [name, setName] = useState(draft.name);
   useEffect(() => setName(draft.name), [draft.name]);
 
@@ -29,7 +35,7 @@ export function DraftRow({ draft, readOnly = false, onChange, onDelete }: DraftR
   };
 
   const choice = (field: 'religion' | 'gender', options: readonly string[]) => (
-    <TableCell className={cn('p-1', !draft[field] && 'bg-red-50 ring-1 ring-inset ring-red-300')}>
+    <TableCell className="p-1">
       <Select
         value={draft[field] ?? ''}
         disabled={readOnly}
@@ -37,7 +43,7 @@ export function DraftRow({ draft, readOnly = false, onChange, onDelete }: DraftR
       >
         <SelectTrigger
           aria-label={`${field === 'religion' ? 'Religion' : 'Gender'} for ${draft.name}`}
-          className={cn(!draft[field] && 'border-red-300 text-red-700')}
+          className={cn(!draft[field] && 'border-red-400 text-red-700')}
         >
           <SelectValue placeholder="Choose…" />
         </SelectTrigger>
@@ -49,10 +55,8 @@ export function DraftRow({ draft, readOnly = false, onChange, onDelete }: DraftR
   );
 
   return (
-    <TableRow className="group bg-red-50/30">
+    <TableRow className={cn('group', last && 'border-b-2')}>
       <TableCell className="p-1">
-        {/* Stacked, not side by side: in the 200px Name column a pill beside
-            the input squeezes the name to a sliver. */}
         <Input
           value={name}
           disabled={readOnly}
@@ -60,19 +64,22 @@ export function DraftRow({ draft, readOnly = false, onChange, onDelete }: DraftR
           onBlur={commitName}
           aria-label={`Name for ${draft.name}`}
         />
-        <span className="mt-1 inline-block rounded-full border border-red-300 bg-background px-2 text-xs font-medium text-red-700">
-          Not saved
-        </span>
       </TableCell>
       {choice('religion', RELIGIONS)}
       {choice('gender', GENDERS)}
-      {/* Just the name: the row already says Not saved, and the link itself is
-          made on the server once both people are saved. */}
-      <TableCell
-        className="p-1 px-3 text-sm"
-        title={draft.partner_name ? 'Partners are linked once both are saved.' : undefined}
-      >
-        {draft.partner_name ?? 'None'}
+      {/* Shaped like the saved rows' partner picker, greyed out: a partner is
+          stored as a roster id, so it can't be chosen until this person is
+          saved. The server links an uploaded partner once both are saved. */}
+      <TableCell className="p-1">
+        <div className="flex items-center gap-1">
+          <div
+            className="flex h-10 w-full min-w-0 items-center rounded-md border border-input bg-background px-3 py-2 text-sm opacity-50"
+            title={draft.partner_name ? 'Partners are linked once both are saved.' : undefined}
+          >
+            <span className="truncate">{draft.partner_name ?? 'None'}</span>
+          </div>
+          <span className="w-5 shrink-0" />
+        </div>
       </TableCell>
       <TableCell className="p-1 text-center">
         <input
@@ -84,7 +91,9 @@ export function DraftRow({ draft, readOnly = false, onChange, onDelete }: DraftR
           aria-label={`Mark ${draft.name} as facilitator`}
         />
       </TableCell>
-      <TableCell className="p-1" />
+      <TableCell className="p-1">
+        <span className="text-sm text-muted-foreground px-3">—</span>
+      </TableCell>
       <TableCell className="p-1">
         {!readOnly && (
           <Button

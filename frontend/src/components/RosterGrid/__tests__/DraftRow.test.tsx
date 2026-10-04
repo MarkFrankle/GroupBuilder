@@ -26,9 +26,10 @@ function setupRow(onChange = jest.fn()) {
   return onChange;
 }
 
-it('marks the row as not saved', () => {
+it('asks for the missing value and shows the known one', () => {
   setupRow();
-  expect(screen.getByText('Not saved')).toBeInTheDocument();
+  expect(screen.getByLabelText('Religion for Grace Hansen')).toHaveTextContent('Choose…');
+  expect(screen.getByLabelText('Gender for Grace Hansen')).toHaveTextContent('Female');
 });
 
 it('sends a chosen religion', () => {
@@ -46,5 +47,5 @@ it('shows a waiting partner by name alone', () => {
       </tbody>
     </table>,
   );
-  expect(screen.getByText('Joe Rossi')).toHaveAttribute('title', 'Partners are linked once both are saved.');
+  expect(screen.getByTitle('Partners are linked once both are saved.')).toHaveTextContent('Joe Rossi');
 });

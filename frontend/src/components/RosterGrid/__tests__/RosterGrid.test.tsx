@@ -126,6 +126,20 @@ describe('RosterGrid', () => {
     }));
   });
 
+  test('labels upload drafts once, as a group above saved people', () => {
+    render(
+      <RosterGrid
+        {...defaultProps}
+        drafts={[
+          { id: 'd1', name: 'Grace', religion: null, gender: 'Female', is_facilitator: false, partner_name: null },
+          { id: 'd2', name: 'Ruth', religion: 'Christian', gender: null, is_facilitator: false, partner_name: null },
+        ]}
+      />,
+    );
+    expect(screen.getAllByText('Not saved yet')).toHaveLength(1);
+    expect(screen.getByText('2 participants, plus 2 not saved yet')).toBeInTheDocument();
+  });
+
   describe('unique names', () => {
     test('does not save a name someone else already has', () => {
       render(<RosterGrid {...defaultProps} />);

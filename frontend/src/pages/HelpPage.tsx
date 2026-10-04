@@ -211,8 +211,8 @@ function HelpPage() {
             later on the roster.
           </p>
           <p className="mb-2 text-slate-700 leading-relaxed">
-            People with unanswered cells are added as drafts, marked <strong>Not saved</strong> at the top
-            of the roster. Each one saves as soon as its highlighted cells are filled in. You can't build
+            People with unanswered cells are added as drafts, listed under <strong>Not saved yet</strong> at
+            the top of the roster. Each one saves as soon as its highlighted cells are filled in. You can't build
             sessions until every draft is saved, so nobody gets left out by accident.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">

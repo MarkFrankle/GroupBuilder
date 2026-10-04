@@ -251,13 +251,23 @@ export function RosterGrid({
             </TableRow>
           </TableHeader>
           <TableBody>
+            {/* Drafts are labelled as a group rather than row by row, so their
+                rows keep the same shape as everyone else's. */}
+            {drafts.length > 0 && (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={7} className="px-2 pb-1 pt-3 text-xs font-medium text-red-700">
+                  Not saved yet
+                </TableCell>
+              </TableRow>
+            )}
             {[...drafts]
               .sort((a, b) => a.name.localeCompare(b.name))
-              .map(d => (
+              .map((d, i, sorted) => (
                 <DraftRow
                   key={d.id}
                   draft={d}
                   readOnly={readOnly}
+                  last={i === sorted.length - 1}
                   onChange={patch => onDraftChange?.(d.id, patch)}
                   onDelete={() => onDraftDelete?.(d.id)}
                 />
