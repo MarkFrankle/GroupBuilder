@@ -46,6 +46,15 @@ Env vars live in three places, each serving a different build/runtime system:
 
 **Important:** GitHub Actions secrets become Cloud Run env vars only after a deploy. Updating a secret doesn't affect the running revision — you must redeploy.
 
+## Local Emulators
+
+The start command is in `CLAUDE.md`. Things it doesn't say:
+
+- The emulators need **Java** (`brew install openjdk` plus the symlink Homebrew prints).
+- The frontend connects to the Auth emulator on its own when `NODE_ENV=development` on `localhost`.
+- To get admin access, create a `bb_admins` doc whose id is your email, with `active: true`.
+- Email sending fails locally because no email provider is configured. The invite UI falls back to a copy-link.
+
 ## Gotchas
 
 - `gcloud config set project group-builder-backend` — easy to forget if you have other GCP projects

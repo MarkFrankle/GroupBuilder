@@ -5,7 +5,8 @@ solver is *for* and which constraints are hard, see the Solver notes in `product
 
 After changing solver code, reinstall it into the API's venv:
 `cd api && poetry run pip install -e ../assignment_logic`. Otherwise the API keeps running the
-stale copy.
+stale copy: the source looks right and the behavior doesn't change. `inspect.getsource()` from
+the API's venv shows what is actually installed.
 
 ## The two hard caps
 
