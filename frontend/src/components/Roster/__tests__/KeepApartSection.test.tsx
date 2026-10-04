@@ -50,6 +50,17 @@ describe('KeepApartSection', () => {
     )).toBeInTheDocument();
   });
 
+  test('a pair naming an unsaved upload draft shows the draft by name', () => {
+    render(
+      <KeepApartSection
+        {...defaultProps}
+        pairs={[['d1', 'p1']]}
+        pendingNames={new Map([['d1', 'Grace Hansen']])}
+      />,
+    );
+    expect(screen.getByText('Grace Hansen (not saved) and Ken Adler')).toBeInTheDocument();
+  });
+
   test('the explanation stays up while a draft row is open', () => {
     render(<KeepApartSection {...defaultProps} />);
     click(screen.getByRole('button', { name: 'Separate pair' }));

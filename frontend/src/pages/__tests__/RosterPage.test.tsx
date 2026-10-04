@@ -844,3 +844,103 @@ describe('the Away column', () => {
     expect(screen.queryByRole('menuitemcheckbox')).toBeNull();
   });
 });
+
+/**
+ * Uploads. A draft is an uploaded person not on the roster yet. Drafts keep
+ * the page editable, block the build, and are named in the discard prompt.
+ */
+describe('roster upload and drafts', () => {
+  const person = (id: string, name: string) => ({
+    id, name, religion: 'Christian', gender: 'Female',
+    partner_id: null, is_facilitator: true, keep_together: false,
+  });
+  const canonicalOf = (p: ReturnType<typeof person>) => ({
+    name: p.name, religion: p.religion, gender: p.gender,
+    partner: null, is_facilitator: p.is_facilitator, keep_together: false,
+  });
+  const draft = (id: string, name: string) => ({
+    id, name, religion: null, gender: 'Female', is_facilitator: false, partner_name: null,
+  });
+
+  const mockProgram = (opts: {
+    roster: ReturnType<typeof person>[];
+    canonical: ReturnType<typeof person>[] | null;
+    drafts?: ReturnType<typeof draft>[];
+  }) => {
+    mockFetch.mockImplementation((url: string) => {
+      // Above every other /api/roster/ branch: the roster URL shares the prefix.
+      if (url.includes('/api/roster/drafts')) {
+        return Promise.resolve({ ok: true, json: async () => ({ drafts: opts.drafts ?? [] }) } as Response);
+      }
+      if (url.includes('/api/roster/canonical')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => opts.canonical
+            ? { participants: opts.canonical.map(canonicalOf), num_tables: 2, num_sessions: 3 }
+            : { participants: [], num_tables: null, num_sessions: null },
+        } as Response);
+      }
+      if (url.includes('/api/assignments/metadata')) {
+        return opts.canonical
+          ? Promise.resolve({
+              ok: true,
+              json: async () => ({ assignment_set_id: 's1', num_tables: 2, num_sessions: 3 }),
+            } as Response)
+          : Promise.resolve({ ok: false, status: 404, json: async () => ({}) } as Response);
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ participants: opts.roster }) } as Response);
+    });
+  };
+
+  const alice = person('p1', 'Alice');
+  const bob = person('p2', 'Bob');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('offers upload while the roster is editable', async () => {
+    mockProgram({ roster: [alice, bob], canonical: null });
+    renderPage();
+    expect(await screen.findByRole('button', { name: /upload roster/i })).toBeInTheDocument();
+  });
+
+  test('hides upload while the roster is locked', async () => {
+    mockProgram({ roster: [alice, bob], canonical: [alice, bob] });
+    renderPage();
+    await screen.findByRole('button', { name: /edit roster/i });
+    expect(screen.queryByRole('button', { name: /upload roster/i })).toBeNull();
+  });
+
+  test('a draft keeps the page unlocked, shows the banner, and blocks the build', async () => {
+    mockProgram({ roster: [alice, bob], canonical: [alice, bob], drafts: [draft('d1', 'Grace')] });
+    renderPage();
+
+    expect(
+      await screen.findByText("1 person from your upload isn't saved yet."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /edit roster/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /save and rebuild sessions/i })).toBeDisabled();
+    expect(screen.getByLabelText('Religion for Grace')).toBeInTheDocument();
+  });
+
+  test('discard names the changes and the drafts', async () => {
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
+    mockProgram({
+      roster: [alice, bob],
+      canonical: [alice],
+      drafts: [draft('d1', 'Grace'), draft('d2', 'Ruth')],
+    });
+    renderPage();
+    // The grid copies the roster in on an effect, one render after loading
+    // ends. Clicking before that counts against an empty grid.
+    await screen.findByDisplayValue('Bob');
+
+    await userEvent.click(await screen.findByRole('button', { name: /discard changes/i }));
+
+    expect(confirmSpy).toHaveBeenCalledWith(
+      'Discard 1 roster change and 2 unsaved people from your upload?',
+    );
+    confirmSpy.mockRestore();
+  });
+});

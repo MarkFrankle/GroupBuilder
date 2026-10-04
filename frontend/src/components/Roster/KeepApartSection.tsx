@@ -17,6 +17,9 @@ interface KeepApartSectionProps {
   onRemove: (aId: string, bId: string) => Promise<void>;
   /** Locked: the sessions were built from this roster, so the rules are inert. */
   readOnly: boolean;
+  /** Upload drafts by id. A rule can name a draft, which keeps its id when it
+   * saves. New rules are still made between saved people only. */
+  pendingNames?: Map<string, string>;
 }
 
 /** The half-written pair. There is only ever one: a second row could commit
@@ -49,14 +52,19 @@ const MISSING = 'someone no longer on the roster';
  * from reading as a second data-entry grid.
  */
 export function KeepApartSection({
-  participants, pairs, onAdd, onRemove, readOnly,
+  participants, pairs, onAdd, onRemove, readOnly, pendingNames,
 }: KeepApartSectionProps) {
   const [draft, setDraft] = useState<Draft | null>(null);
 
   // Alphabetical, matching the partner select on the same page.
   const people = [...participants].sort((a, b) => a.name.localeCompare(b.name));
 
-  const nameOf = (id: string) => participants.find(p => p.id === id)?.name;
+  const nameOf = (id: string) => {
+    const saved = participants.find(p => p.id === id)?.name;
+    if (saved) return saved;
+    const pending = pendingNames?.get(id);
+    return pending ? `${pending} (not saved)` : undefined;
+  };
 
   const partnersOf = (id: string) =>
     pairs.filter(([a, b]) => a === id || b === id).map(([a, b]) => (a === id ? b : a));

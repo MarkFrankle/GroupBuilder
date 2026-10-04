@@ -17,14 +17,17 @@ import { RosterGrid } from '@/components/RosterGrid/RosterGrid';
 import { PopulationStats } from '@/components/Roster/PopulationStats';
 import { ChangesetPanel } from '@/components/Roster/ChangesetPanel';
 import { KeepApartSection } from '@/components/Roster/KeepApartSection';
-import { RosterParticipant } from '@/types/roster';
+import { RosterUploadButton, LoadedRoster } from '@/components/Roster/RosterUploadButton';
+import { RosterImportDialog } from '@/components/Roster/RosterImportDialog';
+import { DraftPatch, RosterParticipant } from '@/types/roster';
 import {
   upsertParticipant, deleteParticipant as apiDeleteParticipant,
   generateFromRoster, discardRosterChanges,
   addKeepApart, removeKeepApart,
+  uploadRoster, updateRosterDraft, deleteRosterDraft, RosterUpload,
 } from '@/api/roster';
 import {
-  useRoster, useAssignmentSetMetadata, useCanonicalRoster, useKeepApart,
+  useRoster, useAssignmentSetMetadata, useCanonicalRoster, useKeepApart, useRosterDrafts,
 } from '@/hooks/queries';
 import { computeChangeset, CanonicalParticipant } from '@/utils/rosterDiff';
 import { useProgram } from '@/contexts/ProgramContext';
@@ -111,6 +114,12 @@ export function RosterPage() {
     error: keepApartError,
   } = useKeepApart(currentProgram?.id ?? null);
   const keepApartPairs = keepApartData ?? [];
+  const {
+    data: draftData,
+    isLoading: draftsLoading,
+    error: draftsError,
+  } = useRosterDrafts(currentProgram?.id ?? null);
+  const drafts = draftData?.drafts ?? [];
 
   // Every one of the three, not just the roster. The lock is derived from all
   // of them, so rendering before they land shows an established program as a
@@ -120,7 +129,10 @@ export function RosterPage() {
   // Keep-apart belongs here for the same reason: the lock is derived from it
   // too, so painting before it lands shows a locked program as dirty - grid
   // editable, autosaving, Discard on screen - and then silently flips back.
-  const loading = rosterLoading || metadataLoading || canonicalLoading || keepApartLoading;
+  // Drafts feed the lock too, so painting before they land could lock a page
+  // that has drafts to fix.
+  const loading =
+    rosterLoading || metadataLoading || canonicalLoading || keepApartLoading || draftsLoading;
 
   const [participants, setParticipants] = useState<RosterParticipant[]>([]);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
@@ -132,6 +144,7 @@ export function RosterPage() {
   // Deliberately not persisted: "I pressed Edit but changed nothing" is not
   // worth remembering, and a reload should put the guard back.
   const [armed, setArmed] = useState(false);
+  const [upload, setUpload] = useState<LoadedRoster | null>(null);
 
   // "Add test data" renders into the top nav bar (next to Admin) so it's out
   // of the way of roster screenshots. The slot div is in NavBar (App.tsx) and
@@ -340,7 +353,12 @@ export function RosterPage() {
 
   const handleDiscard = async () => {
     const count = changeset.total;
-    if (!window.confirm(`Discard ${count} roster change${count === 1 ? '' : 's'}?`)) return;
+    const parts = [
+      count > 0 && `${count} roster change${count === 1 ? '' : 's'}`,
+      drafts.length > 0 &&
+        `${drafts.length} unsaved ${drafts.length === 1 ? 'person' : 'people'} from your upload`,
+    ].filter(Boolean);
+    if (!window.confirm(`Discard ${parts.join(' and ')}?`)) return;
     setError(null);
     setNotice(null);
     try {
@@ -354,8 +372,42 @@ export function RosterPage() {
       if (canonical?.num_sessions) setNumSessions(String(canonical.num_sessions));
       queryClient.invalidateQueries({ queryKey: ['roster', currentProgram!.id] });
       queryClient.invalidateQueries({ queryKey: ['canonical-roster', currentProgram!.id] });
+      queryClient.invalidateQueries({ queryKey: ['roster-drafts', currentProgram!.id] });
     } catch (err: any) {
       setError(err.message);
+    }
+  };
+
+  // Errors propagate so the dialog shows them and stays open.
+  const handleImport = async (data: RosterUpload) => {
+    await uploadRoster(currentProgram!.id, data);
+    setUpload(null);
+    queryClient.invalidateQueries({ queryKey: ['roster', currentProgram!.id] });
+    queryClient.invalidateQueries({ queryKey: ['roster-drafts', currentProgram!.id] });
+    queryClient.invalidateQueries({ queryKey: ['keep-apart', currentProgram!.id] });
+  };
+
+  const handleDraftChange = async (id: string, patch: DraftPatch) => {
+    setError(null);
+    setSaveStatus('saving');
+    try {
+      const { participant } = await updateRosterDraft(currentProgram!.id, id, patch);
+      setSaveStatus('saved');
+      queryClient.invalidateQueries({ queryKey: ['roster-drafts', currentProgram!.id] });
+      if (participant) queryClient.invalidateQueries({ queryKey: ['roster', currentProgram!.id] });
+    } catch (err) {
+      setSaveStatus('error');
+      setError(err instanceof Error ? err.message : 'Could not save that change.');
+    }
+  };
+
+  const handleDraftDelete = async (id: string) => {
+    setError(null);
+    try {
+      await deleteRosterDraft(currentProgram!.id, id);
+      queryClient.invalidateQueries({ queryKey: ['roster-drafts', currentProgram!.id] });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not remove that person.');
     }
   };
 
@@ -364,10 +416,12 @@ export function RosterPage() {
     toCanonical(participants, keepApartPairs),
     { tables: canonical?.num_tables ?? null, sessions: canonical?.num_sessions ?? null },
     { tables: parseInt(numTables), sessions: parseInt(numSessions) },
+    drafts.map(d => d.name),
   );
   // The lock is derived, never stored: a current set exists, the roster still
   // matches the one it was built from, and the coordinator hasn't asked to edit.
-  const locked = !!currentSet && !changeset.isDirty && !armed;
+  // A draft can only be fixed in an editable grid, so drafts keep the page unlocked.
+  const locked = !!currentSet && !changeset.isDirty && !armed && drafts.length === 0;
 
   // Post-build the assignment set owns absences, so the locked Away column is a
   // mirror of the set's per-session absences (served on the canonical roster),
@@ -389,12 +443,28 @@ export function RosterPage() {
   const minParticipants = parseInt(numTables) * 2;
   const numFacilitators = participants.filter(p => p.is_facilitator).length;
   const facilitatorShortfall = numFacilitators < parseInt(numTables);
-  const canGenerate = participants.length >= minParticipants && !facilitatorShortfall;
+  const draftsBlock = drafts.length > 0;
+  const draftCountText = `${drafts.length} ${drafts.length === 1 ? 'person' : 'people'}`;
+  const canGenerate = !draftsBlock && participants.length >= minParticipants && !facilitatorShortfall;
   // computeChangeset reports a brand-new program as clean - there is no
   // canonical roster to differ from - so dirtiness alone would hide the button
   // on exactly the program that needs it.
   const hasAssignmentSet = !!currentSet;
-  const showActions = changeset.isDirty || !hasAssignmentSet;
+  // Drafts too, so the disabled button and its reason stay visible.
+  const showActions = changeset.isDirty || !hasAssignmentSet || draftsBlock;
+
+  // Keep-apart rules as name pairs, for the upload dialog's warning. A pair can
+  // name a draft, which keeps its id when it saves.
+  const draftNames = new Map(drafts.map(d => [d.id, d.name]));
+  const nameById = new Map<string, string>([
+    ...participants.map(p => [p.id, p.name] as [string, string]),
+    ...Array.from(draftNames),
+  ]);
+  const keepApartNames = keepApartPairs.flatMap(([a, b]) => {
+    const aName = nameById.get(a);
+    const bName = nameById.get(b);
+    return aName && bName ? [[aName, bName] as [string, string]] : [];
+  });
 
   if (loading) {
     return (
@@ -438,6 +508,15 @@ export function RosterPage() {
                   Edit roster
                 </Button>
               )}
+              {!locked && (
+                <RosterUploadButton
+                  onLoaded={roster => {
+                    setError(null);
+                    setUpload(roster);
+                  }}
+                  onError={setError}
+                />
+              )}
             </div>
           </div>
         </CardHeader>
@@ -449,6 +528,17 @@ export function RosterPage() {
             navActionsSlot,
           )}
         <CardContent className="space-y-6">
+          {draftsBlock && (
+            <Alert variant="destructive" role="status">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>
+                  {`${draftCountText} from your upload ${drafts.length === 1 ? "isn't" : "aren't"} saved yet.`}
+                </strong>{' '}
+                Fix the highlighted cells and each person saves on their own.
+              </AlertDescription>
+            </Alert>
+          )}
           <PopulationStats participants={participants} keepApartPairs={keepApartPairs} />
 
           <RosterGrid
@@ -459,6 +549,9 @@ export function RosterPage() {
             onKeepTogetherToggle={handleKeepTogetherToggle}
             numSessions={parseInt(numSessions)}
             readOnly={locked}
+            drafts={drafts}
+            onDraftChange={handleDraftChange}
+            onDraftDelete={handleDraftDelete}
           />
 
           {changeset.isDirty && <ChangesetPanel changeset={changeset} />}
@@ -498,9 +591,10 @@ export function RosterPage() {
             onAdd={handleAddKeepApart}
             onRemove={handleRemoveKeepApart}
             readOnly={locked}
+            pendingNames={draftNames}
           />
 
-          {(error || fetchError || canonicalError || keepApartError) && (
+          {(error || fetchError || canonicalError || keepApartError || draftsError) && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               {/* A failure to load is not a refusal to rebuild, and a canonical
@@ -516,7 +610,11 @@ export function RosterPage() {
                       // being kept apart yet", which is a claim rather than an
                       // absence - and the roster reads dirty beside it.
                       ? 'Couldn’t load who is being kept apart'
-                      : 'Couldn’t load your roster'}
+                      : draftsError
+                        // Same reason: unread drafts would look like none, and
+                        // the build button would offer to leave them out.
+                        ? 'Couldn’t load the people from your upload'
+                        : 'Couldn’t load your roster'}
               </AlertTitle>
               <AlertDescription>
                 {error ||
@@ -564,7 +662,9 @@ export function RosterPage() {
                         </button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        {participants.length < minParticipants
+                        {draftsBlock
+                          ? `${draftCountText} from your upload ${drafts.length === 1 ? "isn't" : "aren't"} on the roster yet. Fix the highlighted cells first.`
+                          : participants.length < minParticipants
                           ? `Need at least ${minParticipants} participants for ${numTables} tables — you have ${participants.length}.`
                           : `Need at least ${numTables} facilitators for ${numTables} tables — you have ${numFacilitators}.`}
                       </TooltipContent>
@@ -581,6 +681,16 @@ export function RosterPage() {
           )}
         </CardContent>
       </Card>
+      {upload && (
+        <RosterImportDialog
+          headers={upload.headers}
+          rows={upload.rows}
+          currentCount={participants.length + drafts.length}
+          keepApartNames={keepApartNames}
+          onCancel={() => setUpload(null)}
+          onCommit={handleImport}
+        />
+      )}
     </div>
   );
 }
