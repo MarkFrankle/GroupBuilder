@@ -64,7 +64,14 @@ it('shows the server refusal and stays open', async () => {
 it('blocks only when no column holds names', () => {
   setup();
   fireEvent.keyDown(screen.getByLabelText('Column Name'), { key: 'Enter' });
-  fireEvent.click(screen.getByRole('option', { name: 'Ignore' }));
+  fireEvent.click(screen.getByRole('option', { name: "Don't import" }));
   expect(screen.getByText('Choose which column holds names.')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /^Add/ })).toBeDisabled();
+});
+
+it('shows an unused column as a dash, named only for screen readers', () => {
+  setup({ headers: ['Name', 'Faith', 'Notes'], rows: [['Ana', 'Jewish', 'hi']] });
+  const trigger = screen.getByLabelText('Column Notes');
+  expect(trigger).toHaveTextContent("–Don't import");
+  expect(screen.getByText(/1 column not imported/)).toBeInTheDocument();
 });

@@ -19,7 +19,7 @@ export const FIELD_LABELS: Record<ImportField, string> = {
   gender: 'Gender',
   facilitator: 'Facilitator',
   partner: 'Partner',
-  ignore: 'Ignore',
+  ignore: "Don't import",
 };
 
 /** For comparing headers and values: case, punctuation and spacing don't count. */

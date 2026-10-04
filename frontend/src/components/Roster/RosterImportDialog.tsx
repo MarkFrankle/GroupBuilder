@@ -97,7 +97,7 @@ export function RosterImportDialog({
     resolution.skippedRows.length > 0 &&
       `${resolution.skippedRows.length} ${resolution.skippedRows.length === 1 ? 'row' : 'rows'} skipped`,
     noteCount > 0 && `${noteCount} ${noteCount === 1 ? 'note' : 'notes'} (hover a highlighted cell for details)`,
-    `${ignoredCount} ${ignoredCount === 1 ? 'column' : 'columns'} ignored`,
+    `${ignoredCount} ${ignoredCount === 1 ? 'column' : 'columns'} not imported`,
     droppedRules > 0 &&
       `${droppedRules} keep-apart ${droppedRules === 1 ? 'rule' : 'rules'} will be removed because someone in ${
         droppedRules === 1 ? 'it' : 'them'
@@ -160,8 +160,23 @@ export function RosterImportDialog({
                         value={mapping[c]}
                         onValueChange={v => setMapping(prev => setColumnField(prev, c, v as ImportField))}
                       >
-                        <SelectTrigger aria-label={`Column ${header}`} className={cn('h-8', ignored && 'text-muted-foreground')}>
-                          <SelectValue />
+                        <SelectTrigger
+                          aria-label={`Column ${header}`}
+                          className={cn('h-8', ignored && 'border-dashed text-muted-foreground')}
+                        >
+                          {/* An unused column shows a dash, not a word: "Don't import"
+                              in the closed trigger read like a sixth kind of data
+                              beside Name and Religion. The menu keeps the words. */}
+                          <SelectValue>
+                            {ignored ? (
+                              <>
+                                <span aria-hidden="true">–</span>
+                                <span className="sr-only">{FIELD_LABELS.ignore}</span>
+                              </>
+                            ) : (
+                              FIELD_LABELS[mapping[c]]
+                            )}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {IMPORT_FIELDS.map(f => (
