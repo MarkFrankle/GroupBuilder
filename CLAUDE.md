@@ -112,6 +112,16 @@
   reading `keep_together` — silently applies the wrong rule to half the field's
   users. `planCheck.ts`'s couple-violation and `hasCouples` checks both gate on
   `!keep_together` for this reason.
+- **Anything that builds sessions must refuse while `roster_drafts` is non-empty.** Drafts are
+  uploaded people not yet on the roster. Building around them silently leaves them out.
+  `generate_from_roster` checks it. A new build path must too.
+- **Names are unique per program under `_name_key` (backend) / `nameKey` (frontend).** Both
+  trim, collapse spaces and lowercase, and must stay in step. Any new name check uses them,
+  never a raw `==`.
+- **In `RosterPage.test.tsx`, wait for a grid row before acting on the page.** The grid copies
+  the roster into state on an effect, one render after loading ends, so a `findByRole` on a
+  button can resolve against an empty grid. A discard prompt then counts the wrong changes.
+  `await screen.findByDisplayValue('<name>')` first.
 - **A multi-select popover with checkboxes: use `DropdownMenu` + `DropdownMenuCheckboxItem`,
   not a new Popover dep.** `@radix-ui/react-popover` isn't installed. Give each checkbox item
   `onSelect={e => e.preventDefault()}` or the menu closes on the first tick. Opens in tests

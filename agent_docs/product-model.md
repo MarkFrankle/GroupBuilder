@@ -55,6 +55,24 @@ There is exactly one Assignments per program. There is no gallery of past genera
 - **Keep-apart** — arbitrary pairs that must not sit together. Many-to-many, but expect 0–1
   per program; more than 2 means the program is already failing.
 
+**Roster upload is an on-ramp, not a source of truth.** A coordinator can upload an `.xlsx` or
+`.csv` whenever the grid is editable. The upload replaces the whole roster in one write, and
+after that the grid owns the roster again. Re-uploading is the main repair step. Absences,
+keep-apart rules and a pair's keep-together setting carry over only for names that come over
+(spacing and capitalization don't count, spelling does).
+
+**Drafts are uploaded people who aren't on the roster yet,** because their religion or gender
+couldn't be read. They live on the server (`roster_drafts` on the Program document), never as
+roster documents, so every roster document stays complete and solvable. Each draft saves itself
+once its missing values are filled in. While any draft exists the page never locks and builds
+are refused, so nobody is silently left out. Discard throws them away with the rest of the
+upload.
+
+**Names are unique per program.** People are matched by name everywhere (the changeset, keep-apart
+resolution, upload carry-over), so a new name or a rename that collides with another person or a
+draft is refused. The fix is a nickname or a last initial. Older programs that already hold
+duplicates can still save other fields on them.
+
 ---
 
 ## Invariants
@@ -169,6 +187,7 @@ redesign.
 | Creating keep-apart from the seating view | **Rejected** | It is a program-level change, and click is already single-select highlight — there is no gesture for selecting two people |
 | Auto-rebalancing after an absence | **Rejected** | Surprise motion an hour before an event is scarier than an unbalanced table |
 | A permanent quick-start link in the header | **Rejected** | Competes with Help and splits the docs into two front doors |
+| A document as the roster's source of truth | **Deleted** (`1f5ee9b`, `b272510`) | Download a template, conform, upload, fail, repeat. Upload came back 2026-10 only as a one-time on-ramp into the grid |
 
 ---
 
