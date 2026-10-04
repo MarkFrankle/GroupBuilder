@@ -234,16 +234,20 @@ export function RosterGrid({
         {drafts.length > 0 && `, ${drafts.length} not saved yet`}
       </div>
       <div className="w-full overflow-auto border rounded-md">
-        <Table>
+        {/* Fixed layout, or the widths below are only hints: auto layout sizes by
+            content, and a text input has none, so Name got whatever was left and
+            clipped ordinary names. The widths add up to the card's inner width
+            (max-w-4xl less padding), and min-w scrolls rather than crushes. */}
+        <Table className="table-fixed min-w-[842px]">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[200px]">Name</TableHead>
-              <TableHead className="w-[150px]">Religion</TableHead>
-              <TableHead className="w-[120px]">Gender</TableHead>
-              <TableHead className="w-[260px]">Partner</TableHead>
-              <TableHead className="w-[90px]">Facilitator</TableHead>
-              <TableHead className="w-[160px]">Absences</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
+              <TableHead className="w-[180px]">Name</TableHead>
+              <TableHead className="w-[112px]">Religion</TableHead>
+              <TableHead className="w-[98px]">Gender</TableHead>
+              <TableHead className="w-[176px]">Partner</TableHead>
+              <TableHead className="w-[92px] px-2">Facilitator</TableHead>
+              <TableHead className="w-[136px]">Absences</TableHead>
+              <TableHead className="w-[48px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
