@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -9,8 +9,10 @@ import {
 } from '@/components/ui/select';
 import { PersonCombobox } from '@/components/ui/PersonCombobox';
 import { Trash2, Link, Unlink } from 'lucide-react';
-import { RosterParticipant, Religion, Gender, RELIGIONS, GENDERS } from '@/types/roster';
+import { DraftPatch, RosterDraft, RosterParticipant, Religion, Gender, RELIGIONS, GENDERS } from '@/types/roster';
 import { AwayCell } from './AwayCell';
+import { DraftRow } from './DraftRow';
+import { nameKey } from '@/utils/rosterImport';
 
 interface RosterGridProps {
   participants: RosterParticipant[];
@@ -24,6 +26,10 @@ interface RosterGridProps {
   /** Locked: the assignments were built from this roster and editing it would
    * invalidate them. Every field is inert and the add-row is gone. */
   readOnly?: boolean;
+  /** Uploaded people not yet saved. Rendered first so they're seen. */
+  drafts?: RosterDraft[];
+  onDraftChange?: (id: string, patch: DraftPatch) => void;
+  onDraftDelete?: (id: string) => void;
 }
 
 interface EmptyRowState {
@@ -38,17 +44,68 @@ const EMPTY_ROW: EmptyRowState = {
   name: '', religion: 'Other', gender: 'Other', partner_id: null, is_facilitator: false,
 };
 
-export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepTogetherToggle, numSessions, readOnly = false }: RosterGridProps) {
+const nameTakenMessage = (name: string) =>
+  `Someone named ${name} is already on the roster. Add a last initial or a nickname.`;
+
+export function RosterGrid({
+  participants,
+  onUpdate,
+  onDelete,
+  onAdd,
+  onKeepTogetherToggle,
+  numSessions,
+  readOnly = false,
+  drafts = [],
+  onDraftChange,
+  onDraftDelete,
+}: RosterGridProps) {
 
   const [editingNames, setEditingNames] = useState<Record<string, string>>({});
   const [emptyRow, setEmptyRow] = useState<EmptyRowState>({ ...EMPTY_ROW });
+  // A typed name that collides with someone else's is never saved. It stays in
+  // the input, with this message under it, until it's changed.
+  const [nameErrors, setNameErrors] = useState<Record<string, string>>({});
+  const [emptyRowError, setEmptyRowError] = useState<string | null>(null);
+
+  // Names are unique per program under nameKey, which is also how the server
+  // checks. Drafts count: they will be on the roster once fixed.
+  const ownerByKey = useMemo(() => {
+    const owners = new Map<string, string>();
+    participants.forEach(p => owners.set(nameKey(p.name), p.id));
+    drafts.forEach(d => owners.set(nameKey(d.name), d.id));
+    return owners;
+  }, [participants, drafts]);
+  const isTaken = useCallback(
+    (name: string, selfId: string | null) => {
+      const owner = ownerByKey.get(nameKey(name));
+      return owner !== undefined && owner !== selfId;
+    },
+    [ownerByKey],
+  );
+
+  // The name to send with any other field's change. A pending rename onto a
+  // taken name would make the server refuse the whole edit, so it isn't sent.
+  const nameToSave = (participant: RosterParticipant) => {
+    const pending = editingNames[participant.id];
+    return pending === undefined || isTaken(pending, participant.id) ? participant.name : pending;
+  };
 
   const handleNameChange = (id: string, value: string) => {
     setEditingNames(prev => ({ ...prev, [id]: value }));
+    setNameErrors(prev => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   };
 
   const handleNameBlur = (participant: RosterParticipant) => {
     const newName = editingNames[participant.id];
+    if (newName !== undefined && newName !== participant.name && isTaken(newName, participant.id)) {
+      setNameErrors(prev => ({ ...prev, [participant.id]: nameTakenMessage(newName.trim()) }));
+      return;
+    }
     if (newName !== undefined && newName !== participant.name) {
       onUpdate(participant.id, {
         name: newName,
@@ -74,7 +131,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
   ) => {
     const partnerValue = field === 'partner_id' ? (value === 'none' ? null : value) : participant.partner_id;
     onUpdate(participant.id, {
-      name: editingNames[participant.id] ?? participant.name,
+      name: nameToSave(participant),
       religion: field === 'religion' ? value as Religion : participant.religion,
       gender: field === 'gender' ? value as Gender : participant.gender,
       partner_id: partnerValue,
@@ -86,7 +143,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
 
   const handleFacilitatorChange = (participant: RosterParticipant, checked: boolean) => {
     onUpdate(participant.id, {
-      name: editingNames[participant.id] ?? participant.name,
+      name: nameToSave(participant),
       religion: participant.religion,
       gender: participant.gender,
       partner_id: participant.partner_id,
@@ -98,7 +155,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
 
   const handleAwayChange = (participant: RosterParticipant, next: number[]) => {
     onUpdate(participant.id, {
-      name: editingNames[participant.id] ?? participant.name,
+      name: nameToSave(participant),
       religion: participant.religion,
       gender: participant.gender,
       partner_id: participant.partner_id,
@@ -112,6 +169,10 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
 
   const commitEmptyRow = useCallback(() => {
     if (emptyRow.name.trim()) {
+      if (isTaken(emptyRow.name, null)) {
+        setEmptyRowError(nameTakenMessage(emptyRow.name.trim()));
+        return;
+      }
       onAdd({
         name: emptyRow.name.trim(),
         religion: emptyRow.religion,
@@ -121,7 +182,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
       });
       setEmptyRow({ ...EMPTY_ROW });
     }
-  }, [emptyRow, onAdd]);
+  }, [emptyRow, onAdd, isTaken]);
 
   const handleEmptyRowFieldChange = useCallback((updater: (prev: EmptyRowState) => EmptyRowState) => {
     setEmptyRow(prev => {
@@ -129,6 +190,10 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
       if (next.name.trim()) {
         // Commit after the state update settles so onAdd sees the final values
         setTimeout(() => {
+          if (isTaken(next.name, null)) {
+            setEmptyRowError(nameTakenMessage(next.name.trim()));
+            return;
+          }
           onAdd({
             name: next.name.trim(),
             religion: next.religion,
@@ -141,7 +206,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
       }
       return next;
     });
-  }, [onAdd]);
+  }, [onAdd, isTaken]);
 
   const handleEmptyRowBlur = useCallback(() => {
     // Delay check so focus has time to settle (Radix Select portals the dropdown)
@@ -166,24 +231,51 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
     <div>
       <div className="text-sm text-muted-foreground mb-2">
         {participants.length} participant{participants.length !== 1 ? 's' : ''}
+        {drafts.length > 0 && `, plus ${drafts.length} not saved yet`}
       </div>
       <div className="w-full overflow-auto border rounded-md">
-        <Table>
+        {/* Fixed layout, or the widths below are only hints: auto layout sizes by
+            content, and a text input has none, so Name got whatever was left and
+            clipped ordinary names. The widths add up to the card's inner width
+            (max-w-4xl less padding), and min-w scrolls rather than crushes. */}
+        <Table className="table-fixed min-w-[842px]">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[200px]">Name</TableHead>
-              <TableHead className="w-[150px]">Religion</TableHead>
-              <TableHead className="w-[120px]">Gender</TableHead>
-              <TableHead className="w-[260px]">Partner</TableHead>
-              <TableHead className="w-[90px]">Facilitator</TableHead>
-              <TableHead className="w-[160px]">Absences</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
+              <TableHead className="w-[180px]">Name</TableHead>
+              <TableHead className="w-[112px]">Religion</TableHead>
+              <TableHead className="w-[106px]">Gender</TableHead>
+              <TableHead className="w-[168px]">Partner</TableHead>
+              <TableHead className="w-[92px] px-2">Facilitator</TableHead>
+              <TableHead className="w-[136px]">Absences</TableHead>
+              <TableHead className="w-[48px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
+            {/* Drafts are labelled as a group rather than row by row, so their
+                rows keep the same shape as everyone else's. */}
+            {drafts.length > 0 && (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={7} className="px-2 pb-1 pt-3 text-xs font-medium text-red-700">
+                  Not saved yet
+                </TableCell>
+              </TableRow>
+            )}
+            {[...drafts]
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((d, i, sorted) => (
+                <DraftRow
+                  key={d.id}
+                  draft={d}
+                  readOnly={readOnly}
+                  last={i === sorted.length - 1}
+                  onChange={patch => onDraftChange?.(d.id, patch)}
+                  onDelete={() => onDraftDelete?.(d.id)}
+                />
+              ))}
             {participants.map(p => {
               const currentName = editingNames[p.id] ?? p.name;
-              const hasError = !currentName.trim() || duplicateNames.has(p.name);
+              const nameError = nameErrors[p.id];
+              const hasError = !currentName.trim() || duplicateNames.has(p.name) || !!nameError;
 
               return (
                 <TableRow key={p.id} className="group">
@@ -196,6 +288,7 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
                       disabled={readOnly}
                       className={hasError ? 'border-red-500' : ''}
                     />
+                    {nameError && <p className="mt-1 text-xs text-red-600">{nameError}</p>}
                   </TableCell>
                   <TableCell className="p-1">
                     <Select value={p.religion} disabled={readOnly} onValueChange={v => handleFieldChange(p, 'religion', v)}>
@@ -288,8 +381,13 @@ export function RosterGrid({ participants, onUpdate, onDelete, onAdd, onKeepToge
                 <Input
                   placeholder="Name"
                   value={emptyRow.name}
-                  onChange={e => setEmptyRow(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={e => {
+                    setEmptyRowError(null);
+                    setEmptyRow(prev => ({ ...prev, name: e.target.value }));
+                  }}
+                  className={emptyRowError ? 'border-red-500' : ''}
                 />
+                {emptyRowError && <p className="mt-1 text-xs text-red-600">{emptyRowError}</p>}
               </TableCell>
               <TableCell className="p-1">
                 <Select value={emptyRow.religion} onValueChange={v => handleEmptyRowFieldChange(prev => ({ ...prev, religion: v as Religion }))}>

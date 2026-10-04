@@ -185,11 +185,32 @@ class MockFirestoreCollection:
         return OrderedQuery(parent_collection, sort_field, sort_direction)
 
 
+class MockWriteBatch:
+    """Queues writes and applies them only on ``commit``, like a Firestore batch."""
+
+    def __init__(self):
+        self._ops = []
+
+    def set(self, doc_ref, data, merge=False):
+        self._ops.append(lambda: doc_ref.set(data, merge=merge))
+
+    def delete(self, doc_ref):
+        self._ops.append(doc_ref.delete)
+
+    def commit(self):
+        for op in self._ops:
+            op()
+        self._ops = []
+
+
 class MockFirestoreClient:
     """Mock Firestore client for testing."""
 
     def __init__(self):
         self._collections = {}
+
+    def batch(self):
+        return MockWriteBatch()
 
     def collection(self, collection_name):
         """Get or create collection."""

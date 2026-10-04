@@ -110,7 +110,9 @@ function HelpPage() {
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Adding a participant:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             As you enter a participant's information, a new empty row will appear
-            for the next person and the roster will save automatically.
+            for the next person and the roster will save automatically. Every name
+            must be different. If two people share a name, add a last initial or a
+            nickname to tell them apart.
           </p>
 
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Adding characteristics:</p>
@@ -195,6 +197,30 @@ function HelpPage() {
             solver will spend about 2 minutes working out the best possible
             arrangement. You'll see a progress indicator while it works. When
             it's done, you'll be taken to the results page.
+          </p>
+
+          <h3 className="text-xl font-semibold mb-2">Uploading a spreadsheet</h3>
+          <p className="mb-2 text-slate-700 leading-relaxed">
+            If you already have your participants in Excel or Google Sheets, click{' '}
+            <strong>Upload roster</strong> and choose the file. Save it as .xlsx or .csv first. Any column
+            order works, and the first row should hold your column titles. If your sessions are already
+            built, click <strong>Edit roster</strong> first.
+          </p>
+          <p className="mb-2 text-slate-700 leading-relaxed">
+            Group Builder shows you a preview and guesses what each column holds. If a guess is wrong, pick
+            the right one from the menu above that column. Cells it couldn't read are highlighted in red.
+            You can answer them in the preview, where one answer fixes every cell with the same text, or
+            later on the roster.
+          </p>
+          <p className="mb-2 text-slate-700 leading-relaxed">
+            People with unanswered cells are added as drafts, listed under <strong>Not saved yet</strong> at
+            the top of the roster. Each one saves as soon as its highlighted cells are filled in. You can't build
+            sessions until every draft is saved, so nobody gets left out by accident.
+          </p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            Uploading replaces everyone on your roster, so if something went wrong, fix the spreadsheet and
+            upload it again. Absences and keep-apart rules carry over for anyone whose name is spelled the same way
+            in the new file.
           </p>
 
           <h3 className="text-xl font-semibold mb-2">Editing after you've generated assignments</h3>

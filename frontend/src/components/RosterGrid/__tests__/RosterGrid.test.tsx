@@ -125,4 +125,65 @@ describe('RosterGrid', () => {
       name: 'Alicia', absent_sessions: [3],
     }));
   });
+
+  test('labels upload drafts once, as a group above saved people', () => {
+    render(
+      <RosterGrid
+        {...defaultProps}
+        drafts={[
+          { id: 'd1', name: 'Grace', religion: null, gender: 'Female', is_facilitator: false, partner_name: null },
+          { id: 'd2', name: 'Ruth', religion: 'Christian', gender: null, is_facilitator: false, partner_name: null },
+        ]}
+      />,
+    );
+    expect(screen.getAllByText('Not saved yet')).toHaveLength(1);
+    expect(screen.getByText('2 participants, plus 2 not saved yet')).toBeInTheDocument();
+  });
+
+  describe('unique names', () => {
+    test('does not save a name someone else already has', () => {
+      render(<RosterGrid {...defaultProps} />);
+      const input = screen.getByDisplayValue('Bob');
+      input.focus();
+      fireEvent.change(input, { target: { value: 'alice ' } });
+      fireEvent.blur(input);
+      expect(defaultProps.onUpdate).not.toHaveBeenCalled();
+      expect(screen.getByText(/already on the roster/)).toBeInTheDocument();
+    });
+
+    test('a name held by an upload draft is taken too', () => {
+      render(
+        <RosterGrid
+          {...defaultProps}
+          drafts={[{ id: 'd1', name: 'Grace', religion: null, gender: 'Female', is_facilitator: false, partner_name: null }]}
+        />,
+      );
+      const input = screen.getByDisplayValue('Bob');
+      fireEvent.change(input, { target: { value: 'Grace' } });
+      fireEvent.blur(input);
+      expect(defaultProps.onUpdate).not.toHaveBeenCalled();
+    });
+
+    test('another field still saves under the old name while the new one is taken', () => {
+      render(<RosterGrid {...defaultProps} />);
+      const input = screen.getByDisplayValue('Bob');
+      fireEvent.change(input, { target: { value: 'Alice' } });
+      fireEvent.blur(input);
+      fireEvent.click(screen.getAllByRole('checkbox')[1]);
+      expect(defaultProps.onUpdate).toHaveBeenCalledWith('p2', expect.objectContaining({
+        name: 'Bob', is_facilitator: true,
+      }));
+    });
+
+    test('the empty row does not add a taken name', async () => {
+      render(<RosterGrid {...defaultProps} />);
+      const emptyRow = screen.getAllByPlaceholderText('Name')[2];
+      emptyRow.focus();
+      fireEvent.change(emptyRow, { target: { value: 'BOB' } });
+      await userEvent.click(document.body);
+      await act(async () => { await new Promise(r => setTimeout(r, 10)); });
+      expect(defaultProps.onAdd).not.toHaveBeenCalled();
+      expect(screen.getByText(/already on the roster/)).toBeInTheDocument();
+    });
+  });
 });

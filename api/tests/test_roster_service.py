@@ -131,3 +131,36 @@ class TestAbsentSessions:
     def test_drops_non_positive_values(self, service):
         call = self._upsert(service, self._base(absent_sessions=[0, -1, 3]))
         assert call["absent_sessions"] == [3]
+
+
+class TestStageReplace:
+    def _people(self):
+        return {
+            "n1": {"name": "Ana", "religion": "Jewish", "gender": "Female"},
+            "n2": {"name": "Ben", "religion": "Muslim", "gender": "Male"},
+        }
+
+    def test_stages_deletes_and_writes(self, service, mock_db):
+        old = MagicMock()
+        collection = (
+            mock_db.collection.return_value.document.return_value.collection.return_value
+        )
+        collection.stream.return_value = [old]
+        batch = MagicMock()
+
+        service.stage_replace(batch, "org_1", self._people())
+
+        batch.delete.assert_called_once_with(old.reference)
+        assert batch.set.call_count == 2
+        batch.commit.assert_not_called()
+
+    def test_invalid_row_stages_nothing(self, service):
+        people = self._people()
+        people["n2"]["religion"] = "Catholic"
+        batch = MagicMock()
+
+        with pytest.raises(ValueError):
+            service.stage_replace(batch, "org_1", people)
+
+        batch.set.assert_not_called()
+        batch.delete.assert_not_called()

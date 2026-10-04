@@ -1,5 +1,6 @@
 import { authenticatedFetch } from '@/utils/apiClient';
-import { RosterParticipant } from '@/types/roster';
+import { DraftPatch, RosterDraft, RosterParticipant } from '@/types/roster';
+import { ImportedDraft, ImportedParticipant } from '@/utils/rosterImport';
 
 export async function getRoster(programId: string): Promise<RosterParticipant[]> {
   const response = await authenticatedFetch(`/api/roster/?program_id=${programId}`);
@@ -74,6 +75,55 @@ export async function discardRosterChanges(programId: string): Promise<void> {
     const data = await response.json().catch(() => ({}));
     throw new Error(data?.detail || 'Could not undo those changes. Please try again.');
   }
+}
+
+export interface RosterUpload {
+  participants: ImportedParticipant[];
+  drafts: ImportedDraft[];
+}
+
+/** Replace the whole roster with an upload. The server's refusal is written for the coordinator. */
+export async function uploadRoster(programId: string, upload: RosterUpload): Promise<void> {
+  const response = await authenticatedFetch(`/api/roster/?program_id=${programId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(upload),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data?.detail || 'Could not upload this roster. Please try again.');
+  }
+}
+
+export async function getRosterDrafts(
+  programId: string,
+): Promise<{ drafts: RosterDraft[] }> {
+  const response = await authenticatedFetch(`/api/roster/drafts?program_id=${programId}`);
+  if (!response.ok) throw new Error(`Failed to fetch drafts: ${response.status}`);
+  return response.json();
+}
+
+/** Edit a draft. When the edit completes it, the server saves the person and returns them. */
+export async function updateRosterDraft(
+  programId: string,
+  draftId: string,
+  patch: DraftPatch,
+): Promise<{ draft: RosterDraft | null; participant: RosterParticipant | null }> {
+  const response = await authenticatedFetch(`/api/roster/drafts/${draftId}?program_id=${programId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data?.detail || 'Could not save that change. Please try again.');
+  return data;
+}
+
+export async function deleteRosterDraft(programId: string, draftId: string): Promise<void> {
+  const response = await authenticatedFetch(`/api/roster/drafts/${draftId}?program_id=${programId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Could not remove that person. Please try again.');
 }
 
 /** The pairs who must never share a table: roster ids, each pair sorted. */
