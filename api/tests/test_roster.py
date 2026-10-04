@@ -1636,3 +1636,52 @@ class TestRosterDrafts:
         client.post("/api/roster/discard?program_id=test_org_id")
 
         assert client.get(self._url()).json()["drafts"] == []
+
+
+class TestUniqueNames:
+    URL = "/api/roster/{}?program_id=test_org_id"
+
+    def _body(self, name, religion="Jewish"):
+        return {"name": name, "religion": religion, "gender": "Female"}
+
+    def test_refuses_a_new_person_with_a_taken_name(
+        self, client, add_roster_to_firestore
+    ):
+        add_roster_to_firestore(_draft(2))
+
+        response = client.put(self.URL.format("new"), json=self._body("person0 "))
+
+        assert response.status_code == 400
+        assert "nickname" in response.json()["detail"]
+
+    def test_refuses_a_rename_onto_a_taken_name(self, client, add_roster_to_firestore):
+        add_roster_to_firestore(_draft(2))
+
+        response = client.put(self.URL.format("p1"), json=self._body("Person0"))
+
+        assert response.status_code == 400
+
+    def test_refuses_a_name_held_by_a_draft(self, client):
+        from api.services.roster_draft_storage import RosterDraftStorage
+
+        RosterDraftStorage().write_drafts(
+            "test_org_id", [{"id": "d1", "name": "Grace", "religion": None}]
+        )
+
+        response = client.put(self.URL.format("new"), json=self._body("grace"))
+
+        assert response.status_code == 400
+
+    def test_existing_duplicates_can_still_save_other_fields(
+        self, client, add_roster_to_firestore
+    ):
+        """Programs from before the rule may already hold duplicates."""
+        draft = _draft(2)
+        draft[1]["name"] = "Person0"
+        add_roster_to_firestore(draft)
+
+        response = client.put(
+            self.URL.format("p1"), json=self._body("Person0", religion="Muslim")
+        )
+
+        assert response.status_code == 200

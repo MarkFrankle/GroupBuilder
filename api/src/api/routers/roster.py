@@ -878,7 +878,19 @@ async def upsert_participant(
     program_id: str = Depends(validate_program_access),
     roster_service: RosterService = Depends(get_roster_service),
     keep_apart: KeepApartStorage = Depends(get_keep_apart_storage),
+    drafts_storage: RosterDraftStorage = Depends(get_roster_draft_storage),
 ):
+    # Names are matched everywhere, so they must be unique. Only a new person or
+    # a rename is checked: a program with duplicates from before this rule can
+    # still save other fields on them.
+    roster = roster_service.get_roster(program_id)
+    current = next((p for p in roster if p["id"] == participant_id), None)
+    if current is None or _name_key(current["name"]) != _name_key(data.name):
+        taken = {_name_key(p["name"]) for p in roster if p["id"] != participant_id}
+        taken |= {_name_key(d["name"]) for d in drafts_storage.get_drafts(program_id)}
+        if _name_key(data.name) in taken:
+            raise HTTPException(status_code=400, detail=_name_taken(data.name.strip()))
+
     # The mirror of the POST /keep-apart refusal. Without it the contradiction
     # is reachable from this side - link two people already kept apart - and
     # the coordinator meets it as the solver's generic "No solution exists"
