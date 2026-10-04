@@ -45,8 +45,24 @@ it('imports unanswered rows as drafts', async () => {
 it('warns only about keep-apart rules naming someone not in the file', () => {
   setup({ keepApartNames: [['ana', 'Ben'], ['Ana', 'Zed']] });
   expect(
-    screen.getByText(/1 keep-apart rule will be removed because someone in it isn't in this file/),
+    screen.getByText(
+      "The keep-apart rule for Ana and Zed will be removed because someone in it isn't in this file.",
+    ),
   ).toBeInTheDocument();
+});
+
+it('names two dropped rules and counts more', () => {
+  setup({ keepApartNames: [['Ana', 'Zed'], ['Ben', 'Yan']] });
+  expect(
+    screen.getByText(
+      "The keep-apart rules for Ana and Zed, and for Ben and Yan, will be removed because someone in them isn't in this file.",
+    ),
+  ).toBeInTheDocument();
+});
+
+it('counts more than two dropped rules', () => {
+  setup({ keepApartNames: [['Ana', 'Zed'], ['Ben', 'Yan'], ['Cy', 'Xi']] });
+  expect(screen.getByText(/^3 keep-apart rules will be removed/)).toBeInTheDocument();
 });
 
 it('says it will replace an existing roster', () => {

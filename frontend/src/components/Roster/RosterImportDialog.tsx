@@ -65,8 +65,8 @@ export function RosterImportDialog({
   const drafts = resolution.drafts.length;
   const incoming = new Set([...resolution.participants, ...resolution.drafts].map(p => nameKey(p.name)));
   const droppedRules = resolution.missingName
-    ? 0
-    : keepApartNames.filter(([a, b]) => !incoming.has(nameKey(a)) || !incoming.has(nameKey(b))).length;
+    ? []
+    : keepApartNames.filter(([a, b]) => !incoming.has(nameKey(a)) || !incoming.has(nameKey(b)));
 
   const verb = currentCount === 0 ? `Add ${people(total)}` : `Replace ${people(currentCount)} with ${total}`;
   const commitLabel = drafts
@@ -93,12 +93,15 @@ export function RosterImportDialog({
   }
   // The one loss the table can't show. Skipped rows, notes and unused columns
   // are all visible in the table itself, so the footer doesn't repeat them.
-  const keepApartWarning =
-    droppedRules > 0
-      ? `${droppedRules} keep-apart ${droppedRules === 1 ? 'rule' : 'rules'} will be removed because someone in ${
-          droppedRules === 1 ? 'it' : 'them'
-        } isn't in this file.`
-      : null;
+  // Named, up to two rules, so the coordinator knows what to set up again.
+  const keepApartWarning = (() => {
+    const n = droppedRules.length;
+    if (n === 0) return null;
+    const why = `will be removed because someone in ${n === 1 ? 'it' : 'them'} isn't in this file.`;
+    if (n > 2) return `${n} keep-apart rules ${why}`;
+    const pairs = droppedRules.map(([a, b]) => `${a} and ${b}`).join(', and for ');
+    return `The keep-apart ${n === 1 ? 'rule' : 'rules'} for ${pairs}${n === 2 ? ',' : ''} ${why}`;
+  })();
 
   const answer = (note: CellNote, value: string) => {
     if (!note.fix) return;
