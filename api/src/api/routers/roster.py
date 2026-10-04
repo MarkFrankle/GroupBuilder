@@ -9,7 +9,16 @@ from slowapi.util import get_remote_address
 
 from api.dependencies import validate_program_access
 from api.middleware.auth import get_current_user, AuthUser
-from api.services.roster_service import RosterService, get_roster_service
+from api.services.roster_service import (
+    RosterService,
+    VALID_GENDERS,
+    VALID_RELIGIONS,
+    get_roster_service,
+)
+from api.services.roster_draft_storage import (
+    RosterDraftStorage,
+    get_roster_draft_storage,
+)
 from api.services.assignment_set_storage import (
     AssignmentSetStorage,
     get_assignment_set_storage,
@@ -47,6 +56,46 @@ class ParticipantData(BaseModel):
     is_facilitator: bool = False
     keep_together: bool = False
     absent_sessions: list[int] = Field(default_factory=list)
+
+
+class UploadedPerson(BaseModel):
+    """One person from an upload. A draft has religion and/or gender missing."""
+
+    name: str
+    religion: Optional[str] = None
+    gender: Optional[str] = None
+    is_facilitator: bool = False
+    partner_name: Optional[str] = None
+
+
+class UploadRosterRequest(BaseModel):
+    participants: list[UploadedPerson]
+    drafts: list[UploadedPerson] = Field(default_factory=list)
+
+
+def _name_key(name: str) -> str:
+    """How uploads and drafts match names: case and spacing don't count."""
+    # .lower(), not .casefold(): must match nameKey's toLowerCase() in rosterImport.ts.
+    return " ".join(name.split()).lower()
+
+
+def _people(n: int) -> str:
+    return f"{n} {'person' if n == 1 else 'people'}"
+
+
+def _name_taken(name: str) -> str:
+    return (
+        f"Someone named {name} is already on the roster. "
+        "Add a last initial or a nickname to tell them apart."
+    )
+
+
+def _drafts_refusal(n: int) -> str:
+    verb = "isn't" if n == 1 else "aren't"
+    return (
+        f"{_people(n)} from your upload {verb} on the roster yet. "
+        "Fix the highlighted cells on the roster first."
+    )
 
 
 @router.get("/")
@@ -475,6 +524,135 @@ async def discard_roster_changes(
     )
 
     return {"status": "discarded", "count": len(canonical)}
+
+
+@router.put("/")
+@limiter.limit("10/minute")
+async def upload_roster(
+    request: Request,
+    body: UploadRosterRequest,
+    program_id: str = Depends(validate_program_access),
+    roster_service: RosterService = Depends(get_roster_service),
+    keep_apart: KeepApartStorage = Depends(get_keep_apart_storage),
+    drafts_storage: RosterDraftStorage = Depends(get_roster_draft_storage),
+):
+    """Replace the whole roster, and its drafts, with an uploaded one.
+
+    Uploaded people have no ids, so partners arrive as names and everyone gets
+    a fresh uuid. A partner who is still a draft is linked when that draft
+    saves. Whatever the file does not carry is taken from the roster being
+    replaced, but only when every name involved comes over: absences (one
+    name), keep-apart pairs (both names, drafts included, since a draft keeps
+    its id when it saves), and a pair's keep-together setting when the same two
+    are paired again. The preview already resolves duplicates and partners; the
+    checks here are a backstop.
+    """
+    everyone = body.participants + body.drafts
+    if not everyone:
+        raise HTTPException(
+            status_code=400,
+            detail="The file has no people in it. Add at least one row and try again.",
+        )
+
+    by_key: dict[str, UploadedPerson] = {}
+    for p in everyone:
+        key = _name_key(p.name)
+        if not key:
+            # Participants would fail validation anyway; drafts would not.
+            raise HTTPException(
+                status_code=400,
+                detail="Every person needs a name. Fill in the blank names and try again.",
+            )
+        if key in by_key:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{p.name} appears more than once. Give each person a different name and try again.",
+            )
+        by_key[key] = p
+    for p in everyone:
+        if not p.partner_name:
+            continue
+        partner = by_key.get(_name_key(p.partner_name))
+        if (
+            partner is None
+            or partner is p
+            or _name_key(partner.partner_name or "") != _name_key(p.name)
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=f"{p.name}'s partner doesn't match anyone on the list. Fix or clear the partner and try again.",
+            )
+
+    live = roster_service.get_roster(program_id)
+    live_by_id = {p["id"]: p for p in live}
+    live_by_key = {_name_key(p["name"]): p for p in live}
+    old_pairs = [
+        (_name_key(live_by_id[a]["name"]), _name_key(live_by_id[b]["name"]))
+        for a, b in keep_apart.get_pairs(program_id)
+        if a in live_by_id and b in live_by_id
+    ]
+
+    new_ids = {key: str(uuid.uuid4()) for key in by_key}
+    draft_keys = {_name_key(d.name) for d in body.drafts}
+    docs = {}
+    for p in body.participants:
+        key = _name_key(p.name)
+        old = live_by_key.get(key, {})
+        partner_key = _name_key(p.partner_name) if p.partner_name else None
+        if partner_key in draft_keys:
+            partner_key = None
+        old_partner = live_by_id.get(old.get("partner_id") or "")
+        same_pair = (
+            partner_key is not None
+            and old_partner is not None
+            and _name_key(old_partner["name"]) == partner_key
+        )
+        docs[new_ids[key]] = {
+            "name": p.name,
+            "religion": p.religion,
+            "gender": p.gender,
+            "partner_id": new_ids[partner_key] if partner_key else None,
+            "is_facilitator": p.is_facilitator,
+            "keep_together": bool(old.get("keep_together")) if same_pair else False,
+            "absent_sessions": old.get("absent_sessions") or [],
+        }
+
+    draft_docs = [
+        {
+            "id": new_ids[_name_key(d.name)],
+            "name": d.name.strip(),
+            "religion": d.religion if d.religion in VALID_RELIGIONS else None,
+            "gender": d.gender if d.gender in VALID_GENDERS else None,
+            "is_facilitator": d.is_facilitator,
+            "partner_name": d.partner_name,
+            "absent_sessions": live_by_key.get(_name_key(d.name), {}).get(
+                "absent_sessions"
+            )
+            or [],
+        }
+        for d in body.drafts
+    ]
+
+    batch = roster_service.db.batch()
+    try:
+        roster_service.stage_replace(batch, program_id, docs)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    drafts_storage.stage_drafts(batch, program_id, draft_docs)
+    batch.commit()
+
+    # Outside the batch on purpose: a failure here costs rules, never the
+    # roster. new_ids covers drafts too, so a pair can wait on a draft.
+    keep_apart.replace_pairs(
+        program_id,
+        [
+            (new_ids[a], new_ids[b])
+            for a, b in old_pairs
+            if a in new_ids and b in new_ids
+        ],
+    )
+
+    return {"status": "replaced", "count": len(docs), "drafts": len(draft_docs)}
 
 
 class KeepApartPair(BaseModel):

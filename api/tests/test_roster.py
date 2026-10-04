@@ -1332,3 +1332,199 @@ class TestDeletePrunesKeepApart:
             "pairs"
         ]
         assert pairs == [["p1", "p3"]]
+
+
+class TestUploadRoster:
+    """``PUT /roster/`` swaps the whole roster, and its drafts, for an upload."""
+
+    URL = "/api/roster/?program_id=test_org_id"
+
+    def _roster(self):
+        from api.services.roster_service import RosterService
+
+        return {p["name"]: p for p in RosterService().get_roster("test_org_id")}
+
+    def _drafts(self):
+        from api.services.roster_draft_storage import RosterDraftStorage
+
+        return RosterDraftStorage().get_drafts("test_org_id")
+
+    def _person(self, name, partner=None, religion="Jewish", gender="Female"):
+        return {
+            "name": name,
+            "religion": religion,
+            "gender": gender,
+            "is_facilitator": False,
+            "partner_name": partner,
+        }
+
+    def _upload(self, client, participants, drafts=()):
+        return client.put(
+            self.URL,
+            json={"participants": list(participants), "drafts": list(drafts)},
+        )
+
+    def test_replaces_the_roster(self, client, add_roster_to_firestore):
+        add_roster_to_firestore(_draft(4))
+
+        response = self._upload(client, [self._person("Ana"), self._person("Ben")])
+
+        assert response.status_code == 200
+        assert sorted(self._roster()) == ["Ana", "Ben"]
+
+    def test_writes_drafts_beside_the_roster(self, client):
+        draft = self._person("Grace", religion=None)
+
+        self._upload(client, [self._person("Ana")], drafts=[draft])
+
+        assert list(self._roster()) == ["Ana"]
+        [stored] = self._drafts()
+        assert stored["name"] == "Grace"
+        assert stored["religion"] is None
+
+    def test_a_new_upload_replaces_old_drafts(self, client):
+        draft = self._person("Grace", religion=None)
+        self._upload(client, [self._person("Ana")], drafts=[draft])
+
+        self._upload(client, [self._person("Ben")])
+
+        assert self._drafts() == []
+
+    def test_pairs_partners_by_name_as_a_couple(self, client):
+        self._upload(
+            client,
+            [self._person("Ana", partner="Ben"), self._person("Ben", partner="Ana")],
+        )
+
+        roster = self._roster()
+        assert roster["Ana"]["partner_id"] == roster["Ben"]["id"]
+        assert roster["Ben"]["partner_id"] == roster["Ana"]["id"]
+        assert roster["Ana"]["keep_together"] is False
+
+    def test_a_partner_still_in_drafts_waits(self, client):
+        draft = self._person("Ben", partner="Ana", religion=None)
+
+        self._upload(client, [self._person("Ana", partner="Ben")], drafts=[draft])
+
+        assert self._roster()["Ana"]["partner_id"] is None
+        assert self._drafts()[0]["partner_name"] == "Ana"
+
+    def test_keeps_an_existing_linked_pair_linked(
+        self, client, add_roster_to_firestore
+    ):
+        draft = _draft(2)
+        draft[0].update(partner_id="p1", keep_together=True)
+        draft[1].update(partner_id="p0", keep_together=True)
+        add_roster_to_firestore(draft)
+
+        self._upload(
+            client,
+            [
+                self._person("Person0", partner="Person1"),
+                self._person("Person1", partner="Person0"),
+            ],
+        )
+
+        assert self._roster()["Person0"]["keep_together"] is True
+
+    def test_carries_absences_by_name(self, client, add_roster_to_firestore):
+        draft = _draft(2)
+        draft[0]["absent_sessions"] = [2]
+        add_roster_to_firestore(draft)
+
+        self._upload(client, [self._person("Person0")])
+
+        assert self._roster()["Person0"]["absent_sessions"] == [2]
+
+    def _keep_apart(self, client, a_id="p0", b_id="p2"):
+        client.post(
+            "/api/roster/keep-apart?program_id=test_org_id",
+            json={"a_id": a_id, "b_id": b_id},
+        )
+
+    def _pairs(self, client):
+        return client.get("/api/roster/keep-apart?program_id=test_org_id").json()[
+            "pairs"
+        ]
+
+    def test_keep_apart_survives_when_both_names_come_over(
+        self, client, add_roster_to_firestore
+    ):
+        add_roster_to_firestore(_draft(3))
+        self._keep_apart(client)
+
+        # Capitalization doesn't count; spelling does.
+        self._upload(client, [self._person("person0"), self._person("Person2")])
+
+        roster = self._roster()
+        assert self._pairs(client) == [
+            sorted([roster["person0"]["id"], roster["Person2"]["id"]])
+        ]
+
+    def test_keep_apart_dropped_when_a_name_does_not_come_over(
+        self, client, add_roster_to_firestore
+    ):
+        add_roster_to_firestore(_draft(3))
+        self._keep_apart(client)
+
+        self._upload(client, [self._person("Person0"), self._person("Person 2")])
+
+        assert self._pairs(client) == []
+
+    def test_keep_apart_can_point_at_a_draft(self, client, add_roster_to_firestore):
+        add_roster_to_firestore(_draft(3))
+        self._keep_apart(client)
+
+        self._upload(
+            client,
+            [self._person("Person0")],
+            drafts=[self._person("Person2", religion=None)],
+        )
+
+        draft_id = self._drafts()[0]["id"]
+        assert self._pairs(client) == [
+            sorted([self._roster()["Person0"]["id"], draft_id])
+        ]
+
+    def test_carries_absences_onto_drafts(self, client, add_roster_to_firestore):
+        draft = _draft(2)
+        draft[0]["absent_sessions"] = [2]
+        add_roster_to_firestore(draft)
+
+        self._upload(
+            client,
+            [self._person("Person1")],
+            drafts=[self._person("Person0", religion=None)],
+        )
+
+        assert self._drafts()[0]["absent_sessions"] == [2]
+
+    def test_refuses_duplicate_names_across_people_and_drafts(
+        self, client, add_roster_to_firestore
+    ):
+        add_roster_to_firestore(_draft(2))
+
+        response = self._upload(
+            client,
+            [self._person("Ana")],
+            drafts=[self._person("ana", religion=None)],
+        )
+
+        assert response.status_code == 400
+        assert sorted(self._roster()) == ["Person0", "Person1"]
+
+    def test_refuses_a_one_sided_partner(self, client):
+        response = self._upload(
+            client, [self._person("Ana", partner="Ben"), self._person("Ben")]
+        )
+        assert response.status_code == 400
+
+    def test_invalid_value_leaves_everything_alone(
+        self, client, add_roster_to_firestore
+    ):
+        add_roster_to_firestore(_draft(2))
+
+        response = self._upload(client, [self._person("Ana", religion="Catholic")])
+
+        assert response.status_code == 400
+        assert sorted(self._roster()) == ["Person0", "Person1"]
