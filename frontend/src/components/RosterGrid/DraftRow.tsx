@@ -51,18 +51,18 @@ export function DraftRow({ draft, readOnly = false, onChange, onDelete }: DraftR
   return (
     <TableRow className="group bg-red-50/30">
       <TableCell className="p-1">
-        <div className="flex items-center gap-2">
-          <Input
-            value={name}
-            disabled={readOnly}
-            onChange={e => setName(e.target.value)}
-            onBlur={commitName}
-            aria-label={`Name for ${draft.name}`}
-          />
-          <span className="shrink-0 rounded-full border border-red-300 bg-background px-2 text-xs font-medium text-red-700">
-            Not saved
-          </span>
-        </div>
+        {/* Stacked, not side by side: in the 200px Name column a pill beside
+            the input squeezes the name to a sliver. */}
+        <Input
+          value={name}
+          disabled={readOnly}
+          onChange={e => setName(e.target.value)}
+          onBlur={commitName}
+          aria-label={`Name for ${draft.name}`}
+        />
+        <span className="mt-1 inline-block rounded-full border border-red-300 bg-background px-2 text-xs font-medium text-red-700">
+          Not saved
+        </span>
       </TableCell>
       {choice('religion', RELIGIONS)}
       {choice('gender', GENDERS)}
