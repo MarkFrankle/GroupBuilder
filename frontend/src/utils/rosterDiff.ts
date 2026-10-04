@@ -1,3 +1,5 @@
+import { nameKey } from '@/utils/rosterImport';
+
 /**
  * What changed in the roster since the sessions were built.
  *
@@ -141,6 +143,8 @@ export function computeChangeset(
   draft: CanonicalParticipant[],
   canonicalShape: RosterShape,
   draftShape: RosterShape,
+  /** Upload drafts: people not on the roster yet. */
+  pendingNames: string[] = [],
 ): RosterChangeset {
   const empty: RosterChangeset = {
     added: [],
@@ -156,6 +160,25 @@ export function computeChangeset(
   // Before the first generate there is nothing to compare against: every
   // person would read as "added" and the lock could never engage.
   if (canonicalShape.tables === null) return empty;
+
+  // Drafts are compared as if they weren't there on either side. The live
+  // roster already lacks them; strip them, and every reference to them, from
+  // the built side too. Otherwise a draft reads as a removal, can pair with an
+  // arrival into a false rename (which would skip the rebuild), and its
+  // partner and keep-apart rules ripple into lines about other people. The
+  // banner speaks for drafts instead.
+  if (pendingNames.length > 0) {
+    const pending = new Set(pendingNames.map(nameKey));
+    const isPending = (name: string | null) => name !== null && pending.has(nameKey(name));
+    canonical = canonical
+      .filter(p => !isPending(p.name))
+      .map(p => ({
+        ...p,
+        partner: isPending(p.partner) ? null : p.partner,
+        keep_together: isPending(p.partner) ? false : p.keep_together,
+        keep_apart: p.keep_apart?.filter(n => !isPending(n)),
+      }));
+  }
 
   const canonicalByName = byName(canonical);
   const draftByName = byName(draft);

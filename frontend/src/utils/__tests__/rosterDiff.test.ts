@@ -316,3 +316,37 @@ describe('computeChangeset', () => {
     });
   });
 });
+
+describe('with drafts', () => {
+  const SHAPE = { tables: 2, sessions: 2 };
+
+  it('does not list a draft as removed', () => {
+    const result = computeChangeset([person('Ana'), person('Grace')], [person('Ana')], SHAPE, SHAPE, [
+      'grace',
+    ]);
+    expect(result.isDirty).toBe(false);
+  });
+
+  it('does not pair a draft with an arrival into a rename', () => {
+    const result = computeChangeset(
+      [person('Ana'), person('Grace')],
+      [person('Ana'), person('Ruth')],
+      SHAPE,
+      SHAPE,
+      ['Grace'],
+    );
+    expect(result.renamed).toEqual([]);
+    expect(result.added).toEqual(['Ruth']);
+  });
+
+  it('does not ripple a draft partner or keep-apart rule into other people', () => {
+    const built = [
+      person('Tom', { partner: 'Maureen', keep_together: true }),
+      person('Maureen', { partner: 'Tom', keep_together: true }),
+      person('Ana', { keep_apart: ['Grace'] }),
+      person('Grace', { keep_apart: ['Ana'] }),
+    ];
+    const live = [person('Tom'), person('Ana')];
+    expect(computeChangeset(built, live, SHAPE, SHAPE, ['Maureen', 'Grace']).isDirty).toBe(false);
+  });
+});
