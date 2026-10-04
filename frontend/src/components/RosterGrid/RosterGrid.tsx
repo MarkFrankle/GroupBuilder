@@ -243,8 +243,8 @@ export function RosterGrid({
             <TableRow>
               <TableHead className="w-[180px]">Name</TableHead>
               <TableHead className="w-[112px]">Religion</TableHead>
-              <TableHead className="w-[98px]">Gender</TableHead>
-              <TableHead className="w-[176px]">Partner</TableHead>
+              <TableHead className="w-[106px]">Gender</TableHead>
+              <TableHead className="w-[168px]">Partner</TableHead>
               <TableHead className="w-[92px] px-2">Facilitator</TableHead>
               <TableHead className="w-[136px]">Absences</TableHead>
               <TableHead className="w-[48px]"></TableHead>
