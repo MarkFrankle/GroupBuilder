@@ -5,6 +5,7 @@ import { ArrowLeft, Printer } from 'lucide-react'
 import type { Assignment, Participant } from '@/types/assignments'
 import CircularTable from '@/components/SeatingChart/CircularTable'
 import { authenticatedFetch } from '@/utils/apiClient'
+import { compareLastName } from '@/utils/rosterSort'
 
 interface SeatingTable {
   table_number: number
@@ -20,18 +21,6 @@ interface SeatingData {
 interface LocationState {
   assignments: Assignment[]
   programId: string
-}
-
-function getLastName(name: string): string {
-  const parts = name.trim().split(/\s+/)
-  return parts[parts.length - 1].toLowerCase()
-}
-
-function sortByLastName(a: string, b: string): number {
-  const lastA = getLastName(a)
-  const lastB = getLastName(b)
-  if (lastA !== lastB) return lastA.localeCompare(lastB)
-  return a.toLowerCase().localeCompare(b.toLowerCase())
 }
 
 const RosterPrintPage: React.FC = () => {
@@ -140,11 +129,11 @@ const RosterPrintPage: React.FC = () => {
                 const facilitators = people
                   .filter((p) => p.is_facilitator)
                   .map((p) => p.name)
-                  .sort(sortByLastName)
+                  .sort(compareLastName)
                 const participants = people
                   .filter((p) => !p.is_facilitator)
                   .map((p) => p.name)
-                  .sort(sortByLastName)
+                  .sort(compareLastName)
 
                 return (
                   <div key={tableNum} className="mb-6">
