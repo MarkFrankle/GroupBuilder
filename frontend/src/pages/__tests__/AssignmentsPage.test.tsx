@@ -79,6 +79,8 @@ interface ApiState {
   completionResponse?: { status: number; body: any }
   shuffled?: boolean
   shuffleBody?: any
+  /** The shuffle endpoint reports that no new seating fit. */
+  shuffleUnchanged?: boolean
   /** Serve the fixture where Cara is absent from session 2 with a gap open. */
   absence?: boolean
   /** Replace the results fixture wholesale (plan check band tests). */
@@ -129,12 +131,17 @@ function mockApi() {
     }
 
     if (url.includes('/api/assignments/regenerate/session/')) {
-      api.shuffled = true
+      // An unchanged shuffle writes no version, so the results fixture stays put.
+      if (!api.shuffleUnchanged) api.shuffled = true
       api.shuffleBody = JSON.parse(options?.body ?? 'null')
       return Promise.resolve({
         ok: true,
         status: 200,
-        json: () => Promise.resolve({ version_id: 'v2' }),
+        json: () =>
+          Promise.resolve({
+            version_id: api.shuffleUnchanged ? null : 'v2',
+            assignments_unchanged: !!api.shuffleUnchanged,
+          }),
       } as Response)
     }
 
@@ -403,8 +410,23 @@ describe('AssignmentsPage', () => {
     await userEvent.click(within(session2).getByRole('button', { name: /shuffle/i }))
 
     const receipt = await screen.findByText(/Session 2 shuffled\./)
-    expect(receipt).toHaveTextContent('2 of 4 people moved')
+    expect(receipt).toHaveTextContent('4 of 4 people have new tablemates')
     expect(receipt).toHaveTextContent('sessions 1, 3 unchanged')
+  })
+
+  it('says so when a shuffle finds no new seating, with no Undo', async () => {
+    api.shuffleUnchanged = true
+    renderPage()
+
+    const session2 = await screen.findByRole('region', { name: 'Session 2' })
+    await userEvent.click(within(session2).getByRole('button', { name: /shuffle/i }))
+
+    expect(
+      await screen.findByText(
+        "Session 2 is unchanged. No seating it hasn't already had fits the rules."
+      )
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument()
   })
 
   it('announces the end of the program when every session is complete', async () => {

@@ -96,6 +96,47 @@ def test_list_versions_newest_first(storage):
     assert [v["version_id"] for v in versions] == ["v2", "v1"]
 
 
+def _session(number, tables):
+    return {
+        "session": number,
+        "tables": {
+            str(i + 1): [{"name": name} for name in names]
+            for i, names in enumerate(tables)
+        },
+    }
+
+
+def test_session_tables_collects_every_table_across_versions(storage):
+    set_id = _make_set(storage)
+    storage.save_version(
+        PROGRAM,
+        set_id,
+        "v1",
+        [
+            _session(1, [["Ann", "Ben"], ["Cara", "Dan"]]),
+            _session(2, [["Ann", "Cara"], ["Ben", "Dan"]]),
+        ],
+        {},
+    )
+    storage.save_version(
+        PROGRAM,
+        set_id,
+        "v2",
+        [
+            _session(1, [["Ann", "Dan"], ["Ben", "Cara"]]),
+            _session(2, [["Ann", "Cara"], ["Ben", "Dan"]]),
+        ],
+        {},
+    )
+
+    assert set(storage.session_tables(PROGRAM, set_id, 1)) == {
+        frozenset({"Ann", "Ben"}),
+        frozenset({"Cara", "Dan"}),
+        frozenset({"Ann", "Dan"}),
+        frozenset({"Ben", "Cara"}),
+    }
+
+
 def test_versions_are_scoped_to_their_set(storage):
     first = _make_set(storage)
     storage.save_version(PROGRAM, first, "v1", [], {})

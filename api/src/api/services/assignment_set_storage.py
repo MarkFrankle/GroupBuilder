@@ -238,6 +238,27 @@ class AssignmentSetStorage:
             )
         return versions
 
+    def session_tables(
+        self, program_id: str, set_id: str, session_number: int
+    ) -> List[frozenset]:
+        """Every table membership (by name) one session has had in this set.
+
+        A shuffle forbids all of them, not just the current seating's, so
+        repeated presses keep showing new seatings instead of flipping
+        between two.
+        """
+        versions_ref = self._set_ref(program_id, set_id).collection("versions")
+        tables = set()
+        for doc in versions_ref.stream():
+            for session in doc.to_dict().get("assignments") or []:
+                if session.get("session") != session_number:
+                    continue
+                for seated in (session.get("tables") or {}).values():
+                    names = frozenset(p["name"] for p in seated if p)
+                    if len(names) > 1:
+                        tables.add(names)
+        return list(tables)
+
 
 # Singleton instance for dependency injection
 _assignment_set_storage: Optional[AssignmentSetStorage] = None

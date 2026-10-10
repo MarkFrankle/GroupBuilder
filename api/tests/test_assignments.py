@@ -144,6 +144,37 @@ def sample_assignments_result():
 PROGRAM = "test_org_id"
 OTHER_PROGRAM = "other_org_id"
 
+# Session 1 with different groups from sample_assignments_result, whose
+# session 1 is Alice+Bob / Charlie+Diana.
+SESSION_1_RESHUFFLED = {
+    "session": 1,
+    "tables": {
+        "1": [
+            {
+                "name": "Alice",
+                "religion": "Christian",
+                "gender": "Female",
+                "partner": None,
+            },
+            {
+                "name": "Charlie",
+                "religion": "Muslim",
+                "gender": "Male",
+                "partner": None,
+            },
+        ],
+        "2": [
+            {"name": "Bob", "religion": "Jewish", "gender": "Male", "partner": None},
+            {
+                "name": "Diana",
+                "religion": "Christian",
+                "gender": "Female",
+                "partner": None,
+            },
+        ],
+    },
+}
+
 
 class TestGetAssignments:
     """Test suite for GET /api/assignments/ endpoint."""
@@ -1167,6 +1198,86 @@ class TestRegenerateSingleSession:
         # Verify find_feasible_plan was called twice (hard then soft)
         assert mock_find_feasible_plan.call_count == 2
 
+    def _success(self, session):
+        return (
+            {
+                "status": "success",
+                "solution_quality": "optimal",
+                "solve_time": 1.0,
+                "total_deviation": 0,
+                "assignments": [session],
+            },
+            1,
+            1,
+            1,
+            1,
+        )
+
+    @patch("api.routers.assignments.find_feasible_plan")
+    def test_shuffle_that_only_renumbers_saves_no_version(
+        self,
+        mock_find_feasible_plan,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+    ):
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        add_version_to_firestore(set_id, "v1", sample_assignments_result["assignments"])
+        current = sample_assignments_result["assignments"][0]["tables"]
+        renumbered = {"session": 1, "tables": {"1": current["2"], "2": current["1"]}}
+        mock_find_feasible_plan.side_effect = [
+            ({"status": "failure", "error": "Infeasible"}, None, None, None, None),
+            self._success(renumbered),
+        ]
+
+        response = client.post(
+            f"/api/assignments/regenerate/session/1?program_id={PROGRAM}", json=[]
+        )
+
+        assert response.status_code == 200
+        assert response.json()["assignments_unchanged"] is True
+        from api.services.assignment_set_storage import AssignmentSetStorage
+
+        assert len(AssignmentSetStorage().list_versions(PROGRAM, set_id)) == 1
+
+    @patch("api.routers.assignments.find_feasible_plan")
+    def test_shuffle_forbids_every_table_the_session_has_had(
+        self,
+        mock_find_feasible_plan,
+        client,
+        sample_set_data,
+        sample_assignments_result,
+        add_assignment_set_to_firestore,
+        add_version_to_firestore,
+    ):
+        set_id = add_assignment_set_to_firestore(sample_set_data)
+        add_version_to_firestore(set_id, "v1", sample_assignments_result["assignments"])
+        add_version_to_firestore(
+            set_id,
+            "v2",
+            [SESSION_1_RESHUFFLED, sample_assignments_result["assignments"][1]],
+        )
+        mock_find_feasible_plan.side_effect = [
+            ({"status": "failure", "error": "Infeasible"}, None, None, None, None),
+            self._success(SESSION_1_RESHUFFLED),
+        ]
+
+        client.post(
+            f"/api/assignments/regenerate/session/1?program_id={PROGRAM}", json=[]
+        )
+
+        strict, fallback = mock_find_feasible_plan.call_args_list
+        # sample_set_data ids: Alice 1, Bob 2, Charlie 3, Diana 4
+        assert {frozenset(t) for t in strict.kwargs["forbidden_tables"]} == {
+            frozenset({1, 2}),
+            frozenset({3, 4}),
+            frozenset({1, 3}),
+            frozenset({2, 4}),
+        }
+        assert "forbidden_tables" not in fallback.kwargs
+
     def test_regenerate_single_session_no_assignment_set(self, client):
         """Regenerating in a program with no assignment set returns 404."""
         response = client.post(
@@ -1238,7 +1349,7 @@ class TestRegenerateSingleSession:
                 "solution_quality": "optimal",
                 "solve_time": 1.5,
                 "total_deviation": 3,
-                "assignments": sample_assignments_result["assignments"][:1],
+                "assignments": [SESSION_1_RESHUFFLED],
             },
             1,
             1,
@@ -1850,12 +1961,7 @@ class TestVersionLabels:
                 "solution_quality": "optimal",
                 "solve_time": 1.0,
                 "total_deviation": 0,
-                "assignments": [
-                    {
-                        "session": 1,
-                        "tables": sample_assignments_result["assignments"][0]["tables"],
-                    }
-                ],
+                "assignments": [SESSION_1_RESHUFFLED],
             },
             1,
             1,

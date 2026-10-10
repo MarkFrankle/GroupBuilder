@@ -563,7 +563,9 @@ async def regenerate_single_session(
         absent_participants: List of participants to mark absent for this session
 
     Returns:
-        New version with the regenerated session merged in
+        New version with the regenerated session merged in. When the solver
+        finds no seating with different groups, nothing is saved and the
+        response carries ``assignments_unchanged: true`` and no version_id.
     """
     if completion.is_complete(program_id, session_number):
         raise HTTPException(
@@ -631,6 +633,14 @@ async def regenerate_single_session(
             session_assignment, all_participants
         )
 
+        # Every table this session has had in this set, not just the current
+        # seating's. Forbidding only the current one let repeated presses
+        # flip between two seatings.
+        forbidden_tables = [
+            {name_to_id[n] for n in table if n in name_to_id}
+            for table in storage.session_tables(program_id, set_id, session_number)
+        ]
+
         # 5. Get active participants for this session
         active_participants = _get_active_participants(
             all_participants, absent_participants
@@ -679,11 +689,10 @@ async def regenerate_single_session(
             pairing_window_size=assignment_set.get("pairing_window_size"),
             solver_num_workers=4,
             require_different_assignments=True,  # HARD CONSTRAINT
+            forbidden_tables=forbidden_tables,
             min_pairwise_cap=min_pairwise_cap,
             min_overlap_cap=min_overlap_cap,
         )
-
-        assignments_unchanged = False
 
         # If hard constraint fails, try again without it (current assignments may be optimal)
         if result["status"] != "success":
@@ -722,11 +731,14 @@ async def regenerate_single_session(
                 logger.error(f"Solver failed even without hard constraint: {error_msg}")
                 raise HTTPException(status_code=400, detail=error_msg)
 
-            # Mark that assignments are unchanged
-            assignments_unchanged = True
-            logger.info(
-                "Fallback succeeded: returning same assignments (these are already optimal)"
-            )
+        def memberships(tables):
+            return {
+                frozenset(p["name"] for p in seated if p) for seated in tables.values()
+            }
+
+        assignments_unchanged = memberships(
+            result["assignments"][0]["tables"]
+        ) == memberships(session_assignment["tables"])
 
         # Log solver statistics
         logger.info(
@@ -735,6 +747,19 @@ async def regenerate_single_session(
             f"Deviation: {result.get('total_deviation', 'N/A')} | "
             f"Unchanged: {assignments_unchanged}"
         )
+
+        if assignments_unchanged:
+            # Same groups, maybe renumbered. Not a change to the plan, so no
+            # version: History would otherwise show a shuffle that did nothing.
+            logger.info(f"Shuffle of session {session_number} found no new seating")
+            return {
+                "assignments": existing_assignments,
+                "version_id": None,
+                "session": session_number,
+                "solve_time": result.get("solve_time"),
+                "quality": result.get("solution_quality"),
+                "assignments_unchanged": True,
+            }
 
         # 7. Merge regenerated session back into full assignments
         new_assignments = existing_assignments.copy()
@@ -753,7 +778,6 @@ async def regenerate_single_session(
             "regenerated": True,
             "regenerated_session": session_number,
             "label": f"Session {session_number} shuffled",
-            "assignments_unchanged": assignments_unchanged,  # Flag if same assignments returned
             "pairwise_cap": pairwise_cap,
             "table_overlap_cap": overlap_cap,
             "pairwise_floor": pairwise_floor,
@@ -771,7 +795,7 @@ async def regenerate_single_session(
         )
 
         logger.info(
-            f"Stored regenerated session {session_number} as version {new_version_id} (unchanged: {assignments_unchanged})"
+            f"Stored regenerated session {session_number} as version {new_version_id}"
         )
 
         return {
@@ -780,7 +804,7 @@ async def regenerate_single_session(
             "session": session_number,
             "solve_time": result.get("solve_time"),
             "quality": result.get("solution_quality"),
-            "assignments_unchanged": assignments_unchanged,  # Frontend can show notification
+            "assignments_unchanged": False,
         }
 
     except HTTPException:

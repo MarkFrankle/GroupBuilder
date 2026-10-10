@@ -23,7 +23,7 @@ const before: Assignment[] = [
   { session: 3, tables: { 1: [p('Ann'), p('Cara')], 2: [p('Ben'), p('Dan')] } },
 ]
 
-/** Session 2 reshuffled: Ann swaps with Cara, so two people moved table. */
+/** Session 2 reshuffled: Ann swaps with Cara, so all four have new tablemates. */
 const after: Assignment[] = [
   before[0],
   { session: 2, tables: { 1: [p('Ann'), p('Cara')], 2: [p('Ben'), p('Dan')] } },
@@ -31,9 +31,9 @@ const after: Assignment[] = [
 ]
 
 describe('shuffleReceipt', () => {
-  it('names the session and counts the people who moved', () => {
+  it('names the session and counts people with new tablemates', () => {
     expect(shuffleReceipt(before, after, 2)).toContain('Session 2 shuffled.')
-    expect(shuffleReceipt(before, after, 2)).toContain('2 of 4 people moved')
+    expect(shuffleReceipt(before, after, 2)).toContain('4 of 4 people have new tablemates')
   })
 
   it('names the sessions that did not change', () => {
@@ -41,7 +41,18 @@ describe('shuffleReceipt', () => {
   })
 
   it('degrades honestly when nothing moved', () => {
-    expect(shuffleReceipt(before, before, 2)).toContain('0 of 4 people moved')
+    expect(shuffleReceipt(before, before, 2)).toContain('0 of 4 people have new tablemates')
+  })
+
+  it('counts a pure renumbering as no change', () => {
+    const renumbered: Assignment[] = [
+      before[0],
+      { session: 2, tables: { 1: [p('Cara'), p('Dan')], 2: [p('Ann'), p('Ben')] } },
+      before[2],
+    ]
+    expect(shuffleReceipt(before, renumbered, 2)).toContain(
+      '0 of 4 people have new tablemates'
+    )
   })
 
   it('reports the session-scoped repeat-pair delta', () => {
@@ -85,14 +96,16 @@ describe('shuffleReceipt', () => {
     expect(shuffleReceipt(solo, solo, 1)).not.toContain('unchanged')
   })
 
-  it('does not pluralise a single mover', () => {
+  it('counts everyone whose tablemates changed, on both tables', () => {
+    // Ben moves from Ann's table to Cara's: Ann loses a tablemate, Cara gains
+    // one, and Ben has a new one. Tablemate changes always come in pairs.
     const oneMoved: Assignment[] = [
       { session: 1, tables: { 1: [p('Ann'), p('Ben')], 2: [p('Cara')] } },
     ]
     const moved: Assignment[] = [
       { session: 1, tables: { 1: [p('Ann')], 2: [p('Cara'), p('Ben')] } },
     ]
-    expect(shuffleReceipt(oneMoved, moved, 1)).toContain('1 of 3 people moved')
+    expect(shuffleReceipt(oneMoved, moved, 1)).toContain('3 of 3 people have new tablemates')
   })
 })
 

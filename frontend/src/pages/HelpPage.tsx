@@ -496,15 +496,18 @@ function HelpPage() {
           <h3 className="text-xl font-semibold mb-2">Shuffle one session</h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Press <strong>Shuffle</strong> in a session's header to remake just that
-            night. The solver still knows about every other session, so it avoids
-            pairings people have already had and it changes only the session you
-            pressed. Anyone you have marked absent for that session stays absent.
+            night. Each press finds a seating that session hasn't had yet. The solver
+            still knows about every other session, so it avoids pairings people have
+            already had and it changes only the session you pressed. Anyone you have
+            marked absent for that session stays absent.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Afterwards a line appears at the top telling you what happened: how many
-            people moved, which sessions were left alone, and how many pairs now sit
-            together more than once. That same line offers <strong>Undo</strong>.
-            Pressing it puts back the arrangement you had before the shuffle.
+            people have new tablemates, which sessions were left alone, and how many
+            pairs now sit together more than once. That same line offers{' '}
+            <strong>Undo</strong>. Pressing it puts back the arrangement you had before
+            the shuffle. If no new seating fits the rules, the line says so and
+            nothing changes.
           </p>
 
           <h3 className="text-xl font-semibold mt-8 mb-2">
