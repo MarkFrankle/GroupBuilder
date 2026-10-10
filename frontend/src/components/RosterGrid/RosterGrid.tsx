@@ -2,17 +2,18 @@ import { useState, useCallback, useMemo, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
-  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
+  TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from '@/components/ui/table';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { PersonCombobox } from '@/components/ui/PersonCombobox';
-import { Trash2, Link, Unlink } from 'lucide-react';
+import { Trash2, Link, Unlink, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { DraftPatch, RosterDraft, RosterParticipant, Religion, Gender, RELIGIONS, GENDERS } from '@/types/roster';
 import { AwayCell } from './AwayCell';
 import { DraftRow } from './DraftRow';
 import { nameKey } from '@/utils/rosterImport';
+import { RosterSort, RosterSortColumn } from '@/utils/rosterSort';
 
 interface RosterGridProps {
   participants: RosterParticipant[];
@@ -30,6 +31,10 @@ interface RosterGridProps {
   drafts?: RosterDraft[];
   onDraftChange?: (id: string, patch: DraftPatch) => void;
   onDraftDelete?: (id: string) => void;
+  /** The column last clicked this visit, for its arrow. Not a live sort. */
+  sort?: RosterSort | null;
+  /** Header clicks. Live even when readOnly: order isn't a mixing field. */
+  onSort?: (column: RosterSortColumn) => void;
 }
 
 interface EmptyRowState {
@@ -43,6 +48,35 @@ interface EmptyRowState {
 const EMPTY_ROW: EmptyRowState = {
   name: '', religion: 'Other', gender: 'Other', partner_id: null, is_facilitator: false,
 };
+
+function SortableHead({ column, label, sort, onSort, className }: {
+  column: RosterSortColumn;
+  label: string;
+  sort?: RosterSort | null;
+  onSort?: (column: RosterSortColumn) => void;
+  className?: string;
+}) {
+  const active = sort?.column === column ? sort.direction : null;
+  const Icon = active === 'asc' ? ArrowUp : active === 'desc' ? ArrowDown : ArrowUpDown;
+  return (
+    <TableHead
+      className={className}
+      aria-sort={active === 'asc' ? 'ascending' : active === 'desc' ? 'descending' : undefined}
+    >
+      <button
+        type="button"
+        onClick={() => onSort?.(column)}
+        className="group/sort inline-flex items-center gap-1 hover:text-foreground"
+      >
+        {label}
+        <Icon
+          aria-hidden
+          className={`h-3.5 w-3.5 shrink-0 ${active ? '' : 'opacity-0 group-hover/sort:opacity-50'}`}
+        />
+      </button>
+    </TableHead>
+  );
+}
 
 const nameTakenMessage = (name: string) =>
   `Someone named ${name} is already on the roster. Add a last initial or a nickname.`;
@@ -58,6 +92,8 @@ export function RosterGrid({
   drafts = [],
   onDraftChange,
   onDraftDelete,
+  sort,
+  onSort,
 }: RosterGridProps) {
 
   const [editingNames, setEditingNames] = useState<Record<string, string>>({});
@@ -233,20 +269,24 @@ export function RosterGrid({
         {participants.length} participant{participants.length !== 1 ? 's' : ''}
         {drafts.length > 0 && `, plus ${drafts.length} not saved yet`}
       </div>
-      <div className="w-full overflow-auto border rounded-md">
+      {/* Scrolls sideways only below lg. Any overflow container traps the sticky
+          header, so on wide screens, where the table fits, there is none and the
+          header sticks under the nav. A raw table, not ui/Table, for the same
+          reason: that one wraps itself in an overflow-auto div. */}
+      <div className="w-full overflow-x-auto lg:overflow-visible border rounded-md">
         {/* Fixed layout, or the widths below are only hints: auto layout sizes by
             content, and a text input has none, so Name got whatever was left and
             clipped ordinary names. The widths add up to the card's inner width
             (max-w-4xl less padding), and min-w scrolls rather than crushes. */}
-        <Table className="table-fixed min-w-[842px]">
-          <TableHeader>
+        <table className="w-full caption-bottom text-sm table-fixed min-w-[842px]">
+          <TableHeader className="[&_th]:sticky [&_th]:top-12 [&_th]:z-10 [&_th]:bg-background">
             <TableRow>
-              <TableHead className="w-[180px]">Name</TableHead>
-              <TableHead className="w-[112px]">Religion</TableHead>
-              <TableHead className="w-[106px]">Gender</TableHead>
-              <TableHead className="w-[168px]">Partner</TableHead>
-              <TableHead className="w-[92px] px-2">Facilitator</TableHead>
-              <TableHead className="w-[136px]">Absences</TableHead>
+              <SortableHead column="name" label="Name" sort={sort} onSort={onSort} className="w-[180px]" />
+              <SortableHead column="religion" label="Religion" sort={sort} onSort={onSort} className="w-[112px]" />
+              <SortableHead column="gender" label="Gender" sort={sort} onSort={onSort} className="w-[106px]" />
+              <SortableHead column="partner" label="Partner" sort={sort} onSort={onSort} className="w-[168px]" />
+              <SortableHead column="facilitator" label="Facilitator" sort={sort} onSort={onSort} className="w-[92px] px-2" />
+              <SortableHead column="absences" label="Absences" sort={sort} onSort={onSort} className="w-[136px]" />
               <TableHead className="w-[48px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -425,7 +465,7 @@ export function RosterGrid({
             </TableRow>
             )}
           </TableBody>
-        </Table>
+        </table>
       </div>
     </div>
   );
