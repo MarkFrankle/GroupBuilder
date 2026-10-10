@@ -187,3 +187,45 @@ describe('RosterGrid', () => {
     });
   });
 });
+
+describe('RosterGrid column sorting', () => {
+  const props = {
+    participants: [alice, bob],
+    onUpdate: jest.fn(),
+    onDelete: jest.fn(),
+    onAdd: jest.fn(),
+    onKeepTogetherToggle: jest.fn(),
+    numSessions: 4,
+  };
+
+  beforeEach(() => jest.clearAllMocks());
+
+  test('a header click asks to sort by that column', async () => {
+    const onSort = jest.fn();
+    render(<RosterGrid {...props} onSort={onSort} />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Religion' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Absences' }));
+
+    expect(onSort.mock.calls).toEqual([['religion'], ['absences']]);
+  });
+
+  test('sorting still works on a locked roster', async () => {
+    const onSort = jest.fn();
+    render(<RosterGrid {...props} readOnly onSort={onSort} />);
+
+    const name = screen.getByRole('button', { name: 'Name' });
+    expect(name).toBeEnabled();
+    await userEvent.click(name);
+
+    expect(onSort).toHaveBeenCalledWith('name');
+  });
+
+  test('marks only the sorted column', () => {
+    render(<RosterGrid {...props} onSort={jest.fn()} sort={{ column: 'name', direction: 'desc' }} />);
+
+    const headers = screen.getAllByRole('columnheader');
+    expect(headers[0]).toHaveAttribute('aria-sort', 'descending');
+    headers.slice(1).forEach(h => expect(h).not.toHaveAttribute('aria-sort'));
+  });
+});

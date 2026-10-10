@@ -11,6 +11,11 @@ _roster_service: Optional["RosterService"] = None
 _MAX_BATCH_WRITES = 500
 
 
+def next_position(participants: list[dict]) -> int:
+    """The position after everyone's, for a row joining the bottom."""
+    return max((p.get("position", -1) for p in participants), default=-1) + 1
+
+
 class RosterService:
     def __init__(self, db=None):
         if db is None:
@@ -33,6 +38,16 @@ class RosterService:
             data = doc.to_dict()
             data["id"] = doc.id
             participants.append(data)
+        # Sorted here, not with order_by: Firestore's order_by silently drops
+        # documents without the field, and rosters saved before sorting existed
+        # have no positions. Those come last, by name, until the first sort.
+        participants.sort(
+            key=lambda p: (
+                p.get("position") is None,
+                p.get("position") or 0,
+                p["name"].lower(),
+            )
+        )
         return participants
 
     def _validated_doc(self, data: dict) -> dict:
@@ -52,7 +67,7 @@ class RosterService:
                 f"Invalid gender: {gender}. Must be one of {VALID_GENDERS}"
             )
 
-        return {
+        doc = {
             "name": name,
             "religion": religion,
             "gender": gender,
@@ -64,6 +79,11 @@ class RosterService:
             ),
             "updated_at": datetime.now(timezone.utc),
         }
+        # Passed through, never invented: a row rebuilt from a get_roster dict
+        # keeps its place, and a plain field edit (merge=True) leaves it alone.
+        if data.get("position") is not None:
+            doc["position"] = int(data["position"])
+        return doc
 
     def upsert_participant(
         self, program_id: str, participant_id: str, data: dict
@@ -105,6 +125,15 @@ class RosterService:
             batch.delete(doc.reference)
         for pid, data in docs.items():
             batch.set(collection.document(pid), data)
+
+    def stage_order(self, batch, program_id: str, ids: list[str]) -> None:
+        """Add a write per id setting its position to its index. Merge only:
+        nothing but the order changes."""
+        collection = self._roster_collection(program_id)
+        for position, participant_id in enumerate(ids):
+            batch.set(
+                collection.document(participant_id), {"position": position}, merge=True
+            )
 
     def delete_participant(self, program_id: str, participant_id: str):
         self._roster_collection(program_id).document(participant_id).delete()

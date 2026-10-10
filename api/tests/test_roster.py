@@ -100,6 +100,45 @@ class TestGetRoster:
         assert len(data["participants"]) == 1
         assert data["participants"][0]["name"] == "Alice"
 
+    def test_orders_by_position(self, client):
+        from api.services.roster_service import RosterService
+
+        service = RosterService()
+        for pid, name, position in [("a", "Zed", 0), ("b", "Amy", 2), ("c", "Max", 1)]:
+            service.upsert_participant(
+                "test_org_id",
+                pid,
+                {
+                    "name": name,
+                    "religion": "Other",
+                    "gender": "Other",
+                    "position": position,
+                },
+            )
+
+        names = [p["name"] for p in service.get_roster("test_org_id")]
+        assert names == ["Zed", "Max", "Amy"]
+
+    def test_rows_without_a_position_come_last_by_name(self, client):
+        """Rosters saved before sorting existed have no positions."""
+        from api.services.roster_service import RosterService
+
+        service = RosterService()
+        service.upsert_participant(
+            "test_org_id", "a", {"name": "zoe", "religion": "Other", "gender": "Other"}
+        )
+        service.upsert_participant(
+            "test_org_id", "b", {"name": "Bea", "religion": "Other", "gender": "Other"}
+        )
+        service.upsert_participant(
+            "test_org_id",
+            "c",
+            {"name": "Yan", "religion": "Other", "gender": "Other", "position": 0},
+        )
+
+        names = [p["name"] for p in service.get_roster("test_org_id")]
+        assert names == ["Yan", "Bea", "zoe"]
+
 
 class TestUpsertParticipant:
     def test_creates_participant(self, client):
@@ -136,6 +175,49 @@ class TestUpsertParticipant:
         )
         assert response.status_code == 200
         assert response.json()["name"] == "Alice Updated"
+
+    def test_a_new_row_joins_the_bottom(self, client, add_roster_to_firestore):
+        from api.services.roster_service import RosterService
+
+        add_roster_to_firestore(_draft(2))
+        client.put(
+            "/api/roster/order?program_id=test_org_id", json={"ids": ["p1", "p0"]}
+        )
+
+        for pid, name in [("new1", "Zed"), ("new2", "Aaron")]:
+            client.put(
+                f"/api/roster/{pid}?program_id=test_org_id",
+                json={
+                    "name": name,
+                    "religion": "Other",
+                    "gender": "Other",
+                    "partner_id": None,
+                },
+            )
+
+        names = [p["name"] for p in RosterService().get_roster("test_org_id")]
+        assert names == ["Person1", "Person0", "Zed", "Aaron"]
+
+    def test_an_edit_keeps_the_row_in_place(self, client, add_roster_to_firestore):
+        from api.services.roster_service import RosterService
+
+        add_roster_to_firestore(_draft(2))
+        client.put(
+            "/api/roster/order?program_id=test_org_id", json={"ids": ["p1", "p0"]}
+        )
+
+        client.put(
+            "/api/roster/p1?program_id=test_org_id",
+            json={
+                "name": "Zara",
+                "religion": "Jewish",
+                "gender": "Male",
+                "partner_id": None,
+            },
+        )
+
+        names = [p["name"] for p in RosterService().get_roster("test_org_id")]
+        assert names == ["Zara", "Person0"]
 
     def test_rejects_invalid_data(self, client):
         response = client.put(
@@ -1165,6 +1247,29 @@ class TestDiscard:
         # The ids are new, and that is the point of the name matching above.
         assert not ({p["id"] for p in roster} & {p["id"] for p in draft})
 
+    def test_keeps_the_live_order_by_name(
+        self, client, add_assignment_set_to_firestore, add_roster_to_firestore
+    ):
+        """Discard rewrites every document, so order carries over by name.
+        Someone with no live row goes last."""
+        from api.services.roster_service import RosterService
+
+        add_assignment_set_to_firestore(
+            {"participant_data": _canonical(3), "num_tables": 1, "num_sessions": 2}
+        )
+        draft = _draft(3)
+        draft[0]["name"] = "Typo"
+        add_roster_to_firestore(draft)
+        client.put(
+            "/api/roster/order?program_id=test_org_id",
+            json={"ids": ["p2", "p0", "p1"]},
+        )
+
+        client.post("/api/roster/discard?program_id=test_org_id")
+
+        names = [p["name"] for p in RosterService().get_roster("test_org_id")]
+        assert names == ["Person2", "Person1", "Person0"]
+
     def test_reseeds_absent_sessions_from_the_discarded_set(
         self,
         client,
@@ -1371,6 +1476,13 @@ class TestUploadRoster:
 
         assert response.status_code == 200
         assert sorted(self._roster()) == ["Ana", "Ben"]
+
+    def test_keeps_the_order_it_was_sent_in(self, client):
+        self._upload(
+            client, [self._person("Cy"), self._person("Ana"), self._person("Ben")]
+        )
+
+        assert list(self._roster()) == ["Cy", "Ana", "Ben"]
 
     def test_writes_drafts_beside_the_roster(self, client):
         draft = self._person("Grace", religion=None)
@@ -1595,6 +1707,26 @@ class TestRosterDrafts:
         assert roster["Grace"]["partner_id"] == "p0"
         assert roster["Person0"]["partner_id"] == "d1"
 
+    def test_a_saved_draft_joins_the_bottom_and_its_partner_keeps_its_place(
+        self, client, add_roster_to_firestore
+    ):
+        add_roster_to_firestore(_draft(2))
+        client.put(
+            "/api/roster/order?program_id=test_org_id", json={"ids": ["p1", "p0"]}
+        )
+        self._seed(
+            [
+                self._draft("d1", "Zed", partner_name="Person0"),
+                self._draft("d2", "Aaron"),
+            ]
+        )
+
+        client.put(self._url("d1"), json={"religion": "Christian"})
+        client.put(self._url("d2"), json={"religion": "Christian"})
+
+        roster = list(self._roster())
+        assert roster == ["Person1", "Person0", "Zed", "Aaron"]
+
     def test_refuses_a_name_already_on_the_roster(
         self, client, add_roster_to_firestore
     ):
@@ -1685,3 +1817,41 @@ class TestUniqueNames:
         )
 
         assert response.status_code == 200
+
+
+class TestSaveOrder:
+    """``PUT /roster/order`` stores the grid's row order."""
+
+    URL = "/api/roster/order?program_id=test_org_id"
+
+    def _roster(self):
+        from api.services.roster_service import RosterService
+
+        return RosterService().get_roster("test_org_id")
+
+    def test_rewrites_the_order(self, client, add_roster_to_firestore):
+        add_roster_to_firestore(_draft(3))
+
+        # A 200 also proves the route isn't shadowed by PUT /{participant_id},
+        # which would refuse this body with a 422.
+        response = client.put(self.URL, json={"ids": ["p2", "p0", "p1"]})
+
+        assert response.status_code == 200
+        assert [p["name"] for p in self._roster()] == ["Person2", "Person0", "Person1"]
+
+    def test_refuses_an_id_not_on_the_roster(self, client, add_roster_to_firestore):
+        add_roster_to_firestore(_draft(2))
+
+        response = client.put(self.URL, json={"ids": ["p1", "ghost"]})
+
+        assert response.status_code == 400
+        assert [p["name"] for p in self._roster()] == ["Person0", "Person1"]
+
+    def test_leaves_other_fields_alone(self, client, add_roster_to_firestore):
+        add_roster_to_firestore(_draft(2))
+
+        client.put(self.URL, json={"ids": ["p1", "p0"]})
+
+        by_id = {p["id"]: p for p in self._roster()}
+        assert by_id["p0"]["name"] == "Person0"
+        assert by_id["p0"]["religion"] == "Christian"

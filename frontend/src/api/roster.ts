@@ -1,6 +1,7 @@
 import { authenticatedFetch } from '@/utils/apiClient';
 import { DraftPatch, RosterDraft, RosterParticipant } from '@/types/roster';
 import { ImportedDraft, ImportedParticipant } from '@/utils/rosterImport';
+import { compareLastName } from '@/utils/rosterSort';
 
 export async function getRoster(programId: string): Promise<RosterParticipant[]> {
   const response = await authenticatedFetch(`/api/roster/?program_id=${programId}`);
@@ -33,6 +34,18 @@ export async function deleteParticipant(programId: string, participantId: string
   });
   if (!response.ok) {
     throw new Error(`Failed to delete participant: ${response.status}`);
+  }
+}
+
+/** Store the grid's row order. Allowed while the roster is locked. */
+export async function saveRosterOrder(programId: string, ids: string[]): Promise<void> {
+  const response = await authenticatedFetch(`/api/roster/order?program_id=${programId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to save roster order: ${response.status}`);
   }
 }
 
@@ -84,10 +97,13 @@ export interface RosterUpload {
 
 /** Replace the whole roster with an upload. The server's refusal is written for the coordinator. */
 export async function uploadRoster(programId: string, upload: RosterUpload): Promise<void> {
+  // An upload arrives in last-name order, the printed roster's rule. The
+  // server stores rows in the order they're sent.
+  const participants = [...upload.participants].sort((a, b) => compareLastName(a.name, b.name));
   const response = await authenticatedFetch(`/api/roster/?program_id=${programId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(upload),
+    body: JSON.stringify({ ...upload, participants }),
   });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));

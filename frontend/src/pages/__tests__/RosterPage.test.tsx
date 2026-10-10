@@ -944,3 +944,128 @@ describe('roster upload and drafts', () => {
     confirmSpy.mockRestore();
   });
 });
+
+describe('sorting', () => {
+  const person = (id: string, name: string, fields: Record<string, unknown> = {}) => ({
+    id, name, religion: 'Christian', gender: 'Female',
+    partner_id: null as string | null, is_facilitator: true, keep_together: false, ...fields,
+  });
+  const canonicalOf = (p: ReturnType<typeof person>) => ({
+    name: p.name, religion: p.religion, gender: p.gender,
+    partner: null, is_facilitator: p.is_facilitator, keep_together: false,
+  });
+
+  /** Wires the page's reads and records each order the page saves. */
+  const mockProgram = (opts: {
+    roster: ReturnType<typeof person>[];
+    canonical: ReturnType<typeof person>[] | null;
+  }) => {
+    const savedOrders: string[][] = [];
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes('/api/roster/order')) {
+        savedOrders.push(JSON.parse(init!.body as string).ids);
+        return Promise.resolve({ ok: true, json: async () => ({}) } as Response);
+      }
+      if (url.includes('/api/roster/drafts')) {
+        return Promise.resolve({ ok: true, json: async () => ({ drafts: [] }) } as Response);
+      }
+      if (url.includes('/api/roster/canonical')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => opts.canonical
+            ? { participants: opts.canonical.map(canonicalOf), num_tables: 2, num_sessions: 3 }
+            : { participants: [], num_tables: null, num_sessions: null },
+        } as Response);
+      }
+      if (url.includes('/api/assignments/metadata')) {
+        return opts.canonical
+          ? Promise.resolve({
+              ok: true,
+              json: async () => ({ assignment_set_id: 's1', num_tables: 2, num_sessions: 3 }),
+            } as Response)
+          : Promise.resolve({ ok: false, status: 404, json: async () => ({}) } as Response);
+      }
+      if (url.includes('/api/assignments/results')) {
+        return Promise.resolve({ ok: true, json: async () => [] } as Response);
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ participants: opts.roster }) } as Response);
+    });
+    return savedOrders;
+  };
+
+  const rowNames = () =>
+    screen.getAllByPlaceholderText('Name').map(input => (input as HTMLInputElement).value).filter(Boolean);
+
+  const zed = person('p1', 'Bo Zed', { partner_id: 'p3' });
+  const young = person('p2', 'Cy Young');
+  const adams = person('p3', 'Al Adams', { partner_id: 'p1' });
+
+  beforeEach(() => jest.clearAllMocks());
+
+  test('shows the roster in the order the server sends it', async () => {
+    mockProgram({ roster: [zed, young, adams], canonical: null });
+    renderPage();
+    await screen.findByDisplayValue('Bo Zed');
+
+    // No partner regroup on load: Al Adams stays last.
+    expect(rowNames()).toEqual(['Bo Zed', 'Cy Young', 'Al Adams']);
+  });
+
+  test('a header click sorts the rows and saves the order, and a second click reverses it', async () => {
+    const savedOrders = mockProgram({ roster: [zed, young, adams], canonical: null });
+    renderPage();
+    await screen.findByDisplayValue('Bo Zed');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Name' }));
+    expect(rowNames()).toEqual(['Al Adams', 'Cy Young', 'Bo Zed']);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Name' }));
+    expect(rowNames()).toEqual(['Bo Zed', 'Cy Young', 'Al Adams']);
+
+    await waitFor(() => expect(savedOrders).toEqual([['p3', 'p2', 'p1'], ['p1', 'p2', 'p3']]));
+  });
+
+  test('a locked roster can still be sorted', async () => {
+    // Unpartnered, so canonicalOf matches them and the page locks.
+    const roster = [person('p1', 'Bo Zed'), young, person('p3', 'Al Adams')];
+    const savedOrders = mockProgram({ roster, canonical: roster });
+    renderPage();
+    await screen.findByRole('button', { name: /edit roster/i });
+    await screen.findByDisplayValue('Bo Zed');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Name' }));
+
+    expect(rowNames()).toEqual(['Al Adams', 'Cy Young', 'Bo Zed']);
+    await waitFor(() => expect(savedOrders).toEqual([['p3', 'p2', 'p1']]));
+  });
+
+  test('picking a partner pulls them under the row and saves that order', async () => {
+    const roster = [person('p1', 'Bo Zed'), young, person('p3', 'Al Adams')];
+    const savedOrders = mockProgram({ roster, canonical: null });
+    renderPage();
+    await screen.findByDisplayValue('Bo Zed');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Partner for Bo Zed' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Al Adams' }));
+
+    await waitFor(() => expect(savedOrders).toEqual([['p1', 'p3', 'p2']]));
+    expect(rowNames()).toEqual(['Bo Zed', 'Al Adams', 'Cy Young']);
+  });
+
+  test('picking a partner already next to the row saves no order', async () => {
+    const roster = [person('p1', 'Bo Zed'), person('p3', 'Al Adams'), young];
+    const savedOrders = mockProgram({ roster, canonical: null });
+    renderPage();
+    await screen.findByDisplayValue('Bo Zed');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Partner for Bo Zed' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Al Adams' }));
+
+    // The partner's own save is the last write a pull-up would follow.
+    await waitFor(() =>
+      expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/api/roster/p3'), expect.anything()),
+    );
+    expect(await screen.findByText('Saved')).toBeInTheDocument();
+    expect(savedOrders).toEqual([]);
+  });
+});

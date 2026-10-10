@@ -27,6 +27,13 @@ jsdom does no layout, so no test catches a break in either of these. Look at it 
   card's inner width (842px, `max-w-4xl` less padding), matched by the table's `min-w`. A new
   column, or a wider one, has to take its pixels from another. Under the old auto layout the
   widths were only hints and the Name inputs, which have no content width, got squeezed.
+- **The roster grid's header sticks at `top-12`, under the `h-12` nav.** Any `overflow`
+  ancestor traps `position: sticky`, so the grid renders a raw `<table>` (`ui/Table` wraps
+  itself in `overflow-auto`) and its wrapper scrolls sideways only below `lg`. Wrapping the
+  grid in anything with overflow set breaks the sticky header.
+- **Sticky elements need `bg-card` or `bg-white`, never `bg-background`.** The app doesn't
+  define `--background` (see `styles/index.css`), so `bg-background` is transparent and rows
+  show through as they scroll under it.
 
 ## Backend Stack
 
@@ -54,7 +61,7 @@ organizations/{programId}
     current_assignment_set_id: str | null      # only this set is ever served
     members/{userId}
     invites/{inviteId}
-    roster/{participantId}
+    roster/{participantId}                     # position: int, the grid's row order
     assignment_sets/{setId}
         assignment_set_id, created_by, created_at, filename,
         num_tables, num_sessions, participant_data     # frozen roster snapshot
@@ -97,6 +104,7 @@ Every route below takes `?program_id=<id>` and is gated by `validate_program_acc
 | POST | `/api/assignments/seating/{session_number}` |
 | GET | `/api/roster/` |
 | POST | `/api/roster/generate` → `{"assignment_set_id": ...}` |
+| PUT | `/api/roster/order` (declared before `/{participant_id}`, which would swallow it) |
 | PUT | `/api/roster/{participant_id}` |
 | DELETE | `/api/roster/{participant_id}` |
 
@@ -110,6 +118,18 @@ read it straight off `useCanonicalRoster`, with no `useKeepApart` + id→name re
 current version's per-session `absentParticipants`, not stored on `participant_data`. The
 Roster page's locked "Away" column mirrors it. The dormant roster-document `absent_sessions`
 field is not read while a set exists and may drift.
+
+**Roster order is stored, as `position` on each roster document.** `get_roster` sorts by it
+in Python, not with Firestore `order_by`, which drops documents missing the field. Rows saved
+before sorting existed have none and come last by name. Every write path must keep or assign
+it:
+- `_validated_doc` passes `position` through, so restaging a `get_roster` dict keeps its place.
+- New rows (grid add, draft promotion) get `next_position`.
+- Upload stores the order the client sent, which is last-name order.
+- Discard rewrites every document under new ids, so it carries positions over by name.
+
+Order is not a mixing field, so the changeset ignores it and sorting is allowed while locked.
+It does feed the solver's input order, since `participant_data` ids are positional.
 
 ## Frontend Routes (defined in `frontend/src/App.tsx`)
 

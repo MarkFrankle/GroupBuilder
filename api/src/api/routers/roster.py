@@ -14,6 +14,7 @@ from api.services.roster_service import (
     VALID_GENDERS,
     VALID_RELIGIONS,
     get_roster_service,
+    next_position,
 )
 from api.services.roster_draft_storage import (
     RosterDraftStorage,
@@ -508,12 +509,23 @@ async def discard_roster_changes(
         if a_id in live_names and b_id in live_names
     ]
 
+    # Discard rewrites every document under a fresh uuid, so order carries over
+    # by name, like partners and keep-apart. Anyone with no live row goes last,
+    # in the order the sessions were built with.
+    live_positions = {
+        p["name"]: p["position"] for p in live_roster if p.get("position") is not None
+    }
+    tail = next_position(live_roster)
+
     for participant in live_roster:
         roster_service.delete_participant(program_id, participant["id"])
 
     new_ids = {p["name"]: str(uuid.uuid4()) for p in canonical}
     for p in canonical:
         partner_name = p.get("partner")
+        position = live_positions.get(p["name"])
+        if position is None:
+            position, tail = tail, tail + 1
         roster_service.upsert_participant(
             program_id,
             new_ids[p["name"]],
@@ -525,6 +537,7 @@ async def discard_roster_changes(
                 "is_facilitator": p.get("is_facilitator", False),
                 "keep_together": p.get("keep_together", False),
                 "absent_sessions": absent_by_name.get(p["name"], []),
+                "position": position,
             },
         )
 
@@ -612,7 +625,9 @@ async def upload_roster(
     new_ids = {key: str(uuid.uuid4()) for key in by_key}
     draft_keys = {_name_key(d.name) for d in body.drafts}
     docs = {}
-    for p in body.participants:
+    # The client sends participants in last-name order (the print rule), and
+    # that order is stored as given rather than re-derived here.
+    for position, p in enumerate(body.participants):
         key = _name_key(p.name)
         old = live_by_key.get(key, {})
         partner_key = _name_key(p.partner_name) if p.partner_name else None
@@ -632,6 +647,7 @@ async def upload_roster(
             "is_facilitator": p.is_facilitator,
             "keep_together": bool(old.get("keep_together")) if same_pair else False,
             "absent_sessions": old.get("absent_sessions") or [],
+            "position": position,
         }
 
     draft_docs = [
@@ -670,6 +686,34 @@ async def upload_roster(
     )
 
     return {"status": "replaced", "count": len(docs), "drafts": len(draft_docs)}
+
+
+class RosterOrder(BaseModel):
+    ids: list[str]
+
+
+# Declared before PUT /{participant_id}, which would otherwise take "order" as
+# a participant id.
+@router.put("/order")
+@limiter.limit("60/minute")
+async def save_order(
+    request: Request,
+    data: RosterOrder,
+    program_id: str = Depends(validate_program_access),
+    roster_service: RosterService = Depends(get_roster_service),
+):
+    """Store the grid's row order. Allowed while the roster is locked: order is
+    not a mixing field, so it can't drift the roster from the sessions."""
+    known = {p["id"] for p in roster_service.get_roster(program_id)}
+    if any(i not in known for i in data.ids):
+        raise HTTPException(
+            status_code=400,
+            detail="The roster changed while sorting. Reload the page and sort again.",
+        )
+    batch = roster_service.db.batch()
+    roster_service.stage_order(batch, program_id, data.ids)
+    batch.commit()
+    return {"status": "saved"}
 
 
 class KeepApartPair(BaseModel):
@@ -842,6 +886,7 @@ async def update_draft(
             "partner_id": partner["id"] if partner else None,
             "keep_together": False,
             "absent_sessions": updated.get("absent_sessions") or [],
+            "position": next_position(roster),
         },
     )
     if partner:
@@ -911,10 +956,11 @@ async def upsert_participant(
                 ),
             )
 
+    payload = data.model_dump()
+    if current is None:
+        payload["position"] = next_position(roster)
     try:
-        result = roster_service.upsert_participant(
-            program_id, participant_id, data.model_dump()
-        )
+        result = roster_service.upsert_participant(program_id, participant_id, payload)
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
