@@ -26,6 +26,7 @@ class GroupBuilder:
         table_overlap_cap=None,
         historical_tables=None,
         absent_ids_by_session=None,
+        forbidden_tables=None,
     ):
         """
         Initialize the GroupBuilder.
@@ -51,6 +52,10 @@ class GroupBuilder:
                                     lower-overlap arrangement exists (default: 5)
             require_different_assignments: If True, enforces hard constraint that participants CANNOT be assigned
                                           to their previous tables (fails if impossible)
+            forbidden_tables: Groups of participant ids that may not all sit at
+                              one table in this solve's first session. The
+                              shuffle passes every table the session has had,
+                              so each press finds a seating it hasn't shown.
         """
         self.participants = participants
         self.tables = range(num_tables)
@@ -92,6 +97,7 @@ class GroupBuilder:
         # program_solve.solve_program for how the router-facing, 1-indexed,
         # name-based absence_map becomes this shape.
         self.absent_ids_by_session = absent_ids_by_session or {}
+        self.forbidden_tables = [set(group) for group in (forbidden_tables or [])]
 
         # Configurable solver parameters (can be overridden by env vars or constructor args)
         self.pairing_window_size = pairing_window_size or int(
@@ -197,6 +203,7 @@ class GroupBuilder:
         # No table has more than one participant from a religion than any other table
         self._add_participant_attribute_distribution_constraint("gender", self.genders)
         self._add_facilitator_constraints()
+        self._add_forbidden_table_constraints()
 
     def _add_participant_attribute_distribution_constraint(
         self, attribute_name, attribute_set
@@ -240,6 +247,37 @@ class GroupBuilder:
                     max_participants_per_attribute[(s, attribute_value)]
                     - min_participants_per_attribute[(s, attribute_value)]
                     <= 1
+                )
+
+    def _add_forbidden_table_constraints(self):
+        """No whole forbidden group may sit together at one table in session 0.
+
+        The current seating's groups are always forbidden when a shuffle passes
+        current tables, in strict and soft mode alike. Without this, soft mode
+        returns the same groups renumbered: it reads as "something happened"
+        when nothing did. Callers can add more groups via forbidden_tables.
+
+        Only session 0: this exists for single-session shuffles.
+        """
+        if 0 not in self.sessions:
+            return
+
+        groups = defaultdict(set)
+        for p_id, table_number in self.current_table_assignments.items():
+            groups[table_number].add(p_id)
+
+        present = {p["id"] for p in self._present(0)}
+        for group in list(groups.values()) + self.forbidden_tables:
+            members = [p_id for p_id in group if p_id in present]
+            if len(members) < 2:
+                continue
+            for t in self.tables:
+                self.model.Add(
+                    sum(
+                        self.participant_table_assignments[(p_id, 0, t)]
+                        for p_id in members
+                    )
+                    <= len(members) - 1
                 )
 
     def _add_facilitator_constraints(self):
@@ -522,31 +560,6 @@ class GroupBuilder:
                     f"Added HARD constraints: {len(self.current_table_assignments)} participants "
                     f"CANNOT be assigned to their previous tables"
                 )
-
-                # The per-participant constraint above only forbids each
-                # person's own previous table *index* - it does nothing to
-                # stop a whole table's membership from moving verbatim to a
-                # different index, which reads as "nothing changed" even
-                # though it technically satisfies the constraint. Forbid
-                # each previous table's full membership from landing
-                # together at any table in the new session.
-                previous_tables = defaultdict(list)
-                absent_now = self.absent_ids_by_session.get(0, set())
-                for p_id, table_number in self.current_table_assignments.items():
-                    if p_id not in absent_now:
-                        previous_tables[table_number].append(p_id)
-                if 0 in self.sessions:
-                    for members in previous_tables.values():
-                        if len(members) < 2:
-                            continue
-                        for t in self.tables:
-                            self.model.Add(
-                                sum(
-                                    self.participant_table_assignments[(p_id, 0, t)]
-                                    for p_id in members
-                                )
-                                <= len(members) - 1
-                            )
             else:
                 # SOFT CONSTRAINT: Penalize same table assignments
                 # This gives users the feeling that "something happened" when they click regenerate

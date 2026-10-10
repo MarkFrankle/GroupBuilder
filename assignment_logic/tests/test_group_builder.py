@@ -597,6 +597,72 @@ class TestGroupBuilder:
         }
         assert before.isdisjoint(after)
 
+    def _six_people(self):
+        return [
+            {
+                "id": i,
+                "name": f"P{i}",
+                "religion": "Christian",
+                "gender": "Male",
+                "couple_id": None,
+            }
+            for i in range(1, 7)
+        ]
+
+    def test_soft_mode_never_returns_a_pure_rotation(self):
+        """The shuffle's fallback runs in soft mode. Without the whole-group
+        rule, renumbering the current groups is free while any real change
+        pays repeat penalties, so the solver returns a rotation and the user
+        sees 'something happened' when nothing did."""
+        participants = self._six_people()
+        groups = [[1, 2], [3, 4], [5, 6]]
+        current_table_assignments = {
+            p_id: table for table, members in enumerate(groups) for p_id in members
+        }
+        # Make every cross-group pair expensive, so a rotation is the
+        # cheapest seating unless it is forbidden.
+        historical_meeting_counts = {}
+        for g1, g2 in combinations(groups, 2):
+            for p1 in g1:
+                for p2 in g2:
+                    historical_meeting_counts[tuple(sorted((p1, p2)))] = 1
+
+        builder = GroupBuilder(
+            participants,
+            num_tables=3,
+            num_sessions=1,
+            current_table_assignments=current_table_assignments,
+            require_different_assignments=False,
+            historical_meeting_counts=historical_meeting_counts,
+        )
+        result = builder.generate_assignments(max_time_seconds=10)
+
+        assert result["status"] == "success"
+        after = {
+            frozenset(p["name"] for p in t)
+            for t in result["assignments"][0]["tables"].values()
+        }
+        before = {frozenset(f"P{i}" for i in g) for g in groups}
+        assert before.isdisjoint(after)
+
+    def test_forbidden_tables_are_never_reseated_together(self):
+        participants = self._six_people()
+        forbidden = [{1, 2}, {3, 4}, {5, 6}, {1, 3}, {2, 5}]
+
+        builder = GroupBuilder(
+            participants,
+            num_tables=3,
+            num_sessions=1,
+            forbidden_tables=forbidden,
+        )
+        result = builder.generate_assignments(max_time_seconds=10)
+
+        assert result["status"] == "success"
+        name_to_id = {p["name"]: p["id"] for p in participants}
+        for seated in result["assignments"][0]["tables"].values():
+            ids = {name_to_id[p["name"]] for p in seated}
+            assert not any(group <= ids for group in forbidden)
+
     def test_soft_constraint_allows_same_assignments(self):
         """Test that without require_different_assignments, same assignments are allowed if optimal"""
         participants = [

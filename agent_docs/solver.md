@@ -38,6 +38,23 @@ a bare set of pairs under-restricts a downstream solve once a program's cap is a
 `extract_pairings_from_sessions` in `api/src/api/services/program_solve.py` returns counts for
 this reason. Don't reintroduce a `set()` at a call site that feeds a hard cap.
 
+## Symmetry breaking and shuffles
+
+**`_add_symmetry_breaking` is only valid when every table is interchangeable.** It pins one
+participant to table 0. A single-session shuffle passes `current_table_assignments`, which
+breaks that symmetry: strict mode forbids each person their table number, and soft mode charges
+for keeping it. With the pin on, the strict shuffle was infeasible whenever the pinned person
+already sat at table 0 (always true for session 1 of a fresh plan), and the soft fallback
+returned the same groups renumbered. `generate_assignments` now skips the pin whenever there are
+current tables. Any new per-table input (a cost or constraint tied to a table index) must skip it
+too.
+
+"Different seating" means different groups, never different table numbers.
+`_add_forbidden_table_constraints` forbids each current group, plus every group in
+`forbidden_tables`, from sitting together again, in both modes. The shuffle endpoint passes
+every table the session has had in the assignment set, so repeated presses don't flip between
+two seatings.
+
 ## Writing solver tests
 
 Keep them under 5 seconds: 4 to 8 people, 1 or 2 tables, 1 session is the usual shape.
