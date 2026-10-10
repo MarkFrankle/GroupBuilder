@@ -31,6 +31,9 @@ jsdom does no layout, so no test catches a break in either of these. Look at it 
   ancestor traps `position: sticky`, so the grid renders a raw `<table>` (`ui/Table` wraps
   itself in `overflow-auto`) and its wrapper scrolls sideways only below `lg`. Wrapping the
   grid in anything with overflow set breaks the sticky header.
+- **Sticky elements need `bg-card` or `bg-white`, never `bg-background`.** The app doesn't
+  define `--background` (see `styles/index.css`), so `bg-background` is transparent and rows
+  show through as they scroll under it.
 
 ## Backend Stack
 

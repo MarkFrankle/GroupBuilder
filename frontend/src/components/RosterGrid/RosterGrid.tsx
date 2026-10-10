@@ -279,7 +279,7 @@ export function RosterGrid({
             clipped ordinary names. The widths add up to the card's inner width
             (max-w-4xl less padding), and min-w scrolls rather than crushes. */}
         <table className="w-full caption-bottom text-sm table-fixed min-w-[842px]">
-          <TableHeader className="[&_th]:sticky [&_th]:top-12 [&_th]:z-10 [&_th]:bg-background">
+          <TableHeader className="[&_th]:sticky [&_th]:top-12 [&_th]:z-10 [&_th]:bg-card">
             <TableRow>
               <SortableHead column="name" label="Name" sort={sort} onSort={onSort} className="w-[180px]" />
               <SortableHead column="religion" label="Religion" sort={sort} onSort={onSort} className="w-[112px]" />
