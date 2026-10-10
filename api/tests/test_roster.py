@@ -100,6 +100,45 @@ class TestGetRoster:
         assert len(data["participants"]) == 1
         assert data["participants"][0]["name"] == "Alice"
 
+    def test_orders_by_position(self, client):
+        from api.services.roster_service import RosterService
+
+        service = RosterService()
+        for pid, name, position in [("a", "Zed", 0), ("b", "Amy", 2), ("c", "Max", 1)]:
+            service.upsert_participant(
+                "test_org_id",
+                pid,
+                {
+                    "name": name,
+                    "religion": "Other",
+                    "gender": "Other",
+                    "position": position,
+                },
+            )
+
+        names = [p["name"] for p in service.get_roster("test_org_id")]
+        assert names == ["Zed", "Max", "Amy"]
+
+    def test_rows_without_a_position_come_last_by_name(self, client):
+        """Rosters saved before sorting existed have no positions."""
+        from api.services.roster_service import RosterService
+
+        service = RosterService()
+        service.upsert_participant(
+            "test_org_id", "a", {"name": "zoe", "religion": "Other", "gender": "Other"}
+        )
+        service.upsert_participant(
+            "test_org_id", "b", {"name": "Bea", "religion": "Other", "gender": "Other"}
+        )
+        service.upsert_participant(
+            "test_org_id",
+            "c",
+            {"name": "Yan", "religion": "Other", "gender": "Other", "position": 0},
+        )
+
+        names = [p["name"] for p in service.get_roster("test_org_id")]
+        assert names == ["Yan", "Bea", "zoe"]
+
 
 class TestUpsertParticipant:
     def test_creates_participant(self, client):
