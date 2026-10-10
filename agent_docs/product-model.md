@@ -65,6 +65,12 @@ after that the grid owns the roster again. Re-uploading is the main repair step.
 keep-apart rules and a pair's keep-together setting carry over only for names that come over
 (spacing and capitalization don't count, spelling does).
 
+**Rows only move when the coordinator moves them.** The order on screen is the order stored. A
+column header click sorts once and saves the result, and editing never re-sorts. An upload
+arrives in last-name order, the printed roster's rule. Picking a partner pulls them under the
+row being edited, and that move is saved too. Sorting works while the roster is locked,
+because order isn't a mixing field.
+
 **Drafts are uploaded people who aren't on the roster yet,** because their religion or gender
 couldn't be read. They live on the server (`roster_drafts` on the Program document), never as
 roster documents, so every roster document stays complete and solvable. Each draft saves itself

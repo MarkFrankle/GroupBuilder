@@ -115,6 +115,14 @@ function HelpPage() {
             nickname to tell them apart.
           </p>
 
+          <p className="mb-1 text-slate-700 leading-relaxed font-bold">Sorting the roster:</p>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            Click any column heading to sort the roster by it. Click it again to
+            reverse the order. The order is saved, so the roster looks the same next
+            time. Sorting by <strong>Name</strong> uses last names, like the printed
+            roster. You can sort even when the roster is locked.
+          </p>
+
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Adding characteristics:</p>
           <p className="mb-4 text-slate-700 leading-relaxed">
             Each participant has a <strong>Religion</strong> dropdown (Christian, Jewish,
@@ -210,7 +218,7 @@ function HelpPage() {
             Group Builder shows you a preview and guesses what each column holds. If a guess is wrong, pick
             the right one from the menu above that column. Cells it couldn't read are highlighted in red.
             You can answer them in the preview, where one answer fixes every cell with the same text, or
-            later on the roster.
+            later on the roster. Your roster arrives sorted by last name.
           </p>
           <p className="mb-2 text-slate-700 leading-relaxed">
             People with unanswered cells are added as drafts, listed under <strong>Not saved yet</strong> at
