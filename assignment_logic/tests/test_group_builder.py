@@ -421,9 +421,7 @@ class TestGroupBuilder:
                 "couple_id": None,
             },
         ]
-
-        # Forbid Bob (id=2, not the first participant) from table 1
-        # Symmetry breaking fixes Alice (id=1) to table 0, so we can't forbid her
+        # Forbid Bob (id=2) from table 1
         current_table_assignments = {
             2: 1,  # Bob at table 1 - will be forbidden from table 1
         }
@@ -457,44 +455,41 @@ class TestGroupBuilder:
         ), f"Hard constraint should prevent Bob from being at table 1, but he's at table {bob_table}"
 
     def test_require_different_assignments_impossible_case(self):
-        """Test graceful failure when different assignments are impossible"""
-        # Create a scenario where it's impossible to change assignments:
-        # Only 2 participants and 2 tables - only 2 valid arrangements exist (A,B) or (B,A)
-        # If we lock them to (A,B) with couples constraint, (B,A) may be infeasible
+        """Test graceful failure when different assignments are impossible.
+
+        One table: nobody can leave their current table. (This used to be a
+        separated couple at two tables, which only failed because the
+        symmetry pin held John at table 0. The swap keeps them apart and is
+        legal.)
+        """
         participants = [
             {
                 "id": 1,
                 "name": "John",
                 "religion": "Christian",
                 "gender": "Male",
-                "couple_id": 1,
+                "couple_id": None,
             },
             {
                 "id": 2,
                 "name": "Jane",
                 "religion": "Christian",
                 "gender": "Female",
-                "couple_id": 1,
+                "couple_id": None,
             },
         ]
 
-        # Current assignment: John at table 0, Jane at table 1 (couples separated)
-        current_table_assignments = {
-            1: 0,  # John at table 0
-            2: 1,  # Jane at table 1
-        }
+        current_table_assignments = {1: 0, 2: 0}
 
         builder = GroupBuilder(
             participants,
-            num_tables=2,
+            num_tables=1,
             num_sessions=1,
             current_table_assignments=current_table_assignments,
             require_different_assignments=True,
         )
         result = builder.generate_assignments(max_time_seconds=5)
 
-        # With hard constraint and couple separation, this should fail
-        # (swapping would put the couple together, which violates couple constraint)
         assert result["status"] == "failure"
 
     def test_require_different_assignments_forbids_table_rotation(self):
@@ -524,8 +519,6 @@ class TestGroupBuilder:
         ]
         groups = [[4, 5, 6], [7, 8, 9], [1, 2, 3]]  # tables 0, 1, 2
 
-        # Symmetry breaking pins participant id 1 to table 0, so id 1's
-        # previous table must not be 0 or that alone conflicts.
         current_table_assignments = {
             p_id: table for table, members in enumerate(groups) for p_id in members
         }
@@ -556,6 +549,53 @@ class TestGroupBuilder:
             "hard constraint and the pairwise cap - the solver should "
             "report that as infeasible, not silently return it."
         )
+
+    def test_shuffle_of_a_fresh_plans_first_session_is_feasible(self):
+        """Regression: the symmetry pin put participant 1 at table 0 while
+        require_different_assignments forbade them their current table. A
+        fresh plan always seats participant 1 at table 0 in session 1 (the
+        same pin built it), so every shuffle of session 1 was infeasible and
+        fell back to returning the same groups renumbered."""
+        participants = [
+            {
+                "id": i,
+                "name": f"P{i}",
+                "religion": "Christian",
+                "gender": "Male",
+                "couple_id": None,
+            }
+            for i in range(1, 10)
+        ]
+        name_to_id = {p["name"]: p["id"] for p in participants}
+
+        plan = GroupBuilder(participants, num_tables=3, num_sessions=2)
+        built = plan.generate_assignments(max_time_seconds=10)
+        assert built["status"] == "success"
+        session_1 = built["assignments"][0]["tables"]
+
+        current_table_assignments = {
+            name_to_id[p["name"]]: table - 1
+            for table, seated in session_1.items()
+            for p in seated
+        }
+        assert current_table_assignments[1] == 0  # the trap is set
+
+        shuffle = GroupBuilder(
+            participants,
+            num_tables=3,
+            num_sessions=1,
+            current_table_assignments=current_table_assignments,
+            require_different_assignments=True,
+        )
+        result = shuffle.generate_assignments(max_time_seconds=10)
+
+        assert result["status"] == "success"
+        before = {frozenset(p["name"] for p in t) for t in session_1.values()}
+        after = {
+            frozenset(p["name"] for p in t)
+            for t in result["assignments"][0]["tables"].values()
+        }
+        assert before.isdisjoint(after)
 
     def test_soft_constraint_allows_same_assignments(self):
         """Test that without require_different_assignments, same assignments are allowed if optimal"""

@@ -122,8 +122,14 @@ class GroupBuilder:
         self._add_constraints_to_model()
         logger.info("Adding objective functions to model")
         self._add_objective_functions_to_model()
-        logger.info("Adding symmetry breaking constraints")
-        self._add_symmetry_breaking()
+        # Symmetry breaking assumes every table is interchangeable. A shuffle's
+        # current tables break that: strict mode forbids each person their
+        # table number, and soft mode charges for keeping it. Pinning anyone
+        # then cuts valid seatings, and when the pinned person already sits at
+        # table 0 it makes the strict shuffle infeasible outright.
+        if not self.current_table_assignments:
+            logger.info("Adding symmetry breaking constraints")
+            self._add_symmetry_breaking()
         logger.info("Running solver")
         return self._run_solver(max_time_seconds=max_time_seconds)
 
