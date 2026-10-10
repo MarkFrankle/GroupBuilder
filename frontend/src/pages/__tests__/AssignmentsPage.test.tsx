@@ -403,7 +403,7 @@ describe('AssignmentsPage', () => {
     await userEvent.click(within(session2).getByRole('button', { name: /shuffle/i }))
 
     const receipt = await screen.findByText(/Session 2 shuffled\./)
-    expect(receipt).toHaveTextContent('2 of 4 people moved')
+    expect(receipt).toHaveTextContent('4 of 4 people have new tablemates')
     expect(receipt).toHaveTextContent('sessions 1, 3 unchanged')
   })
 

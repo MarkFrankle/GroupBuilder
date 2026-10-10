@@ -26,15 +26,21 @@ function people(assignment: Assignment): Participant[] {
   )
 }
 
-/** Which table each person sat at in one session. */
-function seatingByName(assignment: Assignment): Map<string, number> {
-  const seating = new Map<string, number>()
+/**
+ * Who each person sat with in one session, as a comparable key. Table numbers
+ * carry no meaning to a seating, so a renumbering must compare equal.
+ */
+function tablematesByName(assignment: Assignment): Map<string, string> {
+  const mates = new Map<string, string>()
   tableNumbers(assignment).forEach(n => {
-    assignment.tables[n].forEach(p => {
-      if (p) seating.set(p.name, n)
+    const names = assignment.tables[n]
+      .filter((p): p is Participant => !!p)
+      .map(p => p.name)
+    names.forEach(name => {
+      mates.set(name, names.filter(other => other !== name).sort().join('\x00'))
     })
   })
-  return seating
+  return mates
 }
 
 /**
@@ -99,10 +105,11 @@ function sessionRepeatPairs(assignments: Assignment[], sessionNumber: number): n
 /**
  * Item 8's three-clause receipt.
  *
- * The moved count answers the question a user actually has after pressing
- * shuffle — did anything happen? A globally-aware re-solve can legitimately
- * return something close to what was there, and this degrades honestly:
- * "2 of 24 moved" is the truth, and tells the user to shuffle again.
+ * The new-tablemates count answers the question a user actually has after
+ * pressing shuffle: did anything happen? It counts by who sits together, not
+ * by table number: a renumbering is not a change. A globally-aware re-solve
+ * can legitimately return something close to what was there, and this
+ * degrades honestly: "4 of 24 have new tablemates" is the truth.
  *
  * The quality delta is scoped to the shuffled session, not the whole program:
  * a program-wide repeat count can stay flat across a shuffle when the change
@@ -120,15 +127,18 @@ export function shuffleReceipt(
   const afterSession = after.find(a => a.session === sessionNumber)
   if (!beforeSession || !afterSession) return `Session ${sessionNumber} shuffled.`
 
-  const wasSeated = seatingByName(beforeSession)
-  const nowSeated = seatingByName(afterSession)
+  const hadMates = tablematesByName(beforeSession)
+  const hasMates = tablematesByName(afterSession)
   const total = people(afterSession).length
-  let moved = 0
-  nowSeated.forEach((table, name) => {
-    if (wasSeated.get(name) !== table) moved += 1
+  let changed = 0
+  hasMates.forEach((mates, name) => {
+    if (hadMates.get(name) !== mates) changed += 1
   })
 
-  const clauses = [`${moved} of ${total} ${total === 1 ? 'person' : 'people'} moved`]
+  // Always "have": tablemate changes come in pairs, so exactly one is impossible.
+  const clauses = [
+    `${changed} of ${total} ${total === 1 ? 'person' : 'people'} have new tablemates`,
+  ]
 
   const untouched = after
     .map(a => a.session)
