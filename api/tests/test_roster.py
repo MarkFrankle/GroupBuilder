@@ -176,6 +176,49 @@ class TestUpsertParticipant:
         assert response.status_code == 200
         assert response.json()["name"] == "Alice Updated"
 
+    def test_a_new_row_joins_the_bottom(self, client, add_roster_to_firestore):
+        from api.services.roster_service import RosterService
+
+        add_roster_to_firestore(_draft(2))
+        client.put(
+            "/api/roster/order?program_id=test_org_id", json={"ids": ["p1", "p0"]}
+        )
+
+        for pid, name in [("new1", "Zed"), ("new2", "Aaron")]:
+            client.put(
+                f"/api/roster/{pid}?program_id=test_org_id",
+                json={
+                    "name": name,
+                    "religion": "Other",
+                    "gender": "Other",
+                    "partner_id": None,
+                },
+            )
+
+        names = [p["name"] for p in RosterService().get_roster("test_org_id")]
+        assert names == ["Person1", "Person0", "Zed", "Aaron"]
+
+    def test_an_edit_keeps_the_row_in_place(self, client, add_roster_to_firestore):
+        from api.services.roster_service import RosterService
+
+        add_roster_to_firestore(_draft(2))
+        client.put(
+            "/api/roster/order?program_id=test_org_id", json={"ids": ["p1", "p0"]}
+        )
+
+        client.put(
+            "/api/roster/p1?program_id=test_org_id",
+            json={
+                "name": "Zara",
+                "religion": "Jewish",
+                "gender": "Male",
+                "partner_id": None,
+            },
+        )
+
+        names = [p["name"] for p in RosterService().get_roster("test_org_id")]
+        assert names == ["Zara", "Person0"]
+
     def test_rejects_invalid_data(self, client):
         response = client.put(
             "/api/roster/p1?program_id=test_org_id",
@@ -1633,6 +1676,26 @@ class TestRosterDrafts:
         roster = self._roster()
         assert roster["Grace"]["partner_id"] == "p0"
         assert roster["Person0"]["partner_id"] == "d1"
+
+    def test_a_saved_draft_joins_the_bottom_and_its_partner_keeps_its_place(
+        self, client, add_roster_to_firestore
+    ):
+        add_roster_to_firestore(_draft(2))
+        client.put(
+            "/api/roster/order?program_id=test_org_id", json={"ids": ["p1", "p0"]}
+        )
+        self._seed(
+            [
+                self._draft("d1", "Zed", partner_name="Person0"),
+                self._draft("d2", "Aaron"),
+            ]
+        )
+
+        client.put(self._url("d1"), json={"religion": "Christian"})
+        client.put(self._url("d2"), json={"religion": "Christian"})
+
+        roster = list(self._roster())
+        assert roster == ["Person1", "Person0", "Zed", "Aaron"]
 
     def test_refuses_a_name_already_on_the_roster(
         self, client, add_roster_to_firestore

@@ -14,6 +14,7 @@ from api.services.roster_service import (
     VALID_GENDERS,
     VALID_RELIGIONS,
     get_roster_service,
+    next_position,
 )
 from api.services.roster_draft_storage import (
     RosterDraftStorage,
@@ -870,6 +871,7 @@ async def update_draft(
             "partner_id": partner["id"] if partner else None,
             "keep_together": False,
             "absent_sessions": updated.get("absent_sessions") or [],
+            "position": next_position(roster),
         },
     )
     if partner:
@@ -939,10 +941,11 @@ async def upsert_participant(
                 ),
             )
 
+    payload = data.model_dump()
+    if current is None:
+        payload["position"] = next_position(roster)
     try:
-        result = roster_service.upsert_participant(
-            program_id, participant_id, data.model_dump()
-        )
+        result = roster_service.upsert_participant(program_id, participant_id, payload)
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
