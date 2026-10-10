@@ -126,6 +126,15 @@ class RosterService:
         for pid, data in docs.items():
             batch.set(collection.document(pid), data)
 
+    def stage_order(self, batch, program_id: str, ids: list[str]) -> None:
+        """Add a write per id setting its position to its index. Merge only:
+        nothing but the order changes."""
+        collection = self._roster_collection(program_id)
+        for position, participant_id in enumerate(ids):
+            batch.set(
+                collection.document(participant_id), {"position": position}, merge=True
+            )
+
     def delete_participant(self, program_id: str, participant_id: str):
         self._roster_collection(program_id).document(participant_id).delete()
 

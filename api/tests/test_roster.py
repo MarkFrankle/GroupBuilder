@@ -1724,3 +1724,41 @@ class TestUniqueNames:
         )
 
         assert response.status_code == 200
+
+
+class TestSaveOrder:
+    """``PUT /roster/order`` stores the grid's row order."""
+
+    URL = "/api/roster/order?program_id=test_org_id"
+
+    def _roster(self):
+        from api.services.roster_service import RosterService
+
+        return RosterService().get_roster("test_org_id")
+
+    def test_rewrites_the_order(self, client, add_roster_to_firestore):
+        add_roster_to_firestore(_draft(3))
+
+        # A 200 also proves the route isn't shadowed by PUT /{participant_id},
+        # which would refuse this body with a 422.
+        response = client.put(self.URL, json={"ids": ["p2", "p0", "p1"]})
+
+        assert response.status_code == 200
+        assert [p["name"] for p in self._roster()] == ["Person2", "Person0", "Person1"]
+
+    def test_refuses_an_id_not_on_the_roster(self, client, add_roster_to_firestore):
+        add_roster_to_firestore(_draft(2))
+
+        response = client.put(self.URL, json={"ids": ["p1", "ghost"]})
+
+        assert response.status_code == 400
+        assert [p["name"] for p in self._roster()] == ["Person0", "Person1"]
+
+    def test_leaves_other_fields_alone(self, client, add_roster_to_firestore):
+        add_roster_to_firestore(_draft(2))
+
+        client.put(self.URL, json={"ids": ["p1", "p0"]})
+
+        by_id = {p["id"]: p for p in self._roster()}
+        assert by_id["p0"]["name"] == "Person0"
+        assert by_id["p0"]["religion"] == "Christian"

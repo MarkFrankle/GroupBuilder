@@ -672,6 +672,34 @@ async def upload_roster(
     return {"status": "replaced", "count": len(docs), "drafts": len(draft_docs)}
 
 
+class RosterOrder(BaseModel):
+    ids: list[str]
+
+
+# Declared before PUT /{participant_id}, which would otherwise take "order" as
+# a participant id.
+@router.put("/order")
+@limiter.limit("60/minute")
+async def save_order(
+    request: Request,
+    data: RosterOrder,
+    program_id: str = Depends(validate_program_access),
+    roster_service: RosterService = Depends(get_roster_service),
+):
+    """Store the grid's row order. Allowed while the roster is locked: order is
+    not a mixing field, so it can't drift the roster from the sessions."""
+    known = {p["id"] for p in roster_service.get_roster(program_id)}
+    if any(i not in known for i in data.ids):
+        raise HTTPException(
+            status_code=400,
+            detail="The roster changed while sorting. Reload the page and sort again.",
+        )
+    batch = roster_service.db.batch()
+    roster_service.stage_order(batch, program_id, data.ids)
+    batch.commit()
+    return {"status": "saved"}
+
+
 class KeepApartPair(BaseModel):
     a_id: str
     b_id: str
