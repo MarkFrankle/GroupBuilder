@@ -375,11 +375,20 @@ const AssignmentsPage: React.FC = () => {
           await refusalDetail(response, 'Could not shuffle this session. Please try again.')
         )
       }
-      return sessionNumber
+      const body = await response.json()
+      return { sessionNumber, unchanged: body.assignments_unchanged === true }
     },
     onMutate: (sessionNumber: number) => setShufflingSession(sessionNumber),
     onSettled: () => setShufflingSession(null),
-    onSuccess: async (sessionNumber: number) => {
+    onSuccess: async ({ sessionNumber, unchanged }) => {
+      if (unchanged) {
+        // No version was written, so there is nothing to undo or refetch.
+        showNotice({
+          tone: 'info',
+          message: `Session ${sessionNumber} is unchanged. No seating it hasn't already had fits the rules.`,
+        }, sessionNumber)
+        return
+      }
       invalidateAll()
       // No queryFn: this reads the results query useAssignmentResults already
       // registered, which is why both sides build the key from the same helper.
