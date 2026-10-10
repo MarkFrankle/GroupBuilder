@@ -509,12 +509,23 @@ async def discard_roster_changes(
         if a_id in live_names and b_id in live_names
     ]
 
+    # Discard rewrites every document under a fresh uuid, so order carries over
+    # by name, like partners and keep-apart. Anyone with no live row goes last,
+    # in the order the sessions were built with.
+    live_positions = {
+        p["name"]: p["position"] for p in live_roster if p.get("position") is not None
+    }
+    tail = next_position(live_roster)
+
     for participant in live_roster:
         roster_service.delete_participant(program_id, participant["id"])
 
     new_ids = {p["name"]: str(uuid.uuid4()) for p in canonical}
     for p in canonical:
         partner_name = p.get("partner")
+        position = live_positions.get(p["name"])
+        if position is None:
+            position, tail = tail, tail + 1
         roster_service.upsert_participant(
             program_id,
             new_ids[p["name"]],
@@ -526,6 +537,7 @@ async def discard_roster_changes(
                 "is_facilitator": p.get("is_facilitator", False),
                 "keep_together": p.get("keep_together", False),
                 "absent_sessions": absent_by_name.get(p["name"], []),
+                "position": position,
             },
         )
 
@@ -613,7 +625,9 @@ async def upload_roster(
     new_ids = {key: str(uuid.uuid4()) for key in by_key}
     draft_keys = {_name_key(d.name) for d in body.drafts}
     docs = {}
-    for p in body.participants:
+    # The client sends participants in last-name order (the print rule), and
+    # that order is stored as given rather than re-derived here.
+    for position, p in enumerate(body.participants):
         key = _name_key(p.name)
         old = live_by_key.get(key, {})
         partner_key = _name_key(p.partner_name) if p.partner_name else None
@@ -633,6 +647,7 @@ async def upload_roster(
             "is_facilitator": p.is_facilitator,
             "keep_together": bool(old.get("keep_together")) if same_pair else False,
             "absent_sessions": old.get("absent_sessions") or [],
+            "position": position,
         }
 
     draft_docs = [

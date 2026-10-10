@@ -1247,6 +1247,29 @@ class TestDiscard:
         # The ids are new, and that is the point of the name matching above.
         assert not ({p["id"] for p in roster} & {p["id"] for p in draft})
 
+    def test_keeps_the_live_order_by_name(
+        self, client, add_assignment_set_to_firestore, add_roster_to_firestore
+    ):
+        """Discard rewrites every document, so order carries over by name.
+        Someone with no live row goes last."""
+        from api.services.roster_service import RosterService
+
+        add_assignment_set_to_firestore(
+            {"participant_data": _canonical(3), "num_tables": 1, "num_sessions": 2}
+        )
+        draft = _draft(3)
+        draft[0]["name"] = "Typo"
+        add_roster_to_firestore(draft)
+        client.put(
+            "/api/roster/order?program_id=test_org_id",
+            json={"ids": ["p2", "p0", "p1"]},
+        )
+
+        client.post("/api/roster/discard?program_id=test_org_id")
+
+        names = [p["name"] for p in RosterService().get_roster("test_org_id")]
+        assert names == ["Person2", "Person1", "Person0"]
+
     def test_reseeds_absent_sessions_from_the_discarded_set(
         self,
         client,
@@ -1453,6 +1476,13 @@ class TestUploadRoster:
 
         assert response.status_code == 200
         assert sorted(self._roster()) == ["Ana", "Ben"]
+
+    def test_keeps_the_order_it_was_sent_in(self, client):
+        self._upload(
+            client, [self._person("Cy"), self._person("Ana"), self._person("Ben")]
+        )
+
+        assert list(self._roster()) == ["Cy", "Ana", "Ben"]
 
     def test_writes_drafts_beside_the_roster(self, client):
         draft = self._person("Grace", religion=None)
