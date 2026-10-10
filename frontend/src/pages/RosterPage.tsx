@@ -24,7 +24,7 @@ import {
   upsertParticipant, deleteParticipant as apiDeleteParticipant,
   generateFromRoster, discardRosterChanges,
   addKeepApart, removeKeepApart,
-  uploadRoster, updateRosterDraft, deleteRosterDraft, RosterUpload,
+  uploadRoster, updateRosterDraft, deleteRosterDraft, RosterUpload, saveRosterOrder,
 } from '@/api/roster';
 import {
   useRoster, useAssignmentSetMetadata, useCanonicalRoster, useKeepApart, useRosterDrafts,
@@ -34,7 +34,8 @@ import { useProgram } from '@/contexts/ProgramContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { MAX_TABLES, MAX_SESSIONS } from '@/constants';
 import { AlertCircle, HelpCircle, Loader2, Pencil } from 'lucide-react';
-import { movePartnerAdjacent, sortPartnersAdjacent } from '@/utils/sortWithPartnerAdjacency';
+import { movePartnerAdjacent } from '@/utils/sortWithPartnerAdjacency';
+import { RosterSort, RosterSortColumn, sortRoster } from '@/utils/rosterSort';
 import { generateTestParticipants } from '@/utils/seedTestRoster';
 
 type SaveStatus = 'saved' | 'saving' | 'error';
@@ -145,6 +146,8 @@ export function RosterPage() {
   // worth remembering, and a reload should put the guard back.
   const [armed, setArmed] = useState(false);
   const [upload, setUpload] = useState<LoadedRoster | null>(null);
+  // Only for the header arrow. Rows are sorted once per click, never kept sorted.
+  const [sort, setSort] = useState<RosterSort | null>(null);
 
   // "Add test data" renders into the top nav bar (next to Admin) so it's out
   // of the way of roster screenshots. The slot div is in NavBar (App.tsx) and
@@ -165,7 +168,8 @@ export function RosterPage() {
 
   useEffect(() => {
     if (rosterData) {
-      setParticipants(sortPartnersAdjacent(rosterData));
+      // The server's order is the order shown. Nothing reorders on load.
+      setParticipants(rosterData);
     }
   }, [rosterData]);
 
@@ -176,6 +180,14 @@ export function RosterPage() {
     const oldParticipant = participants.find(p => p.id === id);
     const oldPartnerId = oldParticipant?.partner_id;
     const newPartnerId = data.partner_id;
+    // Picking a partner pulls them under this row. That's the one order change
+    // no header click made, so it's saved here.
+    const pulledUp = newPartnerId && newPartnerId !== oldPartnerId
+      ? movePartnerAdjacent(
+          participants.map(p => (p.id === id ? { ...p, partner_id: newPartnerId } : p)),
+          id,
+        )
+      : null;
 
     try {
       await upsertParticipant(currentProgram!.id, id, data);
@@ -200,6 +212,9 @@ export function RosterPage() {
               );
               return movePartnerAdjacent(updated, id);
             });
+            if (pulledUp && pulledUp.some((p, i) => p.id !== participants[i]?.id)) {
+              await saveRosterOrder(currentProgram!.id, pulledUp.map(p => p.id));
+            }
           }
         }
       }
@@ -209,6 +224,22 @@ export function RosterPage() {
       setSaveStatus('error');
     }
   }, [participants, currentProgram]);
+
+  const handleSort = useCallback(async (column: RosterSortColumn) => {
+    const direction = sort?.column === column && sort.direction === 'asc' ? 'desc' : 'asc';
+    const next = sortRoster(participants, column, direction);
+    setSort({ column, direction });
+    setParticipants(next);
+    setSaveStatus('saving');
+    try {
+      await saveRosterOrder(currentProgram!.id, next.map(p => p.id));
+      // Marked stale, not refetched: a refetch would overwrite rows still saving.
+      queryClient.invalidateQueries({ queryKey: ['roster', currentProgram!.id], refetchType: 'none' });
+      setSaveStatus('saved');
+    } catch {
+      setSaveStatus('error');
+    }
+  }, [sort, participants, currentProgram, queryClient]);
 
   const handleDelete = useCallback(async (id: string) => {
     setSaveStatus('saving');
@@ -382,6 +413,7 @@ export function RosterPage() {
   const handleImport = async (data: RosterUpload) => {
     await uploadRoster(currentProgram!.id, data);
     setUpload(null);
+    setSort({ column: 'name', direction: 'asc' });
     queryClient.invalidateQueries({ queryKey: ['roster', currentProgram!.id] });
     queryClient.invalidateQueries({ queryKey: ['roster-drafts', currentProgram!.id] });
     queryClient.invalidateQueries({ queryKey: ['keep-apart', currentProgram!.id] });
@@ -552,6 +584,8 @@ export function RosterPage() {
             drafts={drafts}
             onDraftChange={handleDraftChange}
             onDraftDelete={handleDraftDelete}
+            sort={sort}
+            onSort={handleSort}
           />
 
           {changeset.isDirty && <ChangesetPanel changeset={changeset} />}
