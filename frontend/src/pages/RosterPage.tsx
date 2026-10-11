@@ -455,11 +455,12 @@ export function RosterPage() {
   // A draft can only be fixed in an editable grid, so drafts keep the page unlocked.
   const locked = !!currentSet && !changeset.isDirty && !armed && drafts.length === 0;
 
-  // Post-build the assignment set owns absences, so the locked Away column is a
-  // mirror of the set's per-session absences (served on the canonical roster),
-  // not of the dormant roster-document field, which is allowed to drift.
+  // Post-build the assignment set owns absences, so the Away column mirrors the
+  // set's per-session absences (served on the canonical roster) whether locked
+  // or not. The dormant roster-document field is allowed to drift, and showing
+  // it once the roster was unlocked made a stale value look editable.
   const gridParticipants = (() => {
-    if (!locked) return participants;
+    if (!currentSet) return participants;
     const absentByName = new Map(
       (canonical?.participants ?? []).map(p => [p.name, p.absent_sessions ?? []]),
     );
@@ -586,6 +587,7 @@ export function RosterPage() {
             onDraftDelete={handleDraftDelete}
             sort={sort}
             onSort={handleSort}
+            absencesReadOnly={!!currentSet}
           />
 
           {changeset.isDirty && <ChangesetPanel changeset={changeset} />}

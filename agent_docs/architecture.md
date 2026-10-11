@@ -116,8 +116,10 @@ read it straight off `useCanonicalRoster`, with no `useKeepApart` + id→name re
 
 **It also returns `absent_sessions` per participant.** This is derived at request time from the
 current version's per-session `absentParticipants`, not stored on `participant_data`. The
-Roster page's locked "Away" column mirrors it. The dormant roster-document `absent_sessions`
-field is not read while a set exists and may drift.
+Roster page's "Away" column mirrors it whenever a set exists, locked or unlocked, as inert text with a
+hover pointing to the Assignments page. The dormant roster-document `absent_sessions` field is
+not read while a set exists and may drift. An editable Away cell post-build saved absences that
+no shuffle or rebuild ever saw.
 
 **Roster order is stored, as `position` on each roster document.** `get_roster` sorts by it
 in Python, not with Firestore `order_by`, which drops documents missing the field. Rows saved
