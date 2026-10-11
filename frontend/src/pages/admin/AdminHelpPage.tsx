@@ -60,7 +60,7 @@ export function AdminHelpPage() {
 
         {/* ===================== Section 1: Getting Started ===================== */}
         <section className="mb-12">
-          <h2 id="getting-started" className="text-2xl font-bold mb-4 scroll-mt-8">
+          <h2 id="getting-started" className="text-2xl font-bold mb-4 scroll-mt-16">
             Getting Started as an Admin
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
@@ -96,7 +96,7 @@ export function AdminHelpPage() {
 
         {/* ===================== Section 2: Creating a Program ===================== */}
         <section className="mb-12">
-          <h2 id="creating-a-program" className="text-2xl font-bold mb-4 scroll-mt-8">
+          <h2 id="creating-a-program" className="text-2xl font-bold mb-4 scroll-mt-16">
             Creating a Program
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
@@ -149,7 +149,7 @@ export function AdminHelpPage() {
 
         {/* ===================== Section 3: Managing a Program ===================== */}
         <section className="mb-12">
-          <h2 id="managing-a-program" className="text-2xl font-bold mb-4 scroll-mt-8">
+          <h2 id="managing-a-program" className="text-2xl font-bold mb-4 scroll-mt-16">
             Managing a Program
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
@@ -204,7 +204,7 @@ export function AdminHelpPage() {
 
         {/* ===================== Section 4: Deleting a Program ===================== */}
         <section className="mb-12">
-          <h2 id="deleting-a-program" className="text-2xl font-bold mb-4 scroll-mt-8">
+          <h2 id="deleting-a-program" className="text-2xl font-bold mb-4 scroll-mt-16">
             Deleting a Program
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
@@ -233,7 +233,7 @@ export function AdminHelpPage() {
 
         {/* ===================== Section 5: Onboarding a New Facilitator ===================== */}
         <section className="mb-12">
-          <h2 id="onboarding-facilitators" className="text-2xl font-bold mb-4 scroll-mt-8">
+          <h2 id="onboarding-facilitators" className="text-2xl font-bold mb-4 scroll-mt-16">
             Onboarding a New Facilitator: What They'll Experience
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
@@ -312,7 +312,7 @@ export function AdminHelpPage() {
 
         {/* ===================== Section 6: Logins, Sharing, and Who Can See What ===================== */}
         <section className="mb-12">
-          <h2 id="logins-and-access" className="text-2xl font-bold mb-4 scroll-mt-8">
+          <h2 id="logins-and-access" className="text-2xl font-bold mb-4 scroll-mt-16">
             Logins, Sharing, and Who Can See What
           </h2>
 
@@ -372,7 +372,7 @@ export function AdminHelpPage() {
 
         {/* ===================== Section 7: Quick Reference ===================== */}
         <section className="mb-12">
-          <h2 id="quick-reference" className="text-2xl font-bold mb-4 scroll-mt-8">
+          <h2 id="quick-reference" className="text-2xl font-bold mb-4 scroll-mt-16">
             Common Admin Tasks
           </h2>
 
@@ -406,7 +406,7 @@ export function AdminHelpPage() {
 
         {/* ===================== Section 8: Troubleshooting ===================== */}
         <section className="mb-12">
-          <h2 id="troubleshooting" className="text-2xl font-bold mb-4 scroll-mt-8">
+          <h2 id="troubleshooting" className="text-2xl font-bold mb-4 scroll-mt-16">
             Troubleshooting
           </h2>
 
