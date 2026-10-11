@@ -6,6 +6,12 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from '@/components/ui/tooltip';
+
+/** Shown on the cells and the column header once sessions are built. */
+export const ABSENCES_ON_ASSIGNMENTS = 'Change absences on the Assignments page.';
 
 interface AwayCellProps {
   name: string;
@@ -13,9 +19,9 @@ interface AwayCellProps {
    * ignored for display — a mark left over from a since-reduced session count. */
   absentSessions: number[];
   numSessions: number;
-  /** Locked: the sessions were built from this roster. The cell shows the
-   * mirror as plain text — inert, like every other locked field. Absences are
-   * managed on the Assignments page instead. */
+  /** Set once sessions are built, locked or not. The plan owns absences from
+   * then on, so the cell is inert text with a hover pointing to Assignments.
+   * Saving from the roster would write a field nothing reads after the build. */
   readOnly: boolean;
   onChange: (next: number[]) => void;
 }
@@ -44,7 +50,16 @@ export function AwayCell({
   }`;
 
   if (readOnly) {
-    return <span className={triggerClass}>{text}</span>;
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span tabIndex={0} className={`${triggerClass} cursor-help`}>{text}</span>
+          </TooltipTrigger>
+          <TooltipContent>{ABSENCES_ON_ASSIGNMENTS}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
   }
 
   const toggle = (n: number) => {

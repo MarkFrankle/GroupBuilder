@@ -62,14 +62,23 @@ describe('AwayCell editing', () => {
   });
 });
 
-describe('AwayCell locked', () => {
-  test('shows the mirror text as plain, inert text', () => {
+describe('AwayCell after the build', () => {
+  test('shows the absences as inert text with a question-mark cursor', () => {
     render(<AwayCell {...base} readOnly absentSessions={[2]} />);
     const cell = screen.getByText('Misses session 2');
-    expect(cell.tagName).toBe('SPAN');
+    expect(cell).toHaveClass('cursor-help');
     fireEvent.click(cell);
     fireEvent.keyDown(cell, { key: 'Enter' });
     expect(screen.queryByRole('menuitemcheckbox')).toBeNull();
     expect(screen.queryByRole('button')).toBeNull();
+    expect(base.onChange).not.toHaveBeenCalled();
+  });
+
+  test('hovering it says where absences are changed', async () => {
+    render(<AwayCell {...base} readOnly absentSessions={[2]} />);
+    screen.getByText('Misses session 2').focus();
+    expect(
+      (await screen.findAllByText('Change absences on the Assignments page.')).length
+    ).toBeGreaterThan(0);
   });
 });

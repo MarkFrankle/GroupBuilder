@@ -154,7 +154,8 @@ function HelpPage() {
             roster, use the <strong>Absences</strong> column on their row and tick the
             sessions they'll miss. The first build works around those absences. After
             you've built your sessions, new absences are managed per session on the
-            Assignments page instead, and the Absences column becomes a read-only summary.
+            Assignments page instead, and the Absences column becomes a read-only summary,
+            even while you edit the roster.
           </p>
 
           <p className="mb-1 text-slate-700 leading-relaxed font-bold">Deleting a participant:</p>

@@ -765,8 +765,8 @@ describe('the Keep apart block', () => {
 
 /**
  * The Away column. Editable before the first build (autosaves like every other
- * field); a read-only, inert mirror of the assignment set's per-session
- * absences afterward — same as every other locked field.
+ * field). Afterward, locked or not, it is inert text mirroring the assignment
+ * set's per-session absences, with a hover pointing to the Assignments page.
  */
 describe('the Away column', () => {
   const alice = {
@@ -841,6 +841,44 @@ describe('the Away column', () => {
 
     const cell = await screen.findByText('Misses session 2');
     fireEvent.click(cell);
+    expect(screen.queryByRole('menuitemcheckbox')).toBeNull();
+  });
+
+  test('post-build: the column header explains where absences are changed', async () => {
+    mockProgram({ draft: [alice, bob], canonical: [alice, bob] });
+    renderPage();
+
+    (await screen.findByRole('button', { name: 'About absences' })).focus();
+    expect(
+      (await screen.findAllByText('Change absences on the Assignments page.')).length
+    ).toBeGreaterThan(0);
+  });
+
+  test('pre-build: the column header has no explanation', async () => {
+    mockProgram({ draft: [alice, bob], canonical: null });
+    renderPage();
+    await screen.findByDisplayValue('Alice');
+
+    expect(screen.queryByRole('button', { name: 'About absences' })).toBeNull();
+  });
+
+  // The roster document's absent_sessions is dormant once a set exists. Editing
+  // it after the build used to save an absence that nothing ever read, so a
+  // shuffle or rebuild seated the person anyway.
+  test('post-build, editing: the cell still mirrors the set and stays inert', async () => {
+    mockProgram({
+      draft: [{ ...alice, absent_sessions: [3] }, bob],
+      canonical: [alice, bob],
+      canonicalAbsences: { Alice: [2] },
+    });
+    renderPage();
+    await screen.findByDisplayValue('Alice');
+
+    await userEvent.click(await screen.findByRole('button', { name: /edit roster/i }));
+
+    expect(screen.queryByText('Misses session 3')).toBeNull();
+    const cell = screen.getByText('Misses session 2');
+    fireEvent.keyDown(cell, { key: 'Enter' });
     expect(screen.queryByRole('menuitemcheckbox')).toBeNull();
   });
 });

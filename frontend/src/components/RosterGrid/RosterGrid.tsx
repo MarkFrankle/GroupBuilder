@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef, ReactNode } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -8,9 +8,12 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { PersonCombobox } from '@/components/ui/PersonCombobox';
-import { Trash2, Link, Unlink, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Trash2, Link, Unlink, ArrowUp, ArrowDown, ArrowUpDown, HelpCircle } from 'lucide-react';
 import { DraftPatch, RosterDraft, RosterParticipant, Religion, Gender, RELIGIONS, GENDERS } from '@/types/roster';
-import { AwayCell } from './AwayCell';
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { AwayCell, ABSENCES_ON_ASSIGNMENTS } from './AwayCell';
 import { DraftRow } from './DraftRow';
 import { nameKey } from '@/utils/rosterImport';
 import { RosterSort, RosterSortColumn } from '@/utils/rosterSort';
@@ -35,6 +38,9 @@ interface RosterGridProps {
   sort?: RosterSort | null;
   /** Header clicks. Live even when readOnly: order isn't a mixing field. */
   onSort?: (column: RosterSortColumn) => void;
+  /** Set once sessions are built, locked or not. The Away column then shows
+   * the plan's absences as inert text rather than editing. */
+  absencesReadOnly?: boolean;
 }
 
 interface EmptyRowState {
@@ -49,12 +55,14 @@ const EMPTY_ROW: EmptyRowState = {
   name: '', religion: 'Other', gender: 'Other', partner_id: null, is_facilitator: false,
 };
 
-function SortableHead({ column, label, sort, onSort, className }: {
+function SortableHead({ column, label, sort, onSort, className, hint }: {
   column: RosterSortColumn;
   label: string;
   sort?: RosterSort | null;
   onSort?: (column: RosterSortColumn) => void;
   className?: string;
+  /** Sits beside the sort button, outside it, so it never sorts. */
+  hint?: ReactNode;
 }) {
   const active = sort?.column === column ? sort.direction : null;
   const Icon = active === 'asc' ? ArrowUp : active === 'desc' ? ArrowDown : ArrowUpDown;
@@ -74,6 +82,7 @@ function SortableHead({ column, label, sort, onSort, className }: {
           className={`h-3.5 w-3.5 shrink-0 ${active ? '' : 'opacity-0 group-hover/sort:opacity-50'}`}
         />
       </button>
+      {hint}
     </TableHead>
   );
 }
@@ -94,6 +103,7 @@ export function RosterGrid({
   onDraftDelete,
   sort,
   onSort,
+  absencesReadOnly = false,
 }: RosterGridProps) {
 
   const [editingNames, setEditingNames] = useState<Record<string, string>>({});
@@ -286,7 +296,29 @@ export function RosterGrid({
               <SortableHead column="gender" label="Gender" sort={sort} onSort={onSort} className="w-[106px]" />
               <SortableHead column="partner" label="Partner" sort={sort} onSort={onSort} className="w-[168px]" />
               <SortableHead column="facilitator" label="Facilitator" sort={sort} onSort={onSort} className="w-[92px] px-2" />
-              <SortableHead column="absences" label="Absences" sort={sort} onSort={onSort} className="w-[136px]" />
+              <SortableHead
+                column="absences"
+                label="Absences"
+                sort={sort}
+                onSort={onSort}
+                className="w-[136px]"
+                hint={absencesReadOnly && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="ml-1 align-middle text-muted-foreground hover:text-foreground"
+                          aria-label="About absences"
+                        >
+                          <HelpCircle className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>{ABSENCES_ON_ASSIGNMENTS}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              />
               <TableHead className="w-[48px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -394,7 +426,7 @@ export function RosterGrid({
                       name={p.name}
                       absentSessions={p.absent_sessions ?? []}
                       numSessions={numSessions}
-                      readOnly={readOnly}
+                      readOnly={absencesReadOnly}
                       onChange={next => handleAwayChange(p, next)}
                     />
                   </TableCell>
