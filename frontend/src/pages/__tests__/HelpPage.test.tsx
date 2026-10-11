@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 import HelpPage from '../HelpPage';
 
 const renderPage = () => render(<BrowserRouter><HelpPage /></BrowserRouter>);
@@ -18,7 +18,7 @@ describe('HelpPage', () => {
       'Reading Your Assignments',
       'Running Your Sessions',
       'How Good Are the Assignments: Reading the Banner',
-      'Changing a Plan',
+      'Changing Assignments',
       'Troubleshooting',
     ];
     for (const name of sectionNames) {
@@ -51,5 +51,20 @@ describe('HelpPage', () => {
     renderPage();
     // Info callout explaining the login-link expiry
     expect(screen.getAllByText(/login links expire/).length).toBeGreaterThan(0);
+  });
+
+  // In-app navigation to /help#section doesn't scroll on its own: the browser
+  // only jumps to a hash on a full page load.
+  test('opening with a section in the address scrolls to that heading', () => {
+    const scrolled: Element[] = [];
+    Element.prototype.scrollIntoView = jest.fn(function (this: Element) {
+      scrolled.push(this);
+    });
+    render(
+      <MemoryRouter initialEntries={['/help#running-your-sessions']}>
+        <HelpPage />
+      </MemoryRouter>,
+    );
+    expect(scrolled).toContain(screen.getByRole('heading', { name: 'Running Your Sessions' }));
   });
 });

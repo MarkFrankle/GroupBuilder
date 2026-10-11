@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { ArrowUp } from "lucide-react";
 import { Screenshot, WarningCallout, InfoCallout } from "../components/HelpCallouts";
 
@@ -7,11 +9,18 @@ const tocItems = [
   { id: "viewing-your-groups", label: "Reading Your Assignments" },
   { id: "running-your-sessions", label: "Running Your Sessions" },
   { id: "reading-the-banner", label: "How Good Are the Assignments: Reading the Banner" },
-  { id: "editing-sessions", label: "Changing a Plan" },
+  { id: "editing-sessions", label: "Changing Assignments" },
   { id: "troubleshooting", label: "Troubleshooting" },
 ];
 
 function HelpPage() {
+  // The browser only jumps to a #section on a full page load. Links from inside
+  // the app (the post-build nudge, the welcome page) arrive without one.
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (hash) document.getElementById(hash.slice(1))?.scrollIntoView();
+  }, [hash]);
+
   return (
     <div className="min-h-screen bg-white print:bg-white">
       <div className="max-w-[700px] mx-auto px-4 py-8 sm:py-12">
@@ -44,7 +53,7 @@ function HelpPage() {
 
         {/* ===================== Section 1: Welcome to Group Builder ===================== */}
         <section className="mb-12">
-          <h2 id="welcome-to-group-builder" className="text-2xl font-bold mb-4 scroll-mt-8">
+          <h2 id="welcome-to-group-builder" className="text-2xl font-bold mb-4 scroll-mt-16">
             Welcome to Group Builder
           </h2>
 
@@ -86,7 +95,7 @@ function HelpPage() {
 
         {/* ===================== Section 2: Creating Your Roster ===================== */}
         <section className="mb-12">
-          <h2 id="creating-your-roster" className="text-2xl font-bold mb-4 scroll-mt-8">
+          <h2 id="creating-your-roster" className="text-2xl font-bold mb-4 scroll-mt-16">
             Creating Your Roster
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
@@ -205,7 +214,8 @@ function HelpPage() {
             If you already have your participants in Excel or Google Sheets, click{' '}
             <strong>Upload roster</strong> and choose the file. Save it as .xlsx or .csv first. Any column
             order works, and the first row should hold your column titles. If your sessions are already
-            built, click <strong>Edit roster</strong> first.
+            built, click <strong>Edit roster</strong> first. Group Builder reads names, religion, gender,
+            facilitator and partner. Absences aren't uploaded, so tick them in the Absences column afterward.
           </p>
           <p className="mb-2 text-slate-700 leading-relaxed">
             Group Builder shows you a preview and guesses what each column holds. If a guess is wrong, pick
@@ -252,21 +262,6 @@ function HelpPage() {
             Nothing changes until you click <strong>Save and rebuild sessions</strong>.
           </p>
 
-          <h4 className="text-lg font-semibold mb-2">Rebuilding while the program is ongoing</h4>
-          <p className="mb-4 text-slate-700 leading-relaxed">
-            If you've already held at least one session and need to change the
-            roster, you can rebuild your assignments without changing history.
-            Make sure all past sessions are{" "}
-            <a href="#marking-sessions-complete" className="text-blue-600 hover:text-blue-800 underline">
-              marked complete
-            </a>{" "}
-            before clicking <strong>Save and rebuild sessions</strong>. Group
-            Builder will build groups for the remaining sessions using your
-            updated roster, leaving your completed sessions exactly as they
-            were. It still remembers who already sat together in those
-            sessions, so it won't seat the same pair twice just because the
-            rebuild started fresh.
-          </p>
           <WarningCallout>
             <p>
               When the rebuild finishes, a banner appears at the top of the
@@ -283,7 +278,7 @@ function HelpPage() {
 
         {/* ===================== Section 3: Reading Your Assignments ===================== */}
         <section className="mb-12">
-          <h2 id="viewing-your-groups" className="text-2xl font-bold mb-4 scroll-mt-8">
+          <h2 id="viewing-your-groups" className="text-2xl font-bold mb-4 scroll-mt-16">
             Reading Your Assignments
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
@@ -355,7 +350,7 @@ function HelpPage() {
 
         {/* ===================== Section 4: Running Your Sessions ===================== */}
         <section className="mb-12">
-          <h2 id="running-your-sessions" className="text-2xl font-bold mb-4 scroll-mt-8">
+          <h2 id="running-your-sessions" className="text-2xl font-bold mb-4 scroll-mt-16">
             Running Your Sessions
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
@@ -366,7 +361,7 @@ function HelpPage() {
             session to try for better mixing, or mark someone <strong>absent</strong>{" "}
             when they can't make it. See{" "}
             <a href="#editing-sessions" className="text-blue-600 hover:text-blue-800 underline">
-              Changing a Plan
+              Changing Assignments
             </a>{" "}
             below for both.
           </p>
@@ -409,7 +404,9 @@ function HelpPage() {
             don't have Group Builder accounts, use the PDF method above instead.
           </p>
 
-          <h3 className="text-xl font-semibold mt-8 mb-2">Marking a session complete</h3>
+          <h3 id="marking-sessions-complete" className="text-xl font-semibold mt-8 mb-2 scroll-mt-16">
+            Marking a session complete
+          </h3>
           <p className="mb-4 text-slate-700 leading-relaxed">
             When a meeting night has happened, press <strong>Mark complete</strong> in
             that session's header. The session collapses to a single line and moves
@@ -418,18 +415,34 @@ function HelpPage() {
             Press the arrow on a completed line to expand the session and look at who sat where.
           </p>
           <p className="mb-4 text-slate-700 leading-relaxed">
-            A completed session cannot be changed. Shuffling it and editing it are refused,
-            the past stays as it happened. If you complete any sessions and then change your 
-            roster and rebuild assignments, the completed sesssions will stay as they were.
+            A completed session cannot be changed. Shuffling it and editing it are refused.
+            The past stays as it happened. If you complete any sessions and then change your
+            roster and rebuild assignments, the completed sessions will stay as they were.
             If you marked one complete by mistake, press <strong>Reopen</strong> on
             it, or press <strong>Undo</strong> on the line that appears at the top
             right after you mark complete.
+          </p>
+
+          <h3 className="text-xl font-semibold mt-8 mb-2">Rebuilding while the program is ongoing</h3>
+          <p className="mb-4 text-slate-700 leading-relaxed">
+            If you've already held at least one session and need to change the
+            roster, you can rebuild your assignments without changing history.
+            Make sure all past sessions are{" "}
+            <a href="#marking-sessions-complete" className="text-blue-600 hover:text-blue-800 underline">
+              marked complete
+            </a>{" "}
+            before clicking <strong>Save and rebuild sessions</strong>. Group
+            Builder will build groups for the remaining sessions using your
+            updated roster, leaving your completed sessions exactly as they
+            were. It still remembers who already sat together in those
+            sessions, so it won't seat the same pair twice just because the
+            rebuild started fresh.
           </p>
         </section>
 
         {/* ===================== Section 5: How Good Are the Assignments ===================== */}
         <section className="mb-12">
-          <h2 id="reading-the-banner" className="text-2xl font-bold mb-4 scroll-mt-8">
+          <h2 id="reading-the-banner" className="text-2xl font-bold mb-4 scroll-mt-16">
             How Good Are the Assignments: Reading the Banner
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">
@@ -488,9 +501,9 @@ function HelpPage() {
           </p>
         </section>
 
-        {/* ===================== Section 6: Changing a Plan ===================== */}
+        {/* ===================== Section 6: Changing Assignments ===================== */}
         <section className="mb-12">
-          <h2 id="editing-sessions" className="text-2xl font-bold mb-4 scroll-mt-8">
+          <h2 id="editing-sessions" className="text-2xl font-bold mb-4 scroll-mt-16">
             Changing Assignments
           </h2>
 
@@ -507,7 +520,9 @@ function HelpPage() {
             people have new tablemates, which sessions were left alone, and how many
             pairs now sit together more than once. That same line offers{' '}
             <strong>Undo</strong>. Pressing it puts back the arrangement you had before
-            the shuffle. If no new seating fits the rules, the line says so and
+            the shuffle. Undo is for when the new seating is worse for your room. Maybe it
+            puts a pair together a second time, or you've already printed and handed out
+            the old charts. If no new seating fits the rules, the line says so and
             nothing changes.
           </p>
 
@@ -579,7 +594,7 @@ function HelpPage() {
 
         {/* ===================== Section 7: Troubleshooting ===================== */}
         <section className="mb-12">
-          <h2 id="troubleshooting" className="text-2xl font-bold mb-4 scroll-mt-8">
+          <h2 id="troubleshooting" className="text-2xl font-bold mb-4 scroll-mt-16">
             Troubleshooting
           </h2>
           <p className="mb-4 text-slate-700 leading-relaxed">

@@ -266,7 +266,7 @@ const AssignmentsPage: React.FC = () => {
       tone: 'info',
       message: "Assignments created. New to this? Here's how session management works.",
       actions: [
-        { label: 'Show me', onClick: () => navigate('/help#editing-sessions') },
+        { label: 'Show me', onClick: () => navigate('/help#running-your-sessions') },
       ],
       onDismiss: () => localStorage.setItem(nudgeKey(uid), 'true'),
     })
